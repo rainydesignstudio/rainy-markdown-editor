@@ -21,7 +21,7 @@
   },
   "source": {
     "unsavedTitle": "未保存文稿",
-    "info": "点击文件修改基本信息",
+    "info": "点击修改文稿信息",
     "showLines": "显示行号",
     "hideLines": "隐藏行号",
     "find": "查找替换（⌘F / Ctrl+F）",
@@ -33,7 +33,8 @@
     "metadataReadOnly": "元数据错误时正文只读",
     "notStored": "文章尚未保存到资料目录；保存前不会生成文章文件。",
     "lineToggle": "{{action}}（⌘/ / Ctrl+/）",
-    "diagnosticsUnavailable": "撰写诊断暂不可用：{{message}}"
+    "diagnosticsUnavailable": "撰写诊断暂不可用：{{message}}",
+    "saveRefreshPreview": "保存刷新预览"
   },
   "workspace": {
     "panes": "窄屏编辑与预览切换",
@@ -63,9 +64,7 @@
     "options": "预览选项",
     "scrollSync": "预览滚动对齐",
     "saveReport": "保存时显示格式检查",
-    "saveOnly": "仅保存时刷新预览",
-    "frozen": "预览保留于上次保存；成功保存后刷新。",
-    "frozenSyncPaused": "预览保留于上次保存；源码已变化，滚动对齐暂停至保存。"
+    "saveOnly": "仅保存时刷新预览"
   },
   "clipboard": {
     "title": "剪贴板接收区",
@@ -104,7 +103,7 @@
     "label": "插入元素",
     "readOnly": "归档文档只读",
     "unavailable": "当前无法插入元素",
-    "images": "图片",
+    "images": "素材",
     "fromLibrary": "从素材库选择",
     "chooseImage": "选择图片",
     "snippets": "片段库",

@@ -1,30 +1,60 @@
-import snippetsIndex from '../../resources/template/fresh-library/snippets/index.json' with { type: 'json' };
-import templatesIndex from '../../resources/template/fresh-library/templates/index.json' with { type: 'json' };
-import seedSnippet0 from '../../resources/template/fresh-library/snippets/default/callout.json' with { type: 'json' };
-import seedSnippet1 from '../../resources/template/fresh-library/snippets/default/captioned-image.json' with { type: 'json' };
-import seedSnippet2 from '../../resources/template/fresh-library/snippets/default/half-break.json' with { type: 'json' };
-import seedSnippet3 from '../../resources/template/fresh-library/snippets/default/horizontal-scroll.json' with { type: 'json' };
-import seedSnippet4 from '../../resources/template/fresh-library/snippets/default/image-pair.json' with { type: 'json' };
-import seedSnippet5 from '../../resources/template/fresh-library/snippets/default/rich-blockquote.json' with { type: 'json' };
-import seedSnippet6 from '../../resources/template/fresh-library/snippets/default/signature.json' with { type: 'json' };
-import seedSnippet7 from '../../resources/template/fresh-library/snippets/default/table-merged.json' with { type: 'json' };
-import seedSnippet8 from '../../resources/template/fresh-library/snippets/zixu/zixu-blockquote.json' with { type: 'json' };
-import seedSnippet9 from '../../resources/template/fresh-library/snippets/zixu/zixu-chapter.json' with { type: 'json' };
-import seedSnippet10 from '../../resources/template/fresh-library/snippets/zixu/zixu-entry.json' with { type: 'json' };
-import seedSnippet11 from '../../resources/template/fresh-library/snippets/zixu/zixu-index.json' with { type: 'json' };
-import seedSnippet12 from '../../resources/template/fresh-library/snippets/zixu/zixu-note.json' with { type: 'json' };
-import seedSnippet13 from '../../resources/template/fresh-library/snippets/zixu/zixu-opening.json' with { type: 'json' };
-import seedSnippet14 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-chapter.json' with { type: 'json' };
-import seedSnippet15 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-closing.json' with { type: 'json' };
-import seedSnippet16 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-opening-ii.json' with { type: 'json' };
-import seedSnippet17 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-opening.json' with { type: 'json' };
-import seedSnippet18 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-quote.json' with { type: 'json' };
-import seedSnippet19 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-section.json' with { type: 'json' };
-import seedTemplate0 from '../../resources/template/fresh-library/templates/default/markdown-guide.md';
-import seedTemplate1 from '../../resources/template/fresh-library/templates/default/project-review.md';
-import seedTemplate2 from '../../resources/template/fresh-library/templates/default/tutorial.md';
-import seedTemplate3 from '../../resources/template/fresh-library/templates/theme-samples/rainy-design-sample-ii.md';
-import seedTemplate4 from '../../resources/template/fresh-library/templates/theme-samples/rainy-design-sample.md';
+import enSnippetsIndex from '../../resources/template/fresh-library/en-US/snippets/index.json' with { type: 'json' };
+import enTemplatesIndex from '../../resources/template/fresh-library/en-US/templates/index.json' with { type: 'json' };
+import enSeedSnippet0 from '../../resources/template/fresh-library/en-US/snippets/default/callout.json' with { type: 'json' };
+import enSeedSnippet1 from '../../resources/template/fresh-library/en-US/snippets/default/captioned-image.json' with { type: 'json' };
+import enSeedSnippet2 from '../../resources/template/fresh-library/en-US/snippets/default/half-break.json' with { type: 'json' };
+import enSeedSnippet3 from '../../resources/template/fresh-library/en-US/snippets/default/horizontal-scroll.json' with { type: 'json' };
+import enSeedSnippet4 from '../../resources/template/fresh-library/en-US/snippets/default/image-pair.json' with { type: 'json' };
+import enSeedSnippet5 from '../../resources/template/fresh-library/en-US/snippets/default/rich-blockquote.json' with { type: 'json' };
+import enSeedSnippet6 from '../../resources/template/fresh-library/en-US/snippets/default/signature.json' with { type: 'json' };
+import enSeedSnippet7 from '../../resources/template/fresh-library/en-US/snippets/default/table-merged.json' with { type: 'json' };
+import enSeedSnippet8 from '../../resources/template/fresh-library/en-US/snippets/zixu/zixu-blockquote.json' with { type: 'json' };
+import enSeedSnippet9 from '../../resources/template/fresh-library/en-US/snippets/zixu/zixu-chapter.json' with { type: 'json' };
+import enSeedSnippet10 from '../../resources/template/fresh-library/en-US/snippets/zixu/zixu-entry.json' with { type: 'json' };
+import enSeedSnippet11 from '../../resources/template/fresh-library/en-US/snippets/zixu/zixu-index.json' with { type: 'json' };
+import enSeedSnippet12 from '../../resources/template/fresh-library/en-US/snippets/zixu/zixu-note.json' with { type: 'json' };
+import enSeedSnippet13 from '../../resources/template/fresh-library/en-US/snippets/zixu/zixu-opening.json' with { type: 'json' };
+import enSeedSnippet14 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-chapter.json' with { type: 'json' };
+import enSeedSnippet15 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-closing.json' with { type: 'json' };
+import enSeedSnippet16 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-opening-ii.json' with { type: 'json' };
+import enSeedSnippet17 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-opening.json' with { type: 'json' };
+import enSeedSnippet18 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-quote.json' with { type: 'json' };
+import enSeedSnippet19 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-section.json' with { type: 'json' };
+import enSeedSnippet20 from '../../resources/template/fresh-library/en-US/snippets/default/horizontal-scroll-without-padding.json' with { type: 'json' };
+import enSeedTemplate0 from '../../resources/template/fresh-library/en-US/templates/default/markdown-guide.md';
+import enSeedTemplate1 from '../../resources/template/fresh-library/en-US/templates/default/project-review.md';
+import enSeedTemplate2 from '../../resources/template/fresh-library/en-US/templates/default/tutorial.md';
+import enSeedTemplate3 from '../../resources/template/fresh-library/en-US/templates/theme-samples/rainy-design-sample-ii.md';
+import enSeedTemplate4 from '../../resources/template/fresh-library/en-US/templates/theme-samples/rainy-design-sample.md';
+import zhSnippetsIndex from '../../resources/template/fresh-library/zh-CN/snippets/index.json' with { type: 'json' };
+import zhTemplatesIndex from '../../resources/template/fresh-library/zh-CN/templates/index.json' with { type: 'json' };
+import zhSeedSnippet0 from '../../resources/template/fresh-library/zh-CN/snippets/default/callout.json' with { type: 'json' };
+import zhSeedSnippet1 from '../../resources/template/fresh-library/zh-CN/snippets/default/captioned-image.json' with { type: 'json' };
+import zhSeedSnippet2 from '../../resources/template/fresh-library/zh-CN/snippets/default/half-break.json' with { type: 'json' };
+import zhSeedSnippet3 from '../../resources/template/fresh-library/zh-CN/snippets/default/horizontal-scroll.json' with { type: 'json' };
+import zhSeedSnippet4 from '../../resources/template/fresh-library/zh-CN/snippets/default/image-pair.json' with { type: 'json' };
+import zhSeedSnippet5 from '../../resources/template/fresh-library/zh-CN/snippets/default/rich-blockquote.json' with { type: 'json' };
+import zhSeedSnippet6 from '../../resources/template/fresh-library/zh-CN/snippets/default/signature.json' with { type: 'json' };
+import zhSeedSnippet7 from '../../resources/template/fresh-library/zh-CN/snippets/default/table-merged.json' with { type: 'json' };
+import zhSeedSnippet8 from '../../resources/template/fresh-library/zh-CN/snippets/zixu/zixu-blockquote.json' with { type: 'json' };
+import zhSeedSnippet9 from '../../resources/template/fresh-library/zh-CN/snippets/zixu/zixu-chapter.json' with { type: 'json' };
+import zhSeedSnippet10 from '../../resources/template/fresh-library/zh-CN/snippets/zixu/zixu-entry.json' with { type: 'json' };
+import zhSeedSnippet11 from '../../resources/template/fresh-library/zh-CN/snippets/zixu/zixu-index.json' with { type: 'json' };
+import zhSeedSnippet12 from '../../resources/template/fresh-library/zh-CN/snippets/zixu/zixu-note.json' with { type: 'json' };
+import zhSeedSnippet13 from '../../resources/template/fresh-library/zh-CN/snippets/zixu/zixu-opening.json' with { type: 'json' };
+import zhSeedSnippet14 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-chapter.json' with { type: 'json' };
+import zhSeedSnippet15 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-closing.json' with { type: 'json' };
+import zhSeedSnippet16 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-opening-ii.json' with { type: 'json' };
+import zhSeedSnippet17 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-opening.json' with { type: 'json' };
+import zhSeedSnippet18 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-quote.json' with { type: 'json' };
+import zhSeedSnippet19 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-section.json' with { type: 'json' };
+import zhSeedSnippet20 from '../../resources/template/fresh-library/zh-CN/snippets/default/horizontal-scroll-without-padding.json' with { type: 'json' };
+import zhSeedTemplate0 from '../../resources/template/fresh-library/zh-CN/templates/default/markdown-guide.md';
+import zhSeedTemplate1 from '../../resources/template/fresh-library/zh-CN/templates/default/project-review.md';
+import zhSeedTemplate2 from '../../resources/template/fresh-library/zh-CN/templates/default/tutorial.md';
+import zhSeedTemplate3 from '../../resources/template/fresh-library/zh-CN/templates/theme-samples/rainy-design-sample-ii.md';
+import zhSeedTemplate4 from '../../resources/template/fresh-library/zh-CN/templates/theme-samples/rainy-design-sample.md';
+import { readLibrarySeedLocale, resolveSeedLocale } from './librarySeeds';
 import { ProductError, productCause, productDiagnosticReference, productErrorMessage, productJoin, productMessage, productReference, type ProductMessageInfo } from "./i18n/productMessages";
 import { parseArticle } from './frontMatter';
 import { articleFormatMessage, articleFormatMessageReference, type ArticleFormatIssue } from './articleFormat';
@@ -45,23 +75,36 @@ const SAFE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 export function isContentFileId(id: string): boolean {
   return SAFE_ID.test(id);
 }
-export const DEFAULT_TEMPLATE_CATEGORIES: SnippetCategory[] = templatesIndex.categories as SnippetCategory[];
 
 const CURSOR_MARKER = '▌';
 const MAX_SNIPPET_LENGTH = 64_000;
 const MAX_TEMPLATE_LENGTH = 250_000;
 
-export const DEFAULT_SNIPPET_CATEGORIES: SnippetCategory[] = snippetsIndex.categories as SnippetCategory[];
-
-export const DEFAULT_ARTICLE_SNIPPETS: ArticleSnippet[] = ([seedSnippet0, seedSnippet1, seedSnippet2, seedSnippet3, seedSnippet4, seedSnippet5, seedSnippet6, seedSnippet7, seedSnippet8, seedSnippet9, seedSnippet10, seedSnippet11, seedSnippet12, seedSnippet13, seedSnippet14, seedSnippet15, seedSnippet16, seedSnippet17, seedSnippet18, seedSnippet19] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
-
-export const DEFAULT_ARTICLE_TEMPLATES: ArticleTemplate[] = [
-  { id: "markdown-guide", categoryId: "default", name: parseArticle(seedTemplate0).metadata.title, source: seedTemplate0 },
-  { id: "project-review", categoryId: "default", name: parseArticle(seedTemplate1).metadata.title, source: seedTemplate1 },
-  { id: "tutorial", categoryId: "default", name: parseArticle(seedTemplate2).metadata.title, source: seedTemplate2 },
-  { id: "rainy-design-sample-ii", categoryId: "theme-samples", name: parseArticle(seedTemplate3).metadata.title, source: seedTemplate3 },
-  { id: "rainy-design-sample", categoryId: "theme-samples", name: parseArticle(seedTemplate4).metadata.title, source: seedTemplate4 }
+const enSnippets: ArticleSnippet[] = ([enSeedSnippet0, enSeedSnippet1, enSeedSnippet2, enSeedSnippet3, enSeedSnippet4, enSeedSnippet5, enSeedSnippet6, enSeedSnippet7, enSeedSnippet8, enSeedSnippet9, enSeedSnippet10, enSeedSnippet11, enSeedSnippet12, enSeedSnippet13, enSeedSnippet14, enSeedSnippet15, enSeedSnippet16, enSeedSnippet17, enSeedSnippet18, enSeedSnippet19, enSeedSnippet20] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+const enTemplates: ArticleTemplate[] = [
+  { id: 'markdown-guide', categoryId: 'default', name: parseArticle(enSeedTemplate0).metadata.title, source: enSeedTemplate0 },
+  { id: 'project-review', categoryId: 'default', name: parseArticle(enSeedTemplate1).metadata.title, source: enSeedTemplate1 },
+  { id: 'tutorial', categoryId: 'default', name: parseArticle(enSeedTemplate2).metadata.title, source: enSeedTemplate2 },
+  { id: 'rainy-design-sample-ii', categoryId: 'theme-samples', name: parseArticle(enSeedTemplate3).metadata.title, source: enSeedTemplate3 },
+  { id: 'rainy-design-sample', categoryId: 'theme-samples', name: parseArticle(enSeedTemplate4).metadata.title, source: enSeedTemplate4 },
 ];
+const zhSnippets: ArticleSnippet[] = ([zhSeedSnippet0, zhSeedSnippet1, zhSeedSnippet2, zhSeedSnippet3, zhSeedSnippet4, zhSeedSnippet5, zhSeedSnippet6, zhSeedSnippet7, zhSeedSnippet8, zhSeedSnippet9, zhSeedSnippet10, zhSeedSnippet11, zhSeedSnippet12, zhSeedSnippet13, zhSeedSnippet14, zhSeedSnippet15, zhSeedSnippet16, zhSeedSnippet17, zhSeedSnippet18, zhSeedSnippet19, zhSeedSnippet20] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+const zhTemplates: ArticleTemplate[] = [
+  { id: 'markdown-guide', categoryId: 'default', name: parseArticle(zhSeedTemplate0).metadata.title, source: zhSeedTemplate0 },
+  { id: 'project-review', categoryId: 'default', name: parseArticle(zhSeedTemplate1).metadata.title, source: zhSeedTemplate1 },
+  { id: 'tutorial', categoryId: 'default', name: parseArticle(zhSeedTemplate2).metadata.title, source: zhSeedTemplate2 },
+  { id: 'rainy-design-sample-ii', categoryId: 'theme-samples', name: parseArticle(zhSeedTemplate3).metadata.title, source: zhSeedTemplate3 },
+  { id: 'rainy-design-sample', categoryId: 'theme-samples', name: parseArticle(zhSeedTemplate4).metadata.title, source: zhSeedTemplate4 },
+];
+const contentSeeds = {
+  'en-US': { snippets: enSnippets, templates: enTemplates, snippetCategories: enSnippetsIndex.categories as SnippetCategory[], templateCategories: enTemplatesIndex.categories as SnippetCategory[] },
+  'zh-CN': { snippets: zhSnippets, templates: zhTemplates, snippetCategories: zhSnippetsIndex.categories as SnippetCategory[], templateCategories: zhTemplatesIndex.categories as SnippetCategory[] },
+};
+export function getDefaultContentLibrary(locale: string = 'en-US') { return contentSeeds[resolveSeedLocale(locale)]; }
+export const DEFAULT_ARTICLE_SNIPPETS = enSnippets;
+export const DEFAULT_ARTICLE_TEMPLATES = enTemplates;
+export const DEFAULT_SNIPPET_CATEGORIES = contentSeeds['en-US'].snippetCategories;
+export const DEFAULT_TEMPLATE_CATEGORIES = contentSeeds['en-US'].templateCategories;
 
 function isNotFound(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'NotFoundError';
@@ -241,19 +284,20 @@ async function saveContentCategory(root: DirectoryHandle, kind: 'snippets' | 'te
   return category;
 }
 
-async function loadSnippetEntries(directory: DirectoryHandle): Promise<ArticleSnippetLibrary> {
+async function loadSnippetEntries(directory: DirectoryHandle, locale: string): Promise<ArticleSnippetLibrary> {
   const entries: Array<[string, FileSystemFileHandle | FileSystemDirectoryHandle]> = [];
   for await (const entry of directory.entries()) entries.push(entry);
   if (entries.length === 0) {
+    const defaults = getDefaultContentLibrary(locale);
     const folders = new Map<string, DirectoryHandle>();
-    for (const category of DEFAULT_SNIPPET_CATEGORIES) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
-    for (const snippet of DEFAULT_ARTICLE_SNIPPETS) {
+    for (const category of defaults.snippetCategories) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
+    for (const snippet of defaults.snippets) {
       const { categoryId, ...content } = snippet;
       const folder = folders.get(categoryId ?? 'default');
       if (!folder) throw new ProductError("contentLibraries.theDefaultSnippetCategoryDoesNotExist", { "categoryId": categoryId });
       await writeManagedFile(folder, `${snippet.id}.json`, JSON.stringify(content, null, 2), productReference('contentFileLabels.snippet'));
     }
-    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: DEFAULT_SNIPPET_CATEGORIES }, null, 2), productReference('contentFileLabels.categoryIndex'));
+    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: defaults.snippetCategories }, null, 2), productReference('contentFileLabels.categoryIndex'));
     for await (const entry of directory.entries()) entries.push(entry);
   }
   const snippets: ArticleSnippet[] = [];
@@ -303,7 +347,7 @@ async function loadSnippetEntries(directory: DirectoryHandle): Promise<ArticleSn
 
 export async function loadArticleSnippets(root: DirectoryHandle): Promise<ArticleSnippetLibrary> {
   await ensurePermission(root);
-  return loadSnippetEntries(await root.getDirectoryHandle('snippets', { create: true }));
+  return loadSnippetEntries(await root.getDirectoryHandle('snippets', { create: true }), await readLibrarySeedLocale(root));
 }
 
 // null creates a new file; a string identifies the saved file being updated or renamed.
@@ -355,18 +399,19 @@ export async function deleteArticleSnippet(root: DirectoryHandle, id: string): P
   await directory.removeEntry(`${id}.json`);
 }
 
-async function loadTemplateEntries(directory: DirectoryHandle): Promise<ArticleTemplateLibrary> {
+async function loadTemplateEntries(directory: DirectoryHandle, locale: string): Promise<ArticleTemplateLibrary> {
   const entries: Array<[string, FileHandle | DirectoryHandle]> = [];
   for await (const entry of directory.entries()) entries.push(entry);
   if (!entries.length) {
+    const defaults = getDefaultContentLibrary(locale);
     const folders = new Map<string, DirectoryHandle>();
-    for (const category of DEFAULT_TEMPLATE_CATEGORIES) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
-    for (const template of DEFAULT_ARTICLE_TEMPLATES) {
+    for (const category of defaults.templateCategories) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
+    for (const template of defaults.templates) {
       const folder = folders.get(template.categoryId ?? 'default');
       if (!folder) throw new ProductError("contentLibraries.theDefaultStarterTemplateCategoryDoesNotExist", { "templateCategoryId": template.categoryId });
       await writeManagedFile(folder, `${template.id}.md`, template.source, productReference('contentFileLabels.template'));
     }
-    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: DEFAULT_TEMPLATE_CATEGORIES }, null, 2), productReference('contentFileLabels.categoryIndex'));
+    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: defaults.templateCategories }, null, 2), productReference('contentFileLabels.categoryIndex'));
     for await (const entry of directory.entries()) entries.push(entry);
   }
   const templates: ArticleTemplate[] = [], issues: ContentLibraryIssue[] = [], categories: SnippetCategory[] = [];
@@ -415,7 +460,7 @@ async function loadTemplateEntries(directory: DirectoryHandle): Promise<ArticleT
 
 export async function loadArticleTemplates(root: DirectoryHandle): Promise<ArticleTemplateLibrary> {
   await ensurePermission(root);
-  return loadTemplateEntries(await root.getDirectoryHandle('templates', { create: true }));
+  return loadTemplateEntries(await root.getDirectoryHandle('templates', { create: true }), await readLibrarySeedLocale(root));
 }
 
 export async function saveArticleTemplate(root: DirectoryHandle, id: string, source: string, originalId?: string | null, categoryId?: string, onFormatIssues?: (issues: ArticleFormatIssue[]) => void): Promise<ArticleTemplate> {

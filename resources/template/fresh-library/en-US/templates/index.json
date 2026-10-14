@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "default",
+      "name": "Default",
+      "description": "Common article outlines to use as a starting point.",
+      "order": 0,
+      "icon": "folder"
+    },
+    {
+      "id": "theme-samples",
+      "name": "Theme samples",
+      "description": "Complete examples showing article themes and their matching snippets.",
+      "order": 1,
+      "icon": "book"
+    }
+  ]
+}

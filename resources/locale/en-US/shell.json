@@ -10,14 +10,16 @@
     "themes": "Themes",
     "template": "Templates",
     "assets": "Assets",
-    "settings": "Settings"
+    "settings": "Settings",
+    "knowledge": "Knowledge"
   },
   "views": {
     "articles": "Articles",
     "themes": "Article themes",
     "template": "Templates",
     "assets": "Assets",
-    "settings": "Settings"
+    "settings": "Settings",
+    "knowledge": "Knowledge"
   },
   "sidebar": {
     "expand": "Expand main sidebar",

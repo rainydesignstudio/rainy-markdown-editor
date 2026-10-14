@@ -19,11 +19,13 @@ import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { parseArticle } from '../../lib/frontMatter';
 import { useUITranslation } from './UILocaleProvider';
 import { articleCollectionLabel } from '../../lib/i18n/articleLabels';
+import { useEditingDraft } from './EditingDrafts';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useUITranslation('articles');
   const format = useFormatSnapshot();
   const controller = useEditorControllerContext();
+  useEditingDraft(controller.article.dirty ? { kind: controller.articleDraftKind, objectId: controller.currentArticleId, root: controller.directory, resume: controller.resumeCurrentDraft } : null);
   const historyArticle = controller.article;
   const historyRoot = controller.directory;
   const historyViewOpen = Boolean(
@@ -65,6 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="shell-frame">
         <MainSidebar
           view={controller.view}
+          root={controller.directory}
           mediaOperation={controller.mediaOperation}
           collapsed={mainCollapsed}
           colorMode={controller.displayedEditorAppearance.colorMode}
@@ -151,7 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         }
         setTemplateSnapshot(null);
       }} onClose={() => setTemplateSnapshot(null)} /> : null}
-      {exportSnapshot ? <ArticleExportDialog focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
+      {exportSnapshot ? <ArticleExportDialog getResourceRevision={() => controller.mediaRefreshRevisionRef.current} focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
         const current = controller.articleRef.current;
         return getFormatSnapshot().id === exportSnapshot.formatId && controller.directoryRef.current === exportSnapshot.root && controller.contentLibraryRootSessionRef.current === exportSnapshot.sessionKey
           && current.month === exportSnapshot.month && current.folder === exportSnapshot.folder

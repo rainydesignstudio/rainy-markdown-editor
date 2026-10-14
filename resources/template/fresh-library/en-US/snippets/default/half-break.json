@@ -1,0 +1,9 @@
+{
+  "id": "half-break",
+  "name": "Half-line break",
+  "trigger": "//half-break",
+  "description": "A small blank line for a little extra breathing room.",
+  "content": "<span class=\"block my-6\"></span>",
+  "icon": "snippet",
+  "categoryId": "default"
+}

@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "defaultSource": "google-fonts",
+  "repository": "https://github.com/google/fonts",
+  "commit": "66928797f271fed5ee428544e7229685e2d90127",
+  "sources": [
+    {
+      "id": "google-fonts",
+      "name": "Google Fonts"
+    },
+    {
+      "id": "jsdmirror",
+      "name": "JSDMirror"
+    }
+  ],
+  "fonts": [
+    {
+      "family": "Sen Local",
+      "file": "sen-variable.ttf",
+      "license": "sen-OFL.txt",
+      "weight": "400 800",
+      "version": "2.000",
+      "size": 50824,
+      "sha256": "5a2d5777100be28024b4f28505d678c006bc52e9d9fa78f554a1252b5f254c77",
+      "licenseSize": 4378,
+      "licenseSha256": "7a4a3e3f90c9978a6dd05e2b618e8dbcb39b1e91fe9a6fce75136cf8d3c87ed9",
+      "urls": {
+        "google-fonts": "https://raw.githubusercontent.com/google/fonts/66928797f271fed5ee428544e7229685e2d90127/ofl/sen/Sen%5Bwght%5D.ttf",
+        "jsdmirror": "https://cdn.jsdmirror.com/gh/google/fonts@66928797f271fed5ee428544e7229685e2d90127/ofl/sen/Sen%5Bwght%5D.ttf"
+      }
+    },
+    {
+      "family": "Noto Sans SC Local",
+      "file": "noto-sans-sc-variable.ttf",
+      "license": "noto-sans-sc-OFL.txt",
+      "weight": "100 900",
+      "version": "2.004-H2",
+      "size": 17772300,
+      "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+      "licenseSize": 4387,
+      "licenseSha256": "babcfe66c8a098b2fa279bc724a3a342f8124f77ce18941fbcc1bbb39823cded",
+      "urls": {
+        "google-fonts": "https://raw.githubusercontent.com/google/fonts/66928797f271fed5ee428544e7229685e2d90127/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+        "jsdmirror": "https://cdn.jsdmirror.com/gh/google/fonts@66928797f271fed5ee428544e7229685e2d90127/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+      }
+    },
+    {
+      "family": "Roboto Mono Local",
+      "file": "roboto-mono-variable.ttf",
+      "license": "roboto-mono-OFL.txt",
+      "weight": "100 700",
+      "version": "3.001",
+      "size": 183700,
+      "sha256": "66a80e79d17e4c7cabd162e2916578a4cc08fd19eef6e2a643305eae9c567b2b",
+      "licenseSize": 4394,
+      "licenseSha256": "b6cab49aed2ccfb5f63d27fd252eb0226a4bc882528ba5fdcccd593883b9bf55",
+      "urls": {
+        "google-fonts": "https://raw.githubusercontent.com/google/fonts/66928797f271fed5ee428544e7229685e2d90127/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+        "jsdmirror": "https://cdn.jsdmirror.com/gh/google/fonts@66928797f271fed5ee428544e7229685e2d90127/ofl/robotomono/RobotoMono%5Bwght%5D.ttf"
+      }
+    }
+  ]
+}

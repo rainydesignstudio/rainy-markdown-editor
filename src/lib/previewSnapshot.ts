@@ -27,9 +27,8 @@ export function retainPreviewInput(original: PreviewInput): { original: PreviewI
   return { original, input: { ...original, compiledCss: rewrite(original.compiledCss), snapshot }, dispose };
 }
 
-export function previewInputMatches(saved: PreviewInput, current: PreviewInput): boolean {
-  return saved.parsed.body === current.parsed.body && saved.parsed.canCopy === current.parsed.canCopy &&
-    saved.article.theme === current.article.theme && saved.article.themeValid === current.article.themeValid &&
-    saved.snapshot.id === current.snapshot.id && saved.compiledCss === current.compiledCss &&
-    saved.media?.sessionKey === current.media?.sessionKey;
+/** Asset arrival can refresh a saved canvas without publishing the live draft. */
+export function refreshRetainedPreviewMedia(retained: ReturnType<typeof retainPreviewInput> | null, media: ArticleMediaContext | null) {
+  if (!retained || !media?.article || !retained.original.media?.article || retained.original.media.root !== media.root || retained.original.media.article.id !== media.article.id || retained.original.media.sessionKey === media.sessionKey) return retained;
+  return { ...retained, original: { ...retained.original, media }, input: { ...retained.input, media } };
 }

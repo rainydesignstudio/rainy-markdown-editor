@@ -1,0 +1,9 @@
+{
+  "id": "signature",
+  "name": "Signature / closing",
+  "trigger": "//signature",
+  "description": "A closing note and author signature using the article theme colors.",
+  "content": "<section class=\"mt-10 pt-6 text-center\">\n  <p class=\"m-0 mb-6 border-b-2 text-article-line\"></p>\n  <p class=\"m-0 text-xl font-semibold text-article-accent\">Thanks for reading</p>\n  <p class=\"mt-2 mb-6 text-sm text-article-muted\">[Add a closing thought here]</p>\n  <p class=\"m-0 text-sm text-article-heading\"><strong class=\"font-semibold\">▌[Author / team name]</strong></p>\n  <p class=\"mt-1 mb-0 text-xs text-article-muted\">[Author introduction / contact details]</p>\n</section>",
+  "icon": "bookmark",
+  "categoryId": "default"
+}

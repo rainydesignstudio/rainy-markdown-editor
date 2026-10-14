@@ -58,16 +58,8 @@
     @apply z-30;
   }
 
-  .media-asset-dialog {
-    @apply flex max-h-full max-w-5xl flex-col overflow-hidden;
-  }
-
-  .media-asset-preview {
-    @apply grid min-h-32 min-w-0 flex-1 place-items-center overflow-hidden bg-list p-4;
-  }
-
   .media-image-dialog {
-    @apply block max-h-full max-w-full object-contain;
+    @apply block max-w-full object-contain;
   }
 
   .media-image-placeholder-dialog {

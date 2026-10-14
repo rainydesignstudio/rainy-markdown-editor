@@ -67,29 +67,36 @@ let initializer;
 function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==='copyRichText')initializer=node.initializer;ts.forEachChild(node,visit)}
 visit(ast);
 function copyFixture({ decision=true, getFile=async()=>file(), placeholder=false }={}) {
-  const writes=[],statuses=[]; let current=true,reads=0;
+  const writes=[],statuses=[],reports=[]; let current=true,reads=0;
   let began; const readStarted=new Promise(resolve=>{began=resolve});
   const snapshot={revision:7,source:'body',theme:{},directory:{},month:'2026-10',folder:'test'};
   const context={Blob,Promise,Error,requestAnimationFrame:callback=>callback(),useCallback:callback=>callback,
-    copyRequestRef:{current:0},mediaOperationRef:{current:null},articleRef:{current:{dirty:false}},previewRef:{current:{querySelector:()=>placeholder?{}:null}},
+    copyRequestRef:{current:0},mediaRefreshRevisionRef:{current:0},mediaOperationRef:{current:null},articleRef:{current:{dirty:false}},previewRef:{current:{querySelector:selector=>placeholder&&selector.includes('data-local-asset-src')?{}:null}},
     setLoadInspectionRevision(){},isReadyToCopy:true,snapshotFor:()=>snapshot,matchesSnapshot:()=>current,compiledRevision:7,compileCurrent:async()=>true,
     saveSnapshot:async()=>({ok:true,current,savedSnapshot:snapshot}),
+    publishSourceFormatReport:(snapshot,report)=>reports.push({snapshot,report}),
     inspectArticleFormatReport:async()=>({}),buildClipboardPayload:()=>payload('<p>before</p><img src="media/image/a.png"><p>middle</p><img src="media/image/b.png"><p>after</p>'),
     confirmFormatCheck:async()=>decision,embedClipboardImages,getArticleMediaDirectory:async()=>({getFileHandle:async()=>({getFile:async()=>{reads++;const result=getFile();began();return result}})}),
     setStatus:value=>statuses.push(value),ClipboardItem:class{constructor(types){this.types=types}},navigator:{clipboard:{write:async items=>writes.push(items)}},
   };
   vm.runInNewContext(ts.transpileModule(`globalThis.copy=${initializer.getText(ast)};`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,Object.assign(context, productMessages));
-  return {copy:context.copy,writes,statuses,context,readStarted,stop(){current=false},get reads(){return reads}};
+  return {copy:context.copy,writes,statuses,reports,context,readStarted,stop(){current=false},get reads(){return reads}};
 }
 
 test('formal copy writes one complete HTML/plain payload after the existing report decision; cancellation performs no image reads', async()=>{
   const f=copyFixture();await f.copy();assert.equal(f.writes.length,1);
+  assert.equal(f.reports.length,1, 'the completed copy check also updates current source diagnostics');
   const representations=f.writes[0][0].types;
   assert.deepEqual(Object.keys(representations),['text/html','text/plain']);
   const html=await representations['text/html'].text();assert.equal((html.match(/data:image\/png;base64,/g)||[]).length,2);
   assert.equal(await representations['text/plain'].text(),'before\nmiddle\nafter');assert.equal(f.statuses.at(-1).tone,'success');
   const cancelled=copyFixture({decision:false});await cancelled.copy();assert.equal(cancelled.reads,0);assert.equal(cancelled.writes.length,0);
   const failedSave=copyFixture();failedSave.context.articleRef.current.dirty=true;failedSave.context.saveSnapshot=async()=>({ok:false});await failedSave.copy();assert.equal(failedSave.reads,0);assert.equal(failedSave.writes.length,0);
+});
+
+test('resource changes during the review cancel old output before reading payloads or writing the clipboard', async () => {
+  const f = copyFixture(); f.context.confirmFormatCheck = async () => { f.context.mediaRefreshRevisionRef.current++; return true; };
+  await f.copy(); assert.equal(f.writes.length, 0); assert.equal(f.reads, 0); assert.equal(f.statuses.at(-1).tone, 'error');
 });
 
 test('formal copy retains clipboard on unreadable files, unresolved preview images and changed documents', async()=>{

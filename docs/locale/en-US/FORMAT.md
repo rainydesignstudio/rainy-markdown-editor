@@ -21,9 +21,9 @@ Settings → Local directory shows the currently loaded validation policy and al
 
 ## Bundled application resources
 
-Default UI catalogs live in `resources/locale/`, and release data in `resources/changelog.json`. Platform sources are in `resources/presets/platform/`. New-library seeds live in `resources/template/fresh-library/` using actual theme, snippet and starter directories, with no articles or history. Theme authoring starting points are in `resources/template/`.
+Default UI catalogs live in `resources/locale/`, public release data in `resources/changelog/public.json`, and local development/review notes in Git-ignored `resources/changelog/local.md`. Platform sources are in `resources/presets/platform/`. New-library seeds live in `resources/template/fresh-library/en-US/` and `zh-CN/`, each with actual theme, snippet and starter directories, and no articles or history. Theme authoring starting points are in `resources/template/`.
 
-Browser-loaded scripts remain in `public/format/` and `public/algorithm/`; fonts, images and licenses are in `public/fonts/`, `public/images/` and `public/licenses/`. The sample uses only `/images/article-sample.png`. Old root URLs and arbitrary relative images are not replaced with the sample; correct the actual snippet/template references. Bilingual prose remains in `docs/locale/`.
+Browser-loaded scripts remain in `public/format/` and `public/algorithm/`; complete font sources, sizes and hashes live in the [font manifest](../../../resources/font-sources.json), downloading only into authorized libraries. `public/fonts/` retains three OFL texts; images and other licenses remain in `public/images/` and `public/licenses/`. The sample uses only `/images/article-sample.png`. Old root URLs and arbitrary relative images are not replaced with the sample; correct the actual snippet/template references. Bilingual prose remains in `docs/locale/`.
 
 <a name="doc-editable-fields"></a>
 
@@ -147,6 +147,75 @@ The following capability is additive: repeated steps merge property lists.
 }
 ```
 
+<a name="doc-copy-output"></a>
+
+## Rich-text copying and preview shells
+
+The circular-arrow **Update styles** control is in the editor top bar, after **Export** and before **Check format**. Existing articles/history retain render records. Explicitly update styles and save to adopt current library policy; no bulk migration occurs.
+
+| Existing step | parameters field | Effect |
+|---|---|---|
+| output.html | `tagMap: { "blockquote": "section" }` | WeChat copying reads original quote theme styles before mapping tags in the output copy, retaining nested quotes, borders, backgrounds and inner padding. |
+| output.css | `rootStyleOmissions` | Omits named CSS properties only from generated article/body shells. WeChat defaults cover margin/padding and their sides, width/min-width/max-width and height/min-height/max-height. Internal content containers remain intact. |
+
+Merge fields into existing steps’ `parameters`, retaining other parameters rather than adding duplicate output steps. See the complete [default formatter](../../../resources/presets/platform/wechat-article/format/formatter.json). Older configurations without new fields keep their behavior; other platforms choose their own policies. Source, preview tags and PNG/PDF remain unchanged. This adds no official compliance requirement. JSON configures registered policies; new algorithms still require application capabilities. The rendering engine is not a library plugin.
+
+<a name="doc-source-rendering"></a>
+
+## Optional math and Mermaid source rendering
+
+Add these registered steps to the current library's `formatter.steps[]`, reload the library and explicitly update styles. Defaults do not enable either capability. Older libraries/snapshots keep their own configuration; parameters accept no executable code or custom trust policy.
+
+```json
+[
+  {"id":"math","operator":"markdown.math","enabled":true,"parameters":{"singleDollar":true,"maxLength":8192,"maxExpressions":128}},
+  {"id":"mermaid","operator":"markdown.mermaid","enabled":true,"parameters":{"theme":"neutral","maxLength":16384,"maxDiagrams":16}}
+]
+```
+
+| Capability | Values and output |
+|---|---|
+| markdown.math | Boolean singleDollar; maxLength 1–16384; maxExpressions 1–256. Inline/display/math fences become static KaTeX MathML without external fonts/scripts or cross-expression macros. Trusted commands stay disabled with fixed expansion/size limits. Errors retain TeX and line diagnostics. |
+| markdown.mermaid | theme default/neutral/dark; maxLength 1–32768; maxDiagrams 1–32. Flowcharts/sequence/state/class/ER become isolated static PNG, without config directives, interaction or external resources. Budget 256 statements, 100 edges, 4096 per side and 8MiB per result; excess retains source. |
+
+Math body example (inline/display; a fence marked math also works):
+
+```text
+Inline: $E=mc^2$
+
+$$
+\frac{a}{b}
+$$
+```
+
+Use a fence marked mermaid for a body such as:
+
+```text
+flowchart TD
+  A[Start] --> B[Finish]
+```
+
+Rendering is incomplete until ready; placeholders cannot be copied/exported or stored as render.json/history artifacts. Source can save first, followed by another save/style update when diagrams finish. Invalid syntax is reported at its code block and retained. Verify destination MathML support and PNG reception. Official standards still check static results; enabling a step grants no exemption and does not expand handwritten SVG tag/event permissions.
+
+Implementation and licenses ship locally. Mermaid is rebuilt from locked official modules to unify the KaTeX version; see [resources/render](../../../resources/render/), [math licenses](../../../public/licenses/math/) and [Mermaid licenses](../../../public/licenses/mermaid/). An isolated frame does not guarantee off-main-thread layout; check input/scrolling with small graphs and simplify or pre-render complex ones.
+
+<a name="doc-resource-protocol"></a>
+
+## Resource references, import and output
+
+| Resource | Article reference | Shared reference | Behavior |
+|---|---|---|---|
+| Raster image | media/image/filename | /shared/image/filename | Existing image validation/preview/description index |
+| General attachment | media/file/filename | /shared/file/filename | Type icon/explicit download, no execution or automatic preview; unknown files use a generic icon |
+
+Encode complete filenames as URIs and keep actual final paths. Image metadata keeps the existing `images` object; an attachment directory's `index.json` uses version1 and a `files` object with description per filename. Directories appear on demand; old libraries are not moved wholesale. The [resource registry](../../../resources/presets/resource/types.json) has 23 classes / 284 suffixes. Extension/MIME labels do not grant attachment image-preview capability.
+
+Product checks cover safe paths, target identity, existence and image bytes. Importing is incomplete; failed/cancelled and missing references are separate. These checks remain when `validator.meta.enabled=false`. Unmigrated CSS backgrounds/fonts/complex embeds retain source with notices; local document links are not recursively carried.
+
+`imports/tasks/<id>.json` binds library/article/source/final names. Background work writes resources/status only, never old full body text. Concurrency 2, 64KiB chunks, 100ms progress throttling and 64MiB general attachments apply. CORS/CSP, omitted credentials and permission failures remain explicit and support retry/reselection. Originals remain; knowledge indexes live in the target library's `knowledge/`.
+
+Copy/PNG/PDF checks use current resource/render versions and reject stale output. Attachments are not presented as directly pasteable media. ZIP includes article media and explicitly referenced shared files, excluding knowledge/imports. Partial output needs user confirmation, skips unclosed/failed/missing files, keeps original references and retains the 256MB in-memory limit. Source save, render-record save, checking and output report separately.
+
 <a name="doc-formatter-capabilities"></a>
 
 ## Formatter capabilities
@@ -156,6 +225,8 @@ The following capability is additive: repeated steps merge property lists.
 | markdown.soft-breaks | `mode`: `space` / `line-break` |
 | markdown.blank-lines | `preserve`, `betweenBlocks`, `atEdges` |
 | markdown.code-highlight | styles[]; optional engine (highlight/prism), themeDefaults, prismStyles mapping lexical keys to CSS declarations |
+| markdown.math | singleDollar, maxLength, maxExpressions; optional static MathML |
+| markdown.mermaid | theme, maxLength, maxDiagrams; optional static PNG |
 | markdown.heading-ids | mode: auto/explicit; explicit retains {#id} without generating anchors |
 | markdown.code-layout | wrapperClasses[], preTag, contentClasses[], copyClasses[], copyHtml, copyLabel |
 | css.stylesheets | entry, publicRoot; optional allowUnknownClasses |
@@ -163,15 +234,31 @@ The following capability is additive: repeated steps merge property lists.
 | render.nodes | image (width/height/classes/style/alt), link (classes/rootBase/externalTarget); supplies missing defaults only |
 | markdown.code-whitespace | `tabSize`; disabling retains original code whitespace |
 | preview.surface | lightBackground, darkBackground, fontFamily, color, stripThemeBackground |
-| preview.dark-mode | `transform`: `preserve` or a library component ID; `options` is a JSON object |
+| preview.dark-mode | `mode`: algorithm or tokens; algorithm requires component transform/options, tokens contains only mode |
 | css.drop-properties | properties[]; repeatable |
 | css.utility-aliases | aliases mapping CSS property names |
-| output.css | inlineProperties[], dimensionProperties[], preserveAutoDimensions, colorEncoding: rgb/preserve |
-| output.html | wrapperTag, preserveAttributes[], removeClasses, stripRootBackground |
+| output.css | inlineProperties[], dimensionProperties[], preserveAutoDimensions, colorEncoding: rgb/preserve; optional rootStyleOmissions[] |
+| output.html | wrapperTag, preserveAttributes[], removeClasses, stripRootBackground; optional tagMap |
 | output.text | maxConsecutiveNewlines, trim |
 | output.visual | width, pngBackground, pdfBackground, maxCanvasSide, pdfMargin |
 
 Configuration compiles in array order, but execution still has Markdown, CSS, preview and output stages. Reordering cannot move an output operation ahead of parsing. Except for `css.drop-properties`, each capability can be enabled only once to avoid conflicting parameters. Disabled capabilities use neutral engine behavior; disabling output style capture loses those styles and does not disable checking.
+
+Rich-text copying resolves styles against each original tag before applying `output.html.parameters.tagMap` to content containers, such as `{"blockquote":"section"}` in the WeChat preset. Generated article shells still use `wrapperTag`. `output.css.parameters.rootStyleOmissions` omits styles only from generated article/body shells: the WeChat preset excludes their margins, padding and width/height constraints while retaining spacing and borders inside content cards, paragraphs and quotes. Omitting either optional setting retains legacy behavior; source, preview and PNG/PDF are unchanged. Existing libraries must explicitly update their formatter.json. For articles retaining an older render snapshot, use Update styles before copying; source and history are not migrated automatically.
+
+The two `preview.dark-mode.parameters` sources are exclusive. Automatic example:
+
+```json
+{"mode":"algorithm","transform":"mp-darkmode","options":{"mode":"dark","whitelist":{"attribute":["data-no-dark"]},"needJudgeFirstPage":false,"noEmit":false}}
+```
+
+Manual mode contains only:
+
+```json
+{"mode":"tokens"}
+```
+
+Top-level mode selects the source; options.mode is still component-specific. Manual mode uses the article theme’s dark.tokens without calling a component and retains external CSS dark classes/preview mode. Missing mode is inferred from legacy transform: preserve means tokens, a component ID means algorithm. Reads do not rewrite old files. validator.product.theme may declare `"darkTokens":{"allowPartial":true,"fallback":"light"}`. Partial overrides are allowed by default; keys reuse registered color tokens, rejecting unknown keys, unsafe values and cycles. Typography is shared and canvas backgrounds still use preview.surface. Official format-support criteria remain: manual mode with rules requiring official conversion reports incomplete rather than passing them automatically.
 
 The default `mp-darkmode` component accepts `mode: dark`, `defaultDarkTextColor`, `defaultDarkBgColor`, `needJudgeFirstPage`, `noEmit`, `whitelist.attribute[]` and `whitelist.tagName[]`. The official default template leaves the SDK's default text color unchanged; explicit color options customize that library. Without `defaultDarkBgColor`, the dark surface from `preview.surface` is used. `noEmit: true` computes conversion records without emitting styles and is usually unsuitable for visible previews. The component validates parameter meaning; the shared layer requires only a bounded JSON object. Custom components can add parameters without new workbench props.
 
@@ -248,11 +335,7 @@ Older libraries without a CSS entry keep the original pipeline. Website librarie
       "afterHtml": "",
       "language": "zh-CN",
       "preserveIds": true,
-      "viewport": {
-        "width": 1606,
-        "height": 959,
-        "contentWidth": 996
-      }
+      "viewport": null
     }
   }
 ]
@@ -264,7 +347,7 @@ Relative URLs resolve from their CSS directory. `/image/icons.svg` maps through 
 
 Escaping the library, cycles, remote CSS assets, JS plugins and missing files are rejected. Limits: 256 CSS files, depth 32, 1 MiB per file, 8 MiB total; 2048 assets, 256 MiB total. Directory @source needs an explicit in-library scope, capped at 256 matching files; it does not scan every article by default.
 
-viewport determines CSS layout width/height; contentWidth determines body width. Display zoom does not alter layout. A null viewport uses the available container. beforeHtml/afterHtml affect preview only, without entering source, Markdown-body output or copied body; existing source content remains.
+A null viewport lays out content responsively at the actual preview-column width, uses the available height for scrolling, and adds no display scaling. An explicit viewport object reproduces a fixed layout: width/height set the CSS viewport, contentWidth sets body width, and display scaling does not change that layout. beforeHtml/afterHtml affect preview only, without entering source, Markdown-body output or copied body; existing source content remains.
 
 Custom classes and generated utilities share checks. For classes used solely as content hooks, explicitly set `css.stylesheets.parameters.allowUnknownClasses` to true; by default, classes without generated styles are checked. This does not disable source, safety or platform rules.
 
@@ -282,7 +365,7 @@ For website delivery, **Export article → Markdown body** extracts the reliably
 
 ### Visible preview and current inspection
 
-The article editor's [three preview controls](README.md#doc-preview-controls) are browser UI preferences, separate from the format trio. Save-only refresh retains visible inputs and their resources. The current working canvas still uses the current body, theme and configuration for validation, copying, export and render records. Inspection alone does not advance the display boundary; successful saving followed by compilation does, while failed or stale tasks do not. Scroll alignment uses cached positions for the same input without reading the library or recompiling. It pauses while display and source differ.
+The article editor's [three preview controls](README.md#doc-preview-controls) are browser UI preferences, separate from the format trio. Save-only refresh retains visible inputs and their resources. The current working canvas still uses the current body, theme and configuration for validation, copying, export and render records. Inspection alone does not advance the display boundary; successful saving followed by compilation does, while failed or stale tasks do not. Scroll alignment binds the visible ShadowRoot or iframe and caches valid correspondences from the saved source to the current source. Edited gaps use the nearest valid anchor; no match keeps the position unchanged. Controls, color mode, column size and document changes rebuild cached positions using passive events, requestAnimationFrame and 4 ms slices. Scrolling does not read the library or recompile. Save-only mode adds “· Save to refresh preview” after the source footer’s saved state.
 
 <a name="doc-configuration-loading"></a>
 
@@ -314,3 +397,18 @@ Text inside images, transparent images, SVG content, shared-background container
 Browser frames start through local static scripts and read non-executable JSON configuration, without inline bootstrap code or dynamic evaluation. Shared source generates the asset during development/build, using the static server's CSP.
 
 See [contracts.ts](../../../src/lib/article-format/contracts.ts) for parameter contracts and [configuration tests](../../../tests/article-format-config.test.mjs) for examples/constraints.
+
+## Horizontal scrolling and width exemption
+
+Horizontal scrolling uses the existing [official WeChat §1.4.4 exemption](https://developers.weixin.qq.com/doc/service/guide/product/plugin_spec.html#_1-4-4-豁免机制：data-ignore-width):
+
+```html
+<section class="overflow-x-scroll pb-3">
+  <section data-ignore-width class="flex items-center justify-start gap-3">
+    <section class="shrink-0 w-[85%]">Image and caption</section>
+    <section class="shrink-0 w-[85%]">Image and caption</section>
+  </section>
+</section>
+```
+
+The marked element and its descendants skip every width check. The outer container and other rules are still checked. There is no global flex allowance, new `usable` field or separate empirical standard.

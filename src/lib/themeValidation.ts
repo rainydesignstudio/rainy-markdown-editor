@@ -17,6 +17,39 @@ function validValue(value: unknown): value is string {
     [...value.matchAll(/var\(\s*--([\w-]+)/gi)].every(match => setOf(definition().tokens).has(match[1]));
 }
 
+function validateDarkTokens(theme: Partial<ThemeConfig>, errors: ProductMessageFields[]): void {
+  if (theme.dark === undefined) return;
+  const dark = theme.dark;
+  if (!dark || typeof dark !== 'object' || Array.isArray(dark) || Object.keys(dark).some(key => key !== 'tokens') ||
+    !dark.tokens || typeof dark.tokens !== 'object' || Array.isArray(dark.tokens)) {
+    errors.push(productMessage('themeValidation.darkTokensMustBeAnObject')); return;
+  }
+  const colors = definition().tokens.filter(key => key.startsWith('color-'));
+  for (const [key, value] of Object.entries(dark.tokens)) {
+    const colorSyntax = typeof value === 'string' && /^(?:#[\da-f]{3,8}|[a-z]+|(?:var|rgba?|hsla?|oklab|oklch|lab|lch|hwb|color|color-mix|light-dark)\([\s\S]*\))$/i.test(value.trim());
+    if (!colors.includes(key) || !validValue(value) || !colorSyntax || typeof CSS !== 'undefined' && !CSS.supports('color', value) ||
+      typeof value === 'string' && [...value.matchAll(/var\(\s*--([\w-]+)/gi)].some(match => !colors.includes(match[1]))) {
+      errors.push(productMessage('themeValidation.darkTokenIsUnsupportedOrUnsafe', { key }));
+    }
+  }
+  if (definition().darkTokens?.allowPartial === false) {
+    for (const key of colors) if (!Object.hasOwn(dark.tokens, key)) errors.push(productMessage('themeValidation.requiredDarkTokenIsMissing', { key }));
+  }
+}
+
+function validateTokenCycles(tokens: Record<string, string>, scheme: string, errors: ProductMessageFields[]): void {
+  const visiting = new Set<string>(), visited = new Set<string>();
+  const visit = (key: string): boolean => {
+    if (visiting.has(key)) return true;
+    if (visited.has(key)) return false;
+    visiting.add(key);
+    const value = tokens[key];
+    if (typeof value === 'string') for (const match of value.matchAll(/var\(\s*--([\w-]+)/gi)) if (visit(match[1])) return true;
+    visiting.delete(key); visited.add(key); return false;
+  };
+  if (Object.keys(tokens).some(visit)) errors.push(productMessage('themeValidation.tokenReferenceCycle', { scheme }));
+}
+
 function validateCss(css: string, errors: ProductMessageFields[]): void {
   if (css.length > definition().limits.css) {
     errors.push(productMessage("themeValidation.themeCssExceedsCharacters", { "definition_limitsCss": definition().limits.css }));
@@ -111,6 +144,11 @@ export function inspectThemeConfig(value: unknown): ProductMessageFields[] {
     for (const [key, token] of Object.entries(tokens)) {
       if (!definition().tokens.includes(key) || !validValue(token)) errors.push(productMessage("themeValidation.themeTokenIsUnsupportedOrUnsafe", { "key": key }));
     }
+  }
+  validateDarkTokens(theme, errors);
+  if (theme.tokens && typeof theme.tokens === 'object' && !Array.isArray(theme.tokens)) {
+    validateTokenCycles(theme.tokens, 'tokens', errors);
+    if (theme.dark?.tokens && typeof theme.dark.tokens === 'object' && !Array.isArray(theme.dark.tokens)) validateTokenCycles({ ...theme.tokens, ...theme.dark.tokens }, 'dark.tokens', errors);
   }
   if (typeof theme.css !== 'string') errors.push(productMessage("themeValidation.themeCssMustBeText"));
   else validateCss(theme.css, errors);

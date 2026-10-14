@@ -422,12 +422,12 @@ test('default copy preserves damaged same-ID files, removes failed partial write
   assert.ok((await loadEditorThemeLibrary(root)).issues.some(issue => issue.file === `${id}.json`));
 });
 
-test('failed initial seeding has no completion marker and retries without overwriting successful files', async () => {
+test('failed initial seeding retains a pending locale receipt and retries without overwriting successful files', async () => {
   const root = new MemoryDirectoryHandle('default-initialization-failure');
   root.failCloseFor = `${BUILTIN_EDITOR_THEMES[2].id}.json`;
   await assert.rejects(() => initializeThemeDefaults(root), /injected close failure/);
   const directory = await root.getDirectoryHandle('themes');
-  assert.equal(directory.children.has('default-themes.loaded'), false);
+  assert.equal(JSON.parse(directory.children.get('default-themes.loaded').content).initialized, false);
   await initializeThemeDefaults(root);
   assert.equal(directory.children.has('default-themes.loaded'), true);
   assert.equal((await loadEditorThemeLibrary(root)).themes.length, BUILTIN_EDITOR_THEMES.length);
@@ -440,7 +440,8 @@ test('editing local themes increments version, refuses external changes and pres
   const changed = { ...original, name: '已编辑的主题' };
   const saved = await saveEditorTheme(root, changed, original);
   assert.equal(saved.id, original.id);
-  assert.equal(saved.version, '1.1.1');
+  const [major, minor, patch] = original.version.split('.').map(Number);
+  assert.equal(saved.version, `${major}.${minor}.${patch + 1}`);
   const directory = await (await root.getDirectoryHandle('themes')).getDirectoryHandle('editor-themes');
   const file = await directory.getFileHandle(`${original.id}.json`);
   const before = file.content;

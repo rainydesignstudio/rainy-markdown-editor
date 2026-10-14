@@ -61,12 +61,22 @@ export function sanitizeStyleValue(value: string): string {
 
 export function sanitizeHtml(html: string, snapshot = getFormatSnapshot()): string {
   if (typeof window === 'undefined') return '';
-  return DOMPurify.sanitize(html, {
-    USE_PROFILES: { html: true, svg: true },
+  // Restored static images use Blob URLs. Keep this exception private and limited
+  // to HTML image sources; links, SVG references and executable URLs stay filtered.
+  const purifier = /blob:/i.test(html) ? DOMPurify(window) : DOMPurify;
+  if (purifier !== DOMPurify) purifier.addHook('uponSanitizeAttribute', (node, data) => {
+    if (node.namespaceURI === 'http://www.w3.org/1999/xhtml' && node.localName === 'img' && data.attrName === 'src'
+      && /^blob:(?:https?:\/\/|null\/)/i.test(data.attrValue) && !/[\u0000-\u0020\u007f]/.test(data.attrValue)) data.forceKeepAttr = true;
+  });
+  return purifier.sanitize(html, {
+    USE_PROFILES: { html: true, svg: true, mathMl: Boolean(snapshot.bundle.formatter.math) },
     ADD_TAGS: ['animate', 'animateTransform'],
     ADD_ATTR: ['class', 'style', 'rowspan', 'colspan', 'target', 'rel', 'checked', 'disabled', 'data-theme', ...snapshot.bundle.formatter.output.preserveAttributes],
     FORBID_TAGS,
     FORBID_ATTR,
+    // DOMPurify unwraps unsupported annotation by default, duplicating visible
+    // TeX after the MathML. Plain-text copying has already captured that source.
+    ADD_FORBID_CONTENTS: ['annotation', 'annotation-xml'],
   });
 }
 

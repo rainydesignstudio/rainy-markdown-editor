@@ -10,7 +10,7 @@ export default function AssetsRoute() {
       key={controller.contentLibraryRootSession}
       root={controller.directory}
       sessionKey={controller.contentLibraryRootSession}
-      refreshSignal={controller.mediaRefreshRevision}
+      refreshSignal={controller.mediaCatalogRevision}
       articles={controller.articleList}
       isRootCurrent={(expectedRoot, expectedSession) => controller.directoryRef.current === expectedRoot && controller.contentLibraryRootSessionRef.current === expectedSession}
       workspace={controller.editorWorkspace}

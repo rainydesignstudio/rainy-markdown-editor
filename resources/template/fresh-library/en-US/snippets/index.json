@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "default",
+      "name": "Default",
+      "description": "Basic snippets and Rainy Design compositions ready for article bodies.",
+      "order": 0,
+      "icon": "document"
+    },
+    {
+      "id": "zixu",
+      "name": "Violet Notes",
+      "description": "Violet labels and single rules. Use Markdown for text and HTML for opening cards, numbered chapters and notes.",
+      "order": 1,
+      "icon": "quote"
+    },
+    {
+      "id": "rainy-design",
+      "name": "Rainy Design",
+      "description": "Article compositions used with the Rainy Design theme.",
+      "order": 2,
+      "icon": "sparkles"
+    }
+  ]
+}

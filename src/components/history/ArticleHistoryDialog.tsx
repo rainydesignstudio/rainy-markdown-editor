@@ -13,6 +13,8 @@ import type { StoredArticle, ThemeConfig } from '../../lib/types';
 import { parseArticle } from '../../lib/frontMatter';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { HistorySnapshotPreview } from './HistorySnapshotPreview';
+import { ButtonBar } from '../global/ButtonBar';
+import { EditorActionIcon } from '../global/EditorTopbar';
 
 type Props = {
   articleTitle: string;
@@ -230,17 +232,19 @@ export function ArticleHistoryView(props: Props) {
               {selected ? <>
                 <div className="history-detail-heading"><div><h3 className="font-heading">{selected.title || t('dialogs:ui.untitledManuscript')}</h3><p className="mt-3">{formatSnapshotTime(selected.createdAt, locale, t('common:dates.invalid'))} · {t(`dialogs:historyKinds.${selected.kind}`)}{currentDirty ? t('dialogs:ui.currentManuscriptHasUnsavedChanges') : ''}</p></div></div>
                 {!selected.themeMatches ? <div className="content-library-note" data-tone="warning">{t('dialogs:ui.historicalFrontMatterDoesNotMatchTheTheme')}</div> : null}
-                <div className="history-preview-tabs" role="group" aria-label={t('dialogs:ui.comparisonMode')}>
-                  <button className="button button-quiet" type="button" aria-pressed={previewMode === 'source'} onClick={() => setPreviewMode('source')}>{t('dialogs:ui.sourceAndMetadata')}</button>
-                  <button className="button button-quiet" type="button" aria-pressed={previewMode === 'render'} onClick={() => setPreviewMode('render')} disabled={!selected.parsed.canCopy || !currentParsed.canCopy || !currentThemeValid}>{t('dialogs:ui.renderedLayout')}</button>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <ButtonBar className="history-preview-tabs" label={t('dialogs:ui.comparisonMode')}>
+                    <button className="button button-quiet" type="button" aria-pressed={previewMode === 'source'} onClick={() => setPreviewMode('source')}>{t('dialogs:ui.sourceAndMetadata')}</button>
+                    <button className="button button-quiet" type="button" aria-pressed={previewMode === 'render'} onClick={() => setPreviewMode('render')} disabled={!selected.parsed.canCopy || !currentParsed.canCopy || !currentThemeValid}>{t('dialogs:ui.renderedLayout')}</button>
+                  </ButtonBar>
+                  <ButtonBar className="ml-auto" label={t('dialogs:ui.restoreThisVersionAlternative')}>
+                    <button className="button button-quiet" type="button" onClick={() => setRestoreTarget(selected)} disabled={busy || !canRestore || !selected.themeMatches}><EditorActionIcon name="history" className="size-4 shrink-0" />{t('dialogs:ui.restoreThisVersionAlternative')}</button>
+                  </ButtonBar>
                 </div>
                 {previewMode === 'source' ? (
-                  <div className="history-source-comparison">
-                    <div className="history-diff-columns" aria-label={t('dialogs:ui.sourceSideBySide')}>
-                      <section><h4 className="font-heading">{t('dialogs:ui.historicalVersion')}</h4><pre className="history-diff-lines" tabIndex={0} aria-label={t('dialogs:ui.historicalSource')}>{sourceDiff.map((row, index) => <span key={`left-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.left === null ? '' : String(index + 1)}</i><code>{row.left ?? ' '}</code></span>)}</pre></section>
-                      <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><pre className="history-diff-lines" tabIndex={0} aria-label={t('dialogs:ui.currentSource')}>{sourceDiff.map((row, index) => <span key={`right-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.right === null ? '' : String(index + 1)}</i><code>{row.right ?? ' '}</code></span>)}</pre></section>
-                    </div>
-                    <section className="history-metadata-comparison" aria-label={t('dialogs:ui.articleInformationChanges')}><h4 className="font-heading">{t('dialogs:ui.articleInformationAndTheme')}</h4>{metadata.map((item) => <div key={item.key} className="history-metadata-row" data-changed={item.changed}><strong>{t(`dialogs:historyFields.${item.key}`)}</strong><span>{item.key === 'themeSnapshot' ? t('dialogs:history.savedSnapshot') : item.before || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span><span>{item.key === 'themeSnapshot' ? t('dialogs:history.changedFields', { fields: item.after }) : item.after || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span></div>)}</section>
+                  <div className="history-diff-columns" aria-label={t('dialogs:ui.sourceSideBySide')}>
+                    <section><h4 className="font-heading">{t('dialogs:ui.historicalVersion')}</h4><pre className="history-diff-lines" tabIndex={0} aria-label={t('dialogs:ui.historicalSource')}>{sourceDiff.map((row, index) => <span key={`left-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.left === null ? '' : String(index + 1)}</i><code>{row.left ?? ' '}</code></span>)}</pre></section>
+                    <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><pre className="history-diff-lines" tabIndex={0} aria-label={t('dialogs:ui.currentSource')}>{sourceDiff.map((row, index) => <span key={`right-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.right === null ? '' : String(index + 1)}</i><code>{row.right ?? ' '}</code></span>)}</pre></section>
                   </div>
                 ) : (
                   <div className="history-render-comparison">
@@ -248,24 +252,24 @@ export function ArticleHistoryView(props: Props) {
                     {currentParsed.canCopy && currentThemeValid ? <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><HistorySnapshotPreview key="current-editor-revision" snapshot={currentSnapshot} root={root} article={mediaArticle} articleTitle={currentParsed.metadata.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">{t('dialogs:ui.currentManuscriptCannotRenderSafelyRepairArticleMetadata')}</div>}
                   </div>
                 )}
-                <div className="history-detail-actions">
-                  <button className="button button-quiet" type="button" onClick={() => setRestoreTarget(selected)} disabled={busy || !canRestore || !selected.themeMatches}>{t('dialogs:ui.restoreThisVersionAlternative')}</button>
-                </div>
                 {restoreTarget ? <HistoryRestoreConfirm
                   busy={busy}
                   canRestore={canRestore}
                   onCancel={() => setRestoreTarget(null)}
                   onConfirm={() => { onRestore(restoreTarget); setRestoreTarget(null); }}
                 /> : null}
-                <form className="history-copy-form" onSubmit={(event) => { event.preventDefault(); onSaveAs(selected, copyTitle, copyMonth); }}>
-                  <h4 className="font-heading">{t('dialogs:ui.forkFromHistory')}</h4>
-                  <div className="history-copy-fields">
-                    <label className="field-stack"><span className="field-label">{t('dialogs:ui.newManuscriptTitle')}</span><input className="field" value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches} /></label>
-                    <label className="field-stack"><span className="field-label">{t('dialogs:ui.savedMonth')}</span><select className="field" value={copyMonth} onChange={(event) => setCopyMonth(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches}>{monthOptions.map((value) => <option key={value} value={value}>{formatUIMonth(value, locale)}</option>)}</select></label>
-                  </div>
-                  <p className="status-copy">{t('dialogs:ui.copyArticleAssetsAndTheSelectedThemeSnapshot')}</p>
-                  <button className="button button-primary" type="submit" disabled={busy || !canSaveAs || !selected.themeMatches || !copyTitle.trim()}>{t('dialogs:ui.createIndependentFork')}</button>
-                </form>
+                <div className="grid min-w-0 items-start gap-4 xl:grid-cols-2">
+                  <section className="history-metadata-comparison" aria-label={t('dialogs:ui.articleInformationChanges')}><h4 className="font-heading">{t('dialogs:ui.articleInformationAndTheme')}</h4>{metadata.map((item) => <div key={item.key} className="history-metadata-row" data-changed={item.changed}><strong>{t(`dialogs:historyFields.${item.key}`)}</strong><span>{item.key === 'themeSnapshot' ? t('dialogs:history.savedSnapshot') : item.before || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span><span>{item.key === 'themeSnapshot' ? t('dialogs:history.changedFields', { fields: item.after }) : item.after || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span></div>)}</section>
+                  <form className="history-copy-form" onSubmit={(event) => { event.preventDefault(); onSaveAs(selected, copyTitle, copyMonth); }}>
+                    <h4 className="font-heading">{t('dialogs:ui.forkFromHistory')}</h4>
+                    <div className="history-copy-fields">
+                      <label className="field-stack"><span className="field-label">{t('dialogs:ui.newManuscriptTitle')}</span><input className="field" value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches} /></label>
+                      <label className="field-stack"><span className="field-label">{t('dialogs:ui.savedMonth')}</span><select className="field" value={copyMonth} onChange={(event) => setCopyMonth(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches}>{monthOptions.map((value) => <option key={value} value={value}>{formatUIMonth(value, locale)}</option>)}</select></label>
+                    </div>
+                    <p className="status-copy">{t('dialogs:ui.copyArticleAssetsAndTheSelectedThemeSnapshot')}</p>
+                    <button className="button button-primary" type="submit" disabled={busy || !canSaveAs || !selected.themeMatches || !copyTitle.trim()}>{t('dialogs:ui.createIndependentFork')}</button>
+                  </form>
+                </div>
               </> : <div className="empty-state"><strong>{t('dialogs:ui.chooseAHistoricalVersion')}</strong><p>{t('dialogs:ui.historyAndCurrentManuscriptWillBeComparedHere')}</p></div>}
             </section>
           </div>

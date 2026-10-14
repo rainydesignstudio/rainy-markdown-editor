@@ -5,7 +5,9 @@ import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import changelog from '../resources/changelog.json' with { type: 'json' };
+import { renderToStaticMarkup } from 'react-dom/server';
+import { JSDOM } from 'jsdom';
+import changelog from '../resources/changelog/public.json' with { type: 'json' };
 import { createUII18n, UI_RESOURCES } from '../src/lib/i18n/runtime.ts';
 import { releaseTextKey, chineseReleaseTexts } from '../src/lib/i18n/changelog.ts';
 import * as formats from '../src/lib/i18n/formatters.ts';
@@ -29,7 +31,7 @@ async function component(file, extra = {}) {
       if (id.endsWith('/UILocaleProvider')) return { useUITranslation: ns => ({ t: instance.getFixedT(locale, ns) }), useUILocale: () => ({ locale }) };
       if (id.endsWith('/i18n/formatters')) return formats;
       if (id.endsWith('/i18n/changelog')) return { releaseTextKey };
-      if (id.endsWith('/changelog.json')) return changelog;
+      if (id.endsWith('/resources/changelog/public.json')) return changelog;
       if (id.endsWith('/appVersion')) return { APP_VERSION: '0.2.2' };
       if (id.endsWith('/useAnimatedMaxHeight')) return { useAnimatedMaxHeight: () => null };
       if (id.endsWith('/DialogFrame')) return { DialogFrame: 'frame', DialogHeader: 'header', DialogButton: 'action', DialogActions: 'actions', DialogFooter: 'footer' };
@@ -37,7 +39,7 @@ async function component(file, extra = {}) {
       return extra[id] ?? {};
     },
   });
-  return { exports: module.exports, render(name, props) { cursor = 0; return module.exports[name](props); }, setLocale(value) { locale = value; } };
+  return { exports: module.exports, i18n: instance, render(name, props) { cursor = 0; return module.exports[name](props); }, setLocale(value) { locale = value; } };
 }
 
 test('all release translations cover original summaries, sections and items without duplicating metadata', async () => {
@@ -47,7 +49,8 @@ test('all release translations cover original summaries, sections and items with
   const historicalVersions = ['0.1.1', '0.1.2', '0.1.3', '0.1.3.1', '0.1.4', '0.1.5', '0.1.6', '0.1.7', '0.1.8', '0.2.0', '0.2.1'];
   const historical = changelog.filter(release => historicalVersions.includes(release.version));
   assert.equal(historical.length, historicalVersions.length);
-  assert.equal(createHash('sha256').update(JSON.stringify(historical)).digest('hex'), 'd5c25af3008ad6e15e8ffaf8f41cb840b6870b3b44218684e74b49b99c08941c');
+  // The accepted 0.2.1 release finalized its status and summary; freeze that released history.
+  assert.equal(createHash('sha256').update(JSON.stringify(historical)).digest('hex'), '8f76229bac035be67f5dc53c1dc531a98ca42ca463ee884688c14caf5d5311da');
   for (const release of changelog) {
     const key = releaseTextKey(release.version), prefix = 'changelog:releases.' + key;
     const translated = UI_RESOURCES['en-US'].changelog.releases[key];
@@ -61,11 +64,61 @@ test('all release translations cover original summaries, sections and items with
       assert.ok(en.exists(prefix + `.sections.${si}.title`, { lng: 'en-US' }));
       for (const [ii, item] of section.items.entries()) {
         const path = prefix + `.sections.${si}.items.${ii}`;
-        assert.equal(zh.t(path), item); assert.ok(en.exists(path, { lng: 'en-US' })); assert.ok(en.t(path).trim());
+        if (typeof item === 'string') {
+          assert.equal(zh.t(path), item); assert.ok(en.exists(path, { lng: 'en-US' })); assert.ok(en.t(path).trim());
+        } else {
+          assert.equal(zh.t(path + '.title'), item.title);
+          assert.ok(en.exists(path + '.title', { lng: 'en-US' })); assert.ok(en.t(path + '.title').trim());
+          assert.equal(translated.sections[si].items[ii].items.length, item.items.length);
+          for (const [di, detail] of item.items.entries()) {
+            const detailPath = path + `.items.${di}`;
+            assert.equal(zh.t(detailPath), detail);
+            assert.ok(en.exists(detailPath, { lng: 'en-US' })); assert.ok(en.t(detailPath).trim());
+          }
+        }
       }
       assert.equal(translated.sections[si].items.length, section.items.length);
     }
   }
+});
+
+test('grouped release notes render semantic nested lists, retain legacy strings and fall back to English', async () => {
+  const view = await component('global/ChangelogDialog.tsx');
+  const releaseNode = version => nodes(view.render('ChangelogDialog', { onClose() {} })).find(node => node.props?.release?.version === version);
+  const documentFor = version => {
+    const node = releaseNode(version);
+    return new JSDOM(renderToStaticMarkup(node.type({ ...node.props, open: true }))).window.document;
+  };
+  for (const locale of ['en-US', 'zh-CN']) {
+    view.setLocale(locale);
+    for (const [version, topics, explanations] of [['0.3.0', 26, 46], ['0.2.2.1', 16, 26]]) {
+      const document = documentFor(version);
+      assert.equal(document.querySelectorAll('details').length, 4);
+      assert.equal(document.querySelectorAll('details > ul > li > strong').length, topics);
+      assert.equal(document.querySelectorAll('details > ul > li > ul > li').length, explanations);
+      const expected = UI_RESOURCES[locale].changelog.releases[releaseTextKey(version)].sections;
+      assert.deepEqual([...document.querySelectorAll('details > ul > li > ul > li')].map(node => node.textContent), expected.flatMap(section => section.items.flatMap(item => item.items)));
+    }
+    const legacy = documentFor('0.2.1');
+    assert.equal(legacy.querySelectorAll('ul ul').length, 0);
+    assert.equal(legacy.querySelector('details > ul > li').textContent, UI_RESOURCES[locale].changelog.releases.v0_2_1.sections[0].items[0]);
+  }
+  view.i18n.removeResourceBundle('zh-CN', 'changelog');
+  const fallback = documentFor('0.3.0');
+  assert.equal(fallback.querySelector('strong').textContent, UI_RESOURCES['en-US'].changelog.releases.v0_3_0.sections[0].items[0].title);
+  assert.equal(fallback.querySelector('ul ul li').textContent, UI_RESOURCES['en-US'].changelog.releases.v0_3_0.sections[0].items[0].items[0]);
+});
+
+test('release titles and explanations render markup as literal text', async () => {
+  const view = await component('global/ChangelogDialog.tsx');
+  const title = '<strong>Literal title</strong>', explanation = '<img src=x onerror=alert(1)><br/>Literal explanation';
+  view.i18n.addResource('en-US', 'changelog', 'releases.v0_3_0.sections.0.items.0.title', title);
+  view.i18n.addResource('en-US', 'changelog', 'releases.v0_3_0.sections.0.items.0.items.0', explanation);
+  const node = nodes(view.render('ChangelogDialog', { onClose() {} })).find(node => node.props?.release?.version === '0.3.0');
+  const document = new JSDOM(renderToStaticMarkup(node.type(node.props))).window.document;
+  assert.equal(document.querySelector('strong').textContent, title);
+  assert.equal(document.querySelector('ul ul li').textContent, explanation);
+  assert.equal(document.querySelectorAll('strong strong, img, br, script').length, 0);
 });
 
 test('release expansion, version IDs and category keys survive locale changes and toggle-all', async () => {

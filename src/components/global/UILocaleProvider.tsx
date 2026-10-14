@@ -13,9 +13,9 @@ function browserStorage(): Storage | null {
 }
 
 export function UILocaleProvider({ children }: { children: ReactNode }) {
-  // Server and hydration both start with Chinese. StartupLoading hides product text until the browser preference is ready.
+  // Server and hydration both start with English. StartupLoading hides product text until the browser preference is ready.
   const [instance] = useState(() => createUII18n());
-  const [locale, updateLocale] = useState<UILocale>('zh-CN');
+  const [locale, updateLocale] = useState<UILocale>('en-US');
   const [ready, setReady] = useState(false);
   const [preferenceSaved, setPreferenceSaved] = useState<boolean | null>(null);
   const setLocale = useCallback(async (next: UILocale) => {

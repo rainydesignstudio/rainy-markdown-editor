@@ -7,6 +7,7 @@ import { DEFAULT_EDITOR_THEME, EDITOR_COLOR_ROLES, editorSurfaceTokens, findEdit
 import type { EditorAppearance } from '../../lib/editorWorkspace';
 import { applyEditorThemeCache, cacheSavedEditorTheme, readEditorThemeCache, writeEditorThemeStyles, type EditorThemeCache } from '../../lib/editorThemeCache';
 import { useUILocale, useUITranslation } from './UILocaleProvider';
+import { EditingDraftsProvider } from './EditingDrafts';
 
 type EditorController = ReturnType<typeof useEditorController> & {
   editorAppearancePreview: EditorAppearance | null;
@@ -17,7 +18,7 @@ const EditorContext = createContext<EditorController | null>(null);
 
 export function AppProviders({ children }: { children: ReactNode }) {
   const locale = useUILocale();
-  const controller = useEditorController();
+  const controller = useEditorController(locale.locale);
   const format = useFormatSnapshot();
   const [editorAppearancePreview, previewEditorAppearance] = useState<EditorAppearance | null>(null);
   const [startupCache, setStartupCache] = useState<EditorThemeCache | null>(null);
@@ -85,7 +86,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const loading = !locale.ready || !controller.editorAppearanceReady || controller.contentLibrariesState === 'loading' || format.loading === true;
   return (
     <EditorContext.Provider value={{ ...controller, editorAppearancePreview, previewEditorAppearance, displayedEditorAppearance: appearance }}>
-      <div className={visible ? 'h-full' : 'hidden h-full group-data-[editor-theme-state=cached]/theme:block'} inert={loading} aria-busy={loading}>{children}</div>
+      <EditingDraftsProvider><div className={visible ? 'h-full' : 'hidden h-full group-data-[editor-theme-state=cached]/theme:block'} inert={loading} aria-busy={loading}>{children}</div></EditingDraftsProvider>
       <StartupLoading loading={loading} />
     </EditorContext.Provider>
   );
@@ -103,7 +104,7 @@ function StartupLoading({ loading }: { loading: boolean }) {
     return () => window.clearTimeout(timer);
   }, [loading]);
   if (!present && !loading) return null;
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas text-primary opacity-100 transition-opacity duration-300 ease-out data-[fading=true]:opacity-0 motion-reduce:transition-none" data-fading={!loading && fading} role="status" aria-live="polite" aria-label={ready ? t('loading.label') : undefined}>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas font-loading text-primary opacity-100 transition-opacity duration-300 ease-out data-[fading=true]:opacity-0 motion-reduce:transition-none" data-fading={!loading && fading} role="status" aria-live="polite" aria-label={ready ? t('loading.label') : undefined}>
     <div className="flex flex-col items-center gap-4 p-4">
       <svg className="size-8 animate-spin text-accent motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3a9 9 0 0 1 9 9" /></svg>
       <p className="text-sm text-muted" hidden={!ready}>{t('loading.message')}</p>

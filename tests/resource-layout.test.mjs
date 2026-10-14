@@ -9,8 +9,10 @@ import { getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
 import { formatPreviewDocument } from '../src/lib/article-format/frame.ts';
 import { ARTICLE_EXAMPLE_IMAGE, isApplicationExampleImage } from '../src/lib/articleExamples.ts';
 const root = fileURLToPath(new URL('../', import.meta.url));
-const fresh = path.join(root, 'resources/template/fresh-library');
+const freshRoot = path.join(root, 'resources/template/fresh-library');
+const fresh = path.join(freshRoot, 'en-US');
 test('file-based seeds contain the complete initial library and no manuscripts/history', async () => {
+  assert.deepEqual((await readdir(freshRoot)).sort(), ['en-US', 'zh-CN']);
   assert.deepEqual((await readdir(fresh)).sort(), ['snippets', 'templates', 'themes']);
   for (const [kind, categories] of [['snippets', DEFAULT_SNIPPET_CATEGORIES], ['templates', DEFAULT_TEMPLATE_CATEGORIES]]) {
     const index = JSON.parse(await readFile(path.join(fresh, kind, 'index.json'), 'utf8'));

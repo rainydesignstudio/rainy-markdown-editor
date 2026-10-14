@@ -529,7 +529,7 @@ test('new manuscript menu only changes the themed preview until creation is conf
   assert.deepEqual(Array.from(find(n => n.type === 'menu-heading' && n.props.title === good.name).props.details.props.categories), ['写作', '教程']);
   assert.equal(find(n => n.type === 'content-preview').props.theme, selectedTheme);
   assert.equal(find(n => n.type === 'content-preview').props.bare, true);
-  assert.equal(find(n => n.type === 'category-panel' && n.props.title === '默认').props.open, false);
+  assert.equal(find(n => n.type === 'category-panel' && n.props.title === libraries.DEFAULT_TEMPLATE_CATEGORIES[0].name).props.open, false);
   assert.equal(find(n => n.type === 'category-panel' && n.props.title === '其他').props.open, false);
   find(n => n.type === 'category-panel' && n.props.title === '其他').props.onToggle(); render();
   assert.equal(find(n => n.type === 'category-panel' && n.props.title === '其他').props.open, true);
@@ -765,6 +765,7 @@ test('information cancellation and failed saving retain source drafts; successfu
   assert.equal(w.find(n => n.type === 'metadata-dialog').props.saveDisabled, true, 'source changes do not enable metadata saving');
   w.find(n => n.type === 'metadata-editor').props.onSnippetChange({ name: 'Cancelled title' }); w.render();
   w.find(n => n.type === 'metadata-dialog').props.onClose(); w.render();
+  w.find(n => n.type === 'unsaved-changes-dialog').props.onDiscard(); w.render();
   assert.equal(w.source().props.value, '<p>Unsaved source</p>');
   assert.equal(w.calls.saves, 0);
   w.info();

@@ -1,3 +1,4 @@
+import { articleDraftBaseline } from '../src/lib/editingDrafts.ts';
 import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import { withUILocaleImports } from './ui-locale-fixture.mjs';
 const formatRuntime = await import('../src/lib/article-format/runtime.ts');
@@ -21,6 +22,8 @@ const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node?.props ? 
 const text = node => Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : typeof node === 'string' ? node : '';
 function action(name, next, context) {
   context.getPreviewPreferences ??= () => ({ saveReport: true });
+  context.sourceReports ??= [];
+  context.publishSourceFormatReport ??= (snapshot, report) => context.sourceReports.push({ snapshot, report });
   const start = controllerSource.indexOf(`  const ${name} = useCallback(`);
   const end = controllerSource.indexOf(next === 'useEffect' ? '\n\n  useEffect' : `\n\n  const ${next}`, start);
   assert.ok(start >= 0 && end > start);
@@ -164,6 +167,7 @@ test('standalone format inspection opens the inspection dialog without saving or
   };
   const inspect = action('checkCurrentFormat', 'saveSettings', context);
   assert.equal(await inspect(), true); assert.equal(dialogs[0].mode, 'inspect'); assert.equal(dialogs[0].report, report); assert.equal(saves, 0);
+  assert.equal(context.sourceReports[0].report, report);
 });
 
 test('manual save waits for the compiled report and uses it for the save dialog', async () => {
@@ -178,6 +182,7 @@ test('manual save waits for the compiled report and uses it for the save dialog'
   };
   const save = action('saveCurrent', 'checkCurrentFormat', context);
   assert.equal(await save(), true); assert.equal(inspections, 1); assert.equal(dialogs[0].mode, 'save'); assert.equal(dialogs[0].report, report);
+  assert.equal(context.sourceReports[0].report, report);
 });
 
 
@@ -195,6 +200,7 @@ test('manual save report preference only changes presentation, including an all-
     };
     assert.equal(await action('saveCurrent', 'checkCurrentFormat', context)(), ok);
     assert.equal(dialogs.length, ok && enabled ? 1 : 0);
+    assert.equal(context.sourceReports.length, ok ? 1 : 0, 'the gutter report is published independently of dialog preference');
     assert.deepEqual(events, ok ? ['compile', 'capture'] : []);
     if (dialogs.length) { assert.equal(dialogs[0].mode, 'save'); assert.equal(dialogs[0].report, clean); }
   }
@@ -234,7 +240,7 @@ function loadedRenderFixture(fail = false) {
   const root = { name: 'test-library' }, token = { root, articleId: '2026-10/draft' };
   const retained = { id: 'retained-environment' }, restores = [], compiled = [], states = [];
   const context = {
-    useCallback: fn => fn, directoryRef: { current: root }, documentTokenRef: { current: token },
+    articleBaselineRef: { current: null }, articleDraftBaseline, useCallback: fn => fn, directoryRef: { current: root }, documentTokenRef: { current: token },
     openDocument: () => token, restoreRenderEnvironment: async (_root, record) => {
       restores.push(record); if (fail) throw new Error('damaged retained manifest');
       return { snapshot: retained, css: '.retained {}', dispose() {} };

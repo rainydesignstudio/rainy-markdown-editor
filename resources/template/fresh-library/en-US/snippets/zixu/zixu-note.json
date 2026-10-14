@@ -1,0 +1,9 @@
+{
+  "id": "zixu-note",
+  "name": "Violet Notes · Note card",
+  "trigger": "//zixu-note",
+  "description": "A pale violet note with a bottom accent rule for additional context.",
+  "content": "<section class=\"my-6 border-b-2 border-article-accent bg-article-tint p-4\">\n  <p class=\"mt-0 mb-2 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">NOTE / CONTEXT</p>\n  <p class=\"m-0 text-[15px]/[1.85] text-article-ink\">▌Add an explanation, reminder or background information here.</p>\n</section>\n",
+  "icon": "sparkles",
+  "categoryId": "zixu"
+}

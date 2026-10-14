@@ -86,7 +86,9 @@ export class ProductError extends Error implements ProductMessageInfo {
 }
 
 export function productCause(error: unknown): ProductMessageValue {
-  return isProductMessage(error) ? { messageKey: error.messageKey, messageParams: error.messageParams } : error instanceof Error ? error.message : String(error);
+  return isProductMessage(error) ? { messageKey: error.messageKey, messageParams: error.messageParams }
+    : error instanceof Error ? error.message
+    : error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : String(error);
 }
 
 export function isProductCancellation(error: unknown): boolean {
@@ -113,8 +115,12 @@ export function formatDiagnosticMessage(value: unknown, t: TFunction): string {
   return formatProductMessage(value, t);
 }
 
+const productDiagnosticNames = new Map(['resources.referenceName', 'resources.outputName', 'resources.documentLinkName', 'math.name', 'mermaid.name'].map(key => [productText(key), key]));
+
 export function formatDiagnosticName(value: { name: string; domain?: string }, t: TFunction): string {
   if (value.domain === 'standard') return value.name;
+  const productKey = value.domain === 'product' ? productDiagnosticNames.get(value.name) : undefined;
+  if (productKey) return t('messages:' + productKey);
   if (value.name === '图片资源') return t('messages:image.resourceName');
   if (value.name === '资源相关渲染检查') return t('messages:image.deferredRenderName');
   if (/^本地图片 /.test(value.name)) return t('messages:diagnostic.names.localImage', { fileName: value.name.slice(5) });

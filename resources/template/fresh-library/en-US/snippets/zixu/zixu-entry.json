@@ -1,0 +1,9 @@
+{
+  "id": "zixu-entry",
+  "name": "Violet Notes · Labeled entry",
+  "trigger": "//zixu-entry",
+  "description": "A third-level heading, bold body text and a single rule for the Violet Notes theme.",
+  "content": "<h3 class=\"text-sm text-article-accent tracking-widest\"> 01 / KEY POINT </h3>\n\n**Key point**　▌Add an explanation or example.\n\n<span class=\"block my-6\"></span>\n\n<hr />",
+  "icon": "tag",
+  "categoryId": "zixu"
+}

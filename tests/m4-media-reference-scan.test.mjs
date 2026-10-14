@@ -75,8 +75,8 @@ async function dialog(scanner) {
   let cursor = 0, tree, closes = 0, scans = 0, lastSignal;
   const request = { type: 'delete', assets: [{ kind: 'shared', fileName: 'sample.png' }] };
   const props = { request, articles: [], busy: false, isCurrent: () => true, currentReferences: 2, scanReferences: (assets, signal) => { scans++; lastSignal = signal; return scanner(assets, signal); }, onClose: () => closes++, onSubmit: async () => ({ ok: true }) };
-  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText, { module, exports: module.exports, AbortController, Error, require: withUILocaleImports(function(id){
-    if (id === 'react/jsx-runtime') return { jsx, jsxs };
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText, { module, exports: module.exports, AbortController, Error, window: { addEventListener() {}, removeEventListener() {} }, require: withUILocaleImports(function(id){
+    if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-dialog' }; if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
       useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; },

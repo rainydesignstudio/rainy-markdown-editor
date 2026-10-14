@@ -3,9 +3,8 @@
 import { productCause, productText } from "../lib/i18n/productMessages";
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getArticleMediaDirectory } from '../lib/fileSystem';
-import { readMediaMetadata } from '../lib/mediaManagement';
-import { listArticleImages, listSharedImages, getSharedImageDirectory, type LibraryMediaAsset } from '../lib/articleMedia';
+import { listResourceAssets, type ResourceDestination } from '../lib/resources/storage';
+import type { LibraryMediaAsset } from '../lib/articleMedia';
 import type { ArticleSummary } from '../lib/types';
 
 export function useMediaLibrary({ root, sessionKey, refreshSignal, articles, isRootCurrent }: {
@@ -28,30 +27,19 @@ export function useMediaLibrary({ root, sessionKey, refreshSignal, articles, isR
     if (!root) { setLoading(false); return () => { cancelled = true; }; }
     setLoading(true);
     void (async () => {
-      const rows = await Promise.all([
-        (async () => {
-          try {
-            const assets = await listSharedImages(root), directory = await getSharedImageDirectory(root);
-            try { const metadata: Awaited<ReturnType<typeof readMediaMetadata>> = directory ? await readMediaMetadata(directory) : { version: 1, images: {} }; return { assets: assets.map(asset => ({ ...asset, description: metadata.images[asset.fileName]?.description ?? '' })), issues: [] as string[] }; }
-            catch (error) { return { assets, issues: [productText("useMediaLibrary.sharedDescriptionReadingFailed", { "cause": productCause(error) })] }; }
+      const destinations: ResourceDestination[] = [{ kind: 'shared' }, ...articles.map(article => ({ kind: 'article' as const, articleId: article.id, month: article.month, folder: article.folder, title: article.parse.metadata.title }))];
+      const rows: Array<{ assets: LibraryMediaAsset[]; issues: string[] }> = []; let index = 0;
+      await Promise.all(Array.from({ length: Math.min(4, destinations.length) }, async () => {
+        while (index < destinations.length && current()) {
+          const target = destinations[index++];
+          try { const issues: string[] = []; const assets = await listResourceAssets(root, target, current, error => issues.push(productText('resources.metadataIssue', { cause: productCause(error) }))); rows.push({ assets, issues }); }
+          catch (error) {
+            if (!current()) return;
+            if (error instanceof DOMException && error.name === 'NotFoundError') continue;
+            rows.push({ assets: [], issues: [productText('resources.listFailed', { name: target.kind === 'shared' ? root.name : target.title, cause: productCause(error) })] });
           }
-          catch (error) { return { assets: [], issues: [productText("useMediaLibrary.sharedImageReadingFailed", { "cause": productCause(error) })] }; }
-        })(),
-        ...articles.map(async (article) => {
-          if (!current()) return { assets: [], issues: [] as string[] };
-          try {
-            const directory = await getArticleMediaDirectory(root, article.month, article.folder, false);
-            if (!current()) return { assets: [], issues: [] as string[] };
-            const files = await listArticleImages(directory);
-            let metadata: Awaited<ReturnType<typeof readMediaMetadata>> = { version: 1, images: {} }, metadataIssue = '';
-            try { metadata = await readMediaMetadata(directory); } catch (error) { metadataIssue = productText("useMediaLibrary.imageDescriptionReadingFailed", { "cause": productCause(error) }); }
-            return { assets: files.map((file): LibraryMediaAsset => ({ ...file, description: metadata.images[file.fileName]?.description ?? '', kind: 'article', root, articleId: article.id, month: article.month, folder: article.folder, articleTitle: article.parse.metadata.title })), issues: metadataIssue ? [metadataIssue] : [] as string[] };
-          } catch (error) {
-            if (error && typeof error === 'object' && 'name' in error && error.name === 'NotFoundError') return { assets: [], issues: [] as string[] };
-            return { assets: [], issues: [`${article.parse.metadata.title} · ${error instanceof Error ? error.message : String(error)}`] };
-          }
-        }),
-      ]);
+        }
+      }));
       if (!current()) return;
       setResult({ root, session: sessionKey, assets: rows.flatMap((row) => row.assets), issues: rows.flatMap((row) => row.issues) });
       setLoading(false);

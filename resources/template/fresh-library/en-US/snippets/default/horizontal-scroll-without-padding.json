@@ -1,0 +1,9 @@
+{
+  "id": "horizontal-scroll-without-padding",
+  "name": "Four-image horizontal scroll without padding",
+  "trigger": "//horizontal-scroll-without-padding",
+  "description": "Four sample images in a horizontally scrolling row, without padding and with one shared caption.",
+  "content": "<section class=\"overflow-x-auto pb-3\">\n  <section data-ignore-width class=\"flex items-center justify-start gap-3\">\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n  </section>\n</section>\n\n<figcaption class=\"block mt-2 mb-4 text-center text-xs text-article-muted italic\">&lt;&lt; Swipe left to see the images</figcaption>",
+  "icon": "image",
+  "categoryId": "default"
+}

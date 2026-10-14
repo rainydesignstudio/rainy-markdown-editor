@@ -21,7 +21,7 @@
   },
   "source": {
     "unsavedTitle": "Unsaved manuscript",
-    "info": "Click the file to edit its information",
+    "info": "Click to edit manuscript details",
     "showLines": "Show line numbers",
     "hideLines": "Hide line numbers",
     "find": "Find and replace (⌘F / Ctrl+F)",
@@ -33,7 +33,8 @@
     "metadataReadOnly": "Body is read-only while metadata has errors",
     "notStored": "This article is not saved in a library yet. No article file is created before saving.",
     "lineToggle": "{{action}} (⌘/ / Ctrl+/)",
-    "diagnosticsUnavailable": "Authoring diagnostics unavailable: {{message}}"
+    "diagnosticsUnavailable": "Authoring diagnostics unavailable: {{message}}",
+    "saveRefreshPreview": "Save to refresh preview"
   },
   "workspace": {
     "panes": "Switch between source and preview",
@@ -63,9 +64,7 @@
     "options": "Preview options",
     "scrollSync": "Align preview scrolling",
     "saveReport": "Show format check after manual save",
-    "saveOnly": "Refresh preview only after saving",
-    "frozen": "Preview is retained until the next successful save.",
-    "frozenSyncPaused": "Preview is retained. Source changed; scroll alignment is paused until saving."
+    "saveOnly": "Refresh preview only after saving"
   },
   "clipboard": {
     "title": "Clipboard receiver",
@@ -104,7 +103,7 @@
     "label": "Insert element",
     "readOnly": "Archived document is read-only",
     "unavailable": "Insertion is unavailable",
-    "images": "Images",
+    "images": "Assets",
     "fromLibrary": "Choose from asset library",
     "chooseImage": "Choose images",
     "snippets": "Snippet library",

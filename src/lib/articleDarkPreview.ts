@@ -1,6 +1,12 @@
 import { ProductError } from "./i18n/productMessages";
 import { getFormatSnapshot, type FormatSnapshot } from './article-format/runtime';
 import { formatPreviewDocument } from './article-format/frame';
+import { INSPECTION_CLASSES } from './themeInspection';
+const INSPECTION_STATE_CLASSES = new Set(INSPECTION_CLASSES.filter(name => name.startsWith('data-[theme-inspection-')));
+export function articlePreviewMarkup(root: HTMLElement): string {
+  return root.outerHTML.replace(/\sdata-theme-inspection-[\w-]+="[^"]*"/g, '')
+    .replace(/\sclass="([^"]*)"/g, (_, names: string) => ` class="${names.split(/\s+/).filter(name => !INSPECTION_STATE_CLASSES.has(name)).join(' ')}"`);
+}
 // Configured conversion runs only in a fresh document. The light DOM remains untouched.
 export function observeArticlePreview(root: HTMLElement, refresh: () => void): () => void {
   let active = true;
@@ -9,7 +15,7 @@ export function observeArticlePreview(root: HTMLElement, refresh: () => void): (
     if (!active) return;
     // React can reapply identical attributes (for example checkbox defaults).
     // A notification alone must never trigger another iframe navigation.
-    const content = root.outerHTML;
+    const content = articlePreviewMarkup(root);
     if (content === previous) return;
     previous = content;
     refresh();

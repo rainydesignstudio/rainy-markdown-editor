@@ -67,6 +67,12 @@ function createArticleColorNormalizer(doc) {
 }
 
 window.ArticleColorNormalizer = createArticleColorNormalizer;
+/** Legacy render records infer their source without rewriting stored JSON. */
+function articleDarkMode(formatter) {
+    return formatter.preview.dark.mode ?? (formatter.preview.dark.transform === 'preserve' ? 'tokens' : 'algorithm');
+}
+
+
 
 // Loaded as a local static script in srcdoc frames. Configuration remains inert JSON.
 async function runFormatFrameBootstrap() {
@@ -88,7 +94,12 @@ async function runFormatFrameBootstrap() {
             parent.postMessage({ token: payload.token, result }, payload.origin);
         }
         else if (payload.kind === 'preview') {
-            if (payload.dark)
+            if (payload.dark && articleDarkMode(payload.bundle.formatter) === 'tokens') {
+                document.documentElement.classList.add('dark');
+                document.documentElement.dataset.previewMode = 'dark';
+                root.setAttribute('data-article-dark-tokens', 'true');
+            }
+            else if (payload.dark)
                 await api.ArticleFormatEngine.transform(root, payload.bundle);
         }
         else

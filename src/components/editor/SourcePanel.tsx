@@ -4,13 +4,15 @@ import { formatProductMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MutableRefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type MutableRefObject, type ReactNode } from 'react';
+import { captureEditingLocation, restoreEditingLocation, type RememberedEditingLocation } from '../../lib/editingLocation';
 import type { ArticleSnippet, SnippetCategory, WorkingArticle } from '../../lib/types';
 import type { ArticleFormatIssue } from '../../lib/articleFormat';
 import { validateArticleAuthoringMarkdown } from '../../lib/articleAuthoringFormat';
 import { groupSourceLineIssues, logicalSourceLines } from '../../lib/sourceLineDiagnostics';
 import type { Tone } from '../../hooks/useEditorController';
-import { inspectLocalArticleImages } from '../../lib/mediaManagement';
+import { inspectArticleResources, type ResourceProbeCache } from '../../lib/resources/inspection';
+import { useResourceDocumentVersion } from '../../hooks/imports/useResourceVersion';
 import { useAuthoringChecks } from '../../hooks/useMediaPreferences';
 import { useSourceLineNumbers } from '../../hooks/useSourceLineNumbers';
 import { SnippetTextarea } from '../content/SnippetTextarea';
@@ -21,18 +23,27 @@ import { FindIcon } from '../content/SourceFindBar';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
 import type { parseArticle } from '../../lib/frontMatter';
+import { usePreviewPreferences } from '../../hooks/usePreviewPreferences';
+
+const EMPTY_FORMAT_ISSUES: readonly ArticleFormatIssue[] = [];
 
 type Props = {
   article: WorkingArticle;
   parsed: ReturnType<typeof parseArticle>;
   revision: number;
   mediaRevision?: number;
+  resourceSessionKey?: string | number;
+  sourceFormatIssues?: readonly ArticleFormatIssue[];
+  sourceHistoryKey?: number;
   status: { label: string; tone: Tone; formatRevision?: number };
+  importProgress?: ReactNode;
   mobilePane: 'source' | 'preview';
   directory: FileSystemDirectoryHandle | null;
   snippets: ArticleSnippet[];
   snippetCategories: SnippetCategory[];
   sourceTextareaRef: MutableRefObject<HTMLTextAreaElement | null>;
+  editingLocationRef?: MutableRefObject<RememberedEditingLocation | null>;
+  sourceFocusDisabled?: boolean;
   onChangeBody: (value: string) => void;
   onSnippetInserted: () => void;
   onImportFiles: (files: File[], selection: { start: number; end: number }) => void | Promise<void>;
@@ -48,12 +59,18 @@ export function SourcePanel({
   parsed,
   revision,
   mediaRevision = 0,
+  resourceSessionKey,
+  sourceFormatIssues = EMPTY_FORMAT_ISSUES,
+  sourceHistoryKey,
   status,
+  importProgress,
   mobilePane,
   directory,
   snippets,
   snippetCategories,
   sourceTextareaRef,
+  editingLocationRef,
+  sourceFocusDisabled = false,
   onChangeBody,
   onSnippetInserted,
   onImportFiles,
@@ -64,6 +81,20 @@ export function SourcePanel({
   readOnly,
 }: Props) {
   const { t } = useUITranslation('editor');
+  const { preferences } = usePreviewPreferences();
+  const dirtyRef = useRef(article.dirty); dirtyRef.current = article.dirty;
+  useLayoutEffect(() => {
+    const textarea = sourceTextareaRef.current;
+    const viewport = textarea?.closest<HTMLElement>('[data-source-viewport]') ?? null;
+    const remembered = editingLocationRef?.current;
+    if (remembered && remembered.key === sourceHistoryKey) restoreEditingLocation(remembered.location, () => viewport, !sourceFocusDisabled);
+    return () => {
+      const location = dirtyRef.current ? captureEditingLocation(viewport, textarea) : null;
+      if (location && editingLocationRef) editingLocationRef.current = { key: sourceHistoryKey, location };
+    };
+    // Restore only when this document's editor mounts, not on typing or dialog toggles.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceHistoryKey, sourceTextareaRef, editingLocationRef]);
   const formatSnapshot = useFormatSnapshot();
   const openFindRef = useRef<(() => void) | null>(null);
   const openPickerRef = useRef<(() => void) | null>(null);
@@ -73,11 +104,15 @@ export function SourcePanel({
   const { showLineNumbers, toggle: toggleLineNumbers } = useSourceLineNumbers();
   const [checksEnabled, setChecksEnabled] = useAuthoringChecks();
   const [fileRevision, setFileRevision] = useState(0);
+  const resourceDocumentId = article.month && article.folder ? `${article.month}/${article.folder}` : 'draft';
+  const resourceDocumentRevision = useResourceDocumentVersion(directory, resourceDocumentId);
+  const probeCache = useRef<{ root: FileSystemDirectoryHandle | null; id: string; entries: ResourceProbeCache }>({ root: directory, id: resourceDocumentId, entries: new Map() });
+  if (probeCache.current.root !== directory || probeCache.current.id !== resourceDocumentId) probeCache.current = { root: directory, id: resourceDocumentId, entries: new Map() };
   useEffect(() => { const refresh = () => setFileRevision(value => value + 1); window.addEventListener('focus', refresh); return () => window.removeEventListener('focus', refresh); }, []);
   const [lineIssues, setLineIssues] = useState<ArticleFormatIssue[]>([]);
   const [lineValidationError, setLineValidationError] = useState('');
   const lineCount = useMemo(() => logicalSourceLines(parsed.body).length, [parsed.body]);
-  const lineConcerns = useMemo(() => groupSourceLineIssues(lineIssues, lineCount), [lineIssues, lineCount]);
+  const lineConcerns = useMemo(() => groupSourceLineIssues(checksEnabled ? [...lineIssues, ...sourceFormatIssues] : [], lineCount), [checksEnabled, lineIssues, sourceFormatIssues, lineCount]);
 
   useEffect(() => {
     setLineIssues([]);
@@ -87,7 +122,7 @@ export function SourcePanel({
     // Utility checks compile CSS. Wait until typing pauses so the source field
     // stays responsive while the reader edits a long article.
     const timer = window.setTimeout(() => {
-      void Promise.all([validateArticleAuthoringMarkdown(parsed.body, '当前文章正文'), inspectLocalArticleImages(parsed.body, directory, article.month, article.folder)]).then((results) => {
+      void Promise.all([validateArticleAuthoringMarkdown(parsed.body, '当前文章正文'), inspectArticleResources(parsed.body, { root: directory, month: article.month, folder: article.folder }, { readTasks: false, isCurrent: () => current, cache: probeCache.current.entries, cacheScope: `${resourceSessionKey}:${fileRevision}` })]).then((results) => {
         const issues = results.flat();
         if (!current) return;
         setLineIssues(issues);
@@ -98,7 +133,7 @@ export function SourcePanel({
       });
     }, 600);
     return () => { current = false; window.clearTimeout(timer); };
-  }, [parsed.body, checksEnabled, directory, article.month, article.folder, mediaRevision, fileRevision, formatSnapshot.id]);
+  }, [parsed.body, checksEnabled, directory, article.month, article.folder, mediaRevision, resourceSessionKey, resourceDocumentRevision, fileRevision, formatSnapshot.id]);
   const handleImageFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? []);
     const textarea = sourceTextareaRef.current;
@@ -106,7 +141,7 @@ export function SourcePanel({
     event.currentTarget.value = '';
     if (files.length) void onImportFiles(files, selection);
   };
-  const fileName = article.month && article.folder ? 'article.md' : t('editor:source.unsavedTitle');
+  const fileName = article.month && article.folder ? article.folder : t('editor:source.unsavedTitle');
 
   return (
     <section className="panel source-panel" data-mobile-hidden={mobilePane === 'preview'} onKeyDownCapture={event => {
@@ -134,6 +169,7 @@ export function SourcePanel({
         </div>
       </div>
       <SnippetTextarea
+        historyKey={sourceHistoryKey}
         key={typeof parsed.metadata?.id === 'string' ? parsed.metadata.id : undefined}
         ref={sourceTextareaRef}
         value={parsed.body}
@@ -154,7 +190,8 @@ export function SourcePanel({
       <div className="source-footer">
         <label className="flex shrink-0 items-center gap-1.5 text-2xs text-muted"><input type="checkbox" role="switch" className="size-3 accent-accent" checked={checksEnabled} onChange={event => setChecksEnabled(event.target.checked)} aria-label={checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')} />{checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')}</label>
         <span className="status-copy" data-tone={status.tone} role="status">{formatProductMessage(status, t)}</span>
-        <span className="status-copy">{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}{status.formatRevision === revision ? '' : ` · revision ${revision}`}</span>
+        {importProgress}
+        <span className="status-copy">{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}{preferences.saveOnly ? ` · ${t('editor:source.saveRefreshPreview')}` : ''}{status.formatRevision === revision ? '' : ` · revision ${revision}`}</span>
         {parsed.diagnostics.some((item) => item.level === 'error') ? <span className="status-copy" data-tone="error">{t('editor:source.metadataReadOnly')}</span> : null}
         {checksEnabled && lineValidationError ? <span className="status-copy" data-tone="warning" role="status">{t('editor:source.diagnosticsUnavailable', { message: lineValidationError })}</span> : null}
       </div>

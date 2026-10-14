@@ -8,6 +8,11 @@ import * as sizing from '../src/lib/editorLayout.ts';
 const source = await readFile(new URL('../src/hooks/useResizableColumns.ts', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 
+function pointerTarget() {
+  let pointerId = null;
+  return { releases: [], setPointerCapture(id) { pointerId = id; }, hasPointerCapture(id) { return pointerId === id; }, releasePointerCapture(id) { assert.equal(pointerId, id); pointerId = null; this.releases.push(id); }, captured() { return pointerId; } };
+}
+
 function columns() {
   let cursor = 0, layout, width = 1200, desktop = true, identity = 'first';
   const cells = [], effects = [], observers = [], listeners = new Map();
@@ -37,13 +42,13 @@ function columns() {
 test('shared splitter captures drag, clamps both panes and supports the same keyboard boundaries', () => {
   const view = columns();
   assert.equal(view.layout.wideEnough, true);
-  let captured;
-  view.layout.startDrag({ button: 0, pointerId: 5, currentTarget: { setPointerCapture: id => captured = id } }); view.render();
-  assert.equal(captured, 5); assert.equal(view.layout.dragging, true);
-  view.layout.moveDrag({ clientX: 5000 }); view.render();
+  const target = pointerTarget();
+  view.layout.startDrag({ button: 0, pointerId: 5, currentTarget: target }); view.render();
+  assert.equal(target.captured(), 5); assert.equal(view.layout.dragging, true);
+  view.layout.moveDrag({ buttons: 1, clientX: 5000 }); view.render();
   assert.ok(Math.abs(sizing.getEditorSourceWidth(1200, view.layout.ratio) - 828) < 0.001);
   view.layout.stopDrag(); view.render();
-  assert.equal(view.layout.dragging, false);
+  assert.equal(view.layout.dragging, false); assert.deepEqual(target.releases, [5]);
   let prevented = false;
   view.layout.keyResize({ key: 'Home', preventDefault() { prevented = true; } }); view.render();
   assert.equal(prevented, true); assert.equal(sizing.getEditorSourceWidth(1200, view.layout.ratio), 360);
@@ -56,11 +61,11 @@ test('shared splitter captures drag, clamps both panes and supports the same key
 
 test('narrowing or leaving the desktop breakpoint stops dragging and releases resize observers', () => {
   const view = columns();
-  view.layout.startDrag({ button: 0, pointerId: 1, currentTarget: { setPointerCapture() {} } }); view.render();
+  view.layout.startDrag({ button: 0, pointerId: 1, currentTarget: pointerTarget() }); view.render();
   view.resize(620);
   assert.equal(view.layout.wideEnough, false); assert.equal(view.layout.dragging, false);
   const ratio = view.layout.ratio;
-  view.layout.moveDrag({ clientX: 150 }); view.render();
+  view.layout.moveDrag({ buttons: 1, clientX: 150 }); view.render();
   assert.equal(view.layout.ratio, ratio, 'late pointer move must not resize the stacked panes');
   view.resize(1200, false); assert.equal(view.layout.wideEnough, false);
   view.resize(1200, true); assert.equal(view.layout.wideEnough, true);
@@ -69,7 +74,7 @@ test('narrowing or leaving the desktop breakpoint stops dragging and releases re
 
 test('releasing outside the splitter or leaving the window restores preview interaction', () => {
   const view = columns();
-  const capture = { setPointerCapture() {} };
+  const capture = pointerTarget();
   view.layout.startDrag({ button: 0, pointerId: 1, currentTarget: capture }); view.render();
   assert.equal(view.layout.dragging, true);
   view.dispatch('pointerup'); view.render();
@@ -84,13 +89,27 @@ test('releasing outside the splitter or leaving the window restores preview inte
   assert.equal(view.listeners.size, 0);
 });
 
-test('changing a split-view identity while dragging clears both the ref and iframe-disabling state', () => {
+test('changing a split-view identity while dragging clears drag and releases capture', () => {
   const view = columns();
-  view.layout.startDrag({ button: 0, pointerId: 7, currentTarget: { setPointerCapture() {} } }); view.render();
+  view.layout.startDrag({ button: 0, pointerId: 7, currentTarget: pointerTarget() }); view.render();
   assert.equal(view.layout.dragging, true);
   view.identity('second');
   assert.equal(view.layout.dragging, false);
   view.dispatch('pointerup'); view.render(); assert.equal(view.layout.dragging, false);
-  const ratio = view.layout.ratio; view.layout.moveDrag({ clientX: 5000 }); view.render();
+  const ratio = view.layout.ratio; view.layout.moveDrag({ buttons: 1, clientX: 5000 }); view.render();
   assert.equal(view.layout.ratio, ratio); view.unmount();
+});
+
+test('every external drag exit releases the actual pointer, and inactive pointers cannot start a drag', () => {
+  for (const exit of [view => view.dispatch('pointerup'), view => view.dispatch('pointercancel'), view => view.dispatch('blur'), view => view.hide(), view => view.resize(620), view => view.identity('next'), view => view.unmount()]) {
+    const view = columns(), target = pointerTarget();
+    view.layout.startDrag({ button: 1, pointerId: 1, currentTarget: target }); view.render();
+    assert.equal(target.captured(), null);
+    view.layout.startDrag({ button: 0, isPrimary: false, pointerId: 2, currentTarget: target }); view.render();
+    assert.equal(target.captured(), null);
+    view.layout.startDrag({ button: 0, pointerId: 3, currentTarget: target }); view.render();
+    exit(view); view.render();
+    assert.equal(target.captured(), null); assert.deepEqual(target.releases, [3]);
+    view.unmount();
+  }
 });

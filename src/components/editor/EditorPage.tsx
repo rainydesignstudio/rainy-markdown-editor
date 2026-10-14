@@ -6,6 +6,7 @@ import { useUITranslation } from '../global/UILocaleProvider';
 
 import { useEditorControllerContext } from '../global/AppProviders';
 import { EditorWorkspace } from './EditorWorkspace';
+import { ImportProgressButton } from '../imports/ImportTasksDialog';
 import { availableArticleThemeUpdate } from '../../lib/articleThemeUpdate';
 
 export function EditorPage() {
@@ -35,9 +36,12 @@ export function EditorPage() {
       compiledRevision={controller.compiledRevision}
       savedPreviewRevision={controller.savedPreviewRevision}
       documentGeneration={controller.currentDocumentGeneration}
+      sourceHistoryKey={controller.sourceHistoryKey}
       revision={controller.revision}
       mediaRevision={controller.mediaRefreshRevision}
+      sourceFormatIssues={controller.sourceFormatIssues}
       status={controller.status}
+      importProgress={<ImportProgressButton task={controller.markdownImport.pending.find(item => item.task.target.articleId === controller.currentArticleId)?.task ?? null} onClick={() => controller.markdownImport.openTasks(controller.currentArticleId)} />}
       mobilePane={controller.mobilePane}
       directory={controller.directory}
       snippets={controller.snippets}
@@ -46,6 +50,8 @@ export function EditorPage() {
       attachPreview={controller.attachPreview}
       clipboardReceiverRef={controller.clipboardReceiverRef}
       sourceTextareaRef={controller.sourceTextareaRef}
+      editingLocationRef={controller.articleSourceLocationRef}
+      sourceFocusDisabled={controller.articleInfoDialogOpen}
       onChangeBody={controller.updateArticleBody}
       onSnippetInserted={() => { void controller.compileCurrent(); }}
       onOpenInfo={() => controller.openArticleInfo()}

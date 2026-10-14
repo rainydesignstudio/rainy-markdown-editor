@@ -18,7 +18,7 @@ export async function resolve(specifier, context, nextResolve) {
 }
 
 export async function load(url, context, nextLoad) {
-  if (url.startsWith('file:') && url.endsWith('.md') && new URL(url).pathname.includes('/resources/template/fresh-library/templates/')) {
+  if (url.startsWith('file:') && url.endsWith('.md') && new URL(url).pathname.match(/\/resources\/template\/fresh-library\/(?:en-US|zh-CN)\/(?:templates\/|themes\/preview\.md$)/)) {
     return { format: 'module', shortCircuit: true, source: 'export default ' + JSON.stringify(await readFile(new URL(url), 'utf8')) + ';' };
   }
   return nextLoad(url, context);

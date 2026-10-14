@@ -1,8 +1,0 @@
-{
-  "id": "zixu-note",
-  "name": "紫序 · 提示卡",
-  "trigger": "//zixu-note",
-  "description": "淡紫提示卡与底部强调线，适合补充上下文。",
-  "content": "<section class=\"my-6 border-b-2 border-article-accent bg-article-tint p-4\">\n  <p class=\"mt-0 mb-2 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">NOTE / CONTEXT</p>\n  <p class=\"m-0 text-[15px]/[1.85] text-article-ink\">▌这里写补充说明、提醒或背景信息。</p>\n</section>\n",
-  "categoryId": "zixu"
-}

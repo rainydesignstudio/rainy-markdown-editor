@@ -22,6 +22,8 @@ function page(fileSystem = {}) {
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
     if (id.endsWith('/article-format/runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
+    if (id.endsWith('/useThemePreviewSample')) return { useThemePreviewSample: () => ({ status: 'ready', markdown: '# Sample', origin: 'library' }) };
+    if (id.endsWith('/themePreviewSample')) return {};
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/article-format/preview')) return { articlePreviewStyle: value => value, previewSurfaceStyle: () => ({}) };
     if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input' };
@@ -82,7 +84,7 @@ test('selecting a theme previews it without applying or writing; explicit applic
   const view = page();
   view.find(node => node.props['aria-label'] === '预览主题 Rainy Design').props.onClick(); view.render();
   assert.equal(view.find(node => node.props.id === 'theme-preview-title').props.children, 'Rainy Design');
-  assert.equal(view.find(node => node.props['aria-label'] === '预览主题 基础').props['aria-pressed'], false);
+  assert.equal(view.find(node => node.props['aria-label'] === `预览主题 ${themes.BASIC_THEME.name}`).props['aria-pressed'], false);
   assert.equal(view.applied.length, 0);
   assert.equal(view.writes.length, 0);
   view.button('应用到当前稿').props.onClick();
@@ -108,7 +110,7 @@ test('removed selections and new root libraries select an available preview', ()
   const view = page();
   view.find(node => node.props['aria-label'] === '预览主题 Rainy Design').props.onClick(); view.render();
   view.props.themes = [themes.BASIC_THEME]; view.render();
-  assert.equal(view.find(node => node.props.id === 'theme-preview-title').props.children, '基础');
+  assert.equal(view.find(node => node.props.id === 'theme-preview-title').props.children, themes.BASIC_THEME.name);
   view.props.root = null; view.render(); view.render();
   assert.equal(view.button('导入 JSON').props.disabled, true);
   assert.equal(view.button('新建主题').props.disabled, true);
@@ -196,7 +198,7 @@ test('confirmed deletion locks duplicate actions, updates selection, and preserv
   assert.throws(() => deletionDialog(view), /Control exists/);
   assert.deepEqual(view.writes.map(call => call[1].map(theme => theme.id)), [themes.THEMES.filter(theme => theme.id !== 'rainy').map(theme => theme.id), ['basic']]);
   view.props.themes = view.writes.at(-1)[1]; view.render();
-  assert.equal(view.find(node => node.props.id === 'theme-preview-title').props.children, '基础');
+  assert.equal(view.find(node => node.props.id === 'theme-preview-title').props.children, themes.BASIC_THEME.name);
   assert.equal(view.applied.length, 0);
   assert.equal(view.props.currentTheme, themes.BASIC_THEME);
 });

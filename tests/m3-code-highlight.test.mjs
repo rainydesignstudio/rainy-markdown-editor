@@ -29,7 +29,7 @@ function authoredCodeText(node) {
 
 function asDom(node, parentElement = null) {
   if (node.type === 'text') return { nodeType: 3, textContent: node.value, childNodes: [], parentElement };
-  const element = { nodeType: 1, tagName: node.tagName?.toUpperCase(), parentElement, childNodes: [], hasAttribute: name => Boolean(node.properties?.[name]) };
+  const element = { nodeType: 1, tagName: node.tagName?.toUpperCase(), parentElement, childNodes: [], hasAttribute: name => Boolean(node.properties?.[name]), getAttribute: name => node.properties?.[name] ?? null };
   element.childNodes = (node.children ?? []).map(child => asDom(child, element));
   return element;
 }

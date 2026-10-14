@@ -1,0 +1,9 @@
+{
+  "id": "rainy-opening",
+  "name": "Rainy Design · Opening",
+  "trigger": "//rainy-opening",
+  "description": "An opening I like.",
+  "content": "<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5 rounded-xl\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">EYEBROW / TEXT</p>\n  <h1 class=\"m-0 border-b border-article-line pb-4 text-[26px]/[1.5] font-bold text-article-accent\">This is the first line<br />Use a break element for a new line<br /><span class=\"text-article-accent\">Avoid <em class=\"bg-article-accent text-white/67 pr-1\">large gaps</em> between lines</span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">If Tailwind CSS feels confusing and you do not want to learn HTML, why not try creating through conversation? An LLM can help.<br />Ask it to read this project's README, then say:<br />“Here is what I want my theme to look like…▌”</p>\n</section>",
+  "icon": "document",
+  "categoryId": "rainy-design"
+}

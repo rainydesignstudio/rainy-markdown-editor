@@ -1,4 +1,8 @@
 export type StylesheetsPolicy = { entry: string; publicRoot: string; allowUnknownClasses?: boolean };
+/** Legacy render records infer their source without rewriting stored JSON. */
+export function articleDarkMode(formatter: { preview: { dark: { mode?: 'algorithm' | 'tokens'; transform: string } } }): 'algorithm' | 'tokens' {
+  return formatter.preview.dark.mode ?? (formatter.preview.dark.transform === 'preserve' ? 'tokens' : 'algorithm');
+}
 export type RenderContainer = { tag: string; id?: string; classes: string[] };
 export type RenderDocumentPolicy = {
   root: RenderContainer;

@@ -6,6 +6,7 @@ import test from 'node:test';
 const { initializeThemeDefaults } = await import('../src/lib/themeDefaults.ts');
 const { BASIC_THEME, RAINY_THEME, THEMES } = await import('../src/lib/themes.ts');
 const { themePreviewCss, themeToCss } = await import('../src/lib/themes.ts');
+const { themeColorValue } = await import('../src/lib/themes.ts');
 const { refreshRootSession } = await import('../src/lib/rootSession.ts');
 const { parseThemeConfigJson, validateThemeConfig, validateThemeFormat } = await import('../src/lib/themeValidation.ts');
 const { createArticleSource: createBaseArticleSource, updateFrontMatter } = await import('../src/lib/frontMatter.ts');
@@ -343,4 +344,36 @@ test('applying another theme creates an independent copy with matching metadata 
   assert.equal(await (await targetImage.getFile()).text(), 'image bytes');
   assert.equal(await readText(sourceDirectory, 'article.md'), sourceText);
   assert.equal(await readText(sourceDirectory, 'theme.json'), sourceSnapshot);
+});
+
+
+test('partial dark colors inherit safely, reject unsafe keys and cycles, and persist with article snapshots', async () => {
+  const theme = { ...BASIC_THEME, dark: { tokens: { 'color-article-ink': '#ddeeff', 'color-article-heading': 'var(--color-article-ink)' } } };
+  assert.deepEqual(validateThemeConfig(theme), []);
+  assert.equal(themeColorValue(theme, 'color-article-heading', true), '#ddeeff');
+  assert.equal(themeColorValue(theme, 'color-article-accent', true), BASIC_THEME.tokens['color-article-accent']);
+  assert.equal(themeColorValue(theme, 'color-article-ink'), BASIC_THEME.tokens['color-article-ink']);
+  const css = themeToCss(theme);
+  assert.match(css, /\.article-preview\[data-article-dark-tokens="true"\]\s*\{[^}]*--color-article-ink: #ddeeff/);
+  assert.doesNotMatch(themeToCss(BASIC_THEME), /data-article-dark-tokens/, 'legacy themes are not implicitly migrated');
+  for (const dark of [null, [], { tokens: [] }, { tokens: {}, editable: true }, { tokens: { 'color-primary': '#fff' } }, { tokens: { 'font-article-sans': 'Arial' } }, { tokens: { 'color-article-ink': '2rem' } }, { tokens: { 'color-article-ink': 'url(https://example.invalid/a)' } }, { tokens: { 'color-article-ink': 'var(--color-primary)' } }, { tokens: { 'color-article-ink': 'var(--color-article-heading)', 'color-article-heading': 'var(--color-article-ink)' } }]) {
+    assert.ok(validateThemeConfig({ ...BASIC_THEME, dark }).length, JSON.stringify(dark));
+  }
+  const inheritedCycle = { ...BASIC_THEME, tokens: { ...BASIC_THEME.tokens, 'color-article-ink': 'var(--color-article-heading)' }, dark: { tokens: { 'color-article-heading': 'var(--color-article-ink)' } } };
+  assert.ok(validateThemeConfig(inheritedCycle).some(message => message.includes('循环')));
+  const root = new MemoryDirectoryHandle('dark-theme-storage');
+  await initializeThemeDefaults(root);
+  await saveThemeLibraryTheme(root, theme);
+  assert.deepEqual((await loadThemeLibrary(root)).themes.find(item => item.id === theme.id).dark, theme.dark);
+  const saved = await saveStoredArticle(root, createArticleSource('深色快照', theme.id), theme);
+  const directory = await (await (await root.getDirectoryHandle('articles')).getDirectoryHandle(saved.article.month)).getDirectoryHandle(saved.article.folder);
+  const stored = JSON.parse(await readText(directory, 'theme.json'));
+  assert.deepEqual(stored.dark, theme.dark);
+  assert.deepEqual(stored.tokens, theme.tokens);
+});
+
+test('public article theme template uses the registered colors and an optional manual dark group', async () => {
+  const template = JSON.parse(await readFile(new URL('../resources/template/article-theme-template.json', import.meta.url), 'utf8'));
+  assert.deepEqual(validateThemeConfig(template), []);
+  assert.deepEqual(template.dark, { tokens: {} });
 });

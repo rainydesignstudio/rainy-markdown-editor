@@ -9,22 +9,27 @@ import type { UILocale } from '../../lib/i18n/preferences';
 
 import { useRef, useState, type ChangeEvent } from 'react';
 import type { LibraryMediaAsset, MediaActionOutcome } from '../../lib/articleMedia';
+import { useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
+import { hasEditingDraft } from '../../lib/editingDrafts';
 import { IconButton } from '../global/IconButton';
 import { TooltipButton } from '../global/TooltipButton';
 import type { MediaPreferences } from '../../hooks/useMediaPreferences';
 import { ArticleImagePreview } from './ArticleImagePreview';
+import { ResourceGlyph } from './ResourceGlyph';
+import { libraryMediaAssetKey } from '../../lib/articleMedia';
+import { resourceType } from '../../lib/resources/types';
 
-export const mediaAssetKey = (asset: LibraryMediaAsset) => `${asset.kind}:${asset.kind === 'article' ? asset.articleId : 'shared'}:${asset.fileName}`;
+export const mediaAssetKey = libraryMediaAssetKey;
 export const mediaAssetOrigin = (asset: LibraryMediaAsset, sharedLabel = '共享素材') => asset.kind === 'shared' ? sharedLabel : asset.articleTitle;
-export function MediaSourceSwitch({ value, onChange, disabled, articleLabel: customArticleLabel }: {
+export function MediaSourceSwitch({ value, onChange, disabled, articleLabel: customArticleLabel, resourceLabels = false }: {
   value: 'shared' | 'article';
   onChange: (value: 'shared' | 'article') => void;
   disabled: boolean;
-  articleLabel?: string;
+  articleLabel?: string; resourceLabels?: boolean;
 }) {
   const { t } = useUITranslation('media');
   const articleLabel = customArticleLabel ?? t('media:ui.articleAssets');
-  return <div className="flex min-w-0 gap-1 rounded-lg bg-list p-1" role="group" aria-label={t('media:ui.imageSource')}>
+  return <div className="flex min-w-0 gap-1 rounded-lg bg-list p-1" role="group" aria-label={t(resourceLabels ? 'messages:resources.sourceLabel' : 'media:ui.imageSource')}>
     {(['shared', 'article'] as const).map((kind) => <button key={kind} type="button" aria-pressed={value === kind} disabled={disabled} onClick={() => onChange(kind)} className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-md px-2 py-2 text-sm font-medium text-muted transition-colors md:px-3 hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:bg-panel aria-pressed:text-accent-text"><MediaIcon name={kind === 'shared' ? 'shared' : 'article'} />{kind === 'shared' ? t('media:ui.sharedAssets') : articleLabel}</button>)}
   </div>;
 }
@@ -38,21 +43,23 @@ export function MediaIcon({ name }: { name: 'image' | 'import' | 'refresh' | 'cl
   </svg>;
 }
 
-export function MediaImportButton({ busy, disabled, onImport }: {
+export function MediaImportButton({ busy, disabled, onImport, onSelect, allResources = false }: {
   busy: boolean;
   disabled: boolean;
-  onImport: (files: File[]) => Promise<MediaActionOutcome>;
+  onImport?: (files: File[]) => Promise<MediaActionOutcome>;
+  onSelect?: (files: File[]) => void;
+  allResources?: boolean;
 }) {
   const { t } = useUITranslation('media');
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selectFiles = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.currentTarget.files ?? []);
     event.currentTarget.value = '';
-    if (files.length) void onImport(files);
+    if (files.length) { if (onSelect) onSelect(files); else void onImport?.(files); }
   };
   return <>
-    <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif" multiple hidden aria-label={t('media:ui.importSharedImageFiles')} onChange={selectFiles} />
-    <button className="button button-primary" type="button" disabled={busy || disabled} onClick={() => inputRef.current?.click()}><MediaIcon name="import" /><span>{busy ? t('media:ui.working') : t('media:ui.importSharedImages')}</span></button>
+    <input ref={inputRef} type="file" accept={allResources ? undefined : 'image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif'} multiple hidden aria-label={t(allResources ? 'messages:resources.importSharedFiles' : 'media:ui.importSharedImageFiles')} onChange={selectFiles} />
+    <button className="button button-primary" type="button" disabled={busy || disabled} onClick={() => inputRef.current?.click()}><MediaIcon name="import" /><span>{busy ? t('media:ui.working') : t(allResources ? 'messages:resources.importSharedFiles' : 'media:ui.importSharedImages')}</span></button>
   </>;
 }
 
@@ -81,6 +88,7 @@ export function MediaGallery({ assets, selected, onSelect, sessionKey, isCurrent
   canAdopt?: (asset: LibraryMediaAsset) => boolean; onNotice?: (notice: MediaActionOutcome) => void;
 }) {
   const { t } = useUITranslation('media');
+  const editingDrafts = useEditingDrafts();
   const { locale } = useUILocale();
   const [dimensions, setDimensions] = useState<Record<string, string>>({});
   return <div className="grid min-w-0 grid-cols-2 content-start gap-3 data-[columns=1]:grid-cols-1 md:data-[columns=2]:grid-cols-2 md:data-[columns=3]:grid-cols-3 md:data-[columns=4]:grid-cols-4" data-columns={columns} role="group" aria-label={t('media:ui.imageList')}>
@@ -89,16 +97,16 @@ export function MediaGallery({ assets, selected, onSelect, sessionKey, isCurrent
       return <article key={key} data-selected={chosen} data-selecting={Boolean(selectedKeys)} data-layout={columns === 1 ? 'list' : 'grid'} className="group relative grid min-w-0 content-start overflow-hidden rounded-lg border border-line bg-panel shadow-panel transition duration-300 hover:border-accent-line data-[selected=true]:border-accent-line data-[selected=true]:bg-accent-soft data-[layout=list]:flex">
         <button type="button" disabled={disabled} aria-label={t('media:templates.selectOrigin', { name: asset.fileName, origin: mediaAssetOrigin(asset, t('media:ui.sharedAssets')) })} aria-pressed={selectedKeys ? undefined : chosen} role={selectedKeys ? 'checkbox' : undefined} aria-checked={selectedKeys ? chosen : undefined} onClick={() => onSelect(asset)} className="absolute inset-0 cursor-default rounded-lg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"><span aria-hidden="true" className="absolute top-0 left-0 aspect-square w-full cursor-pointer group-data-[layout=list]:h-full group-data-[layout=list]:w-24 md:group-data-[layout=list]:w-32" /></button>
         <div className="pointer-events-none relative min-w-0 shrink-0 text-left group-data-[layout=list]:w-24 md:group-data-[layout=list]:w-32">
-          <span className="media-gallery-thumbnail group-data-[layout=list]:border-b-0"><ArticleImagePreview handle={asset.handle} fileName={asset.fileName} alt={asset.description ?? ''} variant="tile" sessionKey={`${sessionKey}:${key}`} isCurrent={isCurrent} onDimensions={(width, height) => setDimensions(values => values[key] === `${width} × ${height}` ? values : { ...values, [key]: `${width} × ${height}` })} /></span>
+          <span className="media-gallery-thumbnail group-data-[layout=list]:border-b-0">{asset.storage === 'file' ? <ResourceGlyph fileName={asset.fileName} mimeType={asset.mimeType} /> : <ArticleImagePreview handle={asset.handle} fileName={asset.fileName} alt={asset.description ?? ''} variant="tile" sessionKey={`${sessionKey}:${key}`} isCurrent={isCurrent} onDimensions={(width, height) => setDimensions(values => values[key] === `${width} × ${height}` ? values : { ...values, [key]: `${width} × ${height}` })} />}</span>
           {dimensions[key] ? <span className="absolute right-2 bottom-2 rounded-md bg-popup-bg px-1.5 py-0.5 font-mono text-2xs text-popup-text">{formatUIResolution(dimensions[key], locale)}</span> : null}
         </div>
         {onToggleSelection ? <span data-checked={selectedKeys?.has(key) ?? false} className="absolute top-2 left-2 z-20 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 group-data-[selecting=true]:opacity-100 data-[checked=true]:opacity-100 pointer-coarse:opacity-100"><TooltipButton role="checkbox" aria-checked={selectedKeys?.has(key) ?? false} aria-label={t('media:templates.select', { name: asset.fileName })} tooltip={selectedKeys?.has(key) ? t('media:ui.deselectImage') : t('media:ui.selectImage')} disabled={disabled} onClick={() => onToggleSelection(asset)} className="grid size-6 min-h-6 place-items-center rounded-md border border-line-strong bg-panel text-accent-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"><span aria-hidden="true">{selectedKeys?.has(key) ? '✓' : ''}</span></TooltipButton></span> : null}
         <div className="pointer-events-none relative grid min-w-0 flex-1 content-start gap-2 p-3 group-data-[layout=list]:content-center">
-          <div className="flex min-w-0 items-center gap-1"><button type="button" className="pointer-events-auto min-w-0 cursor-pointer truncate text-left text-sm font-semibold text-primary" disabled={disabled} title={asset.fileName} onClick={() => onRename ? onRename(asset) : onSelect(asset)}>{asset.fileName}</button>{onRename ? <IconButton variant="inline" icon={<MediaIcon name="edit" />} className="pointer-events-auto" tooltip={t('media:ui.renameFile')} aria-label={t('media:templates.rename', { name: asset.fileName })} disabled={disabled} onClick={() => onRename(asset)} /> : null}</div>
+          <div className="flex min-w-0 items-center gap-1"><button type="button" className="pointer-events-auto min-w-0 cursor-pointer truncate text-left text-sm font-semibold text-primary" disabled={disabled} title={asset.fileName} onClick={() => onRename ? onRename(asset) : onSelect(asset)}>{asset.fileName}</button>{hasEditingDraft(editingDrafts, asset.root, 'assets', key) ? <UnsavedMark /> : null}{onRename ? <IconButton variant="inline" icon={<MediaIcon name="edit" />} className="pointer-events-auto" tooltip={t('media:ui.renameFile')} aria-label={t('media:templates.rename', { name: asset.fileName })} disabled={disabled} onClick={() => onRename(asset)} /> : null}</div>
           <span className="truncate text-xs text-muted">{mediaAssetOrigin(asset, t('media:ui.sharedAssets'))}</span>
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs text-muted">{asset.mimeType.replace('image/', '').toUpperCase()} · {formatMediaBytes(asset.size, locale)}</span><div className="flex shrink-0 gap-1" role="group" aria-label={t('media:templates.actions', { name: asset.fileName })}>
-            <IconButton icon={<MediaIcon name="download" />} className="pointer-events-auto" tooltip={t('media:ui.downloadImage')} aria-label={t('media:templates.download', { name: asset.fileName })} disabled={disabled} onClick={() => void downloadMediaAsset(asset, isCurrent).then(onNotice)} />
-            {onDelete ? <IconButton icon={<MediaIcon name="delete" />} className="pointer-events-auto" tone="danger" tooltip={t('media:ui.deleteImage')} aria-label={t('media:templates.delete', { name: asset.fileName })} disabled={disabled} onClick={() => onDelete(asset)} /> : null}
+          <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs text-muted">{asset.storage === 'file' ? resourceType(asset.fileName, asset.mimeType).badge || 'FILE' : asset.mimeType.replace('image/', '').toUpperCase()} · {formatMediaBytes(asset.size, locale)}</span><div className="flex shrink-0 gap-1" role="group" aria-label={t(asset.storage === 'file' ? 'messages:resources.fileActions' : 'media:templates.actions', { name: asset.fileName })}>
+            <IconButton icon={<MediaIcon name="download" />} className="pointer-events-auto" tooltip={t(asset.storage === 'file' ? 'messages:resources.downloadFile' : 'media:ui.downloadImage')} aria-label={t('media:templates.download', { name: asset.fileName })} disabled={disabled} onClick={() => void downloadMediaAsset(asset, isCurrent).then(onNotice)} />
+            {onDelete ? <IconButton icon={<MediaIcon name="delete" />} className="pointer-events-auto" tone="danger" tooltip={t(asset.storage === 'file' ? 'messages:resources.deleteFile' : 'media:ui.deleteImage')} aria-label={t('media:templates.delete', { name: asset.fileName })} disabled={disabled} onClick={() => onDelete(asset)} /> : null}
             {onAdopt ? <IconButton icon={<MediaIcon name="use" />} className="pointer-events-auto" tooltip={canAdopt?.(asset) === false ? t('media:ui.useInCurrentArticleOpenThisImageS') : t('media:ui.useInCurrentArticle')} aria-label={t('media:templates.adopt', { name: asset.fileName })} disabled={disabled || canAdopt?.(asset) === false} onClick={() => onAdopt(asset)} /> : null}
           </div></div>
         </div>
@@ -106,19 +114,20 @@ export function MediaGallery({ assets, selected, onSelect, sessionKey, isCurrent
     })}
   </div>;
 }
-export function MediaDetails({ asset, sessionKey, isCurrent, onPreview, onRename, onDescribe, onReplace, onDelete, disabled = false }: {
+export function MediaDetails({ asset, sessionKey, isCurrent, onPreview, onRename, onDescribe, onReplace, onDelete, onNotice, disabled = false }: {
   asset: LibraryMediaAsset; sessionKey: number; isCurrent: () => boolean;
   onPreview?: () => void; onRename?: () => void; onDescribe?: () => void;
   onReplace?: () => void; onDelete?: () => void; disabled?: boolean;
+  onNotice?: (notice: MediaActionOutcome) => void;
 }) {
   const { t } = useUITranslation('media');
   const { locale } = useUILocale();
   const [dimensions, setDimensions] = useState('');
   return <div className="grid min-w-0 content-start gap-4">
-    <div className="grid min-w-0 gap-1"><div className="flex min-w-0 items-center gap-1"><h3 className="min-w-0 truncate font-heading text-base font-semibold text-primary" title={asset.fileName}>{asset.fileName}</h3>{onRename ? <IconButton variant="inline" icon={<MediaIcon name="edit" />} tooltip={t('media:ui.renameFile')} aria-label={t('media:ui.renameSelectedImage')} disabled={disabled} onClick={onRename} /> : null}</div><p className="text-xs text-muted">{mediaAssetOrigin(asset, t('media:ui.sharedAssets'))}</p></div>
-    <button type="button" aria-label={t('media:ui.previewSelectedImage')} aria-haspopup="dialog" disabled={disabled || !onPreview} onClick={onPreview} className="relative grid aspect-4/3 min-h-0 min-w-0 place-items-center overflow-hidden rounded-lg border border-line bg-list cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default"><ArticleImagePreview handle={asset.handle} fileName={asset.fileName} alt={asset.description ?? ''} variant="tile" sessionKey={`${sessionKey}:${mediaAssetKey(asset)}:detail`} isCurrent={isCurrent} onDimensions={(width, height) => setDimensions(`${width} × ${height}`)} /></button>
-    <dl className="grid min-w-0 grid-cols-2 gap-2 text-xs"><dt className="text-muted">{t('media:ui.resolution')}</dt><dd className="text-right font-mono text-secondary">{dimensions ? formatUIResolution(dimensions, locale) : t('media:ui.loading')}</dd><dt className="text-muted">{t('media:ui.format')}</dt><dd className="text-right font-mono text-secondary">{asset.mimeType.replace('image/', '').toUpperCase()}</dd><dt className="text-muted">{t('media:ui.fileSize')}</dt><dd className="text-right font-mono text-secondary">{formatMediaBytes(asset.size, locale)}</dd></dl>
-    <div className="grid gap-2"><span className="text-xs text-muted">{t('media:ui.description')}</span><div className="flex min-w-0 items-center gap-1"><p className="min-w-0 whitespace-pre-wrap break-words text-xs text-secondary">{asset.description || t('media:ui.noDescription')}</p>{onDescribe ? <IconButton variant="inline" icon={<MediaIcon name="edit" />} tooltip={t('media:ui.editDescription')} aria-label={t('media:ui.editImageDescription')} disabled={disabled} onClick={onDescribe} /> : null}</div></div>
-    {onPreview || onReplace || onDelete ? <div className="flex gap-2" role="group" aria-label={t('media:ui.selectedImageActions')}>{onPreview ? <IconButton icon={<MediaIcon name="image" />} tooltip={t('media:ui.viewOriginalImage')} aria-label={t('media:ui.viewOriginalImage')} onClick={onPreview} /> : null}{onReplace ? <IconButton icon={<MediaIcon name="replace" />} tooltip={t('media:ui.replaceImage')} aria-label={t('media:ui.replaceImage')} disabled={disabled} onClick={onReplace} /> : null}{onDelete ? <IconButton icon={<MediaIcon name="delete" />} tone="danger" tooltip={t('media:ui.deleteImage')} aria-label={t('media:ui.deleteSelectedImages')} disabled={disabled} onClick={onDelete} /> : null}</div> : null}
+    <div className="grid min-w-0 gap-1"><div className="flex min-w-0 items-center gap-1"><h3 className="min-w-0 truncate font-heading text-base font-semibold text-primary" title={asset.fileName}>{asset.fileName}</h3>{onRename ? <IconButton variant="inline" icon={<MediaIcon name="edit" />} tooltip={t('media:ui.renameFile')} aria-label={t(asset.storage === 'file' ? 'messages:resources.renameFile' : 'media:ui.renameSelectedImage')} disabled={disabled} onClick={onRename} /> : null}</div><p className="text-xs text-muted">{mediaAssetOrigin(asset, t('media:ui.sharedAssets'))}</p></div>
+    {asset.storage === 'file' ? <div className="aspect-4/3 overflow-hidden rounded-lg border border-line"><ResourceGlyph fileName={asset.fileName} mimeType={asset.mimeType} /></div> : <button type="button" aria-label={t('media:ui.previewSelectedImage')} aria-haspopup="dialog" disabled={disabled || !onPreview} onClick={onPreview} className="relative grid aspect-4/3 min-h-0 min-w-0 place-items-center overflow-hidden rounded-lg border border-line bg-list cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default"><ArticleImagePreview handle={asset.handle} fileName={asset.fileName} alt={asset.description ?? ''} variant="tile" sessionKey={`${sessionKey}:${mediaAssetKey(asset)}:detail`} isCurrent={isCurrent} onDimensions={(width, height) => setDimensions(`${width} × ${height}`)} /></button>}
+    <dl className="grid min-w-0 grid-cols-2 gap-2 text-xs">{asset.storage !== 'file' ? <><dt className="text-muted">{t('media:ui.resolution')}</dt><dd className="text-right font-mono text-secondary">{dimensions ? formatUIResolution(dimensions, locale) : t('media:ui.loading')}</dd></> : null}<dt className="text-muted">{t('media:ui.format')}</dt><dd className="break-all text-right font-mono text-secondary">{asset.storage === 'file' ? asset.mimeType : asset.mimeType.replace('image/', '').toUpperCase()}</dd><dt className="text-muted">{t('media:ui.fileSize')}</dt><dd className="text-right font-mono text-secondary">{formatMediaBytes(asset.size, locale)}</dd></dl>
+    <div className="grid gap-2"><span className="text-xs text-muted">{t('media:ui.description')}</span><div className="flex min-w-0 items-center gap-1"><p className="min-w-0 whitespace-pre-wrap break-words text-xs text-secondary">{asset.description || t('media:ui.noDescription')}</p>{onDescribe ? <IconButton variant="inline" icon={<MediaIcon name="edit" />} tooltip={t('media:ui.editDescription')} aria-label={t(asset.storage === 'file' ? 'messages:resources.editFileDescription' : 'media:ui.editImageDescription')} disabled={disabled} onClick={onDescribe} /> : null}</div></div>
+    {onPreview || onReplace || onDelete || asset.storage === 'file' ? <div className="flex gap-2" role="group" aria-label={t(asset.storage === 'file' ? 'messages:resources.selectedFileActions' : 'media:ui.selectedImageActions')}>{asset.storage === 'file' ? <IconButton icon={<MediaIcon name="download" />} tooltip={t('messages:resources.downloadFile')} disabled={disabled} onClick={() => void downloadMediaAsset(asset, isCurrent).then(onNotice)} /> : null}{onPreview && asset.storage !== 'file' ? <IconButton icon={<MediaIcon name="image" />} tooltip={t('media:ui.viewOriginalImage')} aria-label={t('media:ui.viewOriginalImage')} onClick={onPreview} /> : null}{onReplace ? <IconButton icon={<MediaIcon name="replace" />} tooltip={t(asset.storage === 'file' ? 'messages:resources.replaceFile' : 'media:ui.replaceImage')} aria-label={t(asset.storage === 'file' ? 'messages:resources.replaceFile' : 'media:ui.replaceImage')} disabled={disabled} onClick={onReplace} /> : null}{onDelete ? <IconButton icon={<MediaIcon name="delete" />} tone="danger" tooltip={t(asset.storage === 'file' ? 'messages:resources.deleteFile' : 'media:ui.deleteImage')} aria-label={t(asset.storage === 'file' ? 'messages:resources.deleteFile' : 'media:ui.deleteSelectedImages')} disabled={disabled} onClick={onDelete} /> : null}</div> : null}
   </div>;
 }

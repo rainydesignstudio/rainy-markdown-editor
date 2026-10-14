@@ -159,6 +159,7 @@
       "operator": "preview.dark-mode",
       "enabled": true,
       "parameters": {
+        "mode": "algorithm",
         "transform": "mp-darkmode",
         "options": {
           "mode": "dark",
@@ -298,7 +299,25 @@
           "max-height"
         ],
         "preserveAutoDimensions": true,
-        "colorEncoding": "rgb"
+        "colorEncoding": "rgb",
+        "rootStyleOmissions": [
+          "margin",
+          "margin-top",
+          "margin-right",
+          "margin-bottom",
+          "margin-left",
+          "padding",
+          "padding-top",
+          "padding-right",
+          "padding-bottom",
+          "padding-left",
+          "width",
+          "min-width",
+          "max-width",
+          "height",
+          "min-height",
+          "max-height"
+        ]
       }
     },
     {
@@ -322,7 +341,10 @@
           "data-src"
         ],
         "removeClasses": true,
-        "stripRootBackground": true
+        "stripRootBackground": true,
+        "tagMap": {
+          "blockquote": "section"
+        }
       }
     },
     {

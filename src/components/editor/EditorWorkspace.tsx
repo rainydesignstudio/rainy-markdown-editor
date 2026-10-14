@@ -4,16 +4,18 @@ import { formatDiagnosticMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
-import type { MutableRefObject } from 'react';
+import type { MutableRefObject, ReactNode } from 'react';
 import { useResizableColumns } from '../../hooks/useResizableColumns';
 import { ColumnSplitter } from '../global/ColumnSplitter';
 import { parseArticle } from '../../lib/frontMatter';
 import type { ArticleSnippet, SnippetCategory, WorkingArticle } from '../../lib/types';
+import type { ArticleFormatIssue } from '../../lib/articleFormat';
 
 import type { ArticleMediaContext } from './MarkdownPreview';
 import type { Tone } from '../../hooks/useEditorController';
 import { PreviewPanel } from './PreviewPanel';
 import { SourcePanel } from './SourcePanel';
+import type { RememberedEditingLocation } from '../../lib/editingLocation';
 
 export type EditorWorkspaceProps = {
   article: WorkingArticle;
@@ -23,9 +25,12 @@ export type EditorWorkspaceProps = {
   compiledRevision?: number | null;
   savedPreviewRevision?: number;
   documentGeneration?: number;
+  sourceHistoryKey?: number;
   revision: number;
   mediaRevision?: number;
+  sourceFormatIssues?: readonly ArticleFormatIssue[];
   status: { label: string; tone: Tone };
+  importProgress?: ReactNode;
   mobilePane: 'source' | 'preview';
   directory: FileSystemDirectoryHandle | null;
   snippets: ArticleSnippet[];
@@ -34,6 +39,8 @@ export type EditorWorkspaceProps = {
   attachPreview: (element: HTMLElement | null) => void;
   clipboardReceiverRef: MutableRefObject<HTMLDivElement | null>;
   sourceTextareaRef: MutableRefObject<HTMLTextAreaElement | null>;
+  editingLocationRef?: MutableRefObject<RememberedEditingLocation | null>;
+  sourceFocusDisabled?: boolean;
   onChangeBody: (value: string) => void;
   onSnippetInserted: () => void;
   onOpenInfo: () => void;
@@ -56,9 +63,12 @@ export function EditorWorkspace({
   compiledRevision = null,
   savedPreviewRevision = 0,
   documentGeneration = 0,
+  sourceHistoryKey,
   revision,
   mediaRevision = 0,
+  sourceFormatIssues,
   status,
+  importProgress,
   mobilePane,
   directory,
   snippets,
@@ -67,6 +77,8 @@ export function EditorWorkspace({
   attachPreview,
   clipboardReceiverRef,
   sourceTextareaRef,
+  editingLocationRef,
+  sourceFocusDisabled,
   onChangeBody,
   onSnippetInserted,
   onOpenInfo,
@@ -101,12 +113,18 @@ export function EditorWorkspace({
             parsed={parsed}
             revision={revision}
             mediaRevision={mediaRevision}
+            resourceSessionKey={media?.sessionKey}
+            sourceFormatIssues={sourceFormatIssues}
+            sourceHistoryKey={sourceHistoryKey}
             status={status}
+            importProgress={importProgress}
             mobilePane={mobilePane}
             directory={directory}
             snippets={snippets}
             snippetCategories={snippetCategories}
             sourceTextareaRef={sourceTextareaRef}
+            editingLocationRef={editingLocationRef}
+            sourceFocusDisabled={sourceFocusDisabled}
             onChangeBody={onChangeBody}
             onSnippetInserted={onSnippetInserted}
             onImportFiles={onImportFiles}

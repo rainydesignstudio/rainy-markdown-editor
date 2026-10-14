@@ -3,6 +3,7 @@ import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { parseArticle } from './frontMatter';
+import { encodeResourceLeaf } from './resources/paths';
 
 type MarkdownNode = {
   type?: string;
@@ -26,6 +27,9 @@ export type ImportedArticleImage = {
   handle: FileSystemFileHandle;
   lastModified?: number;
   description?: string;
+  storage?: 'image' | 'file';
+  typeId?: string;
+  preview?: 'image' | 'none';
 };
 export type ArticleImageFile = ImportedArticleImage;
 export type ArticleMediaAsset = ArticleImageFile & {
@@ -40,6 +44,7 @@ export type LibraryMediaAsset = (ArticleMediaAsset & { kind: 'article' }) | (Art
   root: FileSystemDirectoryHandle;
 });
 export type MediaActionOutcome = { ok: boolean; message: string; tone: 'success' | 'warning' | 'error'; failedKeys?: string[] };
+export const libraryMediaAssetKey = (asset: LibraryMediaAsset) => `${asset.kind}:${asset.kind === 'article' ? asset.articleId : 'shared'}:${asset.storage === 'file' ? 'file:' : ''}${asset.fileName}`;
 
 export async function getSharedImageDirectory(root: FileSystemDirectoryHandle, create = false): Promise<FileSystemDirectoryHandle | null> {
   try {
@@ -92,16 +97,18 @@ export async function inspectArticleImage(file: Blob): Promise<ArticleImageForma
   return detectImageFormat(file);
 }
 
-function imageBaseName(fileName: string): string {
-  const leaf = fileName.replace(/\\/g, '/').split('/').at(-1) ?? '';
-  const dot = leaf.lastIndexOf('.');
-  const withoutExtension = dot > 0 ? leaf.slice(0, dot) : leaf;
-  const cleaned = withoutExtension
+export function sanitizeAssetBaseName(value: string, fallback = 'image'): string {
+  const cleaned = value
     .normalize('NFKC')
     .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, '-')
     .replace(/\s+/g, ' ')
     .replace(/^[. ]+|[. ]+$/g, '');
-  return Array.from(cleaned).slice(0, 80).join('') || 'image';
+  return Array.from(cleaned).slice(0, 80).join('') || fallback;
+}
+function imageBaseName(fileName: string): string {
+  const leaf = fileName.replace(/\\/g, '/').split('/').at(-1) ?? '';
+  const dot = leaf.lastIndexOf('.');
+  return sanitizeAssetBaseName(dot > 0 ? leaf.slice(0, dot) : leaf);
 }
 
 function safeRenameBaseName(value: string, format: ArticleImageFormat): string {
@@ -132,11 +139,12 @@ async function existingNames(directory: FileSystemDirectoryHandle): Promise<Set<
   return names;
 }
 
-async function uniqueImageFileName(directory: FileSystemDirectoryHandle, base: string, extension: string): Promise<string> {
+export async function uniqueAssetFileName(directory: FileSystemDirectoryHandle, base: string, extension: string, reserved: string[] = []): Promise<string> {
   const names = await existingNames(directory);
+  reserved.forEach(name => names.add(normalizedFileName(name)));
   let suffix = 1;
   while (true) {
-    const fileName = `${base}${suffix === 1 ? '' : `-${suffix}`}.${extension}`;
+    const fileName = `${base}${suffix === 1 ? '' : `-${suffix}`}${extension ? '.' + extension : ''}`;
     if (!names.has(normalizedFileName(fileName))) return fileName;
     suffix += 1;
   }
@@ -172,7 +180,7 @@ export async function importArticleImage(
 ): Promise<ImportedArticleImage> {
   const format = await detectImageFormat(file);
   const bytes = await file.arrayBuffer();
-  const fileName = await uniqueImageFileName(directory, imageBaseName(file.name), format.extension);
+  const fileName = await uniqueAssetFileName(directory, imageBaseName(file.name), format.extension);
   const handle = await writeNewImageFile(directory, fileName, bytes);
   return { fileName, mimeType: format.mimeType, size: bytes.byteLength, handle };
 }
@@ -258,8 +266,7 @@ function localImagePath(value: string): { fileName: string; prefix: string; suff
 }
 
 function encodeImageFileName(fileName: string): string {
-  // Parentheses otherwise participate in Markdown's destination delimiter.
-  return encodeURIComponent(fileName).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+  return encodeResourceLeaf(fileName);
 }
 
 export function articleImageFileNameFromSource(source: string): string | null {
@@ -270,8 +277,10 @@ export function insertArticleImageReferences(
   source: string,
   fileNames: string[],
   selection: { start: number; end: number },
+  storage: 'image' | 'file' = 'image',
 ): string {
   if (!fileNames.length) return source;
+  if (!['image', 'file'].includes(storage)) throw new ProductError('resources.unsafeTarget');
   const frontMatterEnd = parseArticle(source).frontMatterRange?.end ?? 0;
   let start = Math.min(source.length, Math.max(frontMatterEnd, selection.start));
   let end = Math.min(source.length, Math.max(frontMatterEnd, selection.end));
@@ -280,8 +289,8 @@ export function insertArticleImageReferences(
 
   const references = fileNames.map((fileName) => {
     if (!fileName || /[\\/\u0000-\u001f\u007f]/.test(fileName)) throw new ProductError("articleMedia.theImageFilenameIsUnsafeNoReferenceWasInserted");
-    const label = fileName.replace(/\.[^.]+$/, '').replace(/\\/g, '\\\\').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
-    return `![${label}](media/image/${encodeImageFileName(fileName)})`;
+    const label = (storage === 'file' ? fileName : fileName.replace(/\.[^.]+$/, '')).replace(/\\/g, '\\\\').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
+    return `${storage === 'image' ? '!' : ''}[${label}](media/${storage}/${encodeImageFileName(fileName)})`;
   });
   const before = source.slice(0, start);
   const after = source.slice(end);
@@ -365,7 +374,15 @@ function findDefinitionDestination(raw: string): SourceRange | null {
   return index > start ? { start, end: index } : null;
 }
 
-function findSrcsetUrlRanges(value: string, absoluteStart: number): SourceRange[] {
+/** Reuse the source-preserving Markdown destination scanner for import links. */
+export function markdownDestinationRange(raw: string, definition = false): SourceRange | null {
+  if (definition) return findDefinitionDestination(raw);
+  if (raw.startsWith('![')) return findInlineImageDestination(raw);
+  const range = findInlineImageDestination('!' + raw);
+  return range ? { start: range.start - 1, end: range.end - 1 } : null;
+}
+
+export function findSrcsetUrlRanges(value: string, absoluteStart: number): SourceRange[] {
   const ranges: SourceRange[] = [];
   let index = 0;
   while (index < value.length) {

@@ -24,6 +24,20 @@
     "authorizeAndOpen": "授权并打开",
     "openExistingLibrary": "打开已有资料库",
     "newLibrary": "新建资料库",
+    "libraryCardTitle": "资料库",
+    "libraryStorageDescription": "当前文稿、素材与历史的保存位置。",
+    "switchLibrary": "切换资料库",
+    "chooseAnotherLibrary": "选择其他资料库",
+    "switchLibraryKeepsFiles": "切换资料库不会移动原目录的文件。",
+    "libraryConfiguration": "资料库内容与配置",
+    "contentAndStorage": "内容与保存",
+    "formatAndDark": "格式与深色",
+    "configurationSource": "配置来源",
+    "builtInConfiguration": "内置默认回退",
+    "officialConfiguration": "官方默认配置",
+    "customConfiguration": "资料库自定义配置",
+    "darkAlgorithm": "深色算法",
+    "algorithmDetails": "版本与来源",
     "thisBrowserDoesNotSupportLocalDirectoryAccess": "当前浏览器不支持本地目录读写，请使用支持此功能的桌面浏览器。",
     "projectOrganizationAndAppearanceAreReadOnlyTo": "为保护原文件，项目组织和外观设置保持只读。",
     "manuscriptsAndAssets": "文稿与素材",
@@ -98,7 +112,8 @@
     "noColorConversion": "保留原色（不转换）",
     "loadingFormatConfiguration": "正在载入格式配置…",
     "formatUnavailable": "配置不可用",
-    "builtInPolicyFallback": " · 内置默认回退"
+    "builtInPolicyFallback": " · 内置默认回退",
+    "currentLibraryConfiguration": "当前资料库的校验规则与深色转换"
   },
   "templates": {
     "previewTheme": "预览编辑器主题 {{name}}",
@@ -125,5 +140,24 @@
     "library": "资料库组件",
     "built-in": "内置组件",
     "legacy": "旧库回退"
+  },
+  "fontDownloads": {
+    "title": "字体下载来源",
+    "google": "Google Fonts（默认）",
+    "mirror": "国内镜像（JSDMirror）",
+    "description": "仅补充资料库缺失的完整字体，已有字体保持不变。",
+    "scope": "此浏览器共用",
+    "ready": "字体已就绪",
+    "downloading": "下载中",
+    "incomplete": "下载未完成",
+    "unchecked": "待检查",
+    "connectFirst": "可先选择来源，连接资料库后再补充缺失字体。",
+    "checking": "正在检查…",
+    "retryDownload": "重试下载",
+    "retry": "补充缺失字体",
+    "cancel": "取消下载",
+    "progress": "正在加载字体文件 {{completed}} / {{total}}…",
+    "unsaved": "来源已切换，但浏览器未能保存偏好。",
+    "heading": "字体下载"
   }
 }

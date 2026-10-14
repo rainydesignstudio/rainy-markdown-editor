@@ -10,14 +10,16 @@
     "themes": "主题",
     "template": "模板",
     "assets": "素材",
-    "settings": "设置"
+    "settings": "设置",
+    "knowledge": "知识库"
   },
   "views": {
     "articles": "文章",
     "themes": "文章主题",
     "template": "模板",
     "assets": "素材",
-    "settings": "设置"
+    "settings": "设置",
+    "knowledge": "知识库"
   },
   "sidebar": {
     "expand": "展开主侧栏",

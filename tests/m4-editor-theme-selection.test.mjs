@@ -68,20 +68,25 @@ test('picker keeps missing current snapshot, supports search, and prevents adopt
 const controllerSource = await readFile(new URL('../src/hooks/useEditorController.ts', import.meta.url), 'utf8');
 const start = controllerSource.indexOf('  const changeTheme = useCallback(');
 const end = controllerSource.indexOf('\n\n', controllerSource.indexOf('  }, [articleSettings.autoSnapshot.maxCount', start));
-function themeChange({ fail = false } = {}) {
+function themeChange({ fail = false, draft = false } = {}) {
   const root = {}, current = { source: '---\ntitle: 原稿\n---\n# 原稿正文', theme: BASIC_THEME, themeValid: true, folder: 'original', month: '2026-09' };
+  if (draft) { current.folder = null; current.month = null; }
   const updates = [], statuses = []; let checkpoints = 0, finishes = 0, hidden = false;
+  const compiles = []; let previewRefreshes = 0;
   const context = {
     useCallback: fn => fn, directoryRef: { current: root }, articleRef: { current }, articleId: () => 'original', editorWorkspaceRef: { current: {} }, getArticleOrganization: () => ({ archived: false }),
-    parseArticle, updateFrontMatter, setStatus: v => statuses.push(v), setShowThemeDialog: () => { hidden = true; }, updateArticle: (...args) => updates.push(args),
-    snapshotFor: () => ({ ...current, directory: root, documentToken: { root } }), beginHistoryOperation: () => ({ lease: true }), finishHistoryOperation: () => { finishes++; },
+    parseArticle, updateFrontMatter, setStatus: v => statuses.push(v), setShowThemeDialog: () => { hidden = true; },
+    updateArticle(source, theme) { updates.push([source, theme]); context.articleRef.current = { ...context.articleRef.current, source, theme, dirty: true }; },
+    snapshotFor: () => ({ ...context.articleRef.current, directory: root, documentToken: { root } }), beginHistoryOperation: () => ({ lease: true }), finishHistoryOperation: () => { finishes++; },
+    compileCurrent: snapshot => new Promise(resolve => compiles.push({ snapshot, resolve })),
+    setSavedPreviewRevision: update => { previewRefreshes = update(previewRefreshes); },
     setHistoryNotice() {}, articleSettings: { autoSnapshot: { maxCount: 20 } }, matchesSnapshot: () => true,
     mutationQueueRef: { current: { canSave: () => true, run: task => Promise.resolve().then(task) } },
     createArticleSnapshot: async () => { checkpoints++; if (fail) throw new Error('checkpoint failed'); return { snapshot: { id: 'checkpoint' }, cleanupIssues: [] }; },
   };
   const code = ts.transpileModule(controllerSource.slice(start, end) + '\nglobalThis.change = changeTheme;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
   vm.runInNewContext(code, Object.assign(context, productMessages));
-  return { context, current, updates, statuses, checkpoints: () => checkpoints, finishes: () => finishes, hidden: () => hidden };
+  return { context, current, updates, statuses, compiles, previewRefreshes: () => previewRefreshes, checkpoints: () => checkpoints, finishes: () => finishes, hidden: () => hidden };
 }
 
 test('saved article applies a changed same-version theme only after its protection snapshot succeeds', async () => {
@@ -96,6 +101,14 @@ test('saved article applies a changed same-version theme only after its protecti
   assert.equal(parseArticle(fixture.updates[0][0]).body, '# 原稿正文');
   assert.equal(fixture.hidden(), true);
   assert.equal(fixture.finishes(), 1);
+  assert.equal(fixture.compiles.length, 1);
+  assert.equal(fixture.compiles[0].snapshot.theme, changed);
+  assert.equal(parseArticle(fixture.compiles[0].snapshot.source).body, '# 原稿正文');
+  assert.equal(fixture.compiles[0].snapshot.dirty, true, 'theme adoption does not save the article');
+  assert.equal(fixture.previewRefreshes(), 0, 'keep the visible boundary until new styles are ready');
+  fixture.compiles[0].resolve(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fixture.previewRefreshes(), 1, 'successful explicit adoption also refreshes save-only preview');
 });
 
 test('failed protection snapshot retains current theme and leaves the picker open', async () => {
@@ -107,6 +120,43 @@ test('failed protection snapshot retains current theme and leaves the picker ope
   assert.equal(fixture.hidden(), false);
   assert.equal(fixture.statuses.at(-1).tone, 'error');
   assert.equal(fixture.finishes(), 1);
+  assert.equal(fixture.compiles.length, 0);
+});
+
+test('a new draft compiles its adopted theme immediately without a checkpoint or save', async () => {
+  const fixture = themeChange({ draft: true });
+  const changed = { ...BASIC_THEME, id: 'alternate' };
+  fixture.context.change(changed);
+  assert.equal(fixture.checkpoints(), 0);
+  assert.equal(fixture.compiles.length, 1);
+  assert.equal(fixture.compiles[0].snapshot.theme, changed);
+  assert.equal(fixture.compiles[0].snapshot.folder, null);
+  assert.equal(parseArticle(fixture.compiles[0].snapshot.source).body, '# 原稿正文');
+  fixture.compiles[0].resolve(true);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(fixture.previewRefreshes(), 1);
+});
+
+test('failed or superseded theme compilation never advances the visible preview boundary', async () => {
+  for (const rendered of [false, true]) {
+    const fixture = themeChange({ draft: true });
+    fixture.context.change({ ...BASIC_THEME, id: 'alternate' });
+    if (rendered) fixture.context.matchesSnapshot = () => false;
+    fixture.compiles[0].resolve(rendered);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(fixture.previewRefreshes(), 0);
+  }
+});
+
+test('an immediately failing compile keeps its error visible after theme adoption', () => {
+  const fixture = themeChange({ draft: true });
+  fixture.context.compileCurrent = () => {
+    fixture.context.setStatus({ label: 'Styles failed', tone: 'error' });
+    return Promise.resolve(false);
+  };
+  fixture.context.change({ ...BASIC_THEME, id: 'alternate' });
+  assert.equal(fixture.statuses.at(-1).tone, 'error');
+  assert.equal(fixture.previewRefreshes(), 0);
 });
 
 test('theme library forks a saved article with its current source and the selected theme', async () => {

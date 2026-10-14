@@ -53,7 +53,14 @@ export function validateRenderRecord(value: unknown): RenderRecord {
       typeof record.html !== 'string' || typeof record.css !== 'string' || !Array.isArray(record.assets) || record.assets.length > STYLE_LIMITS.assets) throw new ProductError("renderRecords.theRenderRecordProtocolIsInvalid");
   if (record.html.length + record.css.length > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderRecordExceedsTheSizeLimit");
   if (record.algorithmHash !== undefined && !HASH.test(record.algorithmHash)) throw new ProductError('algorithms.invalidPackage');
-  if (canonicalFormatJson(checkedFormatter(record.rawFormatter)) !== canonicalFormatJson(record.formatter)) throw new ProductError("renderRecords.theRenderConfigurationDoesNotMatchTheValidatedSteps");
+  const formatter = checkedFormatter(record.rawFormatter);
+  // Pre-mode records retain the source already determined by their validated raw
+  // step. Compare its original shape without changing the stored record or hash.
+  if (record.formatter?.preview?.dark?.mode === undefined && record.rawFormatter.steps.some(step =>
+    step.enabled && step.operator === 'preview.dark-mode' && !Object.hasOwn(step.parameters, 'mode'))) {
+    delete formatter.preview.dark.mode;
+  }
+  if (canonicalFormatJson(formatter) !== canonicalFormatJson(record.formatter)) throw new ProductError("renderRecords.theRenderConfigurationDoesNotMatchTheValidatedSteps");
   assertPortableStyles(record.css);
   for (const asset of record.assets) {
     if (!HASH.test(asset.hash) || typeof asset.path !== 'string' || !/^(image|font)\//.test(asset.mime) || normalizeLibraryPath(asset.path) !== asset.path) throw new ProductError("renderRecords.theRenderResourceReferenceIsInvalid");
@@ -72,9 +79,12 @@ export async function renderRecordMatches(record: RenderRecord, source: string, 
 }
 export async function prepareRenderRecord(source: string, theme: ThemeConfig, element: HTMLElement, css: string, options: { snapshot?: FormatSnapshot; root?: FileSystemDirectoryHandle; articlePath?: string } = {}): Promise<PreparedRenderRecord> {
   const snapshot = options.snapshot ?? getFormatSnapshot();
+  if (snapshot.bundle.formatter.mermaid && element.querySelector('[data-render-state="pending"][data-render-kind="mermaid"]')) throw new ProductError('mermaid.pending');
   const environment = snapshot.environment;
   const assets: CssAsset[] = [...(environment?.assets ?? [])];
   const clone = element.cloneNode(true) as HTMLElement;
+  // Storage tokens must be assigned in an inert document, without loading URLs.
+  element.ownerDocument?.createElement('template').content?.append(clone);
   if (options.root) {
     if (element.querySelector('span[data-local-asset-src],span[data-local-asset-srcset]')) throw new ProductError("renderRecords.localImagesAreNotLoadedNoRenderRecordWasGenerated");
     const images = Array.from(clone.querySelectorAll<HTMLImageElement>('img[data-local-asset-src]'));

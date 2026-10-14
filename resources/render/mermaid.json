@@ -1,0 +1,11 @@
+{
+  "package": "mermaid",
+  "version": "12.1.0",
+  "source": "https://github.com/mermaid-js/mermaid",
+  "file": "public/algorithm/mermaid/mermaid.min.js",
+  "license": "public/licenses/mermaid/dependencies/mermaid/12.1.0/LICENSE",
+  "sourceSha256": "94767fec02cb8b13dad4323a1b8f6143f10abed37ab411973fc96350339f8515",
+  "katex": "0.19.0",
+  "esbuild": "0.28.2",
+  "sha256": "eea925155fdd933efd0dd839992d19c008d5025659896a06b91bff5d39e69dc5"
+}

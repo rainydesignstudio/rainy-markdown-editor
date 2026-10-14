@@ -5,7 +5,7 @@
   },
   "loading": {
     "label": "Loading library",
-    "message": "Loading your library and appearance…"
+    "message": "The first load includes the app and fonts. Please wait…"
   },
   "language": {
     "title": "Interface language",
@@ -41,6 +41,9 @@
   "updateAvailable": "Update available",
   "dates": {
     "invalid": "Invalid date"
+  },
+  "feedback": {
+    "dismiss": "Dismiss notification"
   },
   "eyebrows": {
     "forkManuscript": "FORK MANUSCRIPT",

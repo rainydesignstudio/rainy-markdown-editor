@@ -8,6 +8,9 @@ import { jsx, jsxs } from 'react/jsx-runtime';
 import { inspectionDimmedElements, animateInspectionScroll, createArticleColorInspection, uniqueBindings } from '../src/lib/themeInspection.ts';
 import { compileThemeInspectionUtilities } from '../src/lib/tailwind.ts';
 import * as editorThemes from '../src/lib/editorThemes.ts';
+import { getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
+import { articleDarkMode } from '../src/lib/article-format/styleTypes.ts';
+import { themeColorValue } from '../src/lib/themes.ts';
 import { tokenizeEditorSource } from '../src/lib/editorSourceHighlight.ts';
 
 test('nested inspection hits keep every ancestor opaque and dim unrelated branches only once', () => {
@@ -255,6 +258,10 @@ test('article node swatches use measured CSS defaults and preserve explicit node
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return { useEffect() {}, useState: value => [value, () => {}] };
     if (id.endsWith('/ColorSwatchButton')) return { ColorSwatchButton: 'swatch' };
+    if (id.endsWith('/TooltipButton')) return { TooltipButton: 'tooltip' };
+    if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: getFormatSnapshot };
+    if (id.endsWith('/article-format/styleTypes')) return { articleDarkMode };
+    if (id.endsWith('/themes')) return { themeColorValue };
     if (id.endsWith('/CollapsiblePanel')) return { CollapsiblePanel: 'panel', PanelIcon: 'icon' };
     if (id.endsWith('/ButtonBar')) return { ButtonBar: 'bar' };
     if (id.endsWith('/themeInspection')) return { ARTICLE_COLOR_LABELS: {} };

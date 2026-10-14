@@ -1,13 +1,10 @@
 import { productText } from "./i18n/productMessages";
+import manifest from '../../resources/font-sources.json' with { type: 'json' };
 export const SYSTEM_UI_FONT = '"PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
 export const SYSTEM_SERIF_FONT = '"Songti SC", SimSun, "Noto Serif CJK SC", "Source Han Serif SC", serif';
 export const SYSTEM_CODE_FONT = '"SFMono-Regular", Consolas, "Liberation Mono", monospace';
 
-export const OPEN_FONT_ASSETS = [
-  { family: 'Sen Local', file: 'sen-variable.ttf', license: 'sen-OFL.txt', weight: '400 800' },
-  { family: 'Noto Sans SC Local', file: 'noto-sans-sc-variable.ttf', license: 'noto-sans-sc-OFL.txt', weight: '100 900' },
-  { family: 'Roboto Mono Local', file: 'roboto-mono-variable.ttf', license: 'roboto-mono-OFL.txt', weight: '100 700' },
-] as const;
+export const OPEN_FONT_ASSETS = manifest.fonts;
 
 const CATALOG = [
   { family: 'PingFang SC', label: productText("fontCatalog.systemSansPingfangMicrosoftYahei"), stack: SYSTEM_UI_FONT, code: false },

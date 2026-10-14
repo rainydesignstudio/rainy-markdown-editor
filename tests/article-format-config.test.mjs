@@ -7,6 +7,29 @@ import { findSourceMatches, replaceAllSourceMatches } from '../src/lib/sourceSea
 import { validateArticleFormatMarkdown, validateArticleFormatCss } from '../src/lib/articleFormat.ts';
 
 const copy = () => structuredClone(DEFAULT_FORMAT_BUNDLE);
+test('dark source is exclusive, token mode requires no algorithm, and legacy JSON is read without migration', async () => {
+  const legacy = copy();
+  delete legacy.validator.product.theme.darkTokens;
+  delete legacy.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters.mode;
+  const before = JSON.stringify(legacy);
+  const old = activateFormatBundle(legacy, 'legacy');
+  assert.equal(old.bundle.formatter.preview.dark.mode, 'algorithm');
+  assert.equal(old.officialDefault, true);
+  assert.equal(JSON.stringify(legacy), before);
+  const raw = copy(), step = raw.formatter.steps.find(step => step.operator === 'preview.dark-mode');
+  step.parameters = { mode: 'tokens' };
+  const manual = compileFormatBundle(raw);
+  assert.deepEqual(manual.formatter.preview.dark, { mode: 'tokens', transform: 'preserve', options: {}, background: '#191919' });
+  const { assertAlgorithmCapabilities } = await import('../src/lib/article-format/algorithms.ts');
+  assert.doesNotThrow(() => assertAlgorithmCapabilities({ manifest: { components: [] } }, manual));
+  for (const parameters of [{ mode: 'tokens', transform: 'mp-darkmode' }, { mode: 'tokens', options: {} }, { mode: 'algorithm' }, { mode: 'algorithm', transform: 'preserve', options: {} }, { mode: 'guess', transform: 'mp-darkmode', options: {} }]) {
+    step.parameters = parameters; assert.throws(() => compileFormatBundle(raw));
+  }
+  const preserve = copy();
+  preserve.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters = { transform: 'preserve', options: {} };
+  assert.equal(compileFormatBundle(preserve).formatter.preview.dark.mode, 'tokens');
+  activateFormatBundle(copy(), null, 'built-in');
+});
 test('only public presets can initialize a library and invalid selection writes nothing', async () => {
   assert.deepEqual(PUBLIC_PLATFORM_PRESETS.map(preset => preset.id), ['wechat-article']);
   const root = directory();

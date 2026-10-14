@@ -1,3 +1,6 @@
+import * as resourceTypes from '../src/lib/resources/types.ts';
+import { inspectResourceFile } from '../src/lib/resources/storage.ts';
+import { libraryMediaAssetKey } from '../src/lib/articleMedia.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -23,8 +26,10 @@ async function component(file, dependencies) {
   const code = ts.transpileModule(await readFile(new URL(file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(id => {
     if (id === 'react') return react;
-    if (id === 'react/jsx-runtime') return { jsx, jsxs };
-    if (id in dependencies) return dependencies[id];
+    if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-dialog' }; if (id === 'react/jsx-runtime') return { jsx, jsxs };
+    if (id.endsWith('/resources/types')) return resourceTypes; if (id.endsWith('/resources/storage')) return { inspectResourceFile }; if (id.endsWith('/ResourceGlyph')) return { ResourceGlyph: 'resource-glyph' }; if (id.endsWith('/articleMedia') && !(id in dependencies)) return { libraryMediaAssetKey }; if (id in dependencies) return dependencies[id];
+    if (id.endsWith('/useImageZoom')) return { useImageZoom() {} };
+    if (id.endsWith('/IconButton')) return { IconButton: 'zoom-button' };
     throw new Error('Unexpected import: ' + id);
   }) });
   return {
@@ -35,9 +40,9 @@ async function component(file, dependencies) {
   };
 }
 const dialogs = { DialogFrame: 'frame', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'button' };
-async function importDialog(files, onImport = async () => ({ ok: true }), inspect = inspectArticleImage) {
+async function importDialog(files, onImport = async () => ({ ok: true }), inspect = inspectArticleImage, allResources = false) {
   let closes = 0, current = true;
-  const imported = [], props = { files, libraryName: 'test-only', busy: false, isCurrent: () => current, onImport: async chosen => { imported.push(chosen); return onImport(chosen); }, onClose: () => closes++ };
+  const imported = [], props = { files, libraryName: 'test-only', busy: false, allResources, isCurrent: () => current, onImport: async chosen => { imported.push(chosen); return onImport(chosen); }, onClose: () => closes++ };
   const view = await component('../src/components/media/MediaImportDialog.tsx', { '../../lib/articleMedia': { inspectArticleImage: inspect }, '../global/DialogFrame': dialogs, './MediaGallery': { MediaIcon: 'icon', formatMediaBytes: n => n + 'B' } });
   const render = () => view.render('MediaImportDialog', props);
   const settle = async () => { await new Promise(resolve => setImmediate(resolve)); render(); };
@@ -75,6 +80,13 @@ test('late file inspection does not enable import after cancellation or a change
   const view = await importDialog([image], undefined, () => new Promise(resolve => { finish = resolve; }));
   view.stale(); view.unmount(); finish({ mimeType: 'image/png', extension: 'png' }); await view.settle();
   assert.equal(view.imported.length, 0); assert.equal(view.confirm().props.disabled, true);
+});
+
+test('general resource confirmation accepts inert PDF/text files but keeps broken raster files invalid and writes nothing before confirmation', async () => {
+  const pdf = new File(['%PDF-test'], 'guide.pdf'), broken = new File(['not PNG'], 'broken.png');
+  const view = await importDialog([image, pdf, unsupported, broken], undefined, inspectArticleImage, true); await view.settle();
+  assert.equal(view.imported.length, 0); assert.equal(view.confirm().props.disabled, false);
+  view.confirm().props.onClick(); await view.settle(); assert.deepEqual([...view.imported[0]], [image, pdf, unsupported]); view.unmount();
 });
 
 test('media page accepts only external file drops, opens a pending dialog with zero writes and rejects its stale target callback', async () => {

@@ -76,10 +76,6 @@
     }
   }
 
-  .history-preview-tabs {
-    @apply flex flex-wrap gap-2;
-  }
-
   .history-preview-tabs [aria-pressed="true"] {
     @apply border-accent bg-accent-soft text-accent-text;
   }
@@ -116,7 +112,6 @@
     @apply mt-1 mb-0 text-xs text-muted;
   }
 
-  .history-source-comparison,
   .history-metadata-comparison {
     @apply grid min-w-0 gap-3;
   }
@@ -194,10 +189,6 @@
   .history-render-comparison .history-render-scroll {
     /* Geometry rationale: the rendered version preview must fit shorter viewports and stop growing above 44rem. */
     @apply max-h-[min(58dvh,44rem)];
-  }
-
-  .history-detail-actions {
-    @apply flex justify-end;
   }
 
   .history-restore-confirm-backdrop {

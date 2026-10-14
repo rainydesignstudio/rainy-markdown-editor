@@ -1,6 +1,6 @@
 'use client';
 
-import { useUITranslation } from "./UILocaleProvider";
+import { useUITranslation, useUILocale } from "./UILocaleProvider";
 
 import { CopyDialog, DeleteDialog } from '../articles/ArticleDialogs';
 import { ProjectDeleteDialog } from '../articles/ProjectDeleteDialog';
@@ -11,13 +11,16 @@ import { UnsavedDialog } from '../editor/UnsavedDialog';
 import { MediaAssetDialog } from '../media/MediaLibrary';
 import { MediaPickerDialog } from '../media/MediaPickerDialog';
 import { useEditorControllerContext } from './AppProviders';
-import { resolveDefaultArticleTheme, THEMES } from '../../lib/themes';
+import { resolveDefaultArticleTheme, getBuiltinArticleThemes } from '../../lib/themes';
 import { getArticleOrganization } from '../../lib/editorWorkspace';
 import { FormatCheckDialog } from './FormatCheckDialog';
 import { CreateLibraryDialog } from '../settings/CreateLibraryDialog';
+import { MarkdownImportDialog } from '../imports/MarkdownImportDialog';
+import { ImportTasksDialog } from '../imports/ImportTasksDialog';
 
 export function AppDialogs() {
   const { t } = useUITranslation('messages');
+  const { locale } = useUILocale();
   const controller = useEditorControllerContext();
   const {
     article,
@@ -69,12 +72,14 @@ export function AppDialogs() {
   } = controller;
 
   const currentStored = directory ? articleList.find((item) => item.id === controller.currentArticleId) ?? null : null;
-  const articleThemes = directory && themeLibrary.length ? themeLibrary : THEMES;
+  const articleThemes = directory && themeLibrary.length ? themeLibrary : getBuiltinArticleThemes(locale);
   const defaultArticleTheme = resolveDefaultArticleTheme(articleThemes, controller.articleSettings.defaultArticleThemeId);
   // A pending draft decision takes focus first; only one top-level dialog may own the focus trap.
   const activeDialog = formatCheck ? 'format'
     : showUnsavedDialog ? 'unsaved'
     : controller.createLibraryDialogOpen ? 'create-library'
+    : controller.markdownImport.request?.root === directory && controller.markdownImport.request.session === controller.contentLibraryRootSession ? 'markdown-import'
+    : controller.markdownImport.tasksOpen && directory ? 'import-tasks'
     : controller.mediaPickerRequest && controller.view === 'articles' && controller.articleMode === 'editor' ? 'media-picker'
     : mediaTarget ? 'media'
     : articleInfoDialogOpen ? 'info'
@@ -87,11 +92,26 @@ export function AppDialogs() {
 
   return (
     <>
+      {activeDialog === 'import-tasks' ? <ImportTasksDialog
+        tasks={controller.markdownImport.pending.map(item => item.task)} selectedId={controller.markdownImport.selectedTaskId}
+        busy={controller.markdownImport.taskBusy} issues={controller.markdownImport.taskIssues}
+        onSelect={controller.markdownImport.setSelectedTaskId} onClose={controller.markdownImport.closeTasks}
+        onRetry={controller.markdownImport.retryTask} onPause={controller.markdownImport.pauseTask} onCancel={controller.markdownImport.cancelTask}
+        onChooseSource={controller.markdownImport.chooseTaskSource} onChooseDirectory={controller.markdownImport.chooseTaskDirectory} onReplace={controller.markdownImport.replaceResource}
+      /> : null}
+      {activeDialog === 'markdown-import' && controller.markdownImport.request ? <MarkdownImportDialog
+        key={controller.markdownImport.request.id}
+        source={controller.markdownImport.request.source} mode={controller.markdownImport.request.mode}
+        themes={articleThemes} defaultTheme={defaultArticleTheme}
+        busy={controller.markdownImport.busy} feedback={controller.markdownImport.feedback}
+        onChooseFile={controller.markdownImport.chooseFile} onChooseDirectory={controller.markdownImport.chooseDirectory}
+        onConfirm={controller.markdownImport.confirm} onClose={controller.markdownImport.close}
+      /> : null}
       {activeDialog === 'media-picker' && controller.mediaPickerRequest ? <MediaPickerDialog
         key={controller.mediaPickerRequest.id}
         root={controller.mediaPickerRequest.root}
         sessionKey={controller.mediaPickerRequest.sessionKey}
-        refreshSignal={controller.mediaRefreshRevision}
+        refreshSignal={controller.mediaCatalogRevision}
         articles={controller.articleList}
         articleId={controller.mediaPickerRequest.articleId}
         articleTitle={controller.currentTitle}
@@ -109,7 +129,7 @@ export function AppDialogs() {
       {activeDialog === 'theme' ? <ThemeDialog
         key={`${controller.contentLibraryRootSession}:${controller.currentArticleId}`}
         current={article.theme}
-        themes={directory ? themeLibrary : THEMES}
+        themes={directory ? themeLibrary : getBuiltinArticleThemes(locale)}
         source={controller.parsed.body}
         media={controller.articleMediaContext}
         busy={mediaOperation !== null || historyBusy || editorWorkspaceBusy}
@@ -118,7 +138,7 @@ export function AppDialogs() {
         onClose={() => controller.setShowThemeDialog(false)}
         onSelect={changeTheme}
       /> : null}
-      {activeDialog === 'unsaved' ? <UnsavedDialog label={pendingActionLabel} onCancel={cancelPendingAction} onSave={() => resolvePendingAction(false)} onDiscard={() => void resolvePendingAction(true)} /> : null}
+      {activeDialog === 'unsaved' ? <UnsavedDialog label={pendingActionLabel} onCancel={cancelPendingAction} onContinue={controller.resumeCurrentDraft} onSave={() => resolvePendingAction(false)} onDiscard={() => void resolvePendingAction(true)} /> : null}
       {activeDialog === 'create-library' ? <CreateLibraryDialog onCreate={controller.createDataDirectory} onClose={() => controller.setCreateLibraryDialogOpen(false)} /> : null}
       {activeDialog === 'copy' && copyTarget ? <CopyDialog
         article={copyTarget}
@@ -149,9 +169,14 @@ export function AppDialogs() {
         onConfirm={() => void confirmDeleteProject()}
       /> : null}
       {activeDialog === 'info' ? <ArticleInfoDialog
+        editingLocationRef={controller.articleInfoLocationRef}
+        editingKey={controller.sourceHistoryKey}
         article={article}
         parsed={controller.parsed}
         stored={currentStored}
+        folderName={controller.articleFolderName}
+        onFolderName={controller.setArticleFolderName}
+        onRenameFolder={() => void controller.renameCurrentArticleFolder(controller.articleFolderName)}
         workspace={editorWorkspace}
         archived={controller.currentArticleIsArchived}
         busy={mediaOperation !== null || historyBusy || editorWorkspaceBusy}

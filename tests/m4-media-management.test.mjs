@@ -1,7 +1,7 @@
 import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { articleLocalImageReferences, copyArticleImageAs, importArticleImage, rewriteArticleImageReferences } from '../src/lib/articleMedia.ts';
+import { libraryMediaAssetKey, articleLocalImageReferences, copyArticleImageAs, importArticleImage, rewriteArticleImageReferences } from '../src/lib/articleMedia.ts';
 import { inspectLocalArticleImages, inspectMediaUsage, readMediaMetadata, saveMediaDescription, removeMediaDescription, transferMedia, renameSharedMedia } from '../src/lib/mediaManagement.ts';
 import { getArticleMediaDirectory } from '../src/lib/fileSystem.ts';
 import { parseArticle } from '../src/lib/frontMatter.ts';
@@ -110,7 +110,7 @@ function controllerAction(name, context) {
   return context.action;
 }
 function managementContext(root) {
-  return { directoryRef: { current: root }, contentLibraryRootSessionRef: { current: 1 }, mediaOperationRef: { current: false }, historyOperationRef: { current: null }, editorWorkspaceRef: { current: {} }, getArticleOrganization: () => ({ archived: false }), mutationQueueRef: { current: { run: callback => callback(), isDeleting: () => false } }, compileCurrent() {}, renameMediaImage() {}, setMediaOperation() {}, setMediaRefreshRevision() {}, setStatus() {}, articleMode: 'overview', view: 'assets', snapshotFor: () => ({ articleId: 'draft' }), mediaPickerRequestRef: { current: null }, setMediaPickerRequest() {}, mediaDirectory: async () => ({}), saveMediaDescription: async () => {}, articleRef: { current: {} }, articleId: () => 'draft' };
+  return { libraryMediaAssetKey, directoryRef: { current: root }, contentLibraryRootSessionRef: { current: 1 }, mediaOperationRef: { current: false }, historyOperationRef: { current: null }, editorWorkspaceRef: { current: {} }, getArticleOrganization: () => ({ archived: false }), mutationQueueRef: { current: { run: callback => callback(), isDeleting: () => false } }, compileCurrent() {}, renameMediaImage() {}, setMediaOperation() {}, setMediaRefreshRevision() {}, setStatus() {}, articleMode: 'overview', view: 'assets', snapshotFor: () => ({ articleId: 'draft' }), mediaPickerRequestRef: { current: null }, setMediaPickerRequest() {}, mediaDirectory: async () => ({}), saveMediaDescription: async () => {}, articleRef: { current: {} }, articleId: () => 'draft' };
 }
 test('batch management reports partial failure and returns only failed keys for retry', async () => {
   const root = {}, context = managementContext(root), written = [];

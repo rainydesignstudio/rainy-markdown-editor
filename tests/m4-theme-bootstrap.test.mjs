@@ -37,6 +37,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
     document,
     window: { matchMedia: () => media },
     require(id) {
+      if (id.endsWith('/EditingDrafts')) return { EditingDraftsProvider: 'draft-provider' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/useEditorController')) return { useEditorController: () => controller };
       if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ error: null }) };

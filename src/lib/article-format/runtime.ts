@@ -35,7 +35,14 @@ export function activateFormatBundle(bundle: RawFormatBundle, library: string | 
   const previous = current.environment;
   // Explicit true and older absent flags denote the same default policy.
   const { enabled, ...meta } = bundle.validator.meta;
-  const comparable = enabled === true ? { ...bundle, validator: { ...bundle.validator, meta } } : bundle;
+  const comparable = { ...bundle,
+    validator: { ...bundle.validator, meta: enabled === true ? meta : bundle.validator.meta, product: { ...bundle.validator.product, theme: {
+      ...bundle.validator.product.theme, darkTokens: bundle.validator.product.theme.darkTokens ?? { allowPartial: true, fallback: 'light' },
+    } } },
+    formatter: { ...bundle.formatter, steps: bundle.formatter.steps.map(step => step.operator === 'preview.dark-mode' ? { ...step, parameters: {
+      ...step.parameters, mode: step.parameters.mode ?? (step.parameters.transform === 'preserve' ? 'tokens' : 'algorithm'),
+    } } : step) },
+  };
   current = Object.freeze({ bundle: frozen, id: `${++generation}:${hash}:${algorithms.fingerprint}`, generation, library, source, error: null, rawFormatter: JSON.parse(JSON.stringify(bundle.formatter)), algorithms: freezeFormatBundle(algorithms), algorithmSource, officialDefault: canonicalFormatJson(comparable) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE) && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint, ...(environment ? { environment } : {}) });
   if (previous && previous !== environment) previous.dispose();
   listeners.forEach(listener => listener()); return current;

@@ -1,5 +1,8 @@
 'use client';
 
+import { useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
+import { hasEditingDraft } from '../../lib/editingDrafts';
+
 import { formatDiagnosticMessage, formatProductMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation, useUILocale } from '../global/UILocaleProvider';
@@ -49,6 +52,8 @@ type Props = {
   onRebuildIndexes: (months: string[]) => Promise<void>;
   onRemoveCategories: (targets: ArticleSummary[], labels: string[]) => Promise<boolean>;
   onNew: () => void;
+  onImportMarkdown?: () => void;
+  onImportTasks?: () => void;
   onRefresh: () => void;
   onOpen: (stored: ArticleSummary) => void;
   onInfo: (stored: ArticleSummary) => void;
@@ -77,6 +82,8 @@ export function ArticlesPage({
   busy,
   indexMonths, indexIssues, checks, listNotice, listWork, onCheck, onCancelCheck, onRebuildIndexes, onRemoveCategories,
   onNew,
+  onImportMarkdown,
+  onImportTasks,
   onRefresh,
   onOpen,
   onInfo,
@@ -92,6 +99,7 @@ export function ArticlesPage({
   const { t } = useUITranslation('articles');
   const { locale } = useUILocale();
   const displayCollectionTitle = articleCollectionLabel(collection, collectionTitle, t);
+  const drafts = useEditingDrafts();
   const [query, setQuery] = useState('');
   const [month, setMonth] = useState('all');
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -208,7 +216,7 @@ export function ArticlesPage({
               <strong className="font-mono text-3xl font-medium tracking-tight text-accent-text">{formatUINumber(filtered.length, locale, { minimumIntegerDigits: 2, useGrouping: false })}</strong>
               <span className="text-xs text-muted">{t('articles:documentUnit', { count: filtered.length })}</span>
             </div>
-            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}><button className="button button-primary" type="button" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
+            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportTasks ? <button className="button button-quiet" type="button" onClick={onImportTasks}>{t('messages:imports.tasksTitle')}</button> : null}{onImportMarkdown ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={onImportMarkdown}>{t('messages:imports.title')}</button> : null}<button className="button button-primary" type="button" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
           </div>
         </PageHeading>
 
@@ -292,6 +300,7 @@ export function ArticlesPage({
                     <span>{item.parse.metadata.categories.length ? item.parse.metadata.categories.join('、') : t('articles:list.noCategories')}</span><span aria-hidden="true">·</span>
                     <span aria-label={t('articles:theme.version', { name: item.theme.name, version: item.theme.version })}>v{item.theme.version}</span>
                     {themeUpdate ? <ThemeUpdateTag /> : null}
+                    {hasEditingDraft(drafts, directory, 'articles', item.id) ? <UnsavedMark tag /> : null}
                     <span aria-hidden="true">·</span>
                     <time dateTime={item.parse.metadata.updatedAt}>{formatDate(item.parse.metadata.updatedAt, locale, t('articles:dateNeedsRepair'))}</time>
                     {checks[item.id] ? <span className="status-copy" data-tone={checks[item.id].state === 'failed' || checks[item.id].error ? 'error' : checks[item.id].state === 'stale' || checks[item.id].warning ? 'warning' : 'neutral'} title={checks[item.id].message ? formatDiagnosticMessage(checks[item.id], t) : t('articles:checks.time', { date: formatDate(checks[item.id].checkedAt, locale, t('articles:dateNeedsRepair')) })}>{checks[item.id].state === 'failed' ? t('articles:checks.failure', { message: checks[item.id].message ? formatDiagnosticMessage(checks[item.id], t) : t('articles:checks.retry') }) : checks[item.id].state === 'stale' ? t('articles:checks.stale') : t('articles:checks.previous', { warning: checks[item.id].warning, error: checks[item.id].error })}</span> : null}

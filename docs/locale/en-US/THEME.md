@@ -12,7 +12,7 @@ For Agents and authors creating Rainy Manuscript Workspace content. See [AGENT-G
 | article-theme | Article preview, layout and copied output | JSON; kind article-theme, formatVersion 1 |
 | Snippet | Insertable Markdown/HTML fragment | JSON with content and trigger |
 | Starter template | Complete starting point for a new article | Markdown with Front Matter |
-| Complete article | Final body and article metadata | article.md with independent theme.json and images |
+| Complete article | Final body and article metadata | article.md with independent theme.json, images and attachments |
 
 App version, theme `version` and `formatVersion` are separate. Use unique IDs to avoid built-in/user collisions. IDs/category directory names use lowercase letters, digits and hyphens, 1–48 characters, beginning with a letter or digit. Keep older article snapshots; changing the theme library must not replace an existing article's `theme.json`.
 
@@ -56,7 +56,7 @@ ui serif mono editorSource articleSource heading subHeading eyebrow
 
 Design the palette first, then map semantic roles. Do not put literal colors into `colors` or invent unimplemented roles. Design light/dark separately; Follow system is a display mode, not a third scheme in the file.
 
-`ui` serves interface text; `heading`, `subHeading` and `eyebrow` serve their respective hierarchy. `editorSource` is for content editors, `articleSource` for article source, and `mono` for code/fallbacks. Confirm chosen fonts are available and provide system fallbacks. Bundled Sen Local, Noto Sans SC Local and Roboto Mono Local are also available, retaining original licenses. Article themes/WeChat output do not depend on these interface fonts.
+`ui` serves interface text; `heading`, `subHeading` and `eyebrow` serve their respective hierarchy. `editorSource` is for content editors, `articleSource` for article source, and `mono` for code/fallbacks. Confirm chosen fonts are available and provide system fallbacks. Sen Local, Noto Sans SC Local and Roboto Mono Local are available after verified download into the library, retaining original licenses. See [font downloads](README.md#doc-font-downloads) for sources, retries and offline use. Article themes/WeChat output do not depend on these interface fonts.
 
 Optional `surfaces` contains light/dark schemes. Its fields may be omitted to retain existing role fallbacks; the full field list and editor controls are described below. Colors reference palette keys and bounded opacity values. Follow the [production type and validator](../../../src/lib/editorThemes.ts); this field cannot inject arbitrary CSS.
 
@@ -204,12 +204,15 @@ Token, node, CSS-property and value constraints come from the current library's 
 
 Save under `themes/article-themes/<id>.json`. Import JSON under **Themes** and inspect full typography. **Copy and apply** retains saved originals/snapshots; **Apply to current draft** adopts directly for new drafts. New-article creation can also select the theme.
 
+All article themes share the library's Markdown sample at `themes/preview.md`. The theme library, theme editor, color inspection and save validation use this same content; selecting a theme inside an article still previews the actual article. New libraries include a sample in their seed language. A missing file uses that remembered language, falling back to English when the language is absent or unsupported, and shows its default source. Unreadable or invalid samples show an error. Opening an existing library never fills a missing sample; existing custom samples are retained. Reload the library after editing the file. Changing the interface language does not translate or replace it.
+
 | Field | Constraint under defaults |
 |---|---|
 | kind | Explicit article-theme for new files; older snapshots without kind remain readable |
 | id / name / version | Safe ID, nonempty name and numeric version; three components recommended |
 | formatVersion | 1 |
 | tokens | All 11 supported keys below with safe CSS values |
+| dark.tokens | Optional manual dark overrides, limited to the color keys in tokens; missing keys inherit light values |
 | css | String scoped to article preview; at most 20,000 JavaScript string units |
 | nodes | Optional supported nodes with fontSize/lineHeight/color overrides |
 
@@ -234,6 +237,10 @@ Under defaults, selectors start from `.article-preview .article-body`; outer `.a
 Supported node keys are h1–h6, paragraph, blockquote, inlineCode, codeBlock, table, caption and divider. Overrides are fontSize, lineHeight and color only. See the [validator](../../../src/lib/themeValidation.ts) for full properties/value/length constraints.
 
 The library's `format/formatter.json` controls light/dark surfaces, preview font, dark conversion and output. Built-in WeChat defaults use official `mp-darkmode` on an isolated copy, including colors, gradients and background images; the old neutral-gray-only model is not used. Other platforms can disable/adjust conversion. Check light, dark and receiver results separately; dark preview does not rewrite source or light copying.
+
+Article color tables have light and dark columns. When `preview.dark-mode.parameters.mode` is `algorithm`, the dark column is read only and displays actual converted sample values. A role may have multiple results; unused, calculating and failed states are distinct. With `tokens`, both columns are editable and only dark overrides go into `dark.tokens`. Choose **Inherit light** to remove an override. Variables apply before computed styles are captured; fixed CSS and literal node colors keep their authored values. Typography is shared; the canvas uses `preview.surface`, without another paper token. Automatic mode retains the manual group but does not use or overwrite it.
+
+Older themes without dark keep their styles. Older formatters infer mode from transform; preserve retains external CSS dark behavior. Themes and history are not migrated implicitly. Dark viewing uses an isolated copy and keeps existing light clipboard/export policies.
 
 Theme-structure/security checks and platform reports are separate. `format/validator.json` defines tokens, node mappings and structure limits and calls registered platform capabilities; `format-support.json` owns rule wording, strength and source. See [FORMAT.md](FORMAT.md). Valid JSON is not platform compliance, and incomplete layout/manual review is not a pass.
 
@@ -273,7 +280,15 @@ Save as `guide-paper.json`. In the CSS string, `\n` represents newlines; JSON ca
     "color-article-code-surface": "#0f172a",
     "color-article-code-tint": "#e2e8f0"
   },
-  "css": ".article-preview { color: var(--color-article-ink); }\n.article-preview .article-body { max-width: 42rem; margin: 0 auto; padding: 1.25rem; font-size: 1rem; line-height: 1.8; }\n.article-preview .article-body h1, .article-preview .article-body h2, .article-preview .article-body h3 { color: var(--color-article-heading); font-weight: 700; margin: 1.5rem 0 0.75rem; }\n.article-preview .article-body h1 { font-size: 2rem; }\n.article-preview .article-body h2 { font-size: 1.375rem; }\n.article-preview .article-body p { margin: 1rem 0; }\n.article-preview .article-body a { color: var(--color-article-link); text-decoration: underline; }\n.article-preview .article-body blockquote { color: var(--color-article-muted); background-color: var(--color-article-quote-surface); border-left: 0.1875rem solid var(--color-article-line); padding: 0.75rem 1rem; }\n.article-preview .article-body img { max-width: 100%; height: auto; display: block; }\n.article-preview .article-body hr { border: 0; border-bottom: 0.0625rem solid var(--color-article-line); margin: 1.5rem 0; }\n.article-preview .article-body code { color: var(--color-article-code); background-color: var(--color-article-code-tint); padding: 0.125rem 0.25rem; }\n"
+  "css": ".article-preview { color: var(--color-article-ink); }\n.article-preview .article-body { max-width: 42rem; margin: 0 auto; padding: 1.25rem; font-size: 1rem; line-height: 1.8; }\n.article-preview .article-body h1, .article-preview .article-body h2, .article-preview .article-body h3 { color: var(--color-article-heading); font-weight: 700; margin: 1.5rem 0 0.75rem; }\n.article-preview .article-body h1 { font-size: 2rem; }\n.article-preview .article-body h2 { font-size: 1.375rem; }\n.article-preview .article-body p { margin: 1rem 0; }\n.article-preview .article-body a { color: var(--color-article-link); text-decoration: underline; }\n.article-preview .article-body blockquote { color: var(--color-article-muted); background-color: var(--color-article-quote-surface); border-left: 0.1875rem solid var(--color-article-line); padding: 0.75rem 1rem; }\n.article-preview .article-body img { max-width: 100%; height: auto; display: block; }\n.article-preview .article-body hr { border: 0; border-bottom: 0.0625rem solid var(--color-article-line); margin: 1.5rem 0; }\n.article-preview .article-body code { color: var(--color-article-code); background-color: var(--color-article-code-tint); padding: 0.125rem 0.25rem; }\n",
+  "dark": {
+    "tokens": {
+      "color-article-ink": "#e2e8f0",
+      "color-article-heading": "#f8fafc",
+      "color-article-muted": "#94a3b8",
+      "color-article-line": "#475569"
+    }
+  }
 }
 ```
 
@@ -284,6 +299,8 @@ Save as `guide-paper.json`. In the CSS string, `\n` represents newlines; JSON ca
 Files live under `snippets/<category>/<id>.json`; `snippets/index.json` stores categories/order, so body files do not repeat categoryId. Prefer **Templates → Snippets**: create information, select a category, edit the body and **Save content**. An explicitly authorized Agent can also create a unique file, then refresh/check the app.
 
 Fields are id, name, trigger, description, content and optional icon. Triggers are `//` followed by lowercase letters/digits/hyphens. Limits are name 80, description 240 and content 64,000 JavaScript string units. At most one `▌` marks the insertion cursor and is removed when used. Resolve filename/trigger collisions without overwriting unknown content.
+
+Default snippets include four-image rows and a variant without inner padding. Existing rules exempt fixed vertical scrolling heights; width exemptions remain limited to the actual inner horizontal list. Quote and generated-shell copying follows [output policy](FORMAT.md#doc-copy-output); body width checks remain.
 
 <a name="doc-snippet-example"></a>
 
@@ -311,6 +328,8 @@ Type `//guide-note` and select it, or use Insert element. Complete deliveries co
 Files live under `templates/<category>/<id>.md`, with categories in `templates/index.json`. Filename supplies the ID, Front Matter title supplies the name, and description supplies the summary. `templateIcon` can select a supported icon. Bodies must be nonempty and at most 250,000 JavaScript string units.
 
 Front Matter starts the source and encloses valid YAML in two `---` lines. title, description, author, createdAt and updatedAt are strings; categories is a string array; theme contains id/version. New manuscripts get new dates and the selected article theme; template dates are not final save timestamps.
+
+Articles created from starters can rename their folders independently. Template ID, article title and the `article.md` filename keep separate roles. Internal card and quote spacing in starter content is retained when copying.
 
 <a name="doc-starter-example"></a>
 
@@ -411,7 +430,24 @@ Run actual examples through source validation using repository tests as call ref
 
 Deliver files, adoption method, passes and unverified scope. Starters may keep fill-in prompts; completed articles must remove them. Retain manuscripts when file, style or image operations fail and retry after identifying the stage.
 
-UI language does not translate examples or saved library names, bodies and rule descriptions. Both language editions use the same technical fields/IDs; example prose can follow the reader's language.
+UI language does not translate examples or saved library names, bodies and rule descriptions. Complete seeds live under `resources/template/fresh-library/en-US/` and `zh-CN/`, with matching IDs, filenames and design tokens. Objects have no i18n fields. Once a library is created, UI language changes leave saved content unchanged; defaults fall back to English. Both language editions use the same technical fields/IDs; example prose can follow the reader's language.
+
+<a name="doc-resource-references"></a>
+
+## Images, attachments and source rendering
+
+Use the complete `/images/article-sample.png` URL for the application sample in snippets/starters. Import or adopt real resources first, then use their allocated article paths. Adopting a shared resource makes an independent copy without source-directory write permission.
+
+```text
+![Image](media/image/photo.png)
+[Attachment](media/file/report.pdf)
+```
+
+Images/attachments retain separate description indexes. Attachments use type icons and an unknown-file fallback without automatic preview/execution. Copying a snippet/template to another article does not carry the original media: reimport and update references. Distinguish importing/failed/missing resources and verify save/reopen; knowledge originals stay read-only.
+
+Math/Mermaid depend on optional library formatter steps; see [FORMAT.md](FORMAT.md#doc-source-rendering) for configuration/limits. Snippets keep source and can contain inline/display math or fences marked math/mermaid. Article themes control surrounding headings/paragraphs/spacing/colors without injecting scripts; the Mermaid step controls its diagram theme.
+
+Test short/long articles for source positions, pending/errors, light/dark/narrow/wide, scrolling, save/reopen, history and output. MathML/static PNG have receiver limits. Libraries without the steps retain source display; a local preview does not replace destination acceptance.
 
 ## Production implementation references
 

@@ -11,6 +11,7 @@ type Props = {
   saveDisabled?: boolean;
   saveLabel?: string;
   onCancel: () => void;
+  onContinue: () => void;
   onDiscard: () => void;
   onSave: () => Promise<boolean>;
 };
@@ -25,7 +26,7 @@ function ActionIcon({ name }: { name: 'edit' | 'back' | 'discard' | 'save' }) {
   return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
 }
 
-export function UnsavedChangesDialog({ entries, description, saveDisabled = false, saveLabel, onCancel, onDiscard, onSave }: Props) {
+export function UnsavedChangesDialog({ entries, description, saveDisabled = false, saveLabel, onCancel, onContinue, onDiscard, onSave }: Props) {
   const { t } = useUITranslation('dialogs');
   const id = useId();
   const [saving, setSaving] = useState(false);
@@ -56,7 +57,7 @@ export function UnsavedChangesDialog({ entries, description, saveDisabled = fals
         </div>
         {error ? <p className="rounded-lg border border-danger/30 bg-list px-3 py-2 text-xs text-danger" role="alert">{t('dialogs:ui.saveIncomplete')}</p> : null}
         <DialogActions><div className="grid w-full grid-cols-1 gap-2 md:grid-cols-3">
-          <DialogButton disabled={saving} onClick={cancel}><ActionIcon name="back" />{t('dialogs:ui.continueEditing')}</DialogButton>
+          <DialogButton disabled={saving} onClick={() => { if (!savingRef.current) onContinue(); }}><ActionIcon name="back" />{t('dialogs:ui.continueEditing')}</DialogButton>
           <DialogButton variant="danger" disabled={saving} onClick={() => { if (!savingRef.current) onDiscard(); }}><ActionIcon name="discard" />{t('dialogs:ui.discardChanges')}</DialogButton>
           <DialogButton variant="primary" disabled={saveDisabled || saving} onClick={() => void save()}><ActionIcon name="save" />{saving ? t('dialogs:ui.saving') : saveLabel ?? t('dialogs:ui.saveAndLeave')}</DialogButton>
         </div></DialogActions>

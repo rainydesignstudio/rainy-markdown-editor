@@ -198,8 +198,8 @@
   .clipboard-receiver {
     /* Pasted content is bounded by the dock's own max-height alone; this box is the scroller that
        takes up whatever the dock does not, so there is one ceiling instead of two competing ones. */
-    /* The surface follows the preview's light/dark, the way the theme library's sample does; the
-       pasted markup keeps its own inline colours so the box still shows what the clipboard held. */
-    @apply min-w-0 min-h-16 overflow-auto wrap-anywhere rounded-md border border-dashed border-line-strong bg-wechat-page-light p-3 text-xs-readable text-muted data-[preview-mode=dark]:bg-wechat-page-dark;
+    /* Compare the canonical light clipboard on this library's light paper; pasted
+       inline colours remain intact when the article preview switches modes. */
+    @apply min-w-0 min-h-16 overflow-auto wrap-anywhere rounded-md border border-dashed border-line-strong p-3 text-xs-readable;
   }
 }

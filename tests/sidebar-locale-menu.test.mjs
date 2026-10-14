@@ -15,6 +15,8 @@ function sidebar() {
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require(id) {
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
+    if (id.endsWith('/EditingDrafts')) return { useEditingDrafts: () => [], UnsavedMark: 'unsaved-mark' };
+    if (id.endsWith('/editingDrafts')) return { hasEditingDraft: () => false };
     if (id === 'react') return {
       useState(initial) { const i = cursor++; if (!(i in cells)) cells[i] = initial; return [cells[i], next => { cells[i] = typeof next === 'function' ? next(cells[i]) : next; }]; },
       useEffect(effect, deps) { const i = cursor++; if (cells[i]?.every((value, j) => Object.is(value, deps[j]))) return; cells[i] = deps; effects.push(effect); },

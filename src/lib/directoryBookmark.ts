@@ -14,7 +14,7 @@ type PermissionHandle = FileSystemDirectoryHandle & {
   requestPermission?: (descriptor: { mode: 'readwrite' }) => Promise<PermissionState>;
 };
 
-function openBookmarkDatabase(): Promise<IDBDatabase> {
+export function openBookmarkDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') {
     return Promise.reject(new ProductError("directoryBookmark.thisBrowserCannotRememberTheLastLibraryDirectory"));
   }

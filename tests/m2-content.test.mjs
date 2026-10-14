@@ -247,7 +247,7 @@ test('explicit creation never overwrites existing snippet or template files', as
 test('renaming snippets and templates writes the complete new file, removes the old and preserves unrelated assets', async () => {
   const root = new MemoryDirectoryHandle('rename-content');
   const snippets = await loadArticleSnippets(root), templates = await loadArticleTemplates(root);
-  const old = snippets.snippets[0], template = templates.templates[0];
+  const old = snippets.snippets[0], template = templates.templates.find(item => item.id === 'markdown-guide');
   const saved = await saveArticleSnippet(root, { ...old, id: 'renamed-snippet', categoryId: 'zixu', content: '<p>Full body</p>' }, old.id);
   const renamed = await saveArticleTemplate(root, 'renamed-template', template.source, template.id);
   const base = await root.getDirectoryHandle('snippets');
@@ -330,7 +330,7 @@ test('empty libraries seed themed snippets and sample templates in their categor
   const snippets = await loadArticleSnippets(root);
   const templates = await loadArticleTemplates(root);
 
-  assert.equal(snippets.snippets.length, 20);
+  assert.equal(snippets.snippets.length, 21);
   assert.deepEqual(snippets.categories, DEFAULT_SNIPPET_CATEGORIES);
   assert.equal(templates.templates.length, 5);
   assert.deepEqual(snippets.snippets.map((item) => item.trigger).sort(), DEFAULT_ARTICLE_SNIPPETS.map((item) => item.trigger).sort());
@@ -456,7 +456,7 @@ test('category index names and orders folders while defaults share the default f
   await saveArticleSnippet(root, { ...sampleSnippet, categoryId: 'zixu' });
   await saveSnippetCategory(root, { ...notes, name: '新笔记', order: 9 });
   const loaded = await loadArticleSnippets(root);
-  assert.deepEqual(loaded.categories.map(c => c.name), ['默认', 'Rainy Design', '紫序', '新笔记']);
+  assert.deepEqual(loaded.categories.map(c => c.name), ['Default', 'Rainy Design', '紫序', '新笔记']);
   assert.equal(loaded.snippets.find(s => s.id === sampleSnippet.id).categoryId, 'zixu');
   assert.equal(loaded.snippets.filter(s => s.categoryId === 'default').length, DEFAULT_ARTICLE_SNIPPETS.filter(s => s.categoryId === 'default').length);
   const base = await root.getDirectoryHandle('snippets');

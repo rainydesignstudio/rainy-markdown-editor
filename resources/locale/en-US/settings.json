@@ -24,6 +24,20 @@
     "authorizeAndOpen": "Authorize and open",
     "openExistingLibrary": "Open existing library",
     "newLibrary": "New library",
+    "libraryCardTitle": "Library",
+    "libraryStorageDescription": "Where your manuscripts, assets and history are saved.",
+    "switchLibrary": "Switch library",
+    "chooseAnotherLibrary": "Choose another library",
+    "switchLibraryKeepsFiles": "Switching libraries does not move files from the previous directory.",
+    "libraryConfiguration": "Library contents and configuration",
+    "contentAndStorage": "Contents and storage",
+    "formatAndDark": "Format and dark mode",
+    "configurationSource": "Configuration source",
+    "builtInConfiguration": "Built-in policy fallback",
+    "officialConfiguration": "Official defaults",
+    "customConfiguration": "Custom library configuration",
+    "darkAlgorithm": "Dark-mode algorithm",
+    "algorithmDetails": "Version and source",
     "thisBrowserDoesNotSupportLocalDirectoryAccess": "This browser does not support local directory access. Use a supported desktop browser.",
     "projectOrganizationAndAppearanceAreReadOnlyTo": "Project organization and appearance are read-only to protect the original files.",
     "manuscriptsAndAssets": "Manuscripts and assets",
@@ -98,7 +112,8 @@
     "noColorConversion": "Preserve colors (no conversion)",
     "loadingFormatConfiguration": "Loading format configuration…",
     "formatUnavailable": "Configuration unavailable",
-    "builtInPolicyFallback": " · built-in default fallback"
+    "builtInPolicyFallback": " · built-in default fallback",
+    "currentLibraryConfiguration": "Validation and dark-mode conversion for this library"
   },
   "templates": {
     "previewTheme": "Preview editor theme {{name}}",
@@ -125,5 +140,24 @@
     "library": "Library component",
     "built-in": "Built-in component",
     "legacy": "Legacy fallback"
+  },
+  "fontDownloads": {
+    "title": "Font download source",
+    "google": "Google Fonts (default)",
+    "mirror": "China mirror (JSDMirror)",
+    "description": "Download only complete fonts missing from the library. Existing fonts are retained.",
+    "scope": "Shared in this browser",
+    "ready": "Fonts ready",
+    "downloading": "Downloading",
+    "incomplete": "Download incomplete",
+    "unchecked": "Not checked",
+    "connectFirst": "Choose a source now, then connect a library to download missing fonts.",
+    "checking": "Checking…",
+    "retryDownload": "Retry download",
+    "retry": "Download missing fonts",
+    "cancel": "Cancel download",
+    "progress": "Loading font files {{completed}} / {{total}}…",
+    "unsaved": "Source changed, but the browser could not save your preference.",
+    "heading": "Font downloads"
   }
 }

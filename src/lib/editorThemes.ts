@@ -1,5 +1,5 @@
 import { ProductError, productCause, productJoin, productMessage, productReference, productText, type ProductMessageFields, type ProductMessageValue } from "./i18n/productMessages";
-import { EDITOR_THEME_TEMPLATE_JSON, LEGACY_MIST_THEME_JSON } from '../themes/editor-themes/index';
+import { getEditorThemeTemplateJson, LEGACY_MIST_THEME_JSON } from '../themes/editor-themes/index';
 import { codeFontStack } from './fontCatalog';
 
 export const EDITOR_COLOR_ROLES = [
@@ -245,9 +245,12 @@ export function parseEditorThemeJson(source: string): EditorTheme {
   } };
 }
 
-export const BUILTIN_EDITOR_THEMES: readonly EditorTheme[] = EDITOR_THEME_TEMPLATE_JSON.map((source) => {
-  return parseEditorThemeJson(JSON.stringify(source));
-});
+const builtinEditorThemes = {
+  'en-US': getEditorThemeTemplateJson('en-US').map(source => parseEditorThemeJson(JSON.stringify(source))),
+  'zh-CN': getEditorThemeTemplateJson('zh-CN').map(source => parseEditorThemeJson(JSON.stringify(source))),
+};
+export function getBuiltinEditorThemes(locale: string = 'en-US'): readonly EditorTheme[] { return builtinEditorThemes[locale === 'zh-CN' ? 'zh-CN' : 'en-US']; }
+export const BUILTIN_EDITOR_THEMES = getBuiltinEditorThemes();
 
 export const BASE_EDITOR_THEME = BUILTIN_EDITOR_THEMES[0];
 export const DEFAULT_EDITOR_THEME = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'rainy-design-slate')!;

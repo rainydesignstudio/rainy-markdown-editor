@@ -249,7 +249,7 @@
   }
   const capabilities = { 'style.present': styleCheck, 'style.values': styleCheck, 'style.transparent': styleCheck, 'style.important': styleCheck, 'dom.leaf-content': leafCheck, 'dom.nodeleaf-content': leafCheck, 'dom.redundant-nesting': nestingCheck, 'dom.height-overflow': heightCheck, 'dom.text-overlap': lineHeightCheck, 'dom.opacity-overlay': opacityCheck, 'dom.animation-begin': animationCheck, 'dom.pre-text': preCheck };
   async function transform(root, bundle, rules = []) {
-    if (bundle.formatter.preview.dark.transform === 'preserve') return [];
+    if (bundle.formatter.preview.dark.mode === 'tokens' || bundle.formatter.preview.dark.transform === 'preserve') return [];
     if (!window.ArticleAlgorithmHost) throw new Error('ALGORITHM_HOST_UNAVAILABLE');
     return window.ArticleAlgorithmHost.run(root, bundle, rules);
   }
@@ -273,7 +273,7 @@
       darkRules.forEach(rule => { add(rule, root, '资源不可用或尚未就绪，未执行深色测量。', 'incomplete'); issues[issues.length - 1].resourceDependency = true; });
     } else if (darkRules.length) {
       const findings = await transform(root, bundle, darkRules);
-      if (bundle.formatter.preview.dark.transform === 'preserve') darkRules.forEach(rule => add(rule, root, '当前配置未启用相应转换能力。', 'incomplete'));
+      if (bundle.formatter.preview.dark.mode === 'tokens' || bundle.formatter.preview.dark.transform === 'preserve') darkRules.forEach(rule => add(rule, root, '当前配置未启用相应转换能力。', 'incomplete'));
       else {
         const nodes = [root, ...root.querySelectorAll('*')];
         for (const finding of findings) {

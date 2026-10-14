@@ -1,5 +1,8 @@
 'use client';
 
+import { useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
+import { hasEditingDraft } from '../../lib/editingDrafts';
+
 import { useUITranslation } from '../global/UILocaleProvider';
 
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
@@ -47,6 +50,7 @@ function ArticleSidebarRow({
   projectId,
   archived,
   current,
+  dirty,
   disabled,
   onOpen,
   onInfo,
@@ -60,6 +64,7 @@ function ArticleSidebarRow({
   projectId: string | null;
   archived: boolean;
   current: boolean;
+  dirty: boolean;
   disabled: boolean;
   onOpen: (article: ArticleSummary) => void;
   onInfo: (article: ArticleSummary) => void;
@@ -82,6 +87,7 @@ function ArticleSidebarRow({
       <button className={current ? 'article-sidebar-row group-hover:text-accent-text' : 'article-sidebar-row group-hover:text-primary'} type="button" data-active={current} onClick={() => onOpen(article)} aria-current={current ? 'page' : undefined}>
         <FileIcon />
         <span className="article-sidebar-label">{article.parse.metadata.title || t('articles:untitled')}</span>
+        {dirty ? <UnsavedMark /> : null}
       </button>
       <ArticleActionsMenu article={article} archived={archived} disabled={disabled} insetSummary onInfo={onInfo} onArchive={onArchive} onFork={onFork} onDelete={onDelete} />
     </div>
@@ -115,6 +121,7 @@ export function ArticleSidebar({
 }) {
   const { t } = useUITranslation('articles');
   const controller = useEditorControllerContext();
+  const drafts = useEditingDrafts();
   const [creatingProject, setCreatingProject] = useState(false);
   const [projectName, setProjectName] = useState('');
   const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
@@ -232,6 +239,7 @@ export function ArticleSidebar({
       projectId={projectId}
       archived={archived}
       current={controller.currentArticleId === article.id && controller.articleMode === 'editor'}
+      dirty={hasEditingDraft(drafts, controller.directory, 'articles', article.id)}
       disabled={controller.editorWorkspaceBusy || controller.mediaOperation !== null || controller.historyBusy}
       onOpen={(item) => { controller.openStoredArticle(item); onCloseMobile(); }}
       onInfo={controller.openArticleInfo}
@@ -261,6 +269,7 @@ export function ArticleSidebar({
           ) : (
             <>
               <section className="article-sidebar-section article-sidebar-section--entry" aria-label={t('articles:navigation.entries')}>
+                {controller.article.dirty && !controller.article.folder ? <button className="article-sidebar-row" type="button" onClick={() => { controller.resumeCurrentDraft(); onCloseMobile(); }}><FileIcon /><span className="article-sidebar-label">{controller.currentTitle}</span><UnsavedMark /></button> : null}
                 <button className="article-sidebar-link group/collection hover:bg-hover" type="button" aria-label={t('articles:counts.all', { count: articleCount })} data-active={controller.selectedArticleCollection === 'all'} onClick={() => closeAndSelect('all')}>
                   <CollectionIcon kind="all" /><CollectionLabel name={t('articles:collections.all')} count={articleCount} />
                 </button>

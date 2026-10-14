@@ -74,7 +74,7 @@ function contentSecurityPolicy(filePath) {
     "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     `script-src ${scriptSource}`,
-    "connect-src 'self' blob:",
+    "connect-src 'self' blob: https:",
     "object-src 'none'",
     "frame-ancestors 'none'",
   ].join('; ');

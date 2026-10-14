@@ -110,9 +110,9 @@ test('draft protection precedes the creation dialog and does not open the native
 });
 
 test('directory creation reports success, cancellation, stale selection and file collisions to the dialog', async () => {
-  const statuses = [], opened = [], root = { name: 'new-library' };
-  const context = { useCallback: callback => callback, DOMException, DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, directorySelectionRef: { current: 0 },
-    pickDataDirectory: async () => ({}), createNamedDataDirectory: async () => root,
+  const statuses = [], opened = [], creates = [], root = { name: 'new-library' };
+  const context = { useCallback: callback => callback, DOMException, seedLocale: 'zh-CN', DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, directorySelectionRef: { current: 0 },
+    pickDataDirectory: async () => ({}), createNamedDataDirectory: async (...args) => { creates.push(args); return root; },
     setStatus: status => statuses.push(status), rememberAuthorizedDirectory: (handle, selection) => opened.push(['remember', handle, selection]),
     openAuthorizedDirectory: async (handle, selection) => opened.push(['open', handle, selection]),
   };
@@ -122,6 +122,7 @@ test('directory creation reports success, cancellation, stale selection and file
   assert.equal(opened.length, 0);
   context.pickDataDirectory = async () => ({});
   assert.equal((await create('new-library')).status, 'created'); assert.equal(opened.length, 2);
+  assert.equal(creates[0][3], 'zh-CN');
   context.pickDataDirectory = async () => { throw new DOMException('取消', 'AbortError'); };
   assert.equal((await create('new-library')).status, 'cancelled'); assert.equal(opened.length, 2);
   context.pickDataDirectory = async () => { context.directorySelectionRef.current++; return {}; };

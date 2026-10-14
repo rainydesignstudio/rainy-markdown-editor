@@ -55,7 +55,7 @@ test('undo shortcuts distinguish platform conventions and do not claim unrelated
   assert.equal(textHistoryShortcut({ key: 'z', ctrlKey: true, altKey: true }), null);
 });
 
-function controlsFixture(values) {
+function controlsFixture(values, scopes = []) {
   let cursor = 0;
   const cells = [], effects = [], listeners = new Set(), changes = [], refs = values.map(() => ({ current: null }));
   const document = { activeElement: null, addEventListener(_name, listener) { listeners.add(listener); }, removeEventListener(_name, listener) { listeners.delete(listener); } };
@@ -66,7 +66,7 @@ function controlsFixture(values) {
   require('react');
   const { useTextInputHistory } = require('./useTextInputHistory');
   let hooks;
-  function render() { cursor = 0; hooks = values.map((value, i) => useTextInputHistory(refs[i], value, next => { changes.push([i, next]); values[i] = next; })); while (effects.length) effects.shift()(); }
+  function render() { cursor = 0; hooks = values.map((value, i) => useTextInputHistory(refs[i], value, next => { changes.push([i, next]); values[i] = next; }, false, scopes[i])); while (effects.length) effects.shift()(); }
   function before(index, inputType, target = controls[index]) {
     controls[index].focus();
     const event = { inputType, target, prevented: false, preventDefault() { this.prevented = true; } };
@@ -98,6 +98,16 @@ test('focused native fields route menu undo and keyboard redo independently, inc
   assert.equal(f.values[2], 'Gamma alpha');
   f.key(1, 'y'); assert.equal(f.values[1], 'Gamma');
   f.key(0, 'z'); f.key(0, 'z'); assert.equal(f.values[2], 'Gamma alpha');
+});
+
+test('a new document with identical body has an independent history while saves in the same document preserve undo', () => {
+  const scopes = [undefined, undefined, 1], f = controlsFixture(['query', 'replace', 'Body'], scopes);
+  f.input(2, 'Body edited'); f.render(); f.key(2, 'z'); assert.equal(f.values[2], 'Body');
+  f.key(2, 'y'); assert.equal(f.values[2], 'Body edited');
+  f.render(); f.key(2, 'z'); assert.equal(f.values[2], 'Body', 'same-scope renders or saves do not reset history');
+  f.key(2, 'y'); scopes[2] = 2; f.render();
+  f.key(2, 'z'); assert.equal(f.values[2], 'Body edited', 'a new manuscript cannot undo edits from its source or the previous document');
+  f.input(2, 'Imported edit'); f.key(2, 'z'); assert.equal(f.values[2], 'Body edited');
 });
 
 test('composition remains one transaction despite intermediate controlled renders, and read-only undo preserves content', () => {

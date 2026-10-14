@@ -1,0 +1,9 @@
+{
+  "id": "captioned-image",
+  "name": "Captioned image",
+  "trigger": "//captioned-image",
+  "description": "A sample image with a visible caption. Replace both with article content.",
+  "content": "<section>\n  <img class=\"h-auto max-w-full\" src=\"/images/article-sample.png\" />\n  <figcaption class=\"mt-2 mb-0 text-center text-xs text-article-muted\">Image caption▌</figcaption>\n</section>\n",
+  "icon": "image",
+  "categoryId": "default"
+}

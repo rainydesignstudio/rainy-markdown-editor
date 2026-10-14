@@ -8,8 +8,8 @@ import type { WorkingArticle } from '../../lib/types';
 
 type IconName = 'menu' | 'back' | 'edit' | 'statistics' | 'history' | 'template' | 'export' | 'check' | 'save' | 'copy' | 'refresh';
 
-function Icon({ name }: { name: IconName }) {
-  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+function Icon({ name, className }: { name: IconName; className?: string }) {
+  const common = { className, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   if (name === 'menu') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M4 6h16M4 12h16M4 18h16" /></svg>;
   if (name === 'back') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="m10 5-7 7 7 7M3 12h18" /></svg>;
   if (name === 'edit') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="m4 20 4.4-.9L19 8.5 15.5 5 4.9 15.6 4 20ZM13.5 7l3.5 3.5" /></svg>;
@@ -22,6 +22,8 @@ function Icon({ name }: { name: IconName }) {
   if (name === 'copy') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9a7 7 0 0 1 12-2L20 12M4 12l2.5 5a7 7 0 0 0 12-2" /></svg>;
 }
+
+export { Icon as EditorActionIcon };
 
 type Props = {
   hidden?: boolean;

@@ -11,7 +11,7 @@ import { ArticleDocument } from '../editor/ArticleDocument';
 import { useArticleRenderMount } from '../../hooks/useArticleRenderMount';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { restoreRenderEnvironment } from '../../lib/article-format/renderRecords';
-import { articlePreviewStyle } from '../../lib/article-format/preview';
+import { articlePreviewStyle, previewSurfaceStyle } from '../../lib/article-format/preview';
 import { sanitizeHtml } from '../../lib/article-format/sanitize';
 import type { FormatSnapshot } from '../../lib/article-format/runtime';
 
@@ -49,9 +49,9 @@ export function HistorySnapshotPreview({ snapshot, root, article, articleTitle }
     {(!snapshot.renderRecord || format.algorithmSource === 'legacy' && format.bundle.formatter.preview.dark.transform !== 'preserve') && !issue ? <p className="content-library-note" data-tone="warning">{t(!snapshot.renderRecord ? 'dialogs:history.legacyEnvironment' : 'messages:algorithms.legacyHistory')}</p> : null}
     {issue ? <p className="content-library-note" data-tone="error" role="alert">{t('dialogs:history.restoreIssue', { issue })}</p> : null}
     {!rendition && !issue ? <p className="status-copy" role="status">{t('dialogs:history.loading')}</p> : null}
-    <div ref={hostRef} className="history-render-host" aria-busy={!rendition && !issue} />
+    <div ref={hostRef} className="history-render-host" style={previewSurfaceStyle(false, format)} aria-busy={!rendition && !issue} />
     {target && rendition?.id === snapshot.id ? createPortal(<>
-      {!native ? <style data-article-style>{articlePreviewStyle(rendition.css)}</style> : null}
+      {!native ? <style data-article-style>{articlePreviewStyle(rendition.css, format)}</style> : null}
       {rendition.html !== undefined ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(rendition.html, format) }} /> :
         <ArticleDocument snapshot={format} themeId={snapshot.theme.id} media={media}><MarkdownPreview source={snapshot.parsed.body} media={media} snapshot={format} /></ArticleDocument>}
     </>, target) : null}

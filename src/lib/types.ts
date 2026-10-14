@@ -37,6 +37,7 @@ export type ArticleThemeConfig = {
   version: string;
   formatVersion: number;
   tokens: Record<string, string>;
+  dark?: { tokens: Record<string, string> };
   css: string;
   nodes?: Partial<Record<ThemeNodeKey, ThemeNodeOverrides>>;
 };

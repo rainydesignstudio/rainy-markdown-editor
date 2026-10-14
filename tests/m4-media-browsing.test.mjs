@@ -1,3 +1,6 @@
+import * as resourceTypes from '../src/lib/resources/types.ts';
+import { inspectResourceFile } from '../src/lib/resources/storage.ts';
+import { libraryMediaAssetKey } from '../src/lib/articleMedia.ts';
 import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -31,7 +34,7 @@ const nodes=node=>Array.isArray(node)?node.flatMap(nodes):node?.props?[node,...n
 async function load(relative,dependencies,globals={}){
   const module={exports:{}};
   const code=ts.transpileModule(await readFile(new URL(relative,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  vm.runInNewContext(code,{module,exports:module.exports,Set,Object,...globals,require: withUILocaleImports(function(id){if(id==='react/jsx-runtime')return {jsx,jsxs};if(id in dependencies)return dependencies[id];throw new Error(id)})});
+  vm.runInNewContext(code,{module,exports:module.exports,Set,Object,...globals,require: withUILocaleImports(function(id){if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-dialog' }; if(id==='react/jsx-runtime')return {jsx,jsxs};if (id.endsWith('/resources/types')) return resourceTypes; if (id.endsWith('/resources/storage')) return { inspectResourceFile }; if (id.endsWith('/ResourceGlyph')) return { ResourceGlyph: 'resource-glyph' }; if (id.endsWith('/articleMedia') && !(id in dependencies)) return { libraryMediaAssetKey }; if(id in dependencies)return dependencies[id];throw new Error(id)})});
   return module.exports;
 }
 const find=(tree,predicate)=>{const result=tree.find(predicate);assert.ok(result);return result};
@@ -45,6 +48,7 @@ test('library mounts only the current page, preserves cross-page selections and 
     'react':react,'../../lib/editorWorkspace':{getArticleOrganization:()=>({})},
     '../../hooks/useMediaPreferences':{useMediaPreferences:()=>[preferences,value=>preferences=value]},'../../hooks/useMediaPagination':{useMediaPagination},
     '../../hooks/useMediaLibrary':{useMediaLibrary:()=>({assets,issues:[],loading:false,refresh(){}})},'../../lib/mediaBrowsing':{mediaDirectoryImages},
+    '../../hooks/useImageZoom':{useImageZoom:()=>({})},'../global/IconButton':{IconButton:'zoom-button'},
     '../global/PageHeading':{PageHeading:'heading'},'../global/DialogFrame':{DialogFrame:'frame',DialogHeader:'header',DialogFooter:'footer',DialogActions:'actions',DialogButton:'button'},
     './MediaGallery':{MediaDetails:'details',MediaGallery:'gallery',MediaIcon:'icon',MediaImportButton:'import',sortMediaAssets:values=>values,formatMediaBytes:()=>'',mediaAssetKey:image=>image.fileName},
     './MediaToolbar':{MediaToolbar:'toolbar'},'./MediaPagination':{MediaPagination:'pagination'},'./MediaPreviewDialog':{MediaPreviewDialog:'preview'},'./MediaImportDialog':{MediaImportDialog:'import-dialog'},'./ArticleImagePreview':{ArticleImagePreview:'image'},'./MediaManagementDialog':{MediaManagementDialog:'management'},
@@ -65,12 +69,13 @@ test('library mounts only the current page, preserves cross-page selections and 
 });
 
 test('preview buttons and keyboard obey directory boundaries, modifiers and editable controls; zoom sizes preserve image proportions',async()=>{
-  const cells=[];let cursor=0;
+  const cells=[];let cursor=0,needsRender=false;
   class Element {constructor(editable=false){this.editable=editable}closest(){return this.editable?{}:null}}
-  const react={useState(initial){const index=cursor++;if(!(index in cells))cells[index]=typeof initial==='function'?initial():initial;return [cells[index],value=>{cells[index]=typeof value==='function'?value(cells[index]):value}]},useRef(initial){const index=cursor++;return cells[index]??={current:initial}},useEffect(){},useId:()=> 'preview-title'};
-  const module=await load('../src/components/media/MediaPreviewDialog.tsx',{'react':react,'../global/DialogFrame':{DialogFrame:'frame',DialogHeader:'header'},'../global/IconButton':{IconButton:'icon-button'},'./ArticleImagePreview':{ArticleImagePreview:'image'},'./MediaGallery':{mediaAssetKey:asset=>asset.fileName}},{Element});
+  const react={useState(initial){const index=cursor++;if(!(index in cells))cells[index]=typeof initial==='function'?initial():initial;return [cells[index],value=>{const next=typeof value==='function'?value(cells[index]):value;needsRender ||= !Object.is(next,cells[index]);cells[index]=next}]},useRef(initial){const index=cursor++;return cells[index]??={current:initial}},useEffect(){},useLayoutEffect(callback,deps){const index=cursor++,previous=cells[index];if(!previous||deps.some((value,i)=>!Object.is(value,previous[i]))){cells[index]=deps;callback()}},useCallback:callback=>callback,useId:()=> 'preview-title'};
+  const {useImageZoom}=await load('../src/hooks/useImageZoom.ts',{'react':react});
+  const module=await load('../src/components/media/MediaPreviewDialog.tsx',{'react':react,'../../hooks/useImageZoom':{useImageZoom},'../global/DialogFrame':{DialogFrame:'frame',DialogHeader:'header'},'../global/IconButton':{IconButton:'icon-button'},'./ArticleImagePreview':{ArticleImagePreview:'image'},'./MediaGallery':{mediaAssetKey:asset=>asset.fileName}},{Element});
   const images=[{fileName:'a.png',handle:{}},{fileName:'b.png',handle:{}}],props={initial:images[0],images,sessionKey:1,isCurrent:()=>true,onClose(){}};
-  const view=()=>{cursor=0;return nodes(module.MediaPreviewDialog(props))};
+  const view=()=>{let tree;do{needsRender=false;cursor=0;tree=nodes(module.MediaPreviewDialog(props))}while(needsRender);return tree};
   const image=()=>find(view(),node=>node.type==='image').props;
   const key=(value,target=new Element(),meta=false)=>find(view(),node=>node.type==='frame').props.onKeyDown({key:value,target,metaKey:meta,preventDefault(){},stopPropagation(){}});
   assert.equal(find(view(),node=>node.props['aria-label']==='上一张图片').props.disabled,true);

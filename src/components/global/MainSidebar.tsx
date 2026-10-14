@@ -7,8 +7,10 @@ import type { ViewKey } from '../../hooks/useEditorController';
 import { IconPopover } from './IconPopover';
 import { useUILocale, useUITranslation } from './UILocaleProvider';
 import { UI_LOCALES } from '../../lib/i18n/preferences';
+import { useEditingDrafts, UnsavedMark } from './EditingDrafts';
+import { hasEditingDraft } from '../../lib/editingDrafts';
 
-type IconName = 'brand' | 'collapse' | 'articles' | 'assets' | 'themes' | 'templates' | 'settings' | 'sun' | 'moon' | 'system' | 'language' | 'chevron';
+type IconName = 'brand' | 'collapse' | 'articles' | 'assets' | 'themes' | 'templates' | 'settings' | 'sun' | 'moon' | 'system' | 'knowledge' | 'language' | 'chevron';
 
 function Icon({ name }: { name: IconName }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -19,6 +21,7 @@ function Icon({ name }: { name: IconName }) {
   if (name === 'assets') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8" cy="9" r="1.5" /><path d="m4 18 5-5 3 3 3-4 5 6" /></svg>;
   if (name === 'themes') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="4" y="4" width="10" height="16" rx="2" /><path d="m14 7 3-1.5a2 2 0 0 1 2.7.8l1 1.8a2 2 0 0 1-.8 2.7L14 14M8 9h2M8 13h2M8 17h2" /></svg>;
   if (name === 'templates') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg>;
+  if (name === 'knowledge') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><circle cx="6" cy="6" r="3" /><circle cx="18" cy="8" r="3" /><circle cx="11" cy="18" r="3" /><path d="m9 6 6 1M7 9l3 6m6-4-3 4" /></svg>;
   if (name === 'settings') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M4 7h16M4 17h16M8 4v6M16 14v6" /><circle cx="8" cy="7" r="2" /><circle cx="16" cy="17" r="2" /></svg>;
   if (name === 'sun') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2.5 12h2m15 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>;
   if (name === 'moon') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M19.5 15.7A8.4 8.4 0 0 1 8.3 4.5 8.6 8.6 0 1 0 19.5 15.7Z" /></svg>;
@@ -32,10 +35,12 @@ const NAV_ITEMS: Array<{ id: ViewKey; icon: IconName }> = [
   { id: 'themes', icon: 'themes' },
   { id: 'template', icon: 'templates' },
   { id: 'assets', icon: 'assets' },
+  { id: 'knowledge', icon: 'knowledge' },
   { id: 'settings', icon: 'settings' },
 ];
 
 type Props = {
+  root: FileSystemDirectoryHandle | null;
   view: ViewKey;
   mediaOperation: 'import' | 'rename' | null;
   collapsed: boolean;
@@ -54,7 +59,8 @@ const COLOR_MODES: Array<{ id: EditorColorMode; icon: IconName }> = [
 
 const preferenceOption = 'flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-xs text-popup-text hover:bg-hover hover:text-accent-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent aria-checked:bg-accent-soft aria-checked:text-accent-text';
 
-export function MainSidebar({ view, mediaOperation, collapsed, colorMode, onNavigate, onToggleCollapsed, onSetColorMode, onOpenChangelog }: Props) {
+export function MainSidebar({ root, view, mediaOperation, collapsed, colorMode, onNavigate, onToggleCollapsed, onSetColorMode, onOpenChangelog }: Props) {
+  const drafts = useEditingDrafts();
   const { locale, setLocale, preferenceSaved } = useUILocale();
   const { t } = useUITranslation();
   const [openPreference, setOpenPreference] = useState<'mode' | 'language' | null>(null);
@@ -90,24 +96,25 @@ export function MainSidebar({ view, mediaOperation, collapsed, colorMode, onNavi
           >
             <span className="absolute bottom-3 left-0 top-3 w-0.5 rounded-full bg-accent-text opacity-0 group-aria-[current=page]:opacity-100" aria-hidden="true" /><span className="nav-icon text-faint transition-colors group-hover:text-primary group-aria-[current=page]:text-accent-text"><Icon name={item.icon} /></span>
             <span className="nav-copy">{t('shell:navigation.' + item.id)}</span>
+            {item.id !== 'knowledge' && hasEditingDraft(drafts, root, item.id) ? <UnsavedMark className="absolute right-2 top-1/2 -translate-y-1/2" /> : null}
           </button>
         ))}
       </nav>
 
       <footer className="sidebar-footer">
-        <div className="mode-picker">
+        <div className="mode-picker md:mb-2">
           <IconPopover label={t('displayMode.current', { mode: t('displayMode.' + selectedMode.id) })} icon={<Icon name={selectedMode.icon} />} open={openPreference === 'mode'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{t('displayMode.' + selectedMode.id)}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('mode')} onClose={closePreference}>
             {COLOR_MODES.map(mode => <button key={mode.id} type="button" role="menuitemradio" aria-checked={colorMode === mode.id} className={preferenceOption} onClick={() => { onSetColorMode(mode.id); closePreference(); }}><span className="grid size-4 shrink-0 place-items-center [&_svg]:size-4"><Icon name={mode.icon} /></span><span>{t('displayMode.' + mode.id)}</span></button>)}
           </IconPopover>
         </div>
-        <button className="version-button" type="button" aria-label={t('shell:updates.aria', { title: t('common:app.title'), version: APP_VERSION })} onClick={onOpenChangelog} data-tooltip={t('shell:updates.open')}>
-          <span className="version-copy">{t('common:app.title')} v{APP_VERSION}</span><span className="version-compact" aria-hidden="true">v{APP_VERSION_COMPACT}</span>
-        </button>
         <div className="mode-picker">
           <IconPopover label={t('language.title')} tooltip={languageTooltip} icon={<Icon name="language" />} open={openPreference === 'language'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{languageName}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('language')} onClose={closePreference}>
             {UI_LOCALES.map(option => <button key={option} type="button" role="menuitemradio" aria-checked={locale === option} lang={option} className={preferenceOption} onClick={() => { closePreference(); void setLocale(option); }}><span className="grid size-4 shrink-0 place-items-center" aria-hidden="true">{locale === option ? '✓' : ''}</span><span>{t('language.' + option)}</span></button>)}
           </IconPopover>
         </div>
+        <button className="version-button" type="button" aria-label={t('shell:updates.aria', { title: t('common:app.title'), version: APP_VERSION })} onClick={onOpenChangelog} data-tooltip={t('shell:updates.open')}>
+          <span className="version-copy">{t('common:app.title')} v{APP_VERSION}</span><span className="version-compact" aria-hidden="true">v{APP_VERSION_COMPACT}</span>
+        </button>
         <span className="sr-only" role="status">{preferenceSaved === false ? t('language.preferenceUnsaved') : ''}</span>
       </footer>
     </aside>

@@ -58,7 +58,8 @@
       "severity": "error",
       "source": "wechat-editor",
       "validator": "height",
-      "anchor": "_1-5-height"
+      "anchor": "_1-5-height",
+      "description": "非零高度且节点自身的计算后 overflow-y 为 auto 或 scroll 时，不按文字裁切报错，包括 overflow 双值写法；零高度、hidden/clip 实际裁切及独立子节点错误仍检查。纵向滚动不扩大宽度、深色或安全豁免。"
     },
     {
       "id": "text-align",

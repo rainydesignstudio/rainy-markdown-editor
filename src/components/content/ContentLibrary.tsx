@@ -24,6 +24,8 @@ import type { NavigationGuard } from '../../hooks/useRouteNavigation';
 import type { ArticleSnippet, ArticleTemplate, SnippetCategory, SnippetCategoryIcon, ThemeConfig } from '../../lib/types';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
+import { useDraftLocation, useEditingDraft, UnsavedMark } from '../global/EditingDrafts';
+import type { EditingLocation } from '../../lib/editingLocation';
 import { articleFormatMessage, articleFormatMessageReference, type ArticleFormatIssue } from '../../lib/articleFormat';
 import { validateContentSource, type ContentValidationResult } from '../../lib/contentValidation';
 import { SnippetTextarea } from './SnippetTextarea';
@@ -116,9 +118,29 @@ export function ContentLibrary(props: Props) {
     return Boolean(result && target && result.root === root && result.sessionKey === sessionKey && result.formatId === getFormatSnapshot().id && result.themeSignature === JSON.stringify(previewTheme) && result.signature === JSON.stringify(target.value) && !result.errors.length);
   };
   const [confirmDelete, setConfirmDelete] = useState<{ tab: TemplateTab; id: string; name: string } | null>(null);
-  const [decision, setDecision] = useState<{ label: string; scope: 'page' | 'tab'; run: () => void } | null>(null);
+  const [decision, setDecision] = useState<{ label: string; scope: 'page' | 'tab' | 'info'; run: () => void } | null>(null);
   const current = useRef({ drafts, operation, metadataDialog });
   current.current = { drafts, operation, metadataDialog };
+  const bodyLocation = useDraftLocation<HTMLFormElement>();
+  const infoLocation = useDraftLocation(() => document.getElementById('content-information-form'));
+  const tabLocations = useRef<Partial<Record<TemplateTab, EditingLocation>>>({});
+  const lastEditedTab = useRef<TemplateTab>('snippets');
+  const infoDirty = Boolean(metadataDialog && JSON.stringify(metadataDialog.draft.value) !== metadataDialog.baseline);
+  const managedDraft = (kind: TemplateTab) => infoDirty && metadataDialog?.draft.tab === kind ? metadataDialog.draft : drafts[kind];
+  const resumeContent = (kind: TemplateTab) => {
+    setDecision(null);
+    switchTab(kind);
+    if (infoDirty && metadataDialog?.draft.tab === kind) infoLocation.restore();
+    else bodyLocation.restore(tabLocations.current[kind] ?? bodyLocation.savedRef.current);
+  };
+  const registered = (kind: TemplateTab) => {
+    const target = managedDraft(kind);
+    return target && (dirty(drafts[kind]) || infoDirty && metadataDialog?.draft.tab === kind)
+      ? { kind: kind === 'snippets' ? 'snippet' as const : 'starter-template' as const, root, objectId: `${kind}:${originalId(target) ?? (target.value.id || 'new')}`, resume: () => resumeContent(kind) } : null;
+  };
+  useEditingDraft(registered('snippets'));
+  useEditingDraft(registered('templates'));
+  useEffect(() => { if (infoDirty) { lastEditedTab.current = metadataDialog!.draft.tab; infoLocation.capture(); } }, [metadataDialog, infoDirty]);
   const tabRef = useRef(tab);
   tabRef.current = tab;
   const notice = notices[tab];
@@ -151,6 +173,8 @@ export function ContentLibrary(props: Props) {
   useEffect(() => registerNavigationGuard((proceed) => {
     if (operationLock.current) return true;
     if (!dirty(current.current.drafts.snippets) && !dirty(current.current.drafts.templates) && (!current.current.metadataDialog || JSON.stringify(current.current.metadataDialog.draft.value) === current.current.metadataDialog.baseline)) return false;
+    const position = bodyLocation.capture(); if (position) tabLocations.current[tabRef.current] = position;
+    infoLocation.capture();
     setDecision({ label: productText("contentLibrary.leaveTheTemplatePage"), scope: 'page', run: () => {
       setDrafts({ snippets: null, templates: null });
       setMetadataDialog(null);
@@ -171,12 +195,13 @@ export function ContentLibrary(props: Props) {
 
   const requestDecision = (label: string, run: () => void) => {
     if (operationLock.current) return;
-    if (dirty(drafts[tab])) setDecision({ label, scope: 'tab', run });
+    if (dirty(drafts[tab])) { const position = bodyLocation.capture(); if (position) tabLocations.current[tab] = position; setDecision({ label, scope: 'tab', run }); }
     else run();
   };
 
   const switchTab = (next: TemplateTab, focus = false) => {
     if (operationLock.current) return;
+    const position = bodyLocation.capture(); if (position) tabLocations.current[tabRef.current] = position;
     setTab(next);
     tabRef.current = next;
     window.history.replaceState(window.history.state, '', templateHref(next));
@@ -359,6 +384,7 @@ export function ContentLibrary(props: Props) {
     if (!root || !canManage || busy || !isCurrent(root)) return;
     const next = selectedDraft();
     if (!next) return;
+    lastEditedTab.current = tab;
     report(tab, productReference("contentLibrary.theBodyChangedValidateItBeforeSaving"));
     if (next.tab === 'snippets') replaceDraft('snippets', { ...next, value: { ...next.value, content: body } });
     else {
@@ -400,7 +426,7 @@ export function ContentLibrary(props: Props) {
     const parsed = tab === 'templates' ? parseArticle((entry as ArticleTemplate).source) : null;
     const selectedEntry = (draft?.value.id ?? selected?.id) === entry.id;
     return <div key={entry.id} className="group/entry relative min-w-0">
-      <PanelHeading title={entry.name} icon={<CategoryIcon name={snippet ? snippet.icon : (entry as ArticleTemplate).icon ?? 'document'} />} reserveAction={canManage} aria-label={entry.name} aria-description={parsed ? t('content:templates.articleCategories', { categories: parsed.metadata.categories.length ? parsed.metadata.categories.join('、') : t('content:ui.notSet') }) : undefined} aria-current={selectedEntry ? 'true' : undefined} data-current={selectedEntry} disabled={busy} onClick={() => requestDecision(productText("contentLibrary.switchContent"), () => { replaceDraft(tab, null); setSelectedIds(previous => ({ ...previous, [tab]: entry.id })); })} className="flex-col items-stretch gap-2 rounded-lg border border-transparent px-3 py-3 data-[current=true]:border-accent-line data-[current=true]:bg-accent-soft aria-[current=true]:text-accent-text disabled:cursor-not-allowed disabled:opacity-50" details={<span className="grid min-w-0 gap-1.5 text-left font-sans font-normal"><span className="break-words text-xs text-muted">{snippet?.description || parsed?.metadata.description || (tab === 'snippets' ? t('content:ui.reusableContentSnippet') : t('content:ui.markdownStarterStructure'))}</span>{parsed ? <TemplateArticleCategoryTags categories={parsed.metadata.categories} /> : null}<code className="break-all font-mono text-xs text-faint">{snippet?.trigger || `${entry.id}.md`}</code>{parsed?.diagnostics.some(diagnostic => diagnostic.level === 'error') ? <span className="text-xs text-danger">{t('content:ui.formatErrorsOpenSourceToRepair')}</span> : null}</span>} />
+      <PanelHeading title={<span className="flex min-w-0 items-center gap-2"><span>{entry.name}</span>{registered(tab) && (originalId(managedDraft(tab)!) ?? managedDraft(tab)!.value.id) === entry.id ? <UnsavedMark /> : null}</span>} icon={<CategoryIcon name={snippet ? snippet.icon : (entry as ArticleTemplate).icon ?? 'document'} />} reserveAction={canManage} aria-label={entry.name} aria-description={parsed ? t('content:templates.articleCategories', { categories: parsed.metadata.categories.length ? parsed.metadata.categories.join('、') : t('content:ui.notSet') }) : undefined} aria-current={selectedEntry ? 'true' : undefined} data-current={selectedEntry} disabled={busy} onClick={() => requestDecision(productText("contentLibrary.switchContent"), () => { replaceDraft(tab, null); setSelectedIds(previous => ({ ...previous, [tab]: entry.id })); })} className="flex-col items-stretch gap-2 rounded-lg border border-transparent px-3 py-3 data-[current=true]:border-accent-line data-[current=true]:bg-accent-soft aria-[current=true]:text-accent-text disabled:cursor-not-allowed disabled:opacity-50" details={<span className="grid min-w-0 gap-1.5 text-left font-sans font-normal"><span className="break-words text-xs text-muted">{snippet?.description || parsed?.metadata.description || (tab === 'snippets' ? t('content:ui.reusableContentSnippet') : t('content:ui.markdownStarterStructure'))}</span>{parsed ? <TemplateArticleCategoryTags categories={parsed.metadata.categories} /> : null}<code className="break-all font-mono text-xs text-faint">{snippet?.trigger || `${entry.id}.md`}</code>{parsed?.diagnostics.some(diagnostic => diagnostic.level === 'error') ? <span className="text-xs text-danger">{t('content:ui.formatErrorsOpenSourceToRepair')}</span> : null}</span>} />
       {canManage ? <TooltipButton tooltip={t('content:templates.editInfo', { type: uiName })} type="button" aria-label={t('content:templates.editNamed', { type: uiName, name: entry.name })} disabled={busy} onClick={() => editEntry(entry)} className="button button-quiet pointer-events-none absolute top-3 right-3 size-8 min-h-0 p-0 opacity-0 transition-opacity duration-300 group-hover/entry:pointer-events-auto group-hover/entry:opacity-100 group-focus-within/entry:pointer-events-auto group-focus-within/entry:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 motion-reduce:duration-0"><Icon name="edit" /></TooltipButton> : null}
     </div>;
   };
@@ -446,19 +472,21 @@ export function ContentLibrary(props: Props) {
   const infoSaveTarget: Draft | null = !infoDraft ? null : infoDraft.original === null || infoInvalid ? infoDraft : infoDraft.tab === 'snippets'
     ? { ...infoDraft, value: { ...infoDraft.value, content: JSON.parse(infoDraft.original).content } }
     : { ...infoDraft, value: { ...infoDraft.value, source: replaceArticleBody(infoDraft.value.source, parseArticle(JSON.parse(infoDraft.original).source).body) } };
-  const saveInfo = async (validateFirst = false) => {
-    if (!infoDraft || infoInvalid || !isContentFileId(infoDraft.value.id) || infoFileError || !canManage || busy || !root || !isCurrent(root)) return;
+  const saveInfo = async (validateFirst = false): Promise<boolean> => {
+    if (!infoDraft || infoInvalid || !isContentFileId(infoDraft.value.id) || infoFileError || !canManage || busy || !root || !isCurrent(root)) return false;
     if (infoDraft.original === null) {
-      if (!infoDraft.value.categoryId) return;
+      if (!infoDraft.value.categoryId) return false;
       replaceDraft(infoDraft.tab, infoDraft);
       setMetadataDialog(null);
       report(infoDraft.tab, productReference("contentLibrary.informationConfirmedContinueEditingTheBodyThenClickSaveContentToCreate"));
-      return;
+      return true;
     }
-    if (await save(infoSaveTarget, true, validateFirst)) setMetadataDialog(null);
+    const saved = await save(infoSaveTarget, true, validateFirst);
+    if (saved) setMetadataDialog(null);
+    return saved;
   };
   const readonlyLabel = !root ? t('content:ui.readOnlyPresets') : librariesState === 'ready' ? t('content:ui.localLibrary') : librariesState === 'loading' ? t('content:ui.loading') : t('content:ui.editingUnavailable');
-  const pendingDrafts = decision?.scope === 'page'
+  const pendingDrafts = decision?.scope === 'info' ? infoSaveTarget ? [infoSaveTarget] : [] : decision?.scope === 'page'
     ? Object.values({ ...drafts, ...(infoDraft && JSON.stringify(infoDraft.value) !== metadataDialog?.baseline ? { [infoDraft.tab]: infoDraft } : {}) }).filter((target): target is Draft => Boolean(target && dirty(target)))
     : draft ? [draft] : [];
   const infoOpen = Boolean(metadataDialog && !decision);
@@ -493,10 +521,10 @@ export function ContentLibrary(props: Props) {
             <div className="flex min-w-0 gap-1 rounded-lg bg-list p-1" role="tablist" aria-label={t('content:ui.templateType')}>
               {TABS.map((item) => <button key={item.id} id={`template-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} aria-controls={`template-panel-${item.id}`} tabIndex={tab === item.id ? 0 : -1} disabled={busy} onClick={() => switchTab(item.id)} onKeyDown={(event) => onTabKeyDown(event, item.id)} className="flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-selected:bg-panel aria-selected:text-accent-text">
                 <Icon name={item.id === 'snippets' ? 'snippet' : 'document'} /><span>{t('content:tabs.' + item.id)}</span><span className="font-mono text-xs text-faint">{item.id === 'snippets' ? snippets.length : templates.length}</span>
-                {dirty(drafts[item.id]) ? <span className="size-1.5 rounded-full bg-accent" aria-label={t('content:ui.unsavedDraft')} /> : null}
+                {registered(item.id) ? <UnsavedMark /> : null}
               </button>)}
             </div>
-            <ButtonBar label={t('content:ui.createLibraryContent')}><button className="button button-quiet" type="button" onClick={() => openCategory()} disabled={!canManage || busy}><Icon name="plus" />{t('content:ui.newCategory')}</button><button className="button button-primary" type="button" onClick={beginCreate} disabled={!canManage || busy}><Icon name="plus" />{t('content:ui.new')}{name}</button></ButtonBar>
+            <ButtonBar label={t('content:ui.createLibraryContent')}><button className="button button-quiet" type="button" onClick={() => openCategory()} disabled={!canManage || busy}><Icon name="plus" />{t('content:ui.newCategory')}</button><button className="button button-primary" type="button" onClick={beginCreate} disabled={!canManage || busy}><Icon name="plus" />{t('content:templates.newType', { type: t(tab === 'snippets' ? 'messages:snippetCategoryIcons.snippet' : 'messages:contentLibrary.starterTemplate') })}</button></ButtonBar>
           </div>
 
           {!root || librariesState !== 'ready' ? <div className="shrink-0 border-b border-line bg-list px-5 py-3 text-xs text-muted" role="status">
@@ -524,9 +552,9 @@ export function ContentLibrary(props: Props) {
                 </nav>
 
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden p-5 md:p-6 lg:col-span-2 xl:col-span-3">
-                  {draft || selected ? <form id="content-library-form" aria-label={t('content:templates.details', { type: uiName })} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:gap-5 lg:overflow-hidden" onSubmit={(event) => { event.preventDefault(); if (dirty(draft) && !invalidMetadata) void save(); }}>
+                  {draft || selected ? <form {...bodyLocation.props} id="content-library-form" aria-label={t('content:templates.details', { type: uiName })} className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:gap-5 lg:overflow-hidden" onSubmit={(event) => { event.preventDefault(); if (dirty(draft) && !invalidMetadata) void save(); }}>
                     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line pb-3 lg:gap-4 lg:pb-5">
-                      <div className="flex min-w-0 flex-1 flex-col gap-1"><h3 className="min-w-0 break-words font-heading font-semibold text-primary">{sourceTitle}</h3><code className="min-w-0 break-all font-mono text-xs text-faint">{sourceIdentity}</code></div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-1"><h3 className="min-w-0 break-words font-heading font-semibold text-primary">{sourceTitle}{registered(tab) ? <UnsavedMark className="ml-2 inline-block" /> : null}</h3><code className="min-w-0 break-all font-mono text-xs text-faint">{sourceIdentity}</code></div>
                       <ButtonBar label={t('content:ui.templateEditingActions')} className="justify-end">
                         <ArticleThemeSelect themes={themes} value={previewTheme.id} onChange={setSelectedThemeId} />
                         <PreviewModeSwitch dark={dark} onToggle={toggle} />
@@ -558,11 +586,11 @@ export function ContentLibrary(props: Props) {
         </div>
 
       {confirmDelete && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="template-delete-title" descriptionId="template-delete-description" role="alertdialog" dismissible={!busy} onClose={() => setConfirmDelete(null)}><DialogHeader titleId="template-delete-title" eyebrow={t('common:eyebrows.deleteTemplate')} title={t('content:templates.deleteType', { type: confirmDelete.tab === 'snippets' ? t('content:ui.snippets') : t('content:ui.starterTemplates') })} closeDisabled={busy} onClose={() => setConfirmDelete(null)} /><div className="dialog-content"><p className="break-words text-sm font-medium text-primary">「{confirmDelete.name}」</p><p id="template-delete-description" className="mt-3 text-sm text-muted">{t('content:ui.deletionCannotBeUndone')}{confirmDelete.tab === 'snippets' ? t('content:ui.contentAlreadyInsertedIntoArticles') : t('content:ui.articlesAlreadyCreated')}{t('content:ui.remainUnaffected')}</p>{notice.tone === 'error' ? <p className="mt-3 text-sm text-danger" role="alert">{formatProductMessage(notice, t)}</p> : null}</div><DialogFooter><DialogActions><DialogButton disabled={busy} onClick={() => setConfirmDelete(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy} onClick={() => void remove()}>{busy ? t('content:ui.deleting') : t('content:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
-      {decision && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={pendingDrafts.map((target) => ({ label: target.tab === 'snippets' ? target.value.name : parseArticle(target.value.source).metadata.title || t('content:ui.untitledStarterTemplate'), detail: fileIdentity(target, t('content:ui.unnamed')) }))} description={t('content:templates.leaving', { action: formatProductMessage(decision.label, t) })} saveDisabled={!canManage || busy} saveLabel={decision.scope === 'page' ? t('content:ui.saveAndLeave') : t('content:ui.saveAndContinue')} onCancel={() => setDecision(null)} onDiscard={() => { const run = decision.run; setDecision(null); run(); }} onSave={async () => { const run = decision.run; for (const target of pendingDrafts) if (!await save(target, false, true)) return false; setDecision(null); run(); return true; }} />, document.body) : null}
+      {decision && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={pendingDrafts.map((target) => ({ label: target.tab === 'snippets' ? target.value.name : parseArticle(target.value.source).metadata.title || t('content:ui.untitledStarterTemplate'), detail: fileIdentity(target, t('content:ui.unnamed')) }))} description={t('content:templates.leaving', { action: formatProductMessage(decision.label, t) })} saveDisabled={!canManage || busy} saveLabel={decision.scope === 'page' ? t('content:ui.saveAndLeave') : t('content:ui.saveAndContinue')} onCancel={() => setDecision(null)} onContinue={() => resumeContent(decision.scope === 'info' ? infoDraft!.tab : decision.scope === 'tab' ? tab : pendingDrafts.find(target => target.tab === lastEditedTab.current)?.tab ?? pendingDrafts[0]?.tab ?? tab)} onDiscard={() => { const run = decision.run; setDecision(null); run(); }} onSave={async () => { const run = decision.run; if (decision.scope === 'info') { if (!await saveInfo(true)) return false; } else for (const target of pendingDrafts) if (!await save(target, false, true)) return false; setDecision(null); run(); return true; }} />, document.body) : null}
 
       {categoryDraft && typeof document !== 'undefined' ? createPortal(<SnippetCategoryDialog value={categoryDraft.value} existing={categoryDraft.originalId !== null} kind={categoryDraft.tab} count={(categoryDraft.tab === 'snippets' ? snippets : templates).filter(item => item.categoryId === categoryDraft.originalId).length} busy={busy} error={categoryError} onChange={value => setCategoryDraft({ ...categoryDraft, value })} onClose={() => { if (!busy) setCategoryDraft(null); }} onSave={() => void saveCategory()} />, document.body) : null}
 
-      {metadataDialog && infoDraft && !decision && typeof document !== 'undefined' ? createPortal(<ContentMetadataDialog kind={infoDraft.tab} creating={infoDraft.original === null} busy={busy} validating={operation?.action === 'validate'} onValidate={infoDraft.original !== null ? () => validate(infoSaveTarget) : undefined} validationDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError)} saveDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError) || (infoDraft.original !== null && (!validated(infoSaveTarget) || JSON.stringify(infoDraft.value) === metadataDialog.baseline)) || (!infoDraft.original && !infoDraft.value.categoryId)} error={notice.tone === 'error' ? formatProductMessage(notice, t) : undefined} status={notice.tone === 'success' || notice.tone === 'warning' ? formatProductMessage(notice, t) : undefined} statusTone={notice.tone === 'warning' ? 'warning' : 'success'} onClose={() => { if (!busy) setMetadataDialog(null); }} onSave={() => void saveInfo()}>
+      {metadataDialog && infoDraft && !decision && typeof document !== 'undefined' ? createPortal(<ContentMetadataDialog kind={infoDraft.tab} creating={infoDraft.original === null} busy={busy} validating={operation?.action === 'validate'} onValidate={infoDraft.original !== null ? () => validate(infoSaveTarget) : undefined} validationDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError)} saveDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError) || (infoDraft.original !== null && (!validated(infoSaveTarget) || JSON.stringify(infoDraft.value) === metadataDialog.baseline)) || (!infoDraft.original && !infoDraft.value.categoryId)} error={notice.tone === 'error' ? formatProductMessage(notice, t) : undefined} status={notice.tone === 'success' || notice.tone === 'warning' ? formatProductMessage(notice, t) : undefined} statusTone={notice.tone === 'warning' ? 'warning' : 'success'} onClose={() => { if (busy) return; if (infoDirty) { infoLocation.capture(); setDecision({ label: productText("contentLibrary.cancelEditing"), scope: 'info', run: () => setMetadataDialog(null) }); } else setMetadataDialog(null); }} onSave={() => void saveInfo()}>
         <ContentMetadataEditor fileId={infoDraft.value.id} fileError={infoFileError} creating={infoDraft.original === null} onFileIdChange={updateFileId} snippet={infoDraft.tab === 'snippets' ? infoDraft.value : undefined} metadata={infoParsed?.metadata} inputs={infoDraft.tab === 'templates' ? infoDraft.metadataInputs : undefined} categories={infoDraft.tab === 'snippets' ? snippetCategories : templateCategories} categoryId={infoDraft.value.categoryId} onCategoryChange={categoryId => { if (infoDraft.tab === 'snippets') updateInfoSnippet({ categoryId }); else setMetadataDialog({ ...metadataDialog, draft: { ...infoDraft, value: { ...infoDraft.value, categoryId } } }); }} disabled={busy} invalid={infoInvalid} onSnippetChange={updateInfoSnippet} onMetadataChange={updateTemplateMetadata} onTemplateIconChange={updateTemplateIcon} />
         {infoDraft.tab === 'templates' && infoInvalid ? <section className="mt-4 rounded-lg border border-danger/40 bg-danger/5 p-3"><p className="text-sm font-medium text-danger">{t('content:ui.repairMetadataBeforeSaving')}</p><label className="field-stack mt-3"><span className="field-label">{t('content:ui.metadataSourceIncludingBoundaries')}</span><textarea className="field min-h-32 resize-y font-editor-source text-xs" name="template-metadata-repair" aria-label={t('content:ui.repairStarterTemplateMetadata')} value={infoDraft.value.source.slice(0, infoParsed?.frontMatterRange?.end ?? 0)} onChange={event => setMetadataDialog({ ...metadataDialog, draft: { ...infoDraft, metadataInputs: undefined, value: { ...infoDraft.value, source: event.target.value + (infoParsed?.body ?? '') } } })} disabled={busy} spellCheck={false} /></label></section> : null}
       </ContentMetadataDialog>, document.body) : null}

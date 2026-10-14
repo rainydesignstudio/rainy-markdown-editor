@@ -1,0 +1,9 @@
+{
+  "id": "image-pair",
+  "name": "Side-by-side images",
+  "trigger": "//image-pair",
+  "description": "Two sample images side by side. Replace images and captions with article content.",
+  "content": "<table class=\"w-full\"><tbody><tr>\n  <td class=\"w-1/2 p-2 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><figcaption class=\"mt-2 mb-0 text-center\">Image one</figcaption></td>\n  <td class=\"w-1/2 p-2 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><figcaption class=\"mt-2 mb-0 text-center\">Image two▌</figcaption></td>\n</tr></tbody></table>\n",
+  "icon": "image",
+  "categoryId": "default"
+}

@@ -395,7 +395,16 @@
     "opacity": "不透明度",
     "solidColor": "纯色",
     "gradientColor": "渐变",
-    "platformValidationDisabled": " · 平台校验已关闭，通用检查保留"
+    "platformValidationDisabled": " · 平台校验已关闭，通用检查保留",
+    "mediaChangesUnsaved": "素材名称或描述尚未保存。",
+    "mediaUnsavedDescription": "离开前请保存或放弃素材修改。",
+    "imageZoomActions": "图片缩放",
+    "imageZoomHelp": "Ctrl/⌘＋滚轮缩放；点击倍率切换放大与适应宽度",
+    "fitToWidth": "适应宽度",
+    "articleFolderName": "文章目录名称",
+    "applyFolderName": "应用目录名",
+    "folderRenameImmediate": "输入目录名后按 Enter 或点击应用，立即更新索引并重新读取文稿；article.md 文件名保持。",
+    "imageZoomToggle": "切换放大与适应宽度"
   },
   "templates": {
     "from": "来自{{source}}",
@@ -681,5 +690,17 @@
   },
   "platformPresets": {
     "wechat-article": "微信公众号"
+  },
+  "articleDark": {
+    "automatic": "深色由当前资料库的算法自动计算，仅可查看。色值取自右侧样张；同一颜色角色可能产生多个结果。",
+    "manual": "分别调整浅色与深色。未设置的深色继承浅色；固定 CSS 和节点颜色仍由原声明决定。",
+    "readOnly": "算法结果 · 只读",
+    "pending": "计算中",
+    "failed": "计算失败",
+    "unused": "样张未使用",
+    "multiple": "{{count}} 个结果",
+    "inherited": "继承浅色",
+    "inherit": "继承浅色",
+    "reset": "{{name}}：恢复继承浅色"
   }
 }

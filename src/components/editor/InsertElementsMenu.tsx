@@ -138,7 +138,7 @@ export function InsertElementsMenu({
           <details key={group.id} className="insert-standard-category">
             <summary><InsertIcon name={group.icon} /><span>{t('editor:insert.groups.' + group.id)}</span><span aria-hidden="true">›</span></summary>
             <div className="insert-standard-options" role="group" aria-label={t('editor:insert.groups.' + group.id)}>
-              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); if (isInlineFormat(item.id)) onFormat(item.id); else insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span>{isInlineFormat(item.id) ? <kbd className="ml-auto whitespace-nowrap font-mono text-xs text-faint">⌘{INLINE_FORMATS[item.id].key.toUpperCase()} / Ctrl+{INLINE_FORMATS[item.id].key.toUpperCase()}</kbd> : null}</button>)}
+              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); if (isInlineFormat(item.id)) onFormat(item.id); else insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span>{isInlineFormat(item.id) ? <kbd className="ml-auto whitespace-nowrap font-mono text-xs text-faint">⌘ {INLINE_FORMATS[item.id].key.toUpperCase()} / Ctrl + {INLINE_FORMATS[item.id].key.toUpperCase()}</kbd> : null}</button>)}
             </div>
           </details>
         ))}

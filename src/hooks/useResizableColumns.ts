@@ -6,11 +6,20 @@ import { clampEditorSourceRatio, editorSourceRatioFromPointer, getEditorSourceWi
 export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 64rem)', identity?: unknown) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
+  const captureRef = useRef<{ target: HTMLButtonElement; pointerId: number } | null>(null);
   const [ratio, setRatio] = useState(initialRatio);
   const [width, setWidth] = useState(0);
   const [wideEnough, setWideEnough] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const stopDrag = () => { draggingRef.current = false; setDragging(false); };
+  const releaseCapture = () => {
+    const captured = captureRef.current;
+    captureRef.current = null;
+    if (!captured) return;
+    try {
+      if (captured.target.hasPointerCapture(captured.pointerId)) captured.target.releasePointerCapture(captured.pointerId);
+    } catch { /* The browser may have already released a removed splitter. */ }
+  };
+  const stopDrag = () => { draggingRef.current = false; releaseCapture(); setDragging(false); };
   useEffect(() => {
     const finish = () => { if (draggingRef.current) stopDrag(); };
     const onVisibilityChange = () => { if (document.visibilityState !== 'visible') finish(); };
@@ -23,32 +32,35 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
       window.removeEventListener('pointercancel', finish, true);
       window.removeEventListener('blur', finish);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      draggingRef.current = false; releaseCapture();
     };
   }, []);
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
-    draggingRef.current = false; setDragging(false);
+    stopDrag();
     const update = () => {
       const measured = element.getBoundingClientRect().width;
       const enough = window.matchMedia(breakpoint).matches && getEditorSplitLimits(measured) !== null;
       setWidth(measured); setWideEnough(enough);
       if (enough) setRatio(current => clampEditorSourceRatio(measured, current));
-      else { draggingRef.current = false; setDragging(false); }
+      else stopDrag();
     };
     update();
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
     observer?.observe(element);
     window.addEventListener('resize', update);
-    return () => { draggingRef.current = false; observer?.disconnect(); window.removeEventListener('resize', update); };
+    return () => { draggingRef.current = false; releaseCapture(); observer?.disconnect(); window.removeEventListener('resize', update); };
   }, [breakpoint, identity]);
   const startDrag = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || !wideEnough) return;
+    if (event.button !== 0 || event.isPrimary === false || !wideEnough) return;
+    releaseCapture();
     try { event.currentTarget.setPointerCapture(event.pointerId); }
     catch { return; }
+    captureRef.current = { target: event.currentTarget, pointerId: event.pointerId };
     draggingRef.current = true; setDragging(true);
   };
-  const moveDrag = (event: PointerEvent<HTMLButtonElement>) => {
+  const moveDrag = (event: PointerEvent<HTMLElement>) => {
     if (!draggingRef.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     setRatio(editorSourceRatioFromPointer(event.clientX, rect.left, rect.width));

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent } 
 
 type Props = {
   handle: FileSystemFileHandle;
+  file?: File;
   fileName: string;
   alt: string;
   variant: 'article' | 'tile' | 'dialog';
@@ -21,7 +22,7 @@ type Props = {
   onDimensions?: (width: number, height: number) => void;
 };
 
-export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath, sourceSetPath, clipboardSource, clipboardSourceSet, imageProps, onOpen, isCurrent, sessionKey, onDimensions }: Props) {
+export function ArticleImagePreview({ handle, file: prefetchedFile, fileName, alt, variant, sourcePath, sourceSetPath, clipboardSource, clipboardSourceSet, imageProps, onOpen, isCurrent, sessionKey, onDimensions }: Props) {
   const { t } = useUITranslation('messages');
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath
     const current = () => !cancelled && (currentRef.current?.() ?? true);
     const load = async () => {
       try {
-        const file = await handle.getFile();
+        const file = prefetchedFile ?? await handle.getFile();
         if (!current()) return;
         const url = URL.createObjectURL(file);
         ownedUrl = url;
@@ -70,7 +71,7 @@ export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath
       cancelled = true;
       if (ownedUrl) URL.revokeObjectURL(ownedUrl);
     };
-  }, [fileName, handle, sessionKey]);
+  }, [fileName, handle, prefetchedFile, sessionKey]);
 
   const activate = () => {
     if (objectUrl && isCurrent?.() !== false) onOpen?.();

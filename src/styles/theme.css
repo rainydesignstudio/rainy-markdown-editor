@@ -1,8 +1,8 @@
 /* Fixed palette supplements and typography scale. */
 @theme static {
+  /* Startup guidance must remain readable before library fonts are available. */
+  --font-loading: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   /* WeChat article viewport: fixed by the reader, never an article theme color. */
-  --color-wechat-page-light: #fff;
-  --color-wechat-page-dark: #191919;
 
   /* Sea Glass light palette */
   --color-sea-glass-0: #ffffff;

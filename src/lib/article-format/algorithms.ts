@@ -50,7 +50,7 @@ export async function validateAlgorithmPackage(value: unknown): Promise<Algorith
 }
 export function assertAlgorithmCapabilities(data: AlgorithmPackage, bundle: FormatBundle): void {
   const id = bundle.formatter.preview.dark.transform;
-  if (id === 'preserve') return;
+  if (bundle.formatter.preview.dark.mode === 'tokens' || id === 'preserve') return;
   const component = data.manifest.components.find(item => item.id === id);
   if (!component?.capabilities.transform) throw new ProductError('algorithms.capabilityMissing', { id });
   const required = enabledFormatRules(bundle).filter(rule => rule.operator.startsWith('official.dark-')).map(rule => rule.operator);

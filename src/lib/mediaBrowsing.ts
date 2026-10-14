@@ -13,6 +13,7 @@ export function paginateMedia<T>(items: readonly T[], requestedPage: number, pag
 
 /** Slideshow scope is the actual file directory, independently of search and pagination. */
 export function mediaDirectoryImages(assets: LibraryMediaAsset[], current: LibraryMediaAsset) {
-  const images = assets.filter(asset => asset.root === current.root && asset.kind === current.kind && (asset.kind === 'shared' || current.kind === 'article' && asset.articleId === current.articleId));
+  if (current.storage === 'file') return [];
+  const images = assets.filter(asset => asset.storage !== 'file' && asset.root === current.root && asset.kind === current.kind && (asset.kind === 'shared' || current.kind === 'article' && asset.articleId === current.articleId));
   return images.some(asset => asset.fileName === current.fileName) ? images : [...images, current];
 }

@@ -40,6 +40,11 @@ export type ClipboardPayload = {
 
 export function clipboardPlainText(node: Node, inCodeBlock = false): string {
   const element = node.nodeType === 1 ? node as HTMLElement : null;
+  if (element?.getAttribute('data-render-kind') === 'mermaid' && element.hasAttribute('data-diagram-source')) return `\n\`\`\`mermaid\n${element.getAttribute('data-diagram-source')}\n\`\`\`\n`;
+  if (element?.getAttribute('data-render-kind') === 'math') {
+    const source = element.querySelector('annotation[encoding="application/x-tex"]')?.textContent ?? element.textContent ?? '';
+    return element.getAttribute('data-math-display') === 'true' ? `\n$$\n${source}\n$$\n` : `$${source}$`;
+  }
   if (element?.tagName === 'BR') return '\n';
   if (inCodeBlock && element?.hasAttribute('data-code-tab')) return '\t';
   const codeBlock = inCodeBlock || element?.tagName === 'CODE' && element.parentElement?.tagName === 'PRE';
@@ -54,7 +59,9 @@ export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSna
   assertFormatReady(snapshot);
   const output = snapshot.bundle.formatter.output;
   const keptAttributes = new Set(output.preserveAttributes);
-  const body = root.querySelector('.article-body') ?? root;
+  const body = root.querySelector('[data-article-content-body]') ?? root.querySelector('.article-body') ?? root;
+  const generatedShell = body !== root || root.hasAttribute('data-article-content-root');
+  const rootStyleOmissions = new Set(output.rootStyleOmissions ?? []);
   // Preview containers are editor implementation details. Keep their two style layers in the
   // clipboard, using the configured output container.
   const bodyClone = body === root ? body.cloneNode(true) as HTMLElement : root.ownerDocument.createElement(output.wrapperTag);
@@ -109,11 +116,12 @@ export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSna
     }
     const computed = view.getComputedStyle(source);
     const typed = (source as HTMLElement & { computedStyleMap?: () => ClipboardStyleMap }).computedStyleMap?.();
-    const styles = [...output.inlineProperties.map((property) => {
+    const keepProperty = (property: string) => !(generatedShell && (source === root || source === body) && rootStyleOmissions.has(property));
+    const styles = [...output.inlineProperties.filter(keepProperty).map((property) => {
       if (output.stripRootBackground && body !== root && (source === root || source === body) && (property === 'background-color' || property === 'background-image')) return '';
       const value = property.startsWith('grid-template-') ? typed?.get(property)?.toString() || computed.getPropertyValue(property) : computed.getPropertyValue(property);
       return articleFormatAllowsCssProperty(property, value) ? `${property}:${output.colorEncoding === 'rgb' ? normalizePaint(value) : value}` : '';
-    }), ...output.dimensionProperties.map(property => `${property}:${clipboardDimension(source, computed, typed, property)}`)]
+    }), ...output.dimensionProperties.filter(keepProperty).map(property => `${property}:${clipboardDimension(source, computed, typed, property)}`)]
       .filter((value) => value && !value.endsWith(':'))
       .join(';');
     if (styles) target.setAttribute('style', styles);
@@ -123,10 +131,19 @@ export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSna
         target.removeAttribute(attribute.name);
       }
     });
+    // Resolve styles against the original tag before mapping content for the receiving platform.
+    // The generated shell already uses wrapperTag and is not part of the content tag mapping.
+    const tag = source.tagName.toLowerCase();
+    if (source !== root && source !== body && output.tagMap && Object.hasOwn(output.tagMap, tag)) {
+      const replacement = root.ownerDocument.createElement(output.tagMap[tag]);
+      for (const attribute of target.attributes) replacement.setAttribute(attribute.name, attribute.value);
+      while (target.firstChild) replacement.append(target.firstChild);
+      target.replaceWith(replacement);
+    }
   }
 
   return {
-    html: sanitizeHtml(clone.outerHTML),
+    html: sanitizeHtml(clone.outerHTML, snapshot),
     text: plainText,
     localImageCount,
   };

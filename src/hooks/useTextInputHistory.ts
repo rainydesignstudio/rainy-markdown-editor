@@ -7,7 +7,7 @@ import { TextInputHistory, textHistoryShortcut, type TextSelection, type TextSna
 type Control = HTMLInputElement | HTMLTextAreaElement;
 const selectionOf = (control: Control): TextSelection => ({ start: control.selectionStart ?? 0, end: control.selectionEnd ?? 0, direction: control.selectionDirection ?? 'none' });
 
-export function useTextInputHistory<T extends Control>(ref: RefObject<T | null>, value: string, onChange: (value: string) => void, readOnly = false) {
+export function useTextInputHistory<T extends Control>(ref: RefObject<T | null>, value: string, onChange: (value: string) => void, readOnly = false, historyKey?: number) {
   const history = useRef<TextInputHistory | null>(null);
   if (!history.current) history.current = new TextInputHistory(value);
   const selection = useRef<TextSelection>({ start: 0, end: 0, direction: 'none' });
@@ -15,9 +15,15 @@ export function useTextInputHistory<T extends Control>(ref: RefObject<T | null>,
   const composition = useRef<TextSelection | null>(null);
   const finishableInsertion = useRef(false);
   const latest = useRef({ onChange, readOnly });
+  const scope = useRef(historyKey);
   latest.current = { onChange, readOnly };
 
-  useLayoutEffect(() => { if (!composition.current && value !== history.current!.value) history.current!.reset(value); }, [value]);
+  useLayoutEffect(() => {
+    if (scope.current !== historyKey) {
+      scope.current = historyKey; composition.current = null; beforeInput.current = null; finishableInsertion.current = false;
+      history.current!.reset(value);
+    } else if (!composition.current && value !== history.current!.value) history.current!.reset(value);
+  }, [value, historyKey]);
 
   const apply = (snapshot: TextSnapshot | null) => {
     const control = ref.current;
@@ -35,7 +41,7 @@ export function useTextInputHistory<T extends Control>(ref: RefObject<T | null>,
   const insert = (text: string, start: number, end: number) => {
     const control = ref.current;
     if (!control || control.disabled || control.readOnly || latest.current.readOnly || composition.current) return false;
-    control.focus();
+    control.focus({ preventScroll: true });
     const before = { start, end, direction: 'none' as const };
     control.setRangeText(text, start, end, 'end');
     const after = selectionOf(control);

@@ -1,6 +1,7 @@
 import type { FormatBundle } from './config';
 import { FRAME_MESSAGES } from './frameMessages';
 import type { AlgorithmPackage } from './algorithmTypes';
+import { articleDarkMode } from './styleTypes';
 
 // Loaded as a local static script in srcdoc frames. Configuration remains inert JSON.
 export async function runFormatFrameBootstrap() {
@@ -22,7 +23,11 @@ export async function runFormatFrameBootstrap() {
       const result = await api.ArticleFormatEngine.inspect(root, payload.bundle, payload.css);
       parent.postMessage({ token: payload.token, result }, payload.origin);
     } else if (payload.kind === 'preview') {
-      if (payload.dark) await api.ArticleFormatEngine.transform(root, payload.bundle);
+      if (payload.dark && articleDarkMode(payload.bundle.formatter) === 'tokens') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.dataset.previewMode = 'dark';
+        root.setAttribute('data-article-dark-tokens', 'true');
+      } else if (payload.dark) await api.ArticleFormatEngine.transform(root, payload.bundle);
     } else throw new Error(FRAME_MESSAGES.unknownKind);
     document.body.dataset.previewReady = 'true';
   } catch (cause) {

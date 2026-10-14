@@ -3,7 +3,7 @@
 import { ProductError, formatDiagnosticMessage, formatProductMessage, productCause, productDiagnosticReference, productJoin, productReference, productText, productErrorMessage, type ProductMessageInfo, type ProductMessageValue } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
-import { useArticleRenderMount } from '../../hooks/useArticleRenderMount';
+import { useArticleRenderMount, type ArticleDarkColors } from '../../hooks/useArticleRenderMount';
 import { ArticleDocument } from '../editor/ArticleDocument';
 
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
@@ -18,16 +18,17 @@ import { ColumnSplitter } from '../global/ColumnSplitter';
 import { ButtonBar } from '../global/ButtonBar';
 import { CollapsiblePanel, PanelIcon } from '../global/CollapsiblePanel';
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
+import { useDraftLocation, useEditingDraft, useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
+import { hasEditingDraft } from '../../lib/editingDrafts';
 import { DialogActions, DialogButton, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { PreviewModeSwitch } from '../editor/PreviewModeSwitch';
 import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
-import { articleDarkPreviewDocument, cloneArticleForDarkPreview, observeArticlePreview } from '../../lib/articleDarkPreview';
 import { EditorColorPicker } from '../settings/EditorColorPicker';
 import { ArticleThemeFields } from './ArticleThemeFields';
 import { tailwindColorToHex } from '../../lib/tailwindPalette';
 import type { EditorTheme } from '../../lib/editorThemes';
 import { copyDefaultThemes } from '../../lib/themeDefaults';
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   deleteThemeLibraryTheme,
@@ -36,68 +37,15 @@ import {
   type ThemeLibraryIssue,
 } from '../../lib/fileSystem';
 import { refreshRootSession } from '../../lib/rootSession';
-import { BASIC_THEME, resolveDefaultArticleTheme, themePreviewCss } from '../../lib/themes';
+import { BASIC_THEME, resolveDefaultArticleTheme } from '../../lib/themes';
 import { parseThemeConfigJson, inspectThemeConfig, inspectThemeCss, inspectThemeFormat } from '../../lib/themeValidation';
 import type { ThemeConfig, ThemeNodeKey } from '../../lib/types';
 import { MarkdownPreview } from '../editor/MarkdownPreview';
-import { ARTICLE_EXAMPLE_IMAGE } from '../../lib/articleExamples';
+import { useThemePreviewSample } from '../../hooks/useThemePreviewSample';
+import { getThemePreviewSample } from '../../lib/themePreviewSample';
 import { getArticleNodeSelectors, createArticleColorInspection, type ColorBinding } from '../../lib/themeInspection';
 import { ThemeInspectionPreview, useThemeInspection, type ThemeInspection } from '../global/ThemeInspection';
 import { compileArticleStyles, compileThemeInspectionUtilities } from '../../lib/tailwind';
-
-const STYLEBOOK_SAMPLE = `# 一页文章的开场
-
-这是一段导语。主题样式会作用在真实排版节点上：**重点句**、[普通链接](#把信息说清楚)、删除线 ~~旧说法~~，以及脚注 <sup>1</sup>。
-
-<section style="background:var(--color-article-quote-surface);border:1px solid var(--color-article-line);border-radius:8px;padding:16px;margin:24px 0;">
-  <p style="color:var(--color-article-heading);font-weight:700;margin:0 0 8px;">阅读提示 <span style="color:var(--color-article-accent);">· 重点</span></p>
-  <section style="background:var(--color-article-tint);border-radius:4px;padding:12px;">
-    <p style="color:var(--color-article-ink);margin:0;">正文需要清楚易读。<a href="#把信息说清楚" style="color:var(--color-article-heading);">继续阅读</a>，或记下 <code style="color:var(--color-article-code);background:var(--color-article-code-tint);">theme.title</code>。</p>
-    <p style="color:var(--color-article-muted);margin:8px 0 0;font-size:0.875em;">注释补充信息，引用浅底帮助区分阅读区域。</p>
-  </section>
-  <pre style="background:var(--color-article-code-surface);color:var(--color-article-code-tint);margin:12px 0 0;padding:12px;"><code style="color:inherit;background:transparent;padding:0;">const title = '排印样本';</code></pre>
-</section>
-
-## 把信息说清楚
-
-### 小标题与段落
-
-段落用来承接上下文。这里放一段稍长的文字，观察行宽、行高和留白是否适合连续阅读，而不只看一张颜色卡片。
-
-#### 继续拆分
-
-##### 更细的层级
-
-###### 末级标题
-
-> 引用适合承载采访原话或需要特别强调的一段内容。层级、底色和左侧标记都应清楚但不过分抢眼。
-
-- 第一条列表信息
-- 第二条列表信息
-
-1. 先交代背景
-2. 再给出结论
-
-- [x] 已完成的事项
-- [ ] 尚待确认的事项
-
-正文里也会出现 \`行内代码\`。
-
-\`\`\`ts
-const article = { title: '排印样本', saved: false };
-console.log(article.title);
-\`\`\`
-
-| 信息 | 示例 | 状态 |
-| --- | --- | --- |
-| 标题 | 层级清楚 | 可读 |
-| 正文 | 行宽适中 | 连贯 |
-
-<figure><img src="${ARTICLE_EXAMPLE_IMAGE}" alt="Rainy Design 示例图片" /><figcaption>图注在图片下方，作为文章内容的一部分。</figcaption></figure>
-
----
-
-注脚：这里检查小号注释的阅读感。`;
 
 type ThemeLibraryProps = {
   root: FileSystemDirectoryHandle | null;
@@ -146,19 +94,17 @@ function ThemeIcon({ name }: { name: 'book' | 'upload' | 'plus' | 'edit' | 'appl
   return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
 }
 
-export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'theme-stylebook-reader', framed = false, dark = false, inspection, onLocate, onNodeColors }: { theme: ThemeConfig; source?: string; className?: string; framed?: boolean; dark?: boolean; inspection?: ThemeInspection; onLocate?: (binding: ColorBinding) => void; onNodeColors?: (colors: Partial<Record<ThemeNodeKey, string>>) => void }) {
+export function ThemePreview({ theme, source: explicitSource, className = 'theme-stylebook-reader', framed = false, dark = false, inspection, onLocate, onNodeColors, onDarkColors }: { theme: ThemeConfig; source?: string; className?: string; framed?: boolean; dark?: boolean; inspection?: ThemeInspection; onLocate?: (binding: ColorBinding) => void; onNodeColors?: (colors: Partial<Record<ThemeNodeKey, string>>) => void; onDarkColors?: (theme: ThemeConfig, colors: ArticleDarkColors) => void }) {
   const { t } = useUITranslation('themes');
+  const sample = useThemePreviewSample();
+  const source = explicitSource ?? sample.markdown ?? '';
+  const sampleUnavailable = explicitSource === undefined && sample.status !== 'ready';
   const formatSnapshot = useFormatSnapshot();
   const reactId = useId();
   const instanceScope = Array.from(reactId, character => character.codePointAt(0)!.toString(36)).join('-');
   const scopeClass = `theme-preview-instance-${instanceScope}`;
-  const traceCss = themePreviewCss(theme, instanceScope);
   const articleRef = useRef<HTMLElement | null>(null);
   const lightHostRef = useRef<HTMLDivElement | null>(null);
-  const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const lastSnapshotRef = useRef('');
-  const [darkDocument, setDarkDocument] = useState('');
-  const [failed, setFailed] = useState(false);
 
   const [compiledCss, setCompiledCss] = useState('');
   const [compileError, setCompileError] = useState('');
@@ -166,20 +112,23 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
   const [inspectionRevision, setInspectionRevision] = useState(0);
   const utilitiesRef = useRef('');
   const articleCss = articlePreviewStyle(`${compiledCss}\narticle.article-preview { min-height: 100%; min-width: 0; width: 100%; }`);
-  const { target: lightTarget, native } = useArticleRenderMount(lightHostRef, formatSnapshot, compiledCss, dark);
+  const { target: lightTarget, native, darkIssue, darkColors, darkFrameRef: frameRef } = useArticleRenderMount(lightHostRef, formatSnapshot, compiledCss, dark, { colorTheme: onDarkColors && !sampleUnavailable ? theme : undefined });
+  useEffect(() => { onDarkColors?.(theme, compileError || sampleUnavailable ? { status: 'error', values: {} } : darkColors); }, [theme, darkColors, compileError, sampleUnavailable, sample.id, onDarkColors]);
   useEffect(() => {
     let active = true;
     setCompiledCss(''); setCompileError('');
+    if (sampleUnavailable) return;
     void compileArticleStyles(source, theme).then(({ css }) => {
       if (active) setCompiledCss(css);
     }).catch((error: unknown) => {
       if (active) setCompileError(error instanceof Error ? error.message : String(error));
     });
     return () => { active = false; };
-  }, [source, theme, formatSnapshot.id]);
+  }, [source, theme, formatSnapshot.id, sampleUnavailable]);
   useEffect(() => {
     const article = articleRef.current;
-    if (!article || !compiledCss || !onNodeColors) return;
+    if (!onNodeColors) return;
+    if (!article || !compiledCss || sampleUnavailable) { onNodeColors({}); return; }
     let previous = '';
     const update = () => {
       const colors = Object.fromEntries(Object.entries(getArticleNodeSelectors()).flatMap(([key, selector]) => {
@@ -195,12 +144,12 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
     const observer = new MutationObserver(update);
     observer.observe(article, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [compiledCss, source, onNodeColors]);
+  }, [compiledCss, source, sampleUnavailable, onNodeColors]);
   useEffect(() => {
     if (!inspection || !compiledCss || !articleRef.current) return;
-    provenanceRef.current = createArticleColorInspection(articleRef.current, theme, traceCss);
+    provenanceRef.current = createArticleColorInspection(articleRef.current, theme, compiledCss);
     return () => { provenanceRef.current?.dispose(); provenanceRef.current = null; };
-  }, [Boolean(inspection), theme, traceCss, compiledCss, lightTarget]);
+  }, [Boolean(inspection), theme, compiledCss, lightTarget]);
   useEffect(() => {
     if (!inspection) return;
     let active = true;
@@ -216,26 +165,21 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
     return () => { active = false; };
   }, [Boolean(inspection)]);
   useEffect(() => {
-    if (native || !dark || !compiledCss || !articleRef.current) return;
-    return observeArticlePreview(articleRef.current, () => {
-      try {
-        const clone = cloneArticleForDarkPreview(articleRef.current!);
-        const snapshot = `${articleCss}\n${clone.outerHTML}`;
-        if (snapshot === lastSnapshotRef.current) return;
-        lastSnapshotRef.current = snapshot;
-        setFailed(false);
-        setDarkDocument(articleDarkPreviewDocument(articleCss, clone.outerHTML));
-      } catch { lastSnapshotRef.current = ''; setDarkDocument(''); setFailed(true); }
-    });
-  }, [dark, articleCss, compiledCss, formatSnapshot.id]);
+    const doc = frameRef.current?.contentDocument;
+    if (!inspection || !doc || !utilitiesRef.current || doc.querySelector('[data-theme-inspection-utilities]')) return;
+    const style = doc.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; doc.head.append(style);
+    setInspectionRevision(value => value + 1);
+  }, [dark, darkColors, inspectionRevision, Boolean(inspection)]);
     const content = <div className={`${className} ${scopeClass}`} style={previewSurfaceStyle(dark)} data-preview-mode={dark ? 'dark' : 'light'}>
-    <div ref={lightHostRef} hidden={dark && !native} className={framed ? 'mx-auto min-h-full min-w-0 w-full max-w-3xl rounded-lg shadow-panel' : 'min-h-full min-w-0 w-full border-0'} aria-busy={!compiledCss && !compileError} />
-    {lightTarget ? createPortal(<>{!native ? <style>{articleCss}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }}><MarkdownPreview source={source} snapshot={formatSnapshot} /></ArticleDocument></>, lightTarget) : null}
+    {explicitSource === undefined && sample.status === 'loading' ? <p className="border-b border-line bg-panel p-4 text-xs text-muted" role="status">{t('themes:ui.previewSampleLoading')}</p> : null}
+    {explicitSource === undefined && sample.status === 'error' ? <p className="border-b border-warning-line bg-warning-surface p-4 text-xs text-warning-strong" role="alert">{t('themes:ui.previewSampleUnavailable', { cause: formatProductMessage(sample.error, t) })}</p> : null}
+    {explicitSource === undefined && sample.status === 'ready' && sample.origin === 'default' && sample.library ? <p className="border-b border-line bg-panel p-4 text-xs text-muted" role="status">{t('themes:ui.previewSampleDefault', { locale: sample.locale })}</p> : null}
+    <div ref={lightHostRef} hidden={sampleUnavailable} className={framed ? 'mx-auto min-h-full min-w-0 w-full max-w-3xl rounded-lg shadow-panel' : 'min-h-full min-w-0 w-full border-0'} aria-busy={sampleUnavailable ? sample.status === 'loading' : !compiledCss && !compileError} />
+    {lightTarget && !sampleUnavailable ? createPortal(<>{!native ? <style>{articleCss}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }}><MarkdownPreview source={source} snapshot={formatSnapshot} /></ArticleDocument></>, lightTarget) : null}
     {compileError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t('themes:ui.themePreviewCompilationFailed')}{formatProductMessage(compileError, t)}</p> : null}
-    {dark && !native && failed ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t('themes:ui.darkPreviewFailedSwitchToLightModeAnd')}</p> : null}
-    {dark && !native ? <iframe ref={frameRef} className="block h-full min-w-0 w-full border-0" title={t('themes:ui.darkArticleThemePreview')} sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} onLoad={() => { const target = frameRef.current?.contentDocument; if (inspection && target) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; target.head.append(style); setInspectionRevision(value => value + 1); } }} /> : null}
+    {darkIssue ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{formatProductMessage(darkIssue, t)}</p> : null}
   </div>;
-  return inspection ? <ThemeInspectionPreview inspection={inspection} dialogOwner="theme-stylebook-title" rootRef={articleRef} frameRef={dark ? frameRef : undefined} revision={`${inspectionRevision}:${dark}:${articleCss}`} className="flex min-h-0 flex-1 flex-col" onLocate={onLocate} resolve={(element, root) => {
+  return inspection ? <ThemeInspectionPreview inspection={inspection} dialogOwner="theme-stylebook-title" rootRef={articleRef} frameRef={dark ? frameRef : undefined} revision={`${inspectionRevision}:${dark}:${darkColors.status}:${articleCss}`} className="flex min-h-0 flex-1 flex-col" onLocate={onLocate} resolve={(element, root) => {
     const light = articleRef.current;
     if (!light || !provenanceRef.current) return [];
     const index = [root, ...root.querySelectorAll<HTMLElement>('*')].indexOf(element);
@@ -246,6 +190,7 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
 
 export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], issues, currentTheme, defaultThemeId, currentArticleSaved, canApply, isRootCurrent, onLibraryChange, onApply, onSetDefault }: ThemeLibraryProps) {
   const { t } = useUITranslation('themes');
+  const editingDrafts = useEditingDrafts();
   const themes = storedThemes;
   const defaultTheme = resolveDefaultArticleTheme(themes, defaultThemeId);
   const { dark, toggle } = useArticlePreviewMode();
@@ -516,7 +461,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
             <div className="grid max-h-56 min-h-0 content-start gap-2 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:max-h-none lg:flex-1">
               {themes.map((theme) => <button key={theme.id} className="group flex min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-line hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft" type="button" aria-label={t('themes:templates.previewTheme', { name: theme.name })} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-muted group-aria-pressed:border-accent-line group-aria-pressed:text-accent-text"><ThemeIcon name="book" /></span>
-                <span className="grid min-w-0 flex-1 gap-1"><span className="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text">{theme.name}</span><span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />{t('themes:ui.defaultForNewArticles')}</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />{t('themes:ui.usedByCurrentArticle')}</span> : null}</span>
+                <span className="grid min-w-0 flex-1 gap-1"><span className="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text">{theme.name}{hasEditingDraft(editingDrafts, root, 'themes', theme.id) ? <UnsavedMark className="ml-2 inline-block" /> : null}</span><span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />{t('themes:ui.defaultForNewArticles')}</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />{t('themes:ui.usedByCurrentArticle')}</span> : null}</span>
               </button>)}
             </div>
             <p className="hidden shrink-0 border-t border-line px-5 py-4 text-xs text-faint lg:block">{t('themes:ui.selectAThemeToPreviewItTheArticle')}</p>
@@ -641,9 +586,10 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   onSaved: (root: FileSystemDirectoryHandle, theme: ThemeConfig) => void;
 }) {
   const { t } = useUITranslation('dialogs');
+  const previewSample = useThemePreviewSample();
   const { dark, toggle } = useArticlePreviewMode();
   const layout = useResizableColumns(100 / 3, '(width >= 48rem)');
-  const [picker, setPicker] = useState<{ label: string; token: string; value: string; select: (color: string) => void } | null>(null);
+  const [picker, setPicker] = useState<{ label: string; token: string; value: string; select: (color: string) => void; scheme?: 'light' | 'dark' } | null>(null);
   const [departure, setDeparture] = useState(false);
   // The unsaved gate serves two exits now: closing the editor and applying the theme.
   const [applyAfter, setApplyAfter] = useState(false);
@@ -654,10 +600,15 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const [draft, setDraft] = useState(() => cloneTheme(theme));
   const [previewTheme, setPreviewTheme] = useState(() => cloneTheme(theme));
   const [editorTab, setEditorTab] = useState<'tokens' | 'css' | 'json'>('tokens');
+  const editOrigin = useRef(editorTab);
+  const location = useDraftLocation(() => document.getElementById('theme-stylebook-title')?.closest<HTMLElement>('[role=dialog]') ?? null);
   const [cssText, setCssText] = useState(theme.css);
   const [jsonText, setJsonText] = useState(JSON.stringify(theme, null, 2));
   const [nodeKey, setNodeKey] = useState<ThemeNodeKey>('h1');
   const [nodeColors, setNodeColors] = useState<Partial<Record<ThemeNodeKey, string>>>({});
+  const [darkColorRecord, setDarkColorRecord] = useState<{ theme: ThemeConfig; colors: ArticleDarkColors } | null>(null);
+  const receiveDarkColors = useCallback((theme: ThemeConfig, colors: ArticleDarkColors) => setDarkColorRecord({ theme, colors }), []);
+  const darkColors: ArticleDarkColors | undefined = JSON.stringify(draft) !== JSON.stringify(previewTheme) ? { status: 'error', values: {} } : darkColorRecord?.theme === previewTheme ? darkColorRecord.colors : undefined;
   const inspection = useThemeInspection();
   const cssEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const locateInspection = (binding: ColorBinding) => {
@@ -683,6 +634,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const readOnly = !root;
 
   const updateDraft = (next: ThemeConfig) => {
+    editOrigin.current = editorTab; location.capture();
     setWriteFailed(false);
     setDraft(next);
     if (!jsonNeedsValidation) setJsonText(JSON.stringify(next, null, 2));
@@ -697,6 +649,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
 
   const formatCodeErrors = (errors: { css: ProductMessageValue; json: ProductMessageValue }) => errors.css || errors.json ? productReference('shared.compose', { parts: productJoin([errors.css ? productJoin(['CSS：', errors.css]) : '', errors.json ? productJoin(['JSON：', errors.json]) : ''].filter(Boolean), '；') }) : '';
   const changeCode = (kind: 'css' | 'json', value: string) => {
+    editOrigin.current = kind; location.capture();
     setWriteFailed(false);
     if (kind === 'css') setCssText(value); else setJsonText(value);
     const nextErrors = { ...codeErrors, [kind]: '' };
@@ -741,6 +694,8 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     if (!root || !isRootCurrent(root) || savingRef.current || unappliedChanges && !validatedDraft || !dirty) return false;
     const operationRoot = root;
     const formatId = getFormatSnapshot().id;
+    const sample = getThemePreviewSample();
+    if (sample !== previewSample || sample.status !== 'ready' || sample.markdown === null) { setError(sample.error ?? productReference('themeSample.invalidContent')); return false; }
     const target = validatedDraft ?? draft;
     const errors = [...inspectThemeConfig(target), ...inspectThemeFormat(target)];
     if (errors.length) {
@@ -753,11 +708,11 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setError('');
     setSavedMessage(productText("themeLibrary.saving"));
     try {
-      const measured = await validateContentSource('snippets', STYLEBOOK_SAMPLE, { theme: target });
-      if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId) return false;
+      const measured = await validateContentSource('snippets', sample.markdown, { theme: target });
+      if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId || getThemePreviewSample() !== sample) return false;
       if (measured.errors.length) { setError(measured.errorMessage ?? measured.errors.join('；')); setSavedMessage(productText("themeLibrary.layoutValidationDidNotPassTheThemeFileWasNotWritten")); return false; }
       const saved = await saveThemeLibraryTheme(operationRoot, target);
-      if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId) return false;
+      if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId || getThemePreviewSample() !== sample) return false;
       savedBaseline.current = JSON.stringify(saved);
       savedCode.current = { css: saved.css, json: JSON.stringify(saved, null, 2) };
       setDraft(saved);
@@ -780,11 +735,18 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   };
 
   const setToken = (key: string, value: string) => updateDraft({ ...draft, tokens: { ...draft.tokens, [key]: value } });
+  const setDarkToken = (key: string, value: string | null) => {
+    const tokens = { ...draft.dark?.tokens };
+    if (value === null) delete tokens[key]; else tokens[key] = value;
+    updateDraft({ ...draft, dark: { tokens } });
+  };
   const selectedNode = draft.nodes?.[nodeKey] ?? {};
   const cssNeedsValidation = cssText !== draft.css;
   const jsonNeedsValidation = jsonText !== JSON.stringify(draft, null, 2);
   const unappliedChanges = cssNeedsValidation || jsonNeedsValidation;
   const dirty = JSON.stringify(draft) !== savedBaseline.current || unappliedChanges;
+  const resumeTheme = () => { setDeparture(false); setApplyAfter(false); setEditorTab(editOrigin.current); location.restore(); };
+  useEditingDraft(dirty ? { kind: 'article-theme', root, objectId: theme.id, resume: resumeTheme } : null);
   const resetChanges = () => {
     if (readOnly || savingRef.current || !dirty) return;
     const baseline = cloneTheme(JSON.parse(savedBaseline.current) as ThemeConfig);
@@ -797,9 +759,9 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setError('');
     setSavedMessage('');
   };
-  const close = () => { if (savingRef.current) return; if (dirty) setDeparture(true); else onClose(); };
+  const close = () => { if (savingRef.current) return; if (dirty) { location.capture(); setDeparture(true); } else onClose(); };
   // Applying used to leave straight away, so unsaved edits were dropped without a word.
-  const requestApply = () => { if (savingRef.current) return; if (dirty) { setApplyAfter(true); setDeparture(true); } else onApply(); };
+  const requestApply = () => { if (savingRef.current) return; if (dirty) { location.capture(); setApplyAfter(true); setDeparture(true); } else onApply(); };
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty || savingRef.current) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -820,8 +782,8 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const activeTab = editorTab;
   const chooseTab = setEditorTab;
   const tabs = [{ id: 'tokens', label: productText("themeLibrary.commonFields"), icon: 'edit', pending: false, modified: false, failed: false }, { id: 'css', label: 'CSS', icon: 'code', pending: cssNeedsValidation, modified: cssText !== savedCode.current.css, failed: Boolean(codeErrors.css) }, { id: 'json', label: 'JSON', icon: 'code', pending: jsonNeedsValidation, modified: jsonText !== savedCode.current.json, failed: Boolean(codeErrors.json) }] as const;
-  const openColor = (label: string, token: string, value: string, select: (color: string) => void) => {
-    try { setPicker({ label, token, value: tailwindColorToHex(value, document), select }); }
+  const openColor = (label: string, token: string, value: string, select: (color: string) => void, scheme?: 'light' | 'dark') => {
+    try { setPicker({ label, token, value: tailwindColorToHex(value, document), select, scheme }); }
     catch { setError(productText("themeLibrary.theCurrentColorCouldNotBeParsedFixItInCssOr")); }
   };
   return <>
@@ -837,16 +799,16 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
           <div className="shrink-0 border-b border-line p-4"><label className="grid min-w-0 gap-2 text-xs text-muted">{t('dialogs:ui.themeName')}<input className="field min-w-0 w-full" value={draft.name} disabled={readOnly || saving} onChange={event => updateDraft({ ...draft, name: event.target.value })} /></label><p className="mt-2 break-all font-mono text-2xs text-faint">{draft.id}</p></div>
           <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-line p-3" role="tablist" aria-label={t('dialogs:ui.themeEditMenu')}>{tabs.map((tab, index) => <button key={tab.id} id={`article-theme-tab-${tab.id}`} role="tab" type="button" tabIndex={activeTab === tab.id ? 0 : -1} aria-selected={activeTab === tab.id} aria-controls="article-theme-editor-panel" disabled={saving} data-validation={tab.failed ? 'failed' : tab.pending ? 'pending' : 'complete'} data-modified={tab.modified} aria-label={tab.failed ? t('dialogs:templates.tabFailed', { name: t('dialogs:themeTabs.' + tab.id) }) : tab.modified ? t('dialogs:templates.tabModified', { name: t('dialogs:themeTabs.' + tab.id) }) : undefined} className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 py-2 whitespace-nowrap text-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent ${tab.failed ? 'text-danger aria-selected:border-danger aria-selected:bg-danger/10 aria-selected:text-danger' : 'text-muted aria-selected:border-accent-line aria-selected:bg-accent-soft aria-selected:text-accent-text'}`} onClick={() => chooseTab(tab.id)} onKeyDown={event => { const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null; if (next !== null) { event.preventDefault(); chooseTab(tabs[next].id); document.getElementById(`article-theme-tab-${tabs[next].id}`)?.focus(); } }}><ThemeIcon name={tab.icon} />{t('dialogs:themeTabs.' + tab.id)}{tab.modified ? <span className={`rounded px-1 text-2xs ${tab.failed ? 'bg-danger/10 text-danger' : 'bg-accent-soft text-accent-text'}`}>{t('dialogs:ui.modified')}</span> : null}</button>)}</nav>
           <div id="article-theme-editor-panel" role="tabpanel" aria-labelledby={`article-theme-tab-${activeTab}`} className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
-            {editorTab === 'tokens' ? <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}><ArticleThemeFields theme={draft} nodeColors={nodeColors} disabled={readOnly || saving} nodeKey={nodeKey} onNodeKey={setNodeKey} onToken={setToken} onNodeValue={setNodeValue} onResetNode={resetNode} onColor={openColor} inspection={inspection} /></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><div className="flex min-h-0 flex-1 flex-col gap-2"><span className="shrink-0 font-sub-heading text-xs font-semibold text-primary">{editorTab === 'css' ? t('dialogs:ui.limitedCss') : t('dialogs:ui.fullThemeJson')}</span><SnippetTextarea ref={editorTab === 'css' ? cssEditorRef : undefined} sourceFont="editor" value={editorTab === 'css' ? cssText : jsonText} snippets={[]} readOnly={readOnly} disabled={saving} ariaLabel={editorTab === 'css' ? t('dialogs:ui.themeCss') : t('dialogs:ui.fullThemeJson')} onChange={value => changeCode(editorTab === 'css' ? 'css' : 'json', value)} /></div><p className="shrink-0 text-2xs text-faint">{editorTab === 'css' ? t('dialogs:ui.cssScope') : t('dialogs:ui.keepThemeId')}</p></div>}
+            {editorTab === 'tokens' ? <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}><ArticleThemeFields theme={draft} darkColors={darkColors} onDarkToken={setDarkToken} nodeColors={nodeColors} disabled={readOnly || saving} nodeKey={nodeKey} onNodeKey={setNodeKey} onToken={setToken} onNodeValue={setNodeValue} onResetNode={resetNode} onColor={openColor} inspection={inspection} /></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><div className="flex min-h-0 flex-1 flex-col gap-2"><span className="shrink-0 font-sub-heading text-xs font-semibold text-primary">{editorTab === 'css' ? t('dialogs:ui.limitedCss') : t('dialogs:ui.fullThemeJson')}</span><SnippetTextarea ref={editorTab === 'css' ? cssEditorRef : undefined} sourceFont="editor" value={editorTab === 'css' ? cssText : jsonText} snippets={[]} readOnly={readOnly} disabled={saving} ariaLabel={editorTab === 'css' ? t('dialogs:ui.themeCss') : t('dialogs:ui.fullThemeJson')} onChange={value => changeCode(editorTab === 'css' ? 'css' : 'json', value)} /></div><p className="shrink-0 text-2xs text-faint">{editorTab === 'css' ? t('dialogs:ui.cssScope') : t('dialogs:ui.keepThemeId')}</p></div>}
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line p-4"><ButtonBar label={t('dialogs:ui.themeSaveActions')} className="w-full justify-between"><button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !dirty} onClick={resetChanges}><ThemeIcon name="reset" />{t('dialogs:ui.resetChanges')}</button>{editorTab !== 'tokens' ? <button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !unappliedChanges} onClick={validateCode}><ThemeIcon name="check" />{t('dialogs:ui.validatePreview')}</button> : null}<span className="inline-flex min-w-0 after:top-auto after:bottom-full after:mb-2 after:mt-0" data-tooltip={unappliedChanges ? t('dialogs:ui.validateFirst') : undefined} tabIndex={unappliedChanges ? 0 : undefined} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><button className="button button-primary px-2 disabled:pointer-events-none" type="button" onClick={() => void save()} disabled={readOnly || saving || Boolean(error) && !writeFailed || unappliedChanges || !dirty} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><ThemeIcon name="save" />{saving ? t('dialogs:ui.saving') : t('dialogs:ui.saveTheme')}</button>{unappliedChanges ? <span id="article-theme-validation-hint" className="sr-only">{t('dialogs:ui.validateFirst')}</span> : null}</span></ButtonBar></div>
         </aside>
         <ColumnSplitter layout={layout} label={t('dialogs:ui.resizeTheme')} controls="article-theme-editor-panel" />
-        <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-5 group-data-[wide=true]/theme-columns:min-h-0 group-data-[dragging=true]/theme-columns:pointer-events-none"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">{t('dialogs:ui.liveTypography')}</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={previewTheme} dark={dark} inspection={inspection} onLocate={locateInspection} onNodeColors={setNodeColors} /></div>
+        <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-5 group-data-[wide=true]/theme-columns:min-h-0"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">{t('dialogs:ui.liveTypography')}</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={previewTheme} dark={dark} inspection={inspection} onLocate={locateInspection} onNodeColors={setNodeColors} onDarkColors={receiveDarkColors} /></div>
       </div>
       {error || savedMessage ? <footer className="shrink-0 border-t border-line px-5 py-3">{error ? <p className="text-xs text-danger" role="alert">{formatProductMessage(error, t)}</p> : <p className="text-xs text-success" role="status">{formatProductMessage(savedMessage, t)}</p>}</footer> : null}
     </DialogFrame>
-    {departure ? <UnsavedChangesDialog entries={[{ label: draft.name, detail: unappliedChanges ? t('dialogs:ui.unvalidatedCode') : t('dialogs:ui.themeChangesUnsaved') }]} description={t('dialogs:ui.themeUnsavedDescription')} saveLabel={applyAfter ? t('dialogs:ui.saveApply') : t('dialogs:ui.saveClose')} saveDisabled={Boolean(error) && !writeFailed || unappliedChanges || readOnly} onCancel={() => { setDeparture(false); setApplyAfter(false); }} onDiscard={onClose} onSave={async () => { if (!await save()) return false; if (applyAfter) { setApplyAfter(false); onApply(); } else onClose(); return true; }} /> : null}
-    {picker ? <EditorColorPicker label={picker.label} token={picker.token} modeLabel={t('dialogs:ui.articleTheme')} value={picker.value} onClose={() => setPicker(null)} onSelect={picker.select} /> : null}
+    {departure ? <UnsavedChangesDialog entries={[{ label: draft.name, detail: unappliedChanges ? t('dialogs:ui.unvalidatedCode') : t('dialogs:ui.themeChangesUnsaved') }]} description={t('dialogs:ui.themeUnsavedDescription')} saveLabel={applyAfter ? t('dialogs:ui.saveApply') : t('dialogs:ui.saveClose')} saveDisabled={Boolean(error) && !writeFailed || unappliedChanges || readOnly} onCancel={() => { setDeparture(false); setApplyAfter(false); }} onContinue={resumeTheme} onDiscard={onClose} onSave={async () => { if (!await save()) return false; if (applyAfter) { setApplyAfter(false); onApply(); } else onClose(); return true; }} /> : null}
+    {picker ? <EditorColorPicker label={picker.label} token={picker.token} modeLabel={t(picker.scheme ? `dialogs:ui.${picker.scheme}` : 'dialogs:ui.articleTheme')} value={picker.value} onClose={() => setPicker(null)} onSelect={picker.select} /> : null}
   </>;
 }

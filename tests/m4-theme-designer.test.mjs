@@ -43,7 +43,7 @@ function designer(editing = false, appearanceScheme = 'light') {
   const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : '';
   const render = () => { cursor = 0; tree = module.exports.EditorThemeDesigner(props); while (effects.length) effects.shift()(); };
   render(); render();
-  return { props, render, get closes() { return closes; }, nodes: () => all(tree), find: fn => { const found = all(tree).find(fn); assert.ok(found); return found; }, button: label => all(tree).find(node => node.type === 'button' && text(node) === label), preview: () => all(tree).find(node => node.type?.name === 'Preview').props.theme };
+  return { props, render, get closes() { return closes; }, nodes: () => all(tree), fontNodes: () => all(all(tree).find(node => node.props['aria-label'] === '字体角色列表')), find: fn => { const found = all(tree).find(fn); assert.ok(found); return found; }, button: label => all(tree).find(node => node.type === 'button' && text(node) === label), preview: () => all(tree).find(node => node.type?.name === 'Preview').props.theme };
 }
 
 test('designer starts in the workspace scheme and permits temporary mode inspection without dirtying the theme', () => {
@@ -67,8 +67,8 @@ test('designer independently edits 33 colors per mode and eight fonts without mu
   const view = designer(); const original = JSON.stringify(themes.BASE_EDITOR_THEME);
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 66);
   assert.equal(view.nodes().filter(node => node.type === 'button' && 'aria-expanded' in node.props).length, 2);
-  assert.equal(view.nodes().filter(node => node.type === 'select').length, 8);
-  assert.equal(view.nodes().some(node => node.type === 'input' && ['number', 'range'].includes(node.props.type)), false);
+  assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 8);
+  assert.equal(view.fontNodes().some(node => node.type === 'input' && ['number', 'range'].includes(node.props.type)), false);
   const before = view.preview();
   view.find(node => node.props['aria-label'] === 'light.canvas').props.onClick(); view.render();
   const picker = view.find(node => node.type === 'color-picker');
@@ -96,10 +96,10 @@ test('designer keeps collapsible group headings outside independently scrolling 
   assert.equal(colors().props['aria-expanded'], false);
   assert.equal(fonts().props['aria-expanded'], true);
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 0);
-  assert.equal(view.nodes().filter(node => node.type === 'select').length, 8);
+  assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 8);
   colors().props.onClick(); fonts().props.onClick(); view.render();
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 66);
-  assert.equal(view.nodes().filter(node => node.type === 'select').length, 0);
+  assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 0);
 });
 
 test('designer preview renders highlighted React nodes as content rather than serializing objects into HTML', () => {

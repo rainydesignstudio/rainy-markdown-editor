@@ -115,17 +115,22 @@ test('clipboard keeps authored backgrounds and layout but omits generated page p
   const doc = { defaultView: { getComputedStyle: node => ({ getPropertyValue: property => node.computed[property] ?? '' }) }, createElement: tag => element(tag) };
   function element(tag, computed = {}, dimensions = {}, attributes = {}, children = []) {
     const attrs = new Map(Object.entries(attributes));
-    return { tagName: tag.toUpperCase(), ownerDocument: doc, computed, children,
+    const node = { tagName: tag.toUpperCase(), ownerDocument: doc, computed, children, parentElement: null,
+      get firstChild() { return children[0] ?? null; },
       style: { getPropertyValue: () => '' }, computedStyleMap: () => ({ get: property => dimensions[property] == null ? undefined : { toString: () => dimensions[property] } }),
       get attributes() { return [...attrs].map(([name, value]) => ({ name, value })); },
       getAttribute: name => attrs.get(name) ?? null, hasAttribute: name => attrs.has(name),
       setAttribute: (name, value) => attrs.set(name, value), removeAttribute: name => attrs.delete(name),
-      append: child => children.push(child), querySelector: selector => selector === '.article-body' ? children.find(child => child.getAttribute('class') === 'article-body') ?? null : null,
+      append(child) { if (child.parentElement) child.parentElement.children.splice(child.parentElement.children.indexOf(child), 1); children.push(child); child.parentElement = this; },
+      replaceWith(replacement) { const siblings = this.parentElement.children; siblings.splice(siblings.indexOf(this), 1, replacement); replacement.parentElement = this.parentElement; },
+      querySelector: selector => selector === '.article-body' ? children.find(child => child.getAttribute('class') === 'article-body') ?? null : null,
       querySelectorAll: () => children.flatMap(child => [child, ...child.querySelectorAll('*')]),
       cloneNode: () => element(tag, { ...computed }, { ...dimensions }, Object.fromEntries(attrs), children.map(child => child.cloneNode(true))),
       get textContent() { return tag === 'img' ? '' : children.map(child => child.textContent).join(''); },
       get outerHTML() { return `<${tag} ${[...attrs].map(([name, value]) => `${name}="${value}"`).join(' ')}>${children.map(child => child.outerHTML).join('')}</${tag}>`; },
     };
+    children.forEach(child => { child.parentElement = node; });
+    return node;
   }
   const image = element('img', { display: 'block', 'max-width': '100%', 'height': '640px', 'object-fit': 'cover', 'background-color': 'rgba(0, 0, 0, 0)' }, { width: '100%', height: 'auto' }, { src: 'https://example.test/image.png', 'data-w': '800', 'data-h': '600', 'data-src': 'https://example.test/image.png', 'data-imgfileid': 'image-1', 'data-no-dark': 'true', 'data-internal-selection': 'private' });
   const incompleteImage = element('img', { display: 'inline', 'max-width': '100%' }, { height: 'auto' }, { src: 'https://example.test/incomplete.png' });

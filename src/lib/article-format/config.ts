@@ -20,19 +20,21 @@ export type ProductThemeDefinition = {
   allowUnknownCssProperties: boolean; allowedDisplayValues: string[];
   limits: { id: number; name: number; value: number; css: number; json: number };
   formatVersion: number; kind: string; idPattern: string; versionPattern: string; valuePattern: string;
+  darkTokens?: { allowPartial: boolean; fallback: 'light' };
 };
 export type FormatValidator = { schemaVersion: number; meta: { id: string; enabled?: boolean }; product: { theme: ProductThemeDefinition }; rules: FormatRule[] };
 export type FormatFormatter = {
   schemaVersion: number; meta: { id: string };
   markdown: { softBreaks: 'space' | 'line-break'; preserveExtraBlankLines: boolean; betweenBlocks: number; atEdges: number };
   preview: {
-    light: { background: string }; dark: { background: string; transform: string; options: Record<string, unknown> };
+    light: { background: string }; dark: { background: string; mode?: 'algorithm' | 'tokens'; transform: string; options: Record<string, unknown> };
     fontFamily: string; color: string; stripThemeBackground: boolean;
   };
   output: {
     wrapperTag: string; dropCssProperties: string[]; inlineProperties: string[]; dimensionProperties: string[];
     preserveAutoDimensions: boolean; preserveAttributes: string[]; removeClasses: boolean;
     stripRootBackground: boolean; colorEncoding: 'rgb' | 'preserve';
+    tagMap?: Record<string, string>; rootStyleOmissions?: string[];
     plainText: { maxConsecutiveNewlines: number; trim: boolean };
     visual: { width: number; pngBackground: string; pdfBackground: string; maxCanvasSide: number; pdfMargin: number };
   };
@@ -43,6 +45,8 @@ export type FormatFormatter = {
   nodes?: RenderNodePolicy;
   codeLayout?: CodeLayoutPolicy;
   headingIds?: 'auto' | 'explicit';
+  math?: { singleDollar: boolean; maxLength: number; maxExpressions: number };
+  mermaid?: { theme: 'default' | 'neutral' | 'dark'; maxLength: number; maxDiagrams: number };
 };
 export type FormatBundle = { support: FormatSupport; validator: FormatValidator; formatter: FormatFormatter };
 
@@ -66,7 +70,7 @@ const themeGuard = shape({
   nodeProperties: mapping(property, identifier), wrapperProperties: strings, allowUnknownCssProperties: bool,
   allowedDisplayValues: strings, limits: shape({ id: number(1, 10000, true), name: number(1, 10000, true), value: number(1, 100000, true), css: number(1, 10000000, true), json: number(1, 10000000, true) }),
   formatVersion: number(1, 1, true), kind: choice('article-theme'), idPattern: pattern, versionPattern: pattern, valuePattern: pattern,
-});
+}, { darkTokens: shape({ allowPartial: bool, fallback: choice('light') }) });
 export function validateFormatBundle(input: unknown): RawFormatBundle {
   shape({ support: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier, name: text, sources: mapping(sourceGuard, identifier) }),
     rules: array(shape({ id: identifier, section: text, title: text, severity: choice('warning', 'error'), source: identifier, validator: identifier }, { description: text, anchor: text })),
@@ -126,10 +130,16 @@ export function compileFormatBundle(input: RawFormatBundle): FormatBundle {
       case 'markdown.blank-lines': Object.assign(formatter.markdown, { preserveExtraBlankLines: p.preserve, betweenBlocks: p.betweenBlocks, atEdges: p.atEdges }); break;
       case 'markdown.code-highlight': Object.assign(formatter.codeHighlight, { enabled: true, ...p }); break;
       case 'markdown.heading-ids': formatter.headingIds = p.mode as 'auto' | 'explicit'; break;
+      case 'markdown.math': formatter.math = p as NonNullable<FormatFormatter['math']>; break;
+      case 'markdown.mermaid': formatter.mermaid = p as NonNullable<FormatFormatter['mermaid']>; break;
       case 'markdown.code-layout': formatter.codeLayout = p as CodeLayoutPolicy; break;
       case 'markdown.code-whitespace': Object.assign(formatter.codeWhitespace, { enabled: true, tabSize: p.tabSize }); break;
       case 'preview.surface': Object.assign(formatter.preview, { light: { background: p.lightBackground }, fontFamily: p.fontFamily, color: p.color, stripThemeBackground: p.stripThemeBackground }); formatter.preview.dark.background = p.darkBackground as string; break;
-      case 'preview.dark-mode': Object.assign(formatter.preview.dark, p); break;
+      case 'preview.dark-mode': Object.assign(formatter.preview.dark, p, {
+        mode: p.mode ?? (p.transform === 'preserve' ? 'tokens' : 'algorithm'),
+        transform: p.mode === 'tokens' ? 'preserve' : p.transform,
+        options: p.mode === 'tokens' ? {} : p.options,
+      }); break;
       case 'css.drop-properties': formatter.output.dropCssProperties.push(...p.properties as string[]); break;
       case 'css.utility-aliases': formatter.css.utilityPropertyAliases = p.aliases as Record<string, string>; break;
       case 'css.stylesheets': formatter.stylesheets = p as StylesheetsPolicy; break;

@@ -1,0 +1,9 @@
+{
+  "id": "horizontal-scroll-without-padding",
+  "name": "四图横排滚动（无内边距）",
+  "trigger": "//horizontal-scroll-without-padding",
+  "description": "四张示例图片横向排列并实现溢出滚动，关键区别没有 padding，且只有一个 figcaption。",
+  "content": "<section class=\"overflow-x-auto pb-3\">\n  <section data-ignore-width class=\"flex items-center justify-start gap-3\">\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <img class=\"block max-w-full h-auto rounded-xl\" src=\"/images/article-sample.png\" />\n    </section>\n  </section>\n</section>\n\n<figcaption class=\"block mt-2 mb-4 text-center text-xs text-article-muted italic\">&lt;&lt; 左滑查看图片</figcaption>",
+  "icon": "image",
+  "categoryId": "default"
+}

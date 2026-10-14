@@ -29,6 +29,7 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
   const props = {
     root: { name: 'test-only-directory' }, directoryName: 'test-only-directory', rememberedDirectoryName: null,
     directoryRestoreState: 'idle', directoryBookmarkIssue: null, fileSystemReady: true,
+    directoryStatus: { label: '', tone: 'neutral' },
     settings: structuredClone(DEFAULT_ARTICLE_SETTINGS), issue: null, notice: { label: '', tone: 'neutral' }, busy: false,
     workspace: workspace.createDefaultEditorWorkspace(), workspaceIssue: null, workspaceBusy: false,
     editorThemes: [...editorThemes.BUILTIN_EDITOR_THEMES], editorThemeIssues: [],
@@ -38,7 +39,7 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
     registerNavigationGuard(guard) { navigationGuard = guard; return () => { navigationGuard = null; }; },
   };
   const module = { exports: {} };
-  vm.runInNewContext(code, {
+  vm.runInNewContext(code, { HTMLElement: class HTMLElement {},
     exports: module.exports, module,
     document: { body: {}, getElementById: (id) => ({ focus: () => focus.push(id) }) },
     window: { matchMedia: () => media, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: (name) => listeners.delete(name) },
@@ -48,6 +49,7 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
       if (id.endsWith('/ButtonBar')) return { ButtonBar: 'button-bar' };
       if (id === 'react-dom') return { createPortal: (children) => children };
       if (id.endsWith('/DialogFrame')) { const Dialog = (props) => jsx('dialog', props); return { DialogFrame: Dialog, DialogHeader: Dialog, DialogActions: Dialog, DialogButton: Dialog }; }
+      if (id.endsWith('/FontDownloadSettings')) return { FontDownloadSettings: 'font-download-settings' };
       if (id.endsWith('/EditorThemeDesigner')) return { EditorThemeDesigner: 'editor-theme-designer' };
       if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-changes-dialog' };
       if (id.endsWith('/editorThemes')) return editorThemes;
@@ -103,6 +105,24 @@ test('local-library policy summary follows the active snapshot and never labels 
   assert.match(summary(), /正在载入/);
   page.props.root = null; page.render();
   assert.match(summary(), /尚未连接/);
+  page.unmount();
+});
+
+test('library actions follow connected, remembered and empty states without changing their callbacks', () => {
+  const page = settingsPage(); let selected = 0, reopened = 0;
+  page.props.onAuthorizeDirectory = () => selected++;
+  page.props.onReopenRememberedDirectory = () => reopened++;
+  page.render(); page.button('切换资料库').props.onClick(); page.render();
+  assert.equal(selected, 1); assert.equal(reopened, 0);
+  page.props.root = null; page.props.rememberedDirectoryName = 'remembered-library'; page.render();
+  page.button('授权并打开').props.onClick(); page.render();
+  assert.equal(reopened, 1);
+  page.button('选择其他资料库').props.onClick(); page.render(); assert.equal(selected, 2);
+  page.props.rememberedDirectoryName = null; page.render();
+  assert.equal(page.button('打开已有资料库').props.disabled, false);
+  page.props.fileSystemReady = false; page.render();
+  assert.equal(page.button('打开已有资料库').props.disabled, true);
+  assert.equal(page.button('新建资料库').props.disabled, true);
   page.unmount();
 });
 

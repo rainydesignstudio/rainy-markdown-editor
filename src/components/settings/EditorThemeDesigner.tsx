@@ -10,6 +10,7 @@ import type { NavigationGuard } from '../../hooks/useRouteNavigation';
 import { tokenizeEditorSource } from '../../lib/editorSourceHighlight';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
+import { useDraftLocation, useEditingDraft } from '../global/EditingDrafts';
 import { canonicalFontStack, fontFamily, fontOptions } from '../../lib/fontCatalog';
 import { CollapsiblePanel, PanelIcon } from '../global/CollapsiblePanel';
 import { EditorColorPicker } from './EditorColorPicker';
@@ -144,8 +145,8 @@ function Preview({ theme, mode, inspection }: { theme: EditorTheme; mode: Editor
   </div></ThemeInspectionPreview>;
 }
 
-export function EditorThemeDesigner({ source, themes, appearanceScheme, navigationGuardRef, onClose, onSave, editing = false }: {
-  source: EditorTheme; themes: EditorTheme[]; navigationGuardRef: MutableRefObject<NavigationGuard | null>;
+export function EditorThemeDesigner({ root, source, themes, appearanceScheme, navigationGuardRef, onClose, onSave, editing = false }: {
+  root: FileSystemDirectoryHandle | null; source: EditorTheme; themes: EditorTheme[]; navigationGuardRef: MutableRefObject<NavigationGuard | null>;
   appearanceScheme: EditorColorScheme;
   onClose: () => void; onSave: (theme: EditorTheme) => Promise<boolean>;
   editing?: boolean;
@@ -165,6 +166,10 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
   const busyRef = useRef(false);
   const dirty = JSON.stringify(draft) !== initial.current;
   const dirtyRef = useRef(dirty); dirtyRef.current = dirty;
+  const location = useDraftLocation(() => document.getElementById('editor-theme-designer-title')?.closest<HTMLElement>('[role=dialog]') ?? null);
+  const resumeDesigner = () => { setDeparture(null); location.restore(); };
+  useEditingDraft(dirty ? { kind: 'editor-theme', root, objectId: editing ? source.id : draft.id, resume: resumeDesigner } : null);
+  useEffect(() => { if (dirty && !departure && !colorPicker) location.capture(); }, [draft, dirty, departure, colorPicker]);
   const errors = inspectEditorTheme(draft);
   if (themes.some(theme => theme.id === draft.id && (!editing || theme.id !== source.id))) errors.push(productMessage("editorThemeDesigner.theFileJsonAlreadyExists", { "draftId": draft.id }));
   const availableFonts = [...themes.flatMap(theme => Object.values(theme.fonts)), ...Object.values(draft.fonts)];
@@ -172,7 +177,7 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
   useEffect(() => { if (inspection.selected) setColorsOpen(true); }, [inspection.selected]);
   const close = () => {
     if (busyRef.current) return;
-    if (dirtyRef.current) setDeparture(() => onClose); else onClose();
+    if (dirtyRef.current) { location.capture(); setDeparture(() => onClose); } else onClose();
   };
   const save = async () => {
     if (busyRef.current || errors.length || (editing && !dirtyRef.current)) return false;
@@ -187,7 +192,7 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
   useEffect(() => {
     navigationGuardRef.current = proceed => {
       if (busyRef.current) return true;
-      if (dirtyRef.current) { setDeparture(() => () => { onClose(); proceed(); }); return true; }
+      if (dirtyRef.current) { location.capture(); setDeparture(() => () => { onClose(); proceed(); }); return true; }
       onClose(); return false;
     };
     const beforeUnload = (event: BeforeUnloadEvent) => { if (dirtyRef.current || busyRef.current) { event.preventDefault(); event.returnValue = ''; } };
@@ -226,6 +231,6 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
       <DialogFooter className="pt-4">{error || errors.length ? <p role="alert" className="mb-3 text-xs text-danger">{error ? formatProductMessage(error, t) : errors.map(issue => formatProductMessage(issue, t)).join('; ')}</p> : null}<DialogActions><DialogButton disabled={saving} onClick={close}><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" disabled={saving || Boolean(errors.length) || (editing && !dirty)} onClick={() => void save().then(saved => { if (saved) onClose(); })}><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6" /></svg>{saving ? t('dialogs:ui.saving') : t('dialogs:ui.saveTheme')}</DialogButton></DialogActions></DialogFooter>
     </DialogFrame>
     {colorPicker ? <EditorColorPicker label={colorPicker.label ?? t('dialogs:colorRoles.' + colorPicker.role)} token={colorPicker.token ?? `--color-${colorPicker.role}`} modeLabel={colorPicker.scheme === 'light' ? t('dialogs:ui.light') : t('dialogs:ui.dark')} value={draft.palette[colorPicker.surface ? editorSurfaceValue(draft, colorPicker.scheme, colorPicker.surface).colors[colorPicker.index ?? 0] : colorPicker.key ?? draft.colors[colorPicker.scheme][colorPicker.role!]]} onClose={() => setColorPicker(null)} onSelect={hex => setDraft(current => colorPicker.surface ? updateEditorSurface(current, colorPicker.scheme, colorPicker.surface, { color: hex, index: colorPicker.index }) : ({ ...current, palette: { ...current.palette, [colorPicker.key ?? current.colors[colorPicker.scheme][colorPicker.role!]]: hex } }))} /> : null}
-    {departure ? <UnsavedChangesDialog entries={[{ label: draft.name || t('dialogs:ui.newEditorThemeAlternative'), detail: t('dialogs:ui.colorsAndFontsAreUnsaved') }]} description={t('dialogs:ui.thisNewThemeHasUnsavedChanges')} saveLabel={t('dialogs:ui.saveAndContinue')} saveDisabled={Boolean(errors.length)} onCancel={() => setDeparture(null)} onDiscard={departure} onSave={async () => { if (!await save()) return false; departure(); return true; }} /> : null}
+    {departure ? <UnsavedChangesDialog entries={[{ label: draft.name || t('dialogs:ui.newEditorThemeAlternative'), detail: t('dialogs:ui.colorsAndFontsAreUnsaved') }]} description={t('dialogs:ui.thisNewThemeHasUnsavedChanges')} saveLabel={t('dialogs:ui.saveAndContinue')} saveDisabled={Boolean(errors.length)} onCancel={() => setDeparture(null)} onContinue={resumeDesigner} onDiscard={departure} onSave={async () => { if (!await save()) return false; departure(); return true; }} /> : null}
   </>;
 }

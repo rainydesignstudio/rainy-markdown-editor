@@ -18,7 +18,7 @@ export function insertUndoableText(
   if (managed) return managed(text, start, end);
   const previous = textarea.value;
   const expected = previous.slice(0, start) + text + previous.slice(end);
-  textarea.focus();
+  textarea.focus({ preventScroll: true });
   textarea.setSelectionRange(start, end);
   let inserted = false;
   try { inserted = textarea.ownerDocument.execCommand('insertText', false, text); } catch { /* report failure without bypassing undo */ }

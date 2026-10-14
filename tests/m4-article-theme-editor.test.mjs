@@ -19,15 +19,20 @@ const FORMAT_THEME = {
 };
 function editor(theme = FORMAT_THEME) {
   let cursor = 0, tree, closes = 0, writes = 0, saves = 0; const cells = [], effects = [];
+  let sample = { id: 1, status: 'ready', markdown: '# A library-owned sample', origin: 'library', error: null };
+  const sampleChecks = [];
+  let validateSample = async () => ({ errors: [], issues: [] });
   const props = { theme, root: {}, isRootCurrent: () => true, canApply: true, onClose: () => closes++, onApply() {}, onSaved: () => saves++ };
   let persist = async (_, value) => ({ ...value, version: '1.0.1' });
   const module = { exports: {} };
   vm.runInNewContext(`${code}\nexports.Stylebook = ThemeStylebookDialog;`, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, document: { getElementById: () => ({ focus() {} }) }, require: withUILocaleImports(function(id){
     if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
-    if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
+    if (id.endsWith('/contentValidation')) return { validateContentSource: async (kind, source) => { sampleChecks.push(source); return validateSample(); } };
     if (id.endsWith('/article-format/runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/PageHeading')) return { PageHeading: 'page-heading' };
+    if (id.endsWith('/useThemePreviewSample')) return { useThemePreviewSample: () => sample };
+    if (id.endsWith('/themePreviewSample')) return { getThemePreviewSample: () => sample };
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => formatRuntime.getFormatSnapshot() };
     if (id.endsWith('/article-format/preview')) return formatPreview;
     if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input' };
@@ -54,6 +59,7 @@ function editor(theme = FORMAT_THEME) {
     if (id.endsWith('/fileSystem')) return { saveThemeLibraryTheme: async (...args) => { writes++; return persist(...args); } };
     if (/themeDefaults|rootSession|articleDarkPreview|tailwindPalette/.test(id)) return {};
     if (id === 'react') return {
+      useCallback: value => value,
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = typeof initial === 'function' ? initial() : initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
       useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; },
       useEffect(effect, dependencies) { const index = cursor++, old = cells[index]; if (old && dependencies.every((value, i) => Object.is(value, old.dependencies[i]))) return; effects.push(() => { old?.cleanup?.(); cells[index] = { dependencies, cleanup: effect() }; }); },
@@ -65,7 +71,7 @@ function editor(theme = FORMAT_THEME) {
   const render = () => { cursor = 0; tree = module.exports.Stylebook(props); while (effects.length) effects.shift()(); };
   const find = predicate => { const node = all(tree).find(predicate); assert.ok(node, 'control exists'); return node; };
   render();
-  return { props, render, find, nodes: () => all(tree), get closes() { return closes; }, get writes() { return writes; }, get saves() { return saves; }, setPersist: value => { persist = value; }, button: label => find(node => node.type === 'button' && text(node) === label), tab(label) { this.find(node => node.props.id === `article-theme-tab-${label === '常用项' ? 'tokens' : label.toLowerCase()}`).props.onClick(); render(); }, frame: () => find(node => node.type === 'dialog'), fields: () => find(node => node.type === 'article-fields') };
+  return { props, render, find, sampleChecks, setSample: value => { sample = value; }, setValidation: value => { validateSample = value; }, nodes: () => all(tree), get closes() { return closes; }, get writes() { return writes; }, get saves() { return saves; }, setPersist: value => { persist = value; }, button: label => find(node => node.type === 'button' && text(node) === label), tab(label) { this.find(node => node.props.id === `article-theme-tab-${label === '常用项' ? 'tokens' : label.toLowerCase()}`).props.onClick(); render(); }, frame: () => find(node => node.type === 'dialog'), fields: () => find(node => node.type === 'article-fields') };
 }
 
 test('editor opens directly to common fields and exposes only three tabs on one row', () => {
@@ -253,4 +259,72 @@ test('reset restores the last saved theme, code buffers, preview and validation 
   assert.throws(() => view.find(node => node.props.role === 'alert'), /control exists/);
   assert.equal(view.writes, 1, 'reset never writes to the directory');
   view.frame().props.onClose(); assert.equal(view.closes, 1);
+});
+
+
+test('manual dark edits change only the override group and survive saving; resetting restores inheritance', async () => {
+  const view = editor();
+  const light = JSON.stringify(view.fields().props.theme.tokens);
+  view.fields().props.onDarkToken('color-article-ink', '#ddeeff'); view.render();
+  assert.equal(view.fields().props.theme.dark.tokens['color-article-ink'], '#ddeeff');
+  assert.equal(JSON.stringify(view.fields().props.theme.tokens), light);
+  view.button('保存主题').props.onClick(); await new Promise(resolve => setImmediate(resolve)); view.render();
+  assert.equal(view.writes, 1);
+  assert.equal(view.fields().props.theme.dark.tokens['color-article-ink'], '#ddeeff');
+  view.fields().props.onDarkToken('color-article-ink', null); view.render();
+  assert.deepEqual(Object.keys(view.fields().props.theme.dark.tokens), []);
+  assert.equal(JSON.stringify(view.fields().props.theme.tokens), light);
+});
+
+
+test('continue editing returns to the last modified code tab while closing the gate keeps the inspected tab', () => {
+  const view = editor(); view.tab('CSS');
+  const changed = '.article-preview .article-body p { color: #234567; }';
+  view.find(node => node.type === 'source-input').props.onChange(changed); view.render();
+  view.tab('常用项'); view.frame().props.onClose(); view.render();
+  view.find(node => node.type === 'unsaved-dialog').props.onCancel(); view.render();
+  assert.equal(view.find(node => node.props.id === 'article-theme-tab-tokens').props['aria-selected'], true);
+  view.frame().props.onClose(); view.render();
+  view.find(node => node.type === 'unsaved-dialog').props.onContinue(); view.render();
+  assert.equal(view.find(node => node.props.id === 'article-theme-tab-css').props['aria-selected'], true);
+  assert.equal(view.find(node => node.type === 'source-input').props.value, changed);
+  assert.equal(view.closes, 0); assert.equal(view.writes, 0);
+});
+
+
+test('saving a theme validates the same library sample shown by its preview', async () => {
+  const view = editor();
+  view.setSample({ id: 2, status: 'ready', markdown: '# The custom library sample', origin: 'library', error: null });
+  view.render();
+  view.fields().props.onToken('color-article-quote-surface', '#fafafa'); view.render();
+  await view.button('保存主题').props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(view.sampleChecks, ['# The custom library sample']);
+  assert.equal(view.writes, 1);
+});
+
+test('unavailable samples cannot validate or save a theme, and the draft is retained', async () => {
+  const view = editor();
+  view.fields().props.onToken('color-article-quote-surface', '#fafafa'); view.render();
+  view.setSample({ id: 2, status: 'error', markdown: null, origin: 'library', error: 'Sample read failed' });
+  view.render();
+  await view.button('保存主题').props.onClick();
+  await new Promise(resolve => setImmediate(resolve)); view.render();
+  assert.equal(view.writes, 0);
+  assert.deepEqual(view.sampleChecks, []);
+  assert.equal(view.fields().props.theme.tokens['color-article-quote-surface'], '#fafafa');
+  assert.ok(view.find(node => node.props.role === 'alert'));
+});
+
+test('reloading the sample during a layout check prevents a stale theme write', async () => {
+  const view = editor(); let release;
+  view.setValidation(() => new Promise(resolve => { release = () => resolve({ errors: [], issues: [] }); }));
+  view.fields().props.onToken('color-article-quote-surface', '#fafafa'); view.render();
+  const pending = view.button('保存主题').props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  view.setSample({ id: 2, status: 'ready', markdown: '# Replacement sample', origin: 'library', error: null });
+  release(); await pending;
+  await new Promise(resolve => setImmediate(resolve)); view.render();
+  assert.equal(view.writes, 0);
+  assert.equal(view.fields().props.theme.tokens['color-article-quote-surface'], '#fafafa');
 });

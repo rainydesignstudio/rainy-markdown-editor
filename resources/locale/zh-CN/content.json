@@ -12,7 +12,6 @@
     "unsavedDraft": "有未保存草稿",
     "createLibraryContent": "模板新建",
     "newCategory": "新建分类",
-    "new": "新建",
     "chooseALibraryToCreateEditAndSave": "选择资料目录后，即可新增、编辑和保存模板。当前可浏览内置预设。",
     "readingTheLibraryEditingWillResumeWhenLoading": "正在读取资料目录，完成后可继续编辑。",
     "theLibraryDidNotLoadCompletelyEditingIs": "资料未能完整读取，编辑已暂停。请在设置中重新选择此目录。",
@@ -81,7 +80,8 @@
     "untitled": "未命名{{type}}",
     "emptyCategory": "还没有{{type}}，新建时选择此分类。",
     "empty": "还没有{{type}}。",
-    "choose": "选择一份{{type}}"
+    "choose": "选择一份{{type}}",
+    "newType": "新建{{type}}"
   },
   "tabs": {
     "snippets": "片段",

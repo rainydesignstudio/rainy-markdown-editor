@@ -18,6 +18,13 @@
     const references = new Set();
     for (const node of [tree, ...tree.querySelectorAll('*')]) for (const name of attributes) for (const match of (node.getAttribute(name) || '').matchAll(blobPattern)) references.add(match[0]);
     for (const url of urls(css)) for (const match of url.matchAll(blobPattern)) references.add(match[0]);
+    // The application's fixed typography image is also a local asset. Carry
+    // its bytes through the existing opaque-child bridge, just like Blob URLs.
+    // Other HTTP images remain outside this bridge's fetch authority.
+    for (const image of copied.querySelectorAll('img')) {
+      const source = image.getAttribute('src');
+      if (source === '/images/article-sample.png' || source === new URL('/images/article-sample.png', document.baseURI).href) references.add(source);
+    }
     if (references.size > 2048) throw new Error('ALGORITHM_RESOURCE_LIMIT');
     const resources = [], replacements = new Map(), fetched = new Map(); let total = 0;
     for (const reference of references) {
@@ -32,7 +39,9 @@
       const id = resources.length, token = 'article-algorithm-asset:' + request + '/' + id;
       resources.push({ id, token, fragment, ...resource }); replacements.set(reference, token);
     }
-    const replace = value => value.replace(blobPattern, reference => replacements.get(reference) || reference);
+    const replace = value => replacements.get(value) || value.replace(blobPattern, reference => replacements.get(reference) || reference);
+    // Storage tokens are inert transport data, never live image URLs.
+    document.createElement('template').content.append(tree);
     for (const node of [tree, ...tree.querySelectorAll('*')]) for (const name of attributes) { const value = node.getAttribute(name); if (value) node.setAttribute(name, replace(value)); }
     css = css.replace(/url\((?:[^()"']|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')*\)/gi, replace);
     return { html: tree.outerHTML, css, resources, originals: [...references] };
@@ -71,7 +80,18 @@
     await Promise.all([...root.querySelectorAll('img')].map(image => image.decode().catch(() => {})));
     const nodes = [root, ...root.querySelectorAll('*')];
     if (nodes.length > 20000) throw new Error('ALGORITHM_NODE_LIMIT');
-    const originals = nodes.map(node => { const style = getComputedStyle(node); return Object.fromEntries(paints.map(property => [property, style.getPropertyValue(property)])); });
+    const borders = [];
+    const originals = nodes.map(node => {
+      const style = getComputedStyle(node);
+      // Overriding a colour longhand clears pending var() border shorthands in
+      // CSSOM. Capture their resolved geometry before any paint is applied.
+      const pendingBorder = /(?:^|;)\s*border(?:-(?:top|right|bottom|left|block(?:-start|-end)?|inline(?:-start|-end)?))?\s*:[^;]*\bvar\s*\(/i.test(node.style.cssText);
+      borders.push(pendingBorder ? ['top', 'right', 'bottom', 'left'].flatMap(side => ['width', 'style'].map(part => {
+        const property = 'border-' + side + '-' + part;
+        return [property, style.getPropertyValue(property)];
+      })) : []);
+      return Object.fromEntries(paints.map(property => [property, style.getPropertyValue(property)]));
+    });
     const request = crypto.randomUUID();
     const input = await prepareInput(root, request);
     const rectangle = root.getBoundingClientRect();
@@ -95,7 +115,10 @@
           }
           validateResult(result, nodes, rules, originals);
           // Validate the complete packet before mutating any trusted document node.
-          for (const entry of result.paints) for (const [property, value] of Object.entries(entry.properties)) nodes[entry.node].style.setProperty(property, value, 'important');
+          for (const entry of result.paints) {
+            for (const [property, value] of borders[entry.node]) nodes[entry.node].style.setProperty(property, value, 'important');
+            for (const [property, value] of Object.entries(entry.properties)) nodes[entry.node].style.setProperty(property, value, 'important');
+          }
           resolve(result.findings);
         } catch (cause) { reject(cause); }
       };

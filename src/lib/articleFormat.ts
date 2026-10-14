@@ -2,6 +2,9 @@ import { enabledFormatRules } from './article-format/config';
 import { productCause, productMessage, productText, productReference, productJoin, type ProductMessageInfo, type ProductMessageValue } from "./i18n/productMessages";
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
+import remarkMath from 'remark-math';
+import { inspectMathSource } from './article-format/math';
+import { inspectMermaidSource } from './article-format/mermaid';
 import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
 import rehypeRaw from 'rehype-raw';
@@ -19,7 +22,7 @@ type TreeNode = DefaultTreeAdapterMap['node'];
 type MarkdownNode = { type: string; value?: string; tagName?: string; properties?: Record<string, unknown>; children?: MarkdownNode[]; position?: { start?: { line?: number; offset?: number }; end?: { offset?: number } } };
 export type ArticleFormatTier = 'safe' | 'usable' | 'conditional' | 'lowPriority' | 'danger' | 'notAllowed' | 'unknown' | 'warning' | 'error';
 export type ArticleFormatSeverity = 'safe' | 'warning' | 'error';
-export type ArticleFormatIssue = { kind: 'element' | 'attribute' | 'style' | 'value' | 'engine'; name: string; source: string; sourceKind?: 'utility'; tier: ArticleFormatTier; line?: number; lines?: number[]; message: string; ruleId?: string; reference?: string; domain?: 'standard' | 'product'; resourceSource?: string };
+export type ArticleFormatIssue = Partial<ProductMessageInfo> & { kind: 'element' | 'attribute' | 'style' | 'value' | 'engine'; name: string; source: string; sourceKind?: 'utility'; tier: ArticleFormatTier; line?: number; lines?: number[]; message: string; ruleId?: string; reference?: string; domain?: 'standard' | 'product'; resourceSource?: string; resourceKind?: 'image' | 'file'; resourceState?: 'pending' | 'failed' };
 type Sink = { issues: ArticleFormatIssue[]; passed: Set<string> };
 type StyleDeclaration = { property: string; value: string; important?: boolean };
 export type ArticleStyleContext = { element: string; declarations: ReadonlyMap<string, string> };
@@ -93,7 +96,8 @@ export function articleFormatPreviewStructure(body: string): HTMLElement {
     if (!node.tagName) { node.children?.forEach(child => append(child, parent)); return; }
     if (['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta', 'base'].includes(node.tagName)) return;
     const svg = node.tagName === 'svg' || parent.namespaceURI === 'http://www.w3.org/2000/svg';
-    const element = svg ? inert.createElementNS('http://www.w3.org/2000/svg', node.tagName) as unknown as HTMLElement : inert.createElement(node.tagName);
+    const math = node.tagName === 'math' || parent.namespaceURI === 'http://www.w3.org/1998/Math/MathML';
+    const element = svg || math ? inert.createElementNS(svg ? 'http://www.w3.org/2000/svg' : 'http://www.w3.org/1998/Math/MathML', node.tagName) as unknown as HTMLElement : inert.createElement(node.tagName);
     for (const [name, value] of Object.entries(node.properties ?? {})) {
       const attribute = name === 'className' ? 'class' : name === 'dataSourceLine' ? 'data-source-line' : svg ? name : name.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
       if (attribute === 'src') { if (typeof value === 'string') element.setAttribute('data-inspection-src', value); continue; }
@@ -181,9 +185,11 @@ export function inspectArticleFormatMarkdown(source: string, label = '正文', a
   const invalid = configurationIssue(label); if (invalid) return { issues: [invalid], classes: [], classLines: new Map() };
   let parsed: MarkdownNode;
   try {
-    const markdownTree = markdown.parse(source);
+    const mathPolicy = getFormatSnapshot().bundle.formatter.math;
+    const processor = mathPolicy ? unified().use(remarkParse).use(remarkGfm).use(remarkMath, { singleDollarTextMath: mathPolicy.singleDollar }).use(remarkRehype, { allowDangerousHtml: true }).use(rehypeRaw) : markdown;
+    const markdownTree = processor.parse(source);
     const rawRanges = rawHtmlRanges(markdownTree as MarkdownNode);
-    parsed = markdown.runSync(markdownTree) as MarkdownNode;
+    parsed = processor.runSync(markdownTree) as MarkdownNode;
     const sink: Sink = { issues: [...validateArticleMarkup(source, markdownTree as MarkdownNode, label).map(issue => ({ ...issue, domain: 'product' as const })), ...inspectSourceStructure(source, markdownTree as MarkdownNode, label)], passed: new Set<string>() };
     const classes = new Set<string>();
     const classLines = new Map<string, number[]>();
@@ -208,6 +214,9 @@ export function inspectArticleFormatMarkdown(source: string, label = '正文', a
       node.children?.forEach(visit);
     };
     visit(parsed);
+    if (mathPolicy) { const math = inspectMathSource(source, mathPolicy, label); sink.issues.push(...math.issues); if (math.count && !math.issues.length) sink.passed.add(productText('math.syntax')); }
+    const mermaidPolicy = getFormatSnapshot().bundle.formatter.mermaid;
+    if (mermaidPolicy) sink.issues.push(...inspectMermaidSource(source, mermaidPolicy, label));
     if (passed) for (const name of sink.passed) passed.add(name);
     return { issues: sink.issues, classes: [...classes], classLines };
   } catch (error) {

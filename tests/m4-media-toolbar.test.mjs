@@ -1,3 +1,6 @@
+import * as resourceTypes from '../src/lib/resources/types.ts';
+import { inspectResourceFile } from '../src/lib/resources/storage.ts';
+import { libraryMediaAssetKey } from '../src/lib/articleMedia.ts';
 import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -12,12 +15,14 @@ async function component(file, dependencies) {
   let cursor = 0;
   const code = ts.transpileModule(await readFile(new URL(file, import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   vm.runInNewContext(code, { module, exports: module.exports, Set, window: { matchMedia: () => ({ matches: false }) }, require: withUILocaleImports(function(id){
-    if (id === 'react/jsx-runtime') return { jsx, jsxs };
+    if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-dialog' }; if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = typeof initial === 'function' ? initial() : initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
       useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; }, useMemo: callback => callback(), useEffect() {},
     };
-    if (id in dependencies) return dependencies[id];
+    if (id.endsWith('/resources/types')) return resourceTypes; if (id.endsWith('/resources/storage')) return { inspectResourceFile }; if (id.endsWith('/ResourceGlyph')) return { ResourceGlyph: 'resource-glyph' }; if (id.endsWith('/articleMedia') && !(id in dependencies)) return { libraryMediaAssetKey }; if (id in dependencies) return dependencies[id];
+    if (id.endsWith('/useImageZoom')) return { useImageZoom() {} };
+    if (id.endsWith('/IconButton')) return { IconButton: 'zoom-button' };
     throw new Error(id);
   }) });
   return (name, props) => { cursor = 0; return nodes(module.exports[name](props)); };

@@ -3,6 +3,7 @@ import { getFormatSnapshot } from './article-format/runtime';
 import type { ThemeConfig, ThemeNodeKey } from './types';
 
 export type ColorBinding = { key: string; label: string; token: string; kind?: 'color' | 'node' | 'css'; node?: ThemeNodeKey; start?: number; end?: number; value?: string; hidden?: boolean };
+export type ArticleColorSlot = { token: string; node: number; property: string };
 export const ARTICLE_COLOR_LABELS: Record<string, string> = {
   'color-article-ink': '正文文字', 'color-article-heading': '标题文字', 'color-article-muted': '辅助文字',
   'color-article-quote-surface': '引用底色', 'color-article-line': '分隔线', 'color-article-accent': '强调色',
@@ -88,11 +89,12 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
   const doc = root.ownerDocument;
   const sheet = new CSSStyleSheet();
   sheet.replaceSync(css);
-  const rules = Array.from(sheet.cssRules).filter((rule): rule is CSSStyleRule => 'selectorText' in rule);
+  const flatten = (rules: CSSRuleList): CSSStyleRule[] => Array.from(rules).flatMap(rule => 'selectorText' in rule ? [rule as CSSStyleRule] : 'cssRules' in rule ? flatten((rule as CSSGroupingRule).cssRules) : []);
+  const rules = flatten(sheet.cssRules);
   const bindings = new Map<string, ColorBinding[]>();
   const inlineSourcesByValue = new Map<string, string>();
   const nodes = Object.entries(theme.nodes ?? {}).filter(([, values]) => Object.keys(values).length) as Array<[ThemeNodeKey, Record<string, string>]>;
-  const scope = rules[0]?.selectorText.replace(/\s+\.article-preview.*$/, '') ?? '';
+  const scope = rules[0]?.selectorText.match(/^(\.theme-preview-instance-[\w-]+)\s+\.article-preview/)?.[1] ?? '';
   let counter = 0;
   const authored = theme.css.replace(/\/\*[\s\S]*?\*\//g, match => ' '.repeat(match.length));
   const sourceRules = [...authored.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
@@ -124,7 +126,8 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
     if (inlineKey) inlineSourcesByValue.set(inlineKey, id);
     return id;
   };
-  const generated = rules.map((rule, index) => {
+  const traceRule = (rule: CSSStyleRule) => {
+    const index = rules.indexOf(rule);
     const nodeEntry = index >= rules.length - nodes.length ? nodes[index - (rules.length - nodes.length)] : undefined;
     const result: string[] = [];
     for (const { property, value } of colorDeclarations(rule.style)) {
@@ -138,10 +141,16 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
       }
     }
     return result.length ? `${rule.selectorText}{${result.join('')}}` : '';
+  };
+  const serialize = (rules: CSSRuleList): string => Array.from(rules).map(rule => {
+    if ('selectorText' in rule) return traceRule(rule as CSSStyleRule);
+    if ('cssRules' in rule && !('name' in rule && rule.type === 7)) return rule.cssText.slice(0, rule.cssText.indexOf('{') + 1) + serialize((rule as CSSGroupingRule).cssRules) + '}';
+    return '';
   }).join('\n');
+  const generated = serialize(sheet.cssRules);
   const style = doc.createElement('style');
   style.dataset.themeInspectionTrace = 'true';
-  style.textContent = `${scope} :where(.article-preview,.article-preview *){${TRACE_PROPERTIES.filter(key => key !== 'text').map(key => `${trace(key)}:none;`).join('')}}\n${generated}`;
+  style.textContent = `@layer theme { ${scope} :where(.article-preview,.article-preview *,[data-article-content-root],[data-article-content-root] *){${TRACE_PROPERTIES.filter(key => key !== 'text').map(key => `${trace(key)}:none;`).join('')}} }\n${generated}`;
   root.parentElement!.append(style);
   const elements = [root, ...root.querySelectorAll<HTMLElement>('*')];
   const authoredInline = new Map(elements.map((element, index) => [element, inlineSources?.[index]?.style ?? element.style]));
@@ -164,10 +173,10 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
     }
     return source;
   };
-  const read = (element: HTMLElement): ColorBinding[] => {
+  const readPaints = (element: HTMLElement) => {
     const computed = doc.defaultView!.getComputedStyle(element);
-    const output: ColorBinding[] = [];
-    const append = (source: string) => output.push(...(bindings.get(source) ?? []));
+    const output: Array<{ binding: ColorBinding; element: HTMLElement; property: string }> = [];
+    const append = (source: string, painter: HTMLElement, property: string) => output.push(...(bindings.get(source) ?? []).map(binding => ({ binding, element: painter, property })));
     const ownText = Array.from(element.childNodes).some(node => node.nodeType === 3 && Boolean(node.textContent?.trim())) || element.matches('input,textarea,select,svg,path');
     for (const property of TRACE_PROPERTIES) {
       if (property === 'background' || property === 'image') continue;
@@ -175,7 +184,7 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
       if (property.startsWith('border-') && (parseFloat(computed.getPropertyValue(`${property}-width`)) === 0 || computed.getPropertyValue(`${property}-style`) === 'none')) continue;
       if (property === 'decoration' && computed.textDecorationLine === 'none') continue;
       if (property === 'accent' && !element.matches('input[type=checkbox]:checked,input[type=radio]:checked,input[type=range],progress')) continue;
-      append(sourceFor(element, property));
+      append(sourceFor(element, property), element, property === 'text' ? 'color' : property === 'decoration' ? 'text-decoration-color' : property === 'accent' ? 'accent-color' : `${property}-color`);
     }
     // An opaque child covers ancestor paint. Transparent/partial backgrounds
     // retain the exposed ancestor's contribution, including background images.
@@ -183,14 +192,21 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
       const paint = doc.defaultView!.getComputedStyle(painter);
       const source = sourceFor(painter, 'background');
       const alpha = colorAlpha(paint.backgroundColor ?? paint.getPropertyValue('background-color'));
-      if (alpha > 0) append(source);
-      if (paint.backgroundImage && paint.backgroundImage !== 'none') append(sourceFor(painter, 'image'));
+      if (alpha > 0) append(source, painter, 'background-color');
+      if (paint.backgroundImage && paint.backgroundImage !== 'none') append(sourceFor(painter, 'image'), painter, 'background-image');
       if (alpha === 1 && source && source !== 'none') break;
     }
-    for (const [node, selector] of Object.entries(getArticleNodeSelectors())) {
-      if (element.matches(selector)) output.push({ key: `node:${node}`, label: '', token: '', hidden: true });
-    }
-    return uniqueBindings(output);
+    return output;
   };
-  return { read, dispose: () => style.remove() };
+  const read = (element: HTMLElement): ColorBinding[] => uniqueBindings([
+    ...readPaints(element).map(paint => paint.binding),
+    ...Object.entries(getArticleNodeSelectors()).flatMap(([node, selector]) => element.matches(selector) ? [{ key: `node:${node}`, label: '', token: '', hidden: true }] : []),
+  ]);
+  const colorSlots = (): ArticleColorSlot[] => {
+    const indices = new Map(elements.map((element, index) => [element, index]));
+    const slots = elements.flatMap(element => readPaints(element).filter(paint => paint.binding.kind === 'color').map(paint => ({ token: paint.binding.key, node: indices.get(paint.element)!, property: paint.property })));
+    const unique = new Map(slots.map(slot => [`${slot.token}:${slot.node}:${slot.property}`, slot]));
+    return [...unique.values()];
+  };
+  return { read, colorSlots, dispose: () => style.remove() };
 }

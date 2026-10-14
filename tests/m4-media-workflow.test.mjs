@@ -1,3 +1,4 @@
+import * as resourceTypes from '../src/lib/resources/types.ts';
 import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
@@ -35,11 +36,13 @@ function fixture() {
     directoryRef: { current: root }, contentLibraryRootSessionRef: { current: 1 },
     articleRef: { current: article }, mediaPickerRequestRef: { current: request },
     documentTokenRef: { current: token },
+    mutationQueueRef: { current: { canSave: () => true } },
     mediaOperationRef: { current: false }, historyOperationRef: { current: null },
     articleId: item => `${item.month}/${item.folder}`, parseArticle,
     inspectArticleImage: async () => ({ extension: 'png', mimeType: 'image/png' }),
     setMediaOperation: value => calls.push(['busy', value]),
-    setStatus: value => statuses.push(value),
+    setStatus: value => statuses.push(value), recordMediaArrival() {}, resourceReference: (_storage, name) => 'media/file/' + name,
+    saveSnapshot: async () => { throw Error('unexpected archive'); }, matchesSnapshot: () => true,
     snapshotFor: () => ({ source: article.source, themeValid: true, directory: root, documentToken: token, articleId: request.articleId }),
     insertImagesIntoDraft: (_snapshot, names) => { calls.push(['insert', ...names]); return { ok: true, message: 'inserted', tone: 'warning' }; },
     importImagesWithResult: async (files, selection) => { calls.push(['copy', files[0].name, selection.start]); return { ok: true, message: 'copied and inserted', tone: 'warning' }; },
@@ -133,6 +136,8 @@ function picker(onAdopt, onImport = async () => ({ ok: true, message: 'imported'
     if (id.endsWith('/MediaPagination')) return { MediaPagination: 'pagination' };
     if (id.endsWith('/MediaPreviewDialog')) return { MediaPreviewDialog: 'preview' };
     if (id.endsWith('/ArticleImagePreview')) return { ArticleImagePreview: 'image' };
+    if (id.endsWith('/resources/types')) return resourceTypes;
+    if (id.endsWith('/MediaImportDialog')) return { MediaImportDialog: 'confirmation' };
     if (id.endsWith('/MediaManagementDialog')) return { MediaManagementDialog: 'management' };
     if (id.endsWith('/useMediaLibrary')) return { useMediaLibrary: () => ({ assets: [asset], issues: [], loading: false, refresh() {} }) };
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'frame', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'button' };
@@ -164,14 +169,51 @@ test('a failed adoption preserves the selection, displays its error and permits 
   view.adopt(); await new Promise(resolve => setImmediate(resolve)); assert.equal(view.closes, 1);
 });
 
+test('attachment adoption verifies existing files, copies shared files once and inserts file links through the same undo path', async () => {
+  for (const kind of ['article', 'shared']) {
+    const f = fixture(), inserted = [];
+    f.context.snapshotFor = () => ({ source: f.context.articleRef.current.source, folder: 'article', month: '2026-10', themeValid: true, directory: f.root, documentToken: f.context.documentTokenRef.current, articleId: f.request.articleId });
+    f.context.resourceAssetDirectory = async () => { f.calls.push(['verified']); };
+    f.context.copyResourceFileAs = async (_asset, destination, name, current) => { assert.equal(current(), true); assert.equal(destination.articleId, f.request.articleId); f.calls.push(['copy-file', name]); return { fileName: 'independent.pdf' }; };
+    f.context.setMediaRefreshRevision = () => {};
+    f.context.insertImagesIntoDraft = (_target, names, selection, storage) => { inserted.push({ names, selection, storage }); return { ok: true, message: 'inserted', tone: 'warning' }; };
+    const result = await f.adopt({ kind, root: f.root, articleId: f.request.articleId, fileName: 'guide.pdf', storage: 'file' });
+    assert.equal(result.ok, true); assert.equal(inserted[0].storage, 'file'); assert.equal(inserted[0].selection.start, f.request.selection.start);
+    assert.equal(inserted[0].names[0], kind === 'shared' ? 'independent.pdf' : 'guide.pdf'); assert.equal(f.calls.filter(call => call[0] === 'copy-file').length, kind === 'shared' ? 1 : 0); assert.equal(f.context.mediaOperationRef.current, false);
+  }
+});
+
+test('a library change during attachment copying cannot insert into the newly active manuscript', async () => {
+  const f = fixture();
+  f.context.snapshotFor = () => ({ source: f.context.articleRef.current.source, folder: 'article', month: '2026-10', themeValid: true, directory: f.root, documentToken: f.context.documentTokenRef.current, articleId: f.request.articleId });
+  f.context.resourceAssetDirectory = async () => {};
+  f.context.copyResourceFileAs = async () => { f.context.directoryRef.current = {}; return { fileName: 'copied.pdf' }; };
+  f.context.setMediaRefreshRevision = () => { throw Error('stale view must not refresh'); };
+  const result = await f.adopt({ kind: 'shared', root: f.root, fileName: 'guide.pdf', storage: 'file' });
+  assert.equal(result.ok, false); assert.equal(f.calls.some(call => call[0] === 'insert'), false); assert.equal(f.context.mediaOperationRef.current, false);
+});
+
+test('a new draft with a failed theme snapshot retains its source without copying attachments', async () => {
+  const f = fixture();
+  f.context.snapshotFor = () => ({ source: f.context.articleRef.current.source, folder: null, month: null, themeValid: true, directory: f.root, documentToken: f.context.documentTokenRef.current, articleId: 'draft' });
+  f.context.saveSnapshot = async () => ({ ok: true, current: true, savedSnapshot: { themeValid: false }, result: { article: { themeValid: false } } });
+  f.context.resourceAssetDirectory = async () => { throw Error('must not read attachments'); };
+  const result = await f.adopt({ kind: 'shared', root: f.root, fileName: 'guide.pdf', storage: 'file' });
+  assert.equal(result.ok, false); assert.equal(f.calls.some(call => call[0] === 'insert'), false); assert.equal(f.context.mediaOperationRef.current, false);
+});
+
 test('import success clears stale selection and filters; failure keeps both for retry', async () => {
   const results = [{ ok: false, message: 'permission revoked', tone: 'error' }, { ok: true, message: 'imported', tone: 'success' }];
   const view = picker(async () => ({ ok: true }), async () => results.shift());
   view.find(node => node.type === 'toolbar').props.onQueryChange('previous search'); view.render();
-  await view.find(node => node.type === 'import').props.onImport([new File(['bytes'], 'new.png')]); view.render();
+  view.find(node => node.type === 'import').props.onSelect([new File(['bytes'], 'new.png')]); view.render();
+  const confirmation = view.find(node => node.type === 'confirmation').props;
+  await confirmation.onImport(confirmation.files); confirmation.onClose(); view.render();
   assert.equal(view.find(node => node.type === 'toolbar').props.query, 'previous search');
   assert.ok(view.find(node => node.type === 'detail'));
-  await view.find(node => node.type === 'import').props.onImport([new File(['bytes'], 'new.png')]); view.render();
+  view.find(node => node.type === 'import').props.onSelect([new File(['bytes'], 'new.png')]); view.render();
+  const retry = view.find(node => node.type === 'confirmation').props;
+  await retry.onImport(retry.files); retry.onClose(); view.render();
   assert.equal(view.find(node => node.type === 'toolbar').props.query, '');
   assert.equal(view.find(node => node.type === 'gallery').props.selected, null);
   assert.equal(view.find(node => node.type === 'button' && text(node).includes('采用图片')).props.disabled, true);

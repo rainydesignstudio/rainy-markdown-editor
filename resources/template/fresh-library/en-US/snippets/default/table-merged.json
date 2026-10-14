@@ -1,0 +1,9 @@
+{
+  "id": "table-merged",
+  "name": "Simple table",
+  "trigger": "//table-merged",
+  "description": "A lightweight two-column table. Fill in headings and content; the existing trigger is retained.",
+  "content": "<table>\n  <thead><tr><td class=\"p-2 font-bold\">Item</td><td class=\"p-2 font-bold\">Content</td></tr></thead>\n  <tbody>\n    <tr><td class=\"p-2\">Left cell content▌</td><td class=\"p-2\">Description</td></tr>\n    <tr><td class=\"p-2\">Next item</td><td class=\"p-2\">More content</td></tr>\n  </tbody>\n</table>\n",
+  "icon": "table",
+  "categoryId": "default"
+}

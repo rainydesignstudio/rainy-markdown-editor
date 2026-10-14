@@ -22,6 +22,7 @@ import { CategoryIcon } from './SnippetCategoryDialog';
 
 type Props = {
   value: string;
+  historyKey?: number;
   snippets: ArticleSnippet[];
   categories?: SnippetCategory[];
   openFindRef?: MutableRefObject<(() => void) | null>;
@@ -65,7 +66,7 @@ export function highlightMarkdownSource(value: string): ReactNode[] {
 }
 
 export const SnippetTextarea = forwardRef(function SnippetTextarea(
-  { value, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
+  { value, historyKey, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
   forwardedRef: ForwardedRef<HTMLTextAreaElement>,
 ) {
   const { t } = useUITranslation('editor');
@@ -79,6 +80,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   const tooltipCloseRef = useRef<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const pendingSelectionRef = useRef<(Selection & { value: string }) | null>(null);
+  const pointerFocusRef = useRef<{ top: number; left: number } | null>(null);
   const reportedValueRef = useRef(value);
   const composingRef = useRef(false);
   const [selection, setSelection] = useState<Selection>({ start: 0, end: 0 });
@@ -177,7 +179,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     if (!textarea) return;
     textarea.scrollTop = 0;
     textarea.scrollLeft = 0;
-    if (document.activeElement === textarea && textarea.selectionStart === textarea.selectionEnd) revealCaret();
+    if (!pointerFocusRef.current && document.activeElement === textarea && textarea.selectionStart === textarea.selectionEnd) revealCaret();
   }, [showLineNumbers, sourceFont, value]);
 
   useLayoutEffect(() => {
@@ -208,7 +210,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     setActiveState({ key: null, index: 0 });
     setInsertionIssue(null);
     onChange(next);
-  }, readOnly);
+  }, readOnly, historyKey);
 
   const importTransferFiles = (files: File[], target: HTMLTextAreaElement) => {
     if (!files.length || disabled || readOnly || !onImportFiles) return;
@@ -246,6 +248,11 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
 
   const handleChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
     const nextValue = event.currentTarget.value;
+    pointerFocusRef.current = null;
+    if (findOpen && event.currentTarget.selectionStart === event.currentTarget.selectionEnd
+      && findSnippetMenuMatch(nextValue, event.currentTarget.selectionStart, snippets, composingRef.current)) {
+      setFindOpen(false); setReplaceAllDecision(null);
+    }
     if (pendingSelectionRef.current?.value !== nextValue) pendingSelectionRef.current = null;
     reportedValueRef.current = nextValue;
     rememberSelection(event.currentTarget);
@@ -260,7 +267,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     if (!textarea || disabled || readOnly || composingRef.current) return false;
     const previous = textarea.value;
     const expected = `${previous.slice(0, start)}${insertion.text}${previous.slice(end)}`;
-    textarea.focus();
+    textarea.focus({ preventScroll: true });
     textarea.setSelectionRange(start, end);
     reportedValueRef.current = previous;
     const nextCaret = start + insertion.caretOffset;
@@ -316,7 +323,9 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     if (!openPickerRef) return;
     openPickerRef.current = () => {
       const textarea = textareaRef.current;
-      if (textarea) commitSnippet({ id: 'picker', name: '', description: '', trigger: '//picker', content: '//' }, textarea.selectionStart, textarea.selectionEnd, false);
+      if (textarea && commitSnippet({ id: 'picker', name: '', description: '', trigger: '//picker', content: '//' }, textarea.selectionStart, textarea.selectionEnd, false)) {
+        setFindOpen(false); setReplaceAllDecision(null);
+      }
     };
     return () => { openPickerRef.current = null; };
   }, [openPickerRef, disabled, readOnly, value]);
@@ -331,7 +340,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     setFindOpen(true);
     focusFindRef.current?.();
   };
-  const closeFind = () => { setFindOpen(false); if (!disabled) textareaRef.current?.focus(); };
+  const closeFind = () => { setFindOpen(false); if (!disabled) textareaRef.current?.focus({ preventScroll: true }); };
   const moveFind = (direction: 1 | -1) => {
     if (!findQuery) { openFind(); return; }
     const matches = findOpen ? found : findSourceMatches(value, findQuery, findCase);
@@ -377,6 +386,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   }, [findOpen, found, activeFind]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    pointerFocusRef.current = null;
     sourceHistory.events.onKeyDown(event);
     if (event.defaultPrevented) return;
     pendingSelectionRef.current = null;
@@ -436,6 +446,10 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     composingRef.current = false;
     setIsComposing(false);
     rememberSelection(event.currentTarget);
+    if (findOpen && event.currentTarget.selectionStart === event.currentTarget.selectionEnd
+      && findSnippetMenuMatch(event.currentTarget.value, event.currentTarget.selectionStart, snippets)) {
+      setFindOpen(false); setReplaceAllDecision(null);
+    }
   };
 
   const handleViewportScroll = () => {
@@ -447,7 +461,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     if (event.currentTarget.scrollTop || event.currentTarget.scrollLeft) {
       event.currentTarget.scrollTop = 0;
       event.currentTarget.scrollLeft = 0;
-      revealCaret();
+      if (!pointerFocusRef.current) revealCaret();
     }
   };
 
@@ -493,18 +507,28 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
         disabled={disabled}
         readOnly={readOnly}
         onChange={handleChange}
-        onClick={(event) => { pendingSelectionRef.current = null; rememberSelection(event.currentTarget); if (event.currentTarget.selectionStart === event.currentTarget.selectionEnd) revealCaret(); }}
-        onBlur={() => { sourceHistory.events.onBlur(); pendingSelectionRef.current = null; setDismissedMatch(matchKey); }}
-        onFocus={() => queueMicrotask(() => {
-          const textarea = textareaRef.current;
-          if (textarea && document.activeElement === textarea && textarea.selectionStart === textarea.selectionEnd) revealCaret();
-        })}
+        onPointerDown={() => {
+          const viewport = viewportRef.current;
+          if (viewport) pointerFocusRef.current = { top: viewport.scrollTop, left: viewport.scrollLeft };
+        }}
+        onPointerUp={() => { pointerFocusRef.current = null; }}
+        onPointerCancel={() => { pointerFocusRef.current = null; }}
+        onClick={(event) => { pointerFocusRef.current = null; pendingSelectionRef.current = null; rememberSelection(event.currentTarget); }}
+        onBlur={() => { sourceHistory.events.onBlur(); pointerFocusRef.current = null; pendingSelectionRef.current = null; setDismissedMatch(matchKey); }}
+        onFocus={() => {
+          const pointer = pointerFocusRef.current, viewport = viewportRef.current;
+          if (pointer && viewport) {
+            // Native focus can reveal the old caret before the click places a
+            // new one. Keep the shared viewport at the pointer's actual target.
+            viewport.scrollTop = pointer.top; viewport.scrollLeft = pointer.left;
+          }
+        }}
         name={id ?? "article-source"}
         onKeyUp={(event) => { rememberSelection(event.currentTarget); if (!event.nativeEvent.isComposing && !composingRef.current && /^(Arrow|Home$|End$|PageUp$|PageDown$)/.test(event.key)) revealCaret(); }}
         onSelect={(event) => {
           sourceHistory.events.onSelect(event);
           const changed = rememberSelection(event.currentTarget);
-          if (changed && !composingRef.current && event.currentTarget.selectionStart === event.currentTarget.selectionEnd) revealCaret();
+          if (changed && !pointerFocusRef.current && !composingRef.current && event.currentTarget.selectionStart === event.currentTarget.selectionEnd) revealCaret();
         }}
         onScroll={handleTextareaScroll}
         onKeyDown={handleKeyDown}

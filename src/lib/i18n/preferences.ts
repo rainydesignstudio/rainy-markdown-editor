@@ -11,7 +11,7 @@ export function resolveUILocale(saved: string | null, languages: readonly string
     if (/^zh(?:-|$)/i.test(language)) return 'zh-CN';
     if (/^en(?:-|$)/i.test(language)) return 'en-US';
   }
-  return 'zh-CN';
+  return 'en-US';
 }
 
 type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem'>;

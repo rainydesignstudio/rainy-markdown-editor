@@ -5,6 +5,7 @@ import selectorParser from 'postcss-selector-parser';
 import { getFormatSnapshot, assertFormatReady, assertCurrentFormat, type FormatSnapshot } from './article-format/runtime';
 import { canonicalFormatJson } from './article-format/config';
 import { definedCssClasses, normalizeLibraryPath, type StylesheetEnvironment } from './article-format/styles';
+import { MERMAID_IMAGE_CLASSES } from './article-format/mermaid';
 import { extractClassCandidates, extractMarkdownClassCandidates } from './render';
 import { BASIC_THEME, themeToCss } from './themes';
 import { validateThemeConfig } from './themeValidation';
@@ -78,6 +79,7 @@ function generatedClasses(snapshot: FormatSnapshot): string[] {
     ...extractClassCandidates((formatter.document?.beforeHtml ?? '') + (formatter.document?.afterHtml ?? '') + (formatter.codeLayout?.copyHtml ?? '')),
     ...(formatter.codeLayout?.wrapperClasses ?? []), ...(formatter.codeLayout?.contentClasses ?? []), ...(formatter.codeLayout?.copyClasses ?? []),
     ...(formatter.nodes?.image.classes ?? []), ...(formatter.nodes?.link.classes ?? []),
+    ...(formatter.mermaid ? MERMAID_IMAGE_CLASSES.split(' ') : []),
     ...(snapshot.environment?.candidates ?? []),
   ];
 }

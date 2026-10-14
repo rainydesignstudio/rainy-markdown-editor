@@ -3,6 +3,10 @@ import { articleImageReferences, articleLocalImageReferences, copyArticleImageAs
 import { getArticleMediaDirectory, getStoredArticleDirectory } from './fileSystem';
 import { listArticleHistory } from './articleHistory';
 import type { ArticleFormatIssue } from './articleFormat';
+import { getResourceDirectory, copyResourceFileAs, deleteResourceFile } from './resources/storage';
+import { resourceReferences } from './resources/references';
+import { parseArticle } from './frontMatter';
+import { queryDirectoryReadWritePermission } from './directoryBookmark';
 
 export type MediaDestination = { kind: 'shared' } | { kind: 'article'; articleId: string; month: string; folder: string; title: string };
 export type MediaEditRequest = { type: 'rename' | 'replace' | 'describe' | 'delete' | 'transfer'; assets: LibraryMediaAsset[] };
@@ -15,9 +19,11 @@ const missing = (error: unknown) => Boolean(error && typeof error === 'object' &
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 
 function mediaPath(asset: LibraryMediaAsset): string {
-  return asset.kind === 'shared' ? `/shared/image/${asset.fileName}` : `/articles/${asset.month}/${asset.folder}/media/image/${asset.fileName}`;
+  const storage = asset.storage ?? 'image';
+  return asset.kind === 'shared' ? `/shared/${storage}/${asset.fileName}` : `/articles/${asset.month}/${asset.folder}/media/${storage}/${asset.fileName}`;
 }
 function referencePath(url: string, month: string | null, folder: string | null): string | null {
+  url = url.replace(/^[\u0000-\u0020]+|[\u0000-\u0020]+$/g, '');
   if (/^[a-z][a-z\d+.-]*:|^\/\/|[\\\u0000-\u001f]/i.test(url)) return null;
   try {
     const base = month && folder ? `/articles/${encodeURIComponent(month)}/${encodeURIComponent(folder)}/` : '/';
@@ -27,7 +33,9 @@ function referencePath(url: string, month: string | null, folder: string | null)
   } catch { return null; }
 }
 function countReferences(document: MediaReferenceDocument, targets: ReadonlySet<string>): number {
-  return articleImageReferences(document.source).reduce((count, reference) => count + Number(targets.has(referencePath(reference.url, document.month, document.folder) ?? '')), 0);
+  const filePath = (path: string) => /\/(?:media|shared)\/file\/[^/]+$/.test(path);
+  const images = articleImageReferences(document.source).reduce((count, reference) => { const path = referencePath(reference.url, document.month, document.folder) ?? ''; return count + Number(!filePath(path) && targets.has(path)); }, 0);
+  return images + resourceReferences(parseArticle(document.source).body).reduce((count, reference) => { const path = referencePath(reference.url, document.month, document.folder) ?? ''; return count + Number(filePath(path) && targets.has(path)) * (reference.uses ?? 1); }, 0);
 }
 /** Current draft only: no directory or file reads. Separate article copies have separate paths. */
 export function countCurrentMediaReferences(assets: LibraryMediaAsset[], document: MediaReferenceDocument | null): number | null {
@@ -76,47 +84,63 @@ export async function scanWorkspaceMediaReferences(root: FileSystemDirectoryHand
 }
 
 export async function mediaDirectory(asset: LibraryMediaAsset): Promise<FileSystemDirectoryHandle> {
-  const directory = asset.kind === 'shared' ? await getSharedImageDirectory(asset.root) : await getArticleMediaDirectory(asset.root, asset.month, asset.folder, false);
+  const directory = asset.storage === 'file' ? await getResourceDirectory(asset.root, asset.kind === 'shared' ? { kind: 'shared' } : { kind: 'article', articleId: asset.articleId, month: asset.month, folder: asset.folder, title: asset.articleTitle }, 'file', false)
+    : asset.kind === 'shared' ? await getSharedImageDirectory(asset.root) : await getArticleMediaDirectory(asset.root, asset.month, asset.folder, false);
   if (!directory) throw new ProductError("mediaManagement.theAssetDirectoryDoesNotExist");
   return directory;
 }
-export async function readMediaMetadata(directory: FileSystemDirectoryHandle): Promise<Metadata> {
-  let text: string;
-  try { text = await (await (await directory.getFileHandle('index.json')).getFile()).text(); }
-  catch (error) { if (missing(error)) return { version: 1, images: {} }; throw error; }
-  const data = JSON.parse(text);
-  if (!data || data.version !== 1 || !data.images || typeof data.images !== 'object' || Array.isArray(data.images) || Object.values(data.images).some((value) => !value || typeof value !== 'object' || Array.isArray(value) || ('description' in value && typeof value.description !== 'string'))) throw new ProductError("mediaManagement.theAssetIndexJsonIsInvalidTheOriginalFileIsRetained");
-  return data;
+type MediaMetadataGuard = (handle: FileSystemHandle) => Promise<void>;
+export function resourceMetadataGuard(root: FileSystemDirectoryHandle, destination: MediaDestination, current: () => boolean): MediaMetadataGuard {
+  const base = destination.kind === 'shared' ? ['shared', 'file'] : ['articles', destination.month, destination.folder, 'media', 'file'];
+  return async handle => {
+    if (!current()) throw new ProductError('resources.changed');
+    if (await queryDirectoryReadWritePermission(root) !== 'granted') throw new ProductError('resources.libraryRequired');
+    const path = await root.resolve(handle), expected = handle.kind === 'directory' ? base : [...base, 'index.json'];
+    if (!path || path.join('/') !== expected.join('/')) throw new ProductError('resources.unsafeTarget');
+    if (!current()) throw new ProductError('resources.changed');
+  };
 }
-export async function saveMediaDescription(directory: FileSystemDirectoryHandle, fileName: string, description: string, isCurrent: () => boolean = () => true): Promise<void> {
-  const metadata = await readMediaMetadata(directory);
+export async function readMediaMetadata(directory: FileSystemDirectoryHandle, guard?: MediaMetadataGuard): Promise<Metadata> {
+  let text: string;
+  try { await guard?.(directory); const handle = await directory.getFileHandle('index.json'); await guard?.(handle); const file = await handle.getFile(); if (directory.name === 'file' && file.size > 8 * 1024 * 1024) throw new ProductError('mediaManagement.theAssetIndexJsonIsInvalidTheOriginalFileIsRetained'); text = await file.text(); }
+  catch (error) { if (missing(error)) return { version: 1, images: {} }; throw error; }
+  const data = JSON.parse(text), entries = directory.name === 'file' ? data?.files : data?.images;
+  if (!data || data.version !== 1 || !entries || typeof entries !== 'object' || Array.isArray(entries) || Object.values(entries).some((value) => !value || typeof value !== 'object' || Array.isArray(value) || ('description' in value && typeof value.description !== 'string'))) throw new ProductError("mediaManagement.theAssetIndexJsonIsInvalidTheOriginalFileIsRetained");
+  return { ...data, images: entries };
+}
+function mediaMetadataText(directory: FileSystemDirectoryHandle, metadata: Metadata): string {
+  if (directory.name !== 'file') return JSON.stringify(metadata, null, 2) + '\n';
+  const { images, ...rest } = metadata; return JSON.stringify({ ...rest, files: images }, null, 2) + '\n';
+}
+export async function saveMediaDescription(directory: FileSystemDirectoryHandle, fileName: string, description: string, isCurrent: () => boolean = () => true, guard?: MediaMetadataGuard): Promise<void> {
+  const metadata = await readMediaMetadata(directory, guard);
   if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionWasNotSaved");
   metadata.images = { ...metadata.images, [fileName]: { ...(Object.hasOwn(metadata.images, fileName) ? metadata.images[fileName] : {}), description } };
   let existed = true;
   try { await directory.getFileHandle('index.json'); } catch (error) { if (missing(error)) existed = false; else throw error; }
-  const handle = await directory.getFileHandle('index.json', { create: true });
+  await guard?.(directory); const handle = await directory.getFileHandle('index.json', { create: true }); await guard?.(handle);
   let writer: FileSystemWritableFileStream | null = null;
   try {
     writer = await handle.createWritable();
     if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionWasNotSaved");
-    await writer.write(JSON.stringify(metadata, null, 2) + '\n');
+    await writer.write(mediaMetadataText(directory, metadata));
     if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionWasNotSaved");
-    await writer.close();
-  } catch (error) { try { await writer?.abort(); } catch {} if (!existed) try { await directory.removeEntry('index.json'); } catch {} throw error; }
+    await guard?.(handle); await writer.close();
+  } catch (error) { try { await writer?.abort(); } catch {} if (!existed) try { if (!isCurrent()) throw error; await guard?.(directory); await guard?.(handle); await directory.removeEntry('index.json'); } catch {} throw error; }
 }
-export async function removeMediaDescription(directory: FileSystemDirectoryHandle, fileName: string, isCurrent: () => boolean): Promise<void> {
-  const metadata = await readMediaMetadata(directory);
+export async function removeMediaDescription(directory: FileSystemDirectoryHandle, fileName: string, isCurrent: () => boolean, guard?: MediaMetadataGuard): Promise<void> {
+  const metadata = await readMediaMetadata(directory, guard);
   if (!Object.hasOwn(metadata.images, fileName)) return;
   delete metadata.images[fileName];
   if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionIndexWasNotCleaned");
-  const writer = await (await directory.getFileHandle('index.json')).createWritable();
-  try { await writer.write(JSON.stringify(metadata, null, 2) + '\n'); if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionIndexWasNotCleaned"); await writer.close(); }
+  const handle = await directory.getFileHandle('index.json'); await guard?.(handle); const writer = await handle.createWritable();
+  try { await writer.write(mediaMetadataText(directory, metadata)); if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionIndexWasNotCleaned"); await guard?.(handle); await writer.close(); }
   catch (error) { try { await writer.abort(); } catch {} throw error; }
 }
 export async function inspectMediaUsage(asset: LibraryMediaAsset, currentSource?: string): Promise<MediaUsage> {
-  if (asset.kind === 'shared') return { body: 0, history: 0, issues: [] };
+  if (asset.kind === 'shared') return { body: asset.storage === 'file' && currentSource ? countReferences({ source: currentSource, month: null, folder: null }, new Set([mediaPath(asset)])) : 0, history: 0, issues: [] };
   const source = await (await (await (await getStoredArticleDirectory(asset.root, asset.month, asset.folder)).getFileHandle('article.md')).getFile()).text();
-  const count = (text: string) => articleLocalImageReferences(text).filter(reference => reference.fileName === asset.fileName).length;
+  const count = (text: string) => asset.storage === 'file' ? countReferences({ source: text, month: asset.month, folder: asset.folder }, new Set([mediaPath(asset)])) : articleLocalImageReferences(text).filter(reference => reference.fileName === asset.fileName).length;
   const history = await listArticleHistory(asset.root, asset.month, asset.folder);
   return { body: Math.max(count(source), currentSource === undefined ? 0 : count(currentSource)), history: history.snapshots.reduce((sum, snapshot) => sum + count(snapshot.source), 0), issues: history.issues.map(issue => issue.message) };
 }
@@ -124,38 +148,48 @@ export async function transferMedia(asset: LibraryMediaAsset, destination: Media
   const targetId = destination.kind === 'shared' ? 'shared' : destination.articleId;
   const originId = asset.kind === 'shared' ? 'shared' : asset.articleId;
   if (originId === targetId) throw new ProductError("mediaManagement.destinationAndSourceAreTheSameNothingWasMoved");
+  if (asset.storage === 'file' && asset.kind === 'shared') { const scan = await scanWorkspaceMediaReferences(asset.root, [asset], null, new AbortController().signal, isCurrent); usage = { ...usage, history: usage.history + scan.workspace, issues: [...usage.issues, ...scan.issues] }; }
   if (usage.issues.length) throw new ProductError("mediaManagement.someHistoryCouldNotBeCheckedTheSourceFileIsRetainedRepair");
   const original = await asset.handle.getFile();
   const sourceDirectory = await mediaDirectory(asset);
-  await readMediaMetadata(sourceDirectory);
+  const sourceDestination: MediaDestination = asset.kind === 'shared' ? { kind: 'shared' } : { kind: 'article', articleId: asset.articleId, month: asset.month, folder: asset.folder, title: asset.articleTitle };
+  const sourceGuard = asset.storage === 'file' ? resourceMetadataGuard(asset.root, sourceDestination, isCurrent) : undefined;
+  const targetGuard = asset.storage === 'file' ? resourceMetadataGuard(asset.root, destination, isCurrent) : undefined;
+  await readMediaMetadata(sourceDirectory, sourceGuard);
   if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedNothingWasMoved");
-  const target = destination.kind === 'shared' ? await getSharedImageDirectory(asset.root, true) : await getArticleMediaDirectory(asset.root, destination.month, destination.folder, true);
-  if (target) await readMediaMetadata(target);
+  const target = asset.storage === 'file' ? await getResourceDirectory(asset.root, destination, 'file', true, isCurrent) : destination.kind === 'shared' ? await getSharedImageDirectory(asset.root, true) : await getArticleMediaDirectory(asset.root, destination.month, destination.folder, true);
+  if (target) await readMediaMetadata(target, targetGuard);
   if (!target || !isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedNothingWasMoved");
-  const copied = await importArticleImage(target, new File([original], asset.fileName, { type: original.type }));
+  const copied = asset.storage === 'file' ? await copyResourceFileAs(asset, destination, asset.fileName, isCurrent) : await importArticleImage(target, new File([original], asset.fileName, { type: original.type }));
   let removed = false;
   try {
     if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
-    if (asset.description) await saveMediaDescription(target, copied.fileName, asset.description, isCurrent);
+    if (asset.description) await saveMediaDescription(target, copied.fileName, asset.description, isCurrent, targetGuard);
     if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
     if (usage.body || usage.history) return { ok: true, tone: 'warning', ...productMessage("mediaManagement.copiedTheSourceIsReferencedByTheBodyOrHistoryAndIs", { "copiedFileName": copied.fileName }) };
-    await sourceDirectory.removeEntry(asset.fileName); removed = true;
-    await removeMediaDescription(sourceDirectory, asset.fileName, isCurrent);
+    if (asset.storage === 'file') await deleteResourceFile(asset, isCurrent); else await sourceDirectory.removeEntry(asset.fileName); removed = true;
+    await removeMediaDescription(sourceDirectory, asset.fileName, isCurrent, sourceGuard);
     return { ok: true, tone: 'success', ...productMessage("mediaManagement.moved", { "copiedFileName": copied.fileName }) };
   } catch (error) { return { ok: false, tone: 'warning', ...productMessage("mediaManagement.destinationWasWritten", { "copiedFileName": copied.fileName, "value": message(error), "value2": (removed ? productReference("mediaManagement.theSourceFileWasDeletedButTheDescriptionIndexWasNotCleaned") : productReference("mediaManagement.theSourceFileIsRetained")) }) }; }
 }
-export async function renameSharedMedia(asset: LibraryMediaAsset, name: string, isCurrent: () => boolean, replacement?: File): Promise<MediaActionOutcome> {
+export async function renameSharedMedia(asset: LibraryMediaAsset, name: string, isCurrent: () => boolean, replacement?: File, currentDocument: MediaReferenceDocument | null = null): Promise<MediaActionOutcome> {
   const directory = await mediaDirectory(asset);
-  await readMediaMetadata(directory);
+  const guard = asset.storage === 'file' ? resourceMetadataGuard(asset.root, { kind: 'shared' }, isCurrent) : undefined;
+  await readMediaMetadata(directory, guard);
   if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedNothingWasWritten");
-  const created = replacement ? await importArticleImage(directory, new File([replacement], `${asset.fileName.replace(/\.[^.]+$/, '')}.${replacement.name.split('.').at(-1) ?? 'png'}`)) : await copyArticleImageAs(directory, asset.handle, name);
+  const created = asset.storage === 'file' ? await copyResourceFileAs(asset, { kind: 'shared' }, name, isCurrent, replacement) : replacement ? await importArticleImage(directory, new File([replacement], `${asset.fileName.replace(/\.[^.]+$/, '')}.${replacement.name.split('.').at(-1) ?? 'png'}`)) : await copyArticleImageAs(directory, asset.handle, name);
   let removed = false;
   try {
     if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
-    if (asset.description) await saveMediaDescription(directory, created.fileName, asset.description, isCurrent);
+    if (asset.description) await saveMediaDescription(directory, created.fileName, asset.description, isCurrent, guard);
     if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
-    await directory.removeEntry(asset.fileName); removed = true;
-    await removeMediaDescription(directory, asset.fileName, isCurrent);
+    if (asset.storage === 'file') {
+      const scan = await scanWorkspaceMediaReferences(asset.root, [asset], currentDocument, new AbortController().signal, isCurrent);
+      if (scan.workspace || scan.current || scan.issues.length) return { ok: true, tone: 'warning', ...productMessage('resources.sharedOriginalRetained', { name: created.fileName }) };
+      await deleteResourceFile(asset, isCurrent);
+    } else await directory.removeEntry(asset.fileName);
+    removed = true;
+    await removeMediaDescription(directory, asset.fileName, isCurrent, guard);
     return { ok: true, tone: 'success', ...productMessage("mediaManagement.imageOperationCompletedTheIndependentArticleCopyIsUnchanged", { "value": (replacement ? productReference("mediaManagement.replacedWith") : productReference("mediaManagement.renamedTo")), "createdFileName": created.fileName }) };
   } catch (error) { return { ok: false, tone: 'warning', ...productMessage("mediaManagement.newFileWasSaved", { "createdFileName": created.fileName, "value": message(error), "value2": (removed ? productReference("mediaManagement.theOriginalFileWasDeletedButTheDescriptionIndexWasNotCleaned") : productReference("mediaManagement.theOriginalFileIsRetained")) }) }; }
 }

@@ -68,10 +68,6 @@
     @apply min-w-90 flex-1;
   }
 
-  .editor-grid[data-dragging="true"] .editor-preview-pane iframe {
-    @apply pointer-events-none;
-  }
-
   .editor-grid[data-wide="true"] .editor-source-pane[data-mobile-hidden="true"],
   .editor-grid[data-wide="true"] .editor-preview-pane[data-mobile-hidden="true"] {
     @apply flex;

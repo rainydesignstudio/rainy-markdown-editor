@@ -1,0 +1,9 @@
+{
+  "id": "zixu-blockquote",
+  "name": "Violet Notes · Quotation",
+  "trigger": "//zixu-blockquote",
+  "description": "A quotation with an attribution.",
+  "content": "<blockquote>\n  <p class=\"font-bold text-xl text-article-accent\">Main content<p>\n  <span class=\"text-article-muted\">- Supporting text▌</span>\n</blockquote>",
+  "icon": "snippet",
+  "categoryId": "zixu"
+}

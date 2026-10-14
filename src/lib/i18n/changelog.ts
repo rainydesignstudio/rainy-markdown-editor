@@ -1,4 +1,4 @@
-import changelog from '../../../resources/changelog.json' with { type: 'json' };
+import changelog from '../../../resources/changelog/public.json' with { type: 'json' };
 
 export type Release = (typeof changelog)[number];
 export const releaseTextKey = (version: string) => 'v' + version.replaceAll('.', '_');

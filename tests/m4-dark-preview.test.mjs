@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { articleDarkPreviewDocument, cloneArticleForDarkPreview, createArticleColorNormalizer, observeArticlePreview } from '../src/lib/articleDarkPreview.ts';
+import { articleDarkPreviewDocument, articlePreviewMarkup, cloneArticleForDarkPreview, createArticleColorNormalizer, observeArticlePreview } from '../src/lib/articleDarkPreview.ts';
+
+test('preview snapshots discard private inspection state but retain authored transition utilities', () => {
+  const root = { outerHTML: '<article class="transition-opacity duration-300 data-[theme-inspection-dim=true]:opacity-50" data-theme-inspection-dim="true"><p>Article</p></article>' };
+  const result = articlePreviewMarkup(root);
+  assert.match(result, /class="transition-opacity duration-300"/);
+  assert.doesNotMatch(result, /theme-inspection/);
+  assert.equal(root.outerHTML.includes('data-theme-inspection-dim="true"'), true);
+});
 
 test('late Markdown hydration and subsequent DOM changes refresh dark previews, and stale observers stop on theme switches', t => {
   const previous = globalThis.MutationObserver, observers = [];
@@ -108,4 +116,56 @@ test('the clipboard normalizer resolves colour syntax without mirroring anything
   assert.equal(normalizePaint('rgb(35, 35, 35)'), 'rgb(35, 35, 35)');
   assert.equal(normalizePaint('linear-gradient(oklch(0.2 0 0), rgb(124, 58, 237))'), 'linear-gradient(rgba(35, 35, 35, 1), rgb(124, 58, 237))');
   assert.equal(normalizePaint('url(/article-sample.png)'), 'url(/article-sample.png)', 'asset URLs are never treated as colours');
+});
+
+
+test('manual dark bootstrap applies overrides before computation without invoking the SDK or inlining light paint', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { default: vm } = await import('node:vm');
+  const { DEFAULT_FORMAT_BUNDLE, compileFormatBundle } = await import('../src/lib/article-format/config.ts');
+  const raw = structuredClone(DEFAULT_FORMAT_BUNDLE);
+  raw.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters = { mode: 'tokens' };
+  const bundle = compileFormatBundle(raw), attributes = {}, classes = new Set(); let conversions = 0;
+  const root = { style: { color: '' }, setAttribute: (key, value) => attributes[key] = value };
+  const doc = { head: { querySelector: () => ({ textContent: JSON.stringify({ kind: 'preview', dark: true, bundle, algorithms: {} }) }) },
+    querySelector: () => root, documentElement: { classList: { add: name => classes.add(name) }, dataset: {} }, body: { dataset: {}, setAttribute() {} } };
+  const window = { ArticleAlgorithmHost: { configure() {} }, ArticleFormatEngine: { transform: async () => conversions++ } };
+  vm.runInNewContext(await readFile(new URL('../public/format/article-format-bootstrap.js', import.meta.url), 'utf8'), { document: doc, window });
+  await Promise.resolve();
+  assert.equal(conversions, 0);
+  assert.equal(attributes['data-article-dark-tokens'], 'true');
+  assert.equal(classes.has('dark'), true);
+  assert.equal(root.style.color, '', 'no computed light color blocks manual dark variables');
+  assert.equal(doc.body.dataset.previewReady, 'true');
+});
+
+test('dark rendition cache shares one successful snapshot, isolates library generations, and never stores failures or cancelled work', async t => {
+  const { nativeDarkRendition, clearDarkRenditionCache } = await import('../src/lib/article-format/nativeDark.ts');
+  const { getFormatSnapshot, activateFormatBundle } = await import('../src/lib/article-format/runtime.ts');
+  const { DEFAULT_FORMAT_BUNDLE } = await import('../src/lib/article-format/config.ts');
+  const saved = { document: globalThis.document, window: globalThis.window, MutationObserver: globalThis.MutationObserver };
+  let count = 0, failure = false;
+  const root = { clientWidth: 400, outerHTML: '<article data-article-content-root><p>Light</p></article>' };
+  globalThis.window = { setTimeout, clearTimeout };
+  globalThis.MutationObserver = class { observe() {} disconnect() {} };
+  globalThis.document = {
+    createDocumentFragment: () => ({ querySelector() {} }),
+    createElement: () => ({ style: {}, setAttribute() {}, remove() {}, contentDocument: { body: { dataset: failure ? { previewError: 'failed' } : { previewReady: 'true' } }, querySelector: () => ({ ...root, querySelectorAll: () => [] }), head: { querySelectorAll: () => [{ textContent: '/* converted */' }] } } }),
+    body: { append: frame => { count++; frame.onload(); } },
+  };
+  t.after(() => { clearDarkRenditionCache(); for (const [key, value] of Object.entries(saved)) if (value === undefined) delete globalThis[key]; else globalThis[key] = value; activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), null, 'built-in'); });
+  clearDarkRenditionCache();
+  const signal = new AbortController().signal;
+  const first = await nativeDarkRendition(root, 'a{}', getFormatSnapshot(), signal);
+  assert.equal(await nativeDarkRendition(root, 'a{}', getFormatSnapshot(), signal), first);
+  assert.equal(count, 1);
+  activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), 'another-library');
+  await nativeDarkRendition(root, 'a{}', getFormatSnapshot(), signal);
+  assert.equal(count, 2, 'identical article bytes in another library do not share a stale result');
+  const cancelled = new AbortController(); cancelled.abort();
+  await assert.rejects(nativeDarkRendition(root, 'new{}', getFormatSnapshot(), cancelled.signal));
+  assert.equal(count, 2);
+  failure = true;
+  for (let i = 0; i < 2; i++) await assert.rejects(nativeDarkRendition(root, 'bad{}', getFormatSnapshot(), signal), /failed/);
+  assert.equal(count, 4, 'failure is not cached as a usable rendition');
 });

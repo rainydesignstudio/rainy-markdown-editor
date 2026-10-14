@@ -55,8 +55,9 @@ test('all bilingual documentation links and anchors resolve without maintainer p
 
 test('root entry, paired language navigation and stable anchors match the public document layout', async () => {
   const entry = documents.find(doc => doc.file === 'README.md').source;
+  assert.ok(entry.includes('docs/locale/en-US/README.md'), 'Chinese root README retains its English switch');
   for (const name of names) {
-    for (const locale of locales) assert.ok(entry.includes(`docs/locale/${locale}/${name}`));
+    assert.ok(entry.includes(`docs/locale/zh-CN/${name}`), 'Chinese root README lists Chinese documentation');
     const zh = documents.find(doc => doc.file === `docs/locale/zh-CN/${name}`).source;
     const en = documents.find(doc => doc.file === `docs/locale/en-US/${name}`).source;
     assert.ok(zh.includes(`../en-US/${name}`)); assert.ok(en.includes(`../zh-CN/${name}`));
@@ -129,7 +130,7 @@ for (const locale of locales) test(`${locale}: format MVP objects compile throug
   assert.equal(result.formatter.markdown.softBreaks, 'line-break');
   assert.ok(result.formatter.output.dropCssProperties.includes('text-transform'));
   assert.equal(result.formatter.stylesheets.entry, 'styles/globals.css');
-  assert.equal(result.formatter.document.viewport.contentWidth, 996);
+  assert.equal(result.formatter.document.viewport, null);
   assert.equal(result.validator.rules.at(-1).id, 'custom-alignment');
 });
 

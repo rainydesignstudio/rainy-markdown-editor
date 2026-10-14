@@ -6,9 +6,12 @@ const nextConfig = {
   agentRules: false,
   output: 'export',
   webpack(config) {
+    // The browser decoder uses document at module load. Web workers need the
+    // same package's table implementation; both resolve named entities equally.
+    config.resolve.alias['decode-named-character-reference$'] = fileURLToPath(import.meta.resolve('decode-named-character-reference'));
     config.module.rules.push({
       test: /\.md$/,
-      include: fileURLToPath(new URL('./resources/template/fresh-library/templates/', import.meta.url)),
+      include: ['en-US', 'zh-CN'].flatMap(locale => ['templates/', 'themes/preview.md'].map(relative => fileURLToPath(new URL(`./resources/template/fresh-library/${locale}/${relative}`, import.meta.url)))),
       type: 'asset/source',
     });
     return config;

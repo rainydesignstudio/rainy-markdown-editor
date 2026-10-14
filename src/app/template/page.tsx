@@ -1,12 +1,14 @@
 'use client';
 
+import { useUILocale } from '../../components/global/UILocaleProvider';
 import { ContentLibrary } from '../../components/content/ContentLibrary';
 import { useEditorControllerContext } from '../../components/global/AppProviders';
-import { resolveDefaultArticleTheme, THEMES } from '../../lib/themes';
+import { resolveDefaultArticleTheme, getBuiltinArticleThemes } from '../../lib/themes';
 
 export default function TemplateRoute() {
   const controller = useEditorControllerContext();
-  const themes = controller.directory && controller.themeLibrary.length ? controller.themeLibrary : THEMES;
+  const { locale } = useUILocale();
+  const themes = controller.directory && controller.themeLibrary.length ? controller.themeLibrary : getBuiltinArticleThemes(locale);
   const defaultTheme = resolveDefaultArticleTheme(themes, controller.articleSettings.defaultArticleThemeId);
   return (
     <ContentLibrary

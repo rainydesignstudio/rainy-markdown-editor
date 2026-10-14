@@ -5,7 +5,7 @@
   },
   "loading": {
     "label": "正在载入资料库",
-    "message": "正在载入资料库与外观…"
+    "message": "首次打开需加载应用和字体，请稍候……"
   },
   "language": {
     "title": "界面语言",
@@ -41,6 +41,9 @@
   "updateAvailable": "可更新",
   "dates": {
     "invalid": "时间无效"
+  },
+  "feedback": {
+    "dismiss": "关闭提示"
   },
   "eyebrows": {
     "forkManuscript": "FORK MANUSCRIPT",

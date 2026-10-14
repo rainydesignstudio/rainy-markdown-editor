@@ -10,9 +10,9 @@ const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKi
 function dialog() {
   let cursor = 0, tree;
   const cells = [];
-  const calls = { save: 0, cancel: 0, discard: 0 };
+  const calls = { save: 0, cancel: 0, resume: 0, discard: 0 };
   let resolveSave;
-  const props = { entries: [{ label: '测试外观', detail: '雾灰配色' }], description: '外观尚未保存。', onCancel: () => calls.cancel++, onDiscard: () => calls.discard++, onSave: () => { calls.save++; return new Promise(resolve => { resolveSave = resolve; }); } };
+  const props = { entries: [{ label: '测试外观', detail: '雾灰配色' }], description: '外观尚未保存。', onCancel: () => calls.cancel++, onContinue: () => calls.resume++, onDiscard: () => calls.discard++, onSave: () => { calls.save++; return new Promise(resolve => { resolveSave = resolve; }); } };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
@@ -46,7 +46,11 @@ test('unsaved dialog traps dismissal during save, blocks duplicate writes, and r
   assert.match(d.find(node => node.props.role === 'alert').props.children, /修改已保留/);
   assert.equal(d.frame().props.dismissible, true);
   d.button('继续编辑').props.onClick();
+  assert.equal(d.calls.resume, 1);
+  assert.equal(d.calls.cancel, 0);
+  d.frame().props.onClose();
   assert.equal(d.calls.cancel, 1);
+  assert.equal(d.calls.resume, 1);
 });
 
 test('disabled saving never writes and discard remains an explicit independent action', () => {

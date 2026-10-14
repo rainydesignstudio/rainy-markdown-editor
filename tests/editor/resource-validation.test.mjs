@@ -68,7 +68,7 @@ test('valid images remain eligible for checks while resource failures map to err
 });
 test('a known missing local file returns before any browser measurement or timeout can start', async () => {
   let reads = 0;
-  const root = { getDirectoryHandle: async () => { reads++; throw new DOMException('missing', 'NotFoundError'); } };
+  const root = { queryPermission: async () => 'granted', resolve: async () => [], getDirectoryHandle: async () => { reads++; throw new DOMException('missing', 'NotFoundError'); } };
   const report = await inspectArticleFormatReport(createArticleSource('test') + '\n![lost](media/image/missing.png)', BASIC_THEME, null,
     { root, month: '2026-10', folder: 'test' });
   assert.ok(reads > 0); assert.equal(report.complete, false);

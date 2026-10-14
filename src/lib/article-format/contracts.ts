@@ -72,6 +72,18 @@ const algorithmOptions: Guard = (value, path) => {
   if (JSON.stringify(value).length > 65536) fail(path, productText('algorithms.invalidOptions'));
 };
 
+const darkMode: Guard = (value, path) => {
+  const parameters = record(value, path);
+  if (parameters.mode === 'tokens') {
+    shape({ mode: choice('tokens') })(value, path);
+    return;
+  }
+  shape({ transform: (id, at) => {
+    text(id, at);
+    if (!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(String(id)) || parameters.mode === 'algorithm' && id === 'preserve') fail(at, productText('algorithms.invalidComponentId'));
+  }, options: algorithmOptions }, { mode: choice('algorithm') })(value, path);
+};
+
 export const VALIDATOR_CAPABILITIES: Record<string, { stages: string[]; parameters: Guard }> = {
   'style.present': { stages: ['authoring', 'rendered'], parameters: shape({ property }, { selector }) },
   'style.values': { stages: ['authoring', 'rendered'], parameters: shape({ property, values: strings }, { selector }) },
@@ -95,10 +107,12 @@ export const FORMATTER_CAPABILITIES: Record<string, { phase: string; multiple?: 
   'markdown.blank-lines': { phase: 'markdown', parameters: shape({ preserve: bool, betweenBlocks: number(1, 100, true), atEdges: number(1, 100, true) }) },
   'markdown.code-highlight': { phase: 'markdown', parameters: shape({ styles: array(shape({ selectors: array(selector, 1), declarations: mapping(cssValue, property) })) }, { engine: choice('highlight', 'prism'), themeDefaults: bool, prismStyles: mapping(mapping(cssValue, property), highlightStyleKey) }) },
   'markdown.heading-ids': { phase: 'markdown', parameters: shape({ mode: choice('auto', 'explicit') }) },
+  'markdown.math': { phase: 'markdown', parameters: shape({ singleDollar: bool, maxLength: number(1, 16384, true), maxExpressions: number(1, 256, true) }) },
+  'markdown.mermaid': { phase: 'markdown', parameters: shape({ theme: choice('default', 'neutral', 'dark'), maxLength: number(1, 32768, true), maxDiagrams: number(1, 32, true) }) },
   'markdown.code-layout': { phase: 'markdown', parameters: shape({ wrapperClasses: strings, preTag: choice('div', 'pre'), contentClasses: strings, copyClasses: strings, copyHtml: boundedString(65536), copyLabel: text }) },
   'markdown.code-whitespace': { phase: 'markdown', parameters: shape({ tabSize: number(1, 16, true) }) },
   'preview.surface': { phase: 'preview', parameters: shape({ lightBackground: cssValue, darkBackground: cssValue, fontFamily: cssValue, color: cssValue, stripThemeBackground: bool }) },
-  'preview.dark-mode': { phase: 'preview', parameters: shape({ transform: (value, path) => { text(value, path); if (!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(String(value))) fail(path, productText('algorithms.invalidComponentId')); }, options: algorithmOptions }) },
+  'preview.dark-mode': { phase: 'preview', parameters: darkMode },
   'css.drop-properties': { phase: 'css', multiple: true, parameters: shape({ properties: array(property) }) },
   'css.utility-aliases': { phase: 'css', parameters: shape({ aliases: mapping(property, property) }) },
   'css.stylesheets': { phase: 'css', parameters: shape({ entry: libraryPath, publicRoot: libraryPath }, { allowUnknownClasses: bool }) },
@@ -111,8 +125,8 @@ export const FORMATTER_CAPABILITIES: Record<string, { phase: string; multiple?: 
     image: shape({ width: number(1, 10000, true), height: number(1, 10000, true), classes: strings, style: mapping(cssValue, property), alt: boundedString(1000) }),
     link: shape({ classes: strings, rootBase: httpBase, externalTarget: choice('_blank', '_self') }),
   }) },
-  'output.css': { phase: 'output', parameters: shape({ inlineProperties: array(property), dimensionProperties: array(property), preserveAutoDimensions: bool, colorEncoding: choice('rgb', 'preserve') }) },
-  'output.html': { phase: 'output', parameters: shape({ wrapperTag: tag, preserveAttributes: array(attribute), removeClasses: bool, stripRootBackground: bool }) },
+  'output.css': { phase: 'output', parameters: shape({ inlineProperties: array(property), dimensionProperties: array(property), preserveAutoDimensions: bool, colorEncoding: choice('rgb', 'preserve') }, { rootStyleOmissions: array(property) }) },
+  'output.html': { phase: 'output', parameters: shape({ wrapperTag: tag, preserveAttributes: array(attribute), removeClasses: bool, stripRootBackground: bool }, { tagMap: mapping(tag, tag) }) },
   'output.text': { phase: 'output', parameters: shape({ maxConsecutiveNewlines: number(1, 100, true), trim: bool }) },
   'output.visual': { phase: 'output', parameters: shape({ width: number(1, 10000, true), pngBackground: cssValue, pdfBackground: cssValue, maxCanvasSide: number(1, 32767, true), pdfMargin: number() }) },
 };

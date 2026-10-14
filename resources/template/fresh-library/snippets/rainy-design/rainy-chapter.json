@@ -1,8 +1,0 @@
-{
-  "id": "rainy-chapter",
-  "name": "Rainy Design · 编号章节",
-  "trigger": "//rainy-chapter",
-  "description": "较正后的编号章节，能实现确切的对齐效果。",
-  "content": "<section class=\"mt-8 mb-6 border-b border-article-line pb-4.5\">\n  <span class=\"my-0 text-[24px]/[1.3] font-bold tracking-[0.12em] text-article-accent\">01</span>\n  <p class=\"my-0 text-[11px]/[1.7] font-bold tracking-[0.12em] text-article-accent indent-6\">PREMISE</p>\n  <h2 class=\"m-0 pl-11 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">▌这里写章节标题</h2>\n</section>\n",
-  "categoryId": "rainy-design"
-}

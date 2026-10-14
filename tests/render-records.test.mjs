@@ -4,6 +4,7 @@ import { contentHash, loadStylesheetEnvironment } from '../src/lib/article-forma
 import { DEFAULT_FORMAT_BUNDLE, canonicalFormatJson } from '../src/lib/article-format/config.ts';
 import { DEFAULT_ALGORITHMS, algorithmHash, validateAlgorithmPackage } from '../src/lib/article-format/algorithms.ts';
 import { activateFormatBundle } from '../src/lib/article-format/runtime.ts';
+import { articleDarkMode } from '../src/lib/article-format/styleTypes.ts';
 import { prepareRenderRecord, persistRenderRecord, readRenderRecord, renderRecordMatches, restoreRenderEnvironment, validateRenderRecord } from '../src/lib/article-format/renderRecords.ts';
 import { createArticleSource } from '../src/lib/frontMatter.ts';
 import { BASIC_THEME } from '../src/lib/themes.ts';
@@ -57,11 +58,12 @@ function memoryLibrary() {
   return { root: dir(), files, writes, put, fail: suffix => { fail = suffix; } };
 }
 const element = { outerHTML: '<article class="article-preview"><div class="article-body"><p class="card">body</p></div></article>', cloneNode() { return { outerHTML: this.outerHTML }; } };
-async function fixture() {
+async function fixture(darkParameters) {
   const library = memoryLibrary();
   library.put('styles/globals.css', '@import "tailwindcss"; .card{color:red;background-image:url("/image/mark.svg")}');
   library.put('assets/image/mark.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
   const raw = structuredClone(DEFAULT_FORMAT_BUNDLE);
+  if (darkParameters) raw.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters = darkParameters;
   raw.formatter.steps.push({ id: 'library-css', operator: 'css.stylesheets', enabled: true, parameters: { entry: 'styles/globals.css', publicRoot: 'assets' } });
   const environment = await loadStylesheetEnvironment(library.root, { entry: 'styles/globals.css', publicRoot: 'assets' });
   const snapshot = activateFormatBundle(raw, 'render-test', 'library', environment);
@@ -72,6 +74,66 @@ async function fixture() {
   const prepared = await prepareRenderRecord(source, BASIC_THEME, element, compiled.css, { snapshot });
   return { ...library, snapshot, source, saved, directory, prepared, environment };
 }
+test('pre-mode renditions reopen current and historical sources without migration or weaker integrity checks', async () => {
+  const algorithm = structuredClone(DEFAULT_FORMAT_BUNDLE.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters);
+  delete algorithm.mode;
+  for (const parameters of [algorithm, { transform: 'preserve', options: {} }]) {
+    const f = await fixture(parameters);
+    try {
+      await persistRenderRecord(f.root, f.directory, f.prepared);
+      await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'manual', retained: true, id: 'snapshot-pre-mode' });
+      for (const [path, text] of f.files) if (path.endsWith('/render.json')) {
+        const record = JSON.parse(text);
+        delete record.formatter.preview.dark.mode;
+        f.files.set(path, JSON.stringify(record));
+      }
+      const pointer = 'articles/' + f.saved.article.month + '/' + f.saved.article.folder + '/render.json';
+      const original = f.files.get(pointer), before = f.writes.length;
+      const stored = await readStoredArticleById(f.root, f.saved.article.month, f.saved.article.folder);
+      assert.equal(stored.renderIssue, undefined);
+      assert.equal(await renderRecordMatches(stored.renderRecord, f.source, BASIC_THEME), true);
+      assert.equal(await renderRecordMatches(stored.renderRecord, f.source + '\nchanged', BASIC_THEME), false);
+      const history = await listArticleHistory(f.root, f.saved.article.month, f.saved.article.folder);
+      assert.equal(history.snapshots.length, 1);
+      assert.equal(history.snapshots[0].renderIssue, undefined);
+      const restored = await restoreRenderEnvironment(f.root, history.snapshots[0].renderRecord);
+      try {
+        const mode = parameters.transform === 'preserve' ? 'tokens' : 'algorithm';
+        assert.equal(articleDarkMode(restored.snapshot.bundle.formatter), mode);
+        assert.equal(restored.snapshot.rawFormatter.steps.find(step => step.operator === 'preview.dark-mode').parameters.mode, undefined);
+        assert.equal(stored.renderRecord.environmentHash, f.prepared.record.environmentHash);
+        assert.equal(f.files.get(pointer), original);
+        assert.equal(f.writes.length, before, 'opening current and historical renditions must not write');
+        const altered = structuredClone(stored.renderRecord);
+        altered.formatter.preview.dark.mode = mode === 'algorithm' ? 'tokens' : 'algorithm';
+        assert.throws(() => validateRenderRecord(altered), /不一致/);
+        delete altered.formatter.preview.dark.mode;
+        altered.formatter.preview.dark.background = '#ff0000';
+        assert.throws(() => validateRenderRecord(altered), /不一致/);
+        const object = 'assets/.objects/' + stored.renderRecord.assets[0].hash, bytes = f.files.get(object);
+        f.files.set(object, 'tampered');
+        await assert.rejects(restoreRenderEnvironment(f.root, stored.renderRecord), /校验失败/);
+        f.files.set(object, bytes);
+        const next = await prepareRenderRecord(f.source, BASIC_THEME, element, restored.css, { snapshot: restored.snapshot });
+        await persistRenderRecord(f.root, f.directory, next);
+        assert.equal((await readRenderRecord(f.directory)).formatter.preview.dark.mode, mode);
+      } finally { restored.dispose(); }
+    } finally { f.environment.dispose(); }
+  }
+});
+test('explicit dark-source records still reject a missing mode', async () => {
+  const algorithm = structuredClone(DEFAULT_FORMAT_BUNDLE.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters);
+  for (const parameters of [algorithm, { mode: 'tokens' }]) {
+    const f = await fixture(parameters);
+    try {
+      const record = structuredClone(f.prepared.record), original = JSON.stringify(record);
+      assert.equal(validateRenderRecord(record), record);
+      assert.equal(JSON.stringify(record), original, 'validation must not mutate the stored record');
+      delete record.formatter.preview.dark.mode;
+      assert.throws(() => validateRenderRecord(record), /不一致/);
+    } finally { f.environment.dispose(); }
+  }
+});
 test('renditions keep verified immutable dependencies; opening old source performs no migration writes', async () => {
   const f = await fixture();
   try {

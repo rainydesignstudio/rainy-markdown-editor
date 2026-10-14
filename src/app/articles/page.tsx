@@ -29,6 +29,8 @@ export default function ArticlesRoute() {
       onRebuildIndexes={controller.rebuildListIndexes}
       onRemoveCategories={controller.removeListCategories}
       onNew={controller.createNewArticle}
+      onImportMarkdown={controller.markdownImport.open}
+      onImportTasks={() => controller.markdownImport.openTasks()}
       onRefresh={() => { if (controller.directory) void controller.refreshArticles(); }}
       onOpen={controller.openStoredArticle}
       onInfo={controller.openArticleInfo}

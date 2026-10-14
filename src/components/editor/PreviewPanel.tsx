@@ -18,7 +18,7 @@ import { ButtonBar } from '../global/ButtonBar';
 import { usePreviewPreferences } from '../../hooks/usePreviewPreferences';
 import { connectPreviewScrollSync } from '../../lib/previewScrollSync';
 import { ArticlePreviewCanvas } from './ArticlePreviewCanvas';
-import { retainPreviewInput, previewInputMatches, type PreviewInput } from '../../lib/previewSnapshot';
+import { retainPreviewInput, refreshRetainedPreviewMedia, type PreviewInput } from '../../lib/previewSnapshot';
 
 type Props = {
   article: WorkingArticle;
@@ -69,30 +69,37 @@ export function PreviewPanel({
   const formatSnapshot = article.renderSnapshot?.id === liveFormatSnapshot.id ? article.renderSnapshot : liveFormatSnapshot;
   const input: PreviewInput = { article, parsed, compiledCss, media, snapshot: formatSnapshot };
   const [frozen, setFrozen] = useState<ReturnType<typeof retainPreviewInput> | null>(null);
-  const boundaryRef = useRef<{ saved: number; document: number; directory: FileSystemDirectoryHandle | null } | null>(null);
+  const previewReadyRef = useRef<{ document: number; directory: FileSystemDirectoryHandle | null; month: WorkingArticle['month']; folder: WorkingArticle['folder']; format: string } | null>(null);
+  const boundaryRef = useRef<{ saved: number; document: number; directory: FileSystemDirectoryHandle | null; month: WorkingArticle['month']; folder: WorkingArticle['folder'] } | null>(null);
   useLayoutEffect(() => {
+    const ready = previewReadyRef.current;
+    const ownStylesReady = compiledRevision !== null || ready?.document === documentGeneration && ready.directory === directory && ready.month === article.month && ready.folder === article.folder && ready.format === input.snapshot.id;
+    if (compiledRevision !== null) previewReadyRef.current = { document: documentGeneration, directory, month: article.month, folder: article.folder, format: input.snapshot.id };
     if (!preferences.saveOnly) { boundaryRef.current = null; setFrozen(null); return; }
     const boundary = boundaryRef.current;
-    if (boundary?.saved === savedPreviewRevision && boundary.document === documentGeneration && boundary.directory === directory) return;
-    // A newly opened document must first receive its own compiled stylesheet.
-    if (compiledRevision === null) { setFrozen(null); return; }
-    boundaryRef.current = { saved: savedPreviewRevision, document: documentGeneration, directory };
+    // Generations count opens per article, so different manuscripts can share a number.
+    if (boundary?.saved === savedPreviewRevision && boundary.document === documentGeneration && boundary.directory === directory && boundary.month === article.month && boundary.folder === article.folder) return;
+    // Typing marks CSS stale; the same document can still retain its visible
+    // body with its last own stylesheet. A newly opened document must wait.
+    if (!ownStylesReady) { setFrozen(null); return; }
+    boundaryRef.current = { saved: savedPreviewRevision, document: documentGeneration, directory, month: article.month, folder: article.folder };
     setFrozen(retainPreviewInput(input));
     // Input is captured only at the display boundary, never on typing/check/copy/export.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preferences.saveOnly, savedPreviewRevision, documentGeneration, directory, compiledRevision]);
-  useEffect(() => () => frozen?.dispose(), [frozen]);
+  }, [preferences.saveOnly, savedPreviewRevision, documentGeneration, directory, article.month, article.folder, compiledRevision, formatSnapshot.id]);
+  useLayoutEffect(() => { setFrozen(previous => refreshRetainedPreviewMedia(previous, media)); }, [media]);
+  useEffect(() => () => frozen?.dispose(), [frozen?.dispose]);
   const frozenVisible = preferences.saveOnly && frozen !== null;
-  const stale = frozenVisible && !previewInputMatches(frozen.original, input);
   const { dark, toggle } = useArticlePreviewMode();
   useEffect(() => {
-    if (!preferences.scrollSync || stale) return;
+    if (!preferences.scrollSync) return;
     const textarea = sourceTextareaRef.current;
     const container = frozenVisible ? frozenViewportRef.current : liveViewportRef.current;
     const root = frozenVisible ? frozenRootRef : previewRef;
     if (!textarea || !container) return;
-    return connectPreviewScrollSync({ textarea, container, getRoot: () => root.current, getSource: () => sourceTextRef.current });
-  }, [preferences.scrollSync, stale, frozenVisible, frozen, sourceTextareaRef, previewRef, formatSnapshot.id, dark, documentGeneration, directory]);
+    return connectPreviewScrollSync({ textarea, container, getRoot: () => root.current, getSource: () => sourceTextRef.current,
+      getRenderedSource: () => frozenVisible ? frozen!.input.parsed.body : sourceTextRef.current });
+  }, [preferences.scrollSync, frozenVisible, frozen, sourceTextareaRef, previewRef, formatSnapshot.id, dark, documentGeneration, directory]);
   // The clipboard dock opens to half the preview panel, measured once against the panel so the
   // target does not chase the preview as the dock itself takes space away from it.
   const [dockOpen, setDockOpen] = useState(false);
@@ -144,7 +151,6 @@ export function PreviewPanel({
           <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-faint" role="status"><svg className="size-3.5 text-accent-text" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{article.dirty ? <circle cx="12" cy="12" r="7" /> : <path d="m4 12 5 5L20 6" />}</svg>{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}</span>
         </div>
       </div>
-      {stale ? <p className="m-0 border-b border-line bg-list px-4 py-2 text-xs text-muted" role="status">{t(preferences.scrollSync ? 'preview.frozenSyncPaused' : 'preview.frozen')}</p> : null}
       <div className="relative min-h-0 flex-1">
         <div className="h-full data-[hidden=true]:pointer-events-none data-[hidden=true]:absolute data-[hidden=true]:inset-0 data-[hidden=true]:opacity-0" data-hidden={frozenVisible} aria-hidden={frozenVisible || undefined} inert={frozenVisible}>
           <ArticlePreviewCanvas input={input} dark={frozenVisible ? false : dark} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
@@ -163,7 +169,7 @@ export function PreviewPanel({
                 <p className="m-0 min-w-0 text-xs text-muted">{t('editor:clipboard.description')}</p>
                 <button className="button button-quiet shrink-0" type="button" onClick={() => void onPaste()} disabled={mediaBusy || readOnly || !parsed.canCopy || !article.themeValid}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4h6v3H9zM7 5H5v15h14V5h-2" /><path d="M9 12h6M9 16h4" /></svg>{t('editor:clipboard.paste')}</button>
               </div>
-              <div ref={clipboardReceiverRef} className="clipboard-receiver before:pointer-events-none before:text-muted data-[empty=true]:before:content-[attr(aria-placeholder)]" data-preview-mode={dark ? 'dark' : 'light'} contentEditable={!readOnly} suppressContentEditableWarning style={previewSurfaceStyle(dark)} role="textbox" aria-multiline="true" aria-label={t('editor:clipboard.aria')} aria-placeholder={t('editor:clipboard.placeholder')} />
+              <div ref={clipboardReceiverRef} className="clipboard-receiver before:pointer-events-none data-[empty=true]:before:content-[attr(aria-placeholder)]" contentEditable={!readOnly} suppressContentEditableWarning style={{ ...previewSurfaceStyle(false, liveFormatSnapshot), color: liveFormatSnapshot.bundle.formatter.preview.color }} role="textbox" aria-multiline="true" aria-label={t('editor:clipboard.aria')} aria-placeholder={t('editor:clipboard.placeholder')} />
             </div>
           </div>
         </section>

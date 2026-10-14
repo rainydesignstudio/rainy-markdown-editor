@@ -1,8 +1,0 @@
-{
-  "id": "captioned-image",
-  "name": "带图注图片",
-  "trigger": "//captioned-image",
-  "description": "示例图片与可见图注；使用时替换为文章图片和说明。",
-  "content": "<section>\n  <img class=\"h-auto max-w-full\" src=\"/images/article-sample.png\" />\n  <p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">图注信息▌</p>\n</section>\n",
-  "categoryId": "default"
-}

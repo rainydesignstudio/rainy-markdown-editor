@@ -395,7 +395,16 @@
     "opacity": "Opacity",
     "solidColor": "Solid",
     "gradientColor": "Gradient",
-    "platformValidationDisabled": " · Platform validation off; product checks remain"
+    "platformValidationDisabled": " · Platform validation off; product checks remain",
+    "mediaChangesUnsaved": "The asset name or description has unsaved changes.",
+    "mediaUnsavedDescription": "Save or discard the asset changes before leaving.",
+    "imageZoomActions": "Image zoom",
+    "imageZoomHelp": "Ctrl/⌘ + wheel to zoom; click the scale to toggle zoom and fit width",
+    "fitToWidth": "Fit to width",
+    "articleFolderName": "Article folder name",
+    "applyFolderName": "Apply folder name",
+    "folderRenameImmediate": "Press Enter or Apply to update the index and reload the manuscript immediately. The filename remains article.md.",
+    "imageZoomToggle": "Toggle zoom and fit width"
   },
   "templates": {
     "from": "From {{source}}",
@@ -681,5 +690,17 @@
   },
   "platformPresets": {
     "wechat-article": "WeChat Official Account"
+  },
+  "articleDark": {
+    "automatic": "Dark colors are calculated by this library’s algorithm and are read only. Values come from the sample; one role may produce several results.",
+    "manual": "Edit light and dark colors separately. Unset dark colors inherit light values. Fixed CSS and node colors keep their authored values.",
+    "readOnly": "Algorithm result · read only",
+    "pending": "Calculating",
+    "failed": "Calculation failed",
+    "unused": "Unused in sample",
+    "multiple": "{{count}} results",
+    "inherited": "Inherits light",
+    "inherit": "Inherit light",
+    "reset": "{{name}}: inherit the light color"
   }
 }

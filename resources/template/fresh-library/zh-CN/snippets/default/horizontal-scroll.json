@@ -1,0 +1,9 @@
+{
+  "id": "horizontal-scroll",
+  "name": "四图横排滚动",
+  "trigger": "//horizontal-scroll",
+  "description": "四张示例图片横向排列并实现溢出滚动，使用时替换图片与图注；保留原触发词。",
+  "content": "<section class=\"overflow-x-auto pb-3\">\n  <section data-ignore-width class=\"flex items-center justify-start gap-3\">\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">示例图一</figcaption>\n      </figure>\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">示例图二</figcaption>\n      </figure>\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">示例图三</figcaption>\n      </figure>\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">示例图四</figcaption>\n      </figure>\n    </section>\n  </section>\n</section>",
+  "icon": "image",
+  "categoryId": "default"
+}

@@ -21,9 +21,9 @@
 
 ## 应用内置资源
 
-维护应用默认内容时，界面文案在 `resources/locale/`，公告在 `resources/changelog.json`。平台源位于 `resources/presets/platform/`；新库内容种子位于 `resources/template/fresh-library/`，按真实资料库的主题、片段和模板目录分类，文章与历史为空。主题制作起点在 `resources/template/`。
+维护应用默认内容时，界面文案在 `resources/locale/`，公开公告在 `resources/changelog/public.json`，本地开发与验收记录在不进Git的 `resources/changelog/local.md`。平台源位于 `resources/presets/platform/`；新库内容种子位于 `resources/template/fresh-library/en-US/` 与 `zh-CN/`，每套按真实资料库的主题、片段和模板目录分类，文章与历史为空。主题制作起点在 `resources/template/`。
 
-浏览器直接加载的脚本仍在 `public/format/`、`public/algorithm/`，字体、图片和许可分别在 `public/fonts/`、`public/images/`、`public/licenses/`。样图只使用 `/images/article-sample.png`；旧根地址或任意相对图片不会被替换成样图，应修改实际片段/模板引用。双语说明正文保留在 `docs/locale/`。
+浏览器直接加载的脚本仍在 `public/format/`、`public/algorithm/`，完整字体来源、大小与hash见[字体清单](../../../resources/font-sources.json)，只下载到授权资料库；`public/fonts/`保留三份OFL文本，图片和其它许可在 `public/images/`、`public/licenses/`。样图只使用 `/images/article-sample.png`；旧根地址或任意相对图片不会被替换成样图，应修改实际片段/模板引用。双语说明正文保留在 `docs/locale/`。
 
 <a name="doc-editable-fields"></a>
 
@@ -134,6 +134,75 @@
 }
 ```
 
+<a name="doc-copy-output"></a>
+
+## 富文本复制与预览外壳
+
+编辑页顶栏循环箭头“更新样式”在“导出文章”之后、“检查格式”之前。旧稿/历史保留原渲染记录；显式更新样式并保存才采用当前库策略，不批量迁移。
+
+| 现有步骤 | parameters字段 | 作用 |
+|---|---|---|
+| output.html | `tagMap: { "blockquote": "section" }` | 微信复制先读取原引用主题样式，再在输出副本映射标签；保留嵌套引用、边框、背景及内间距。 |
+| output.css | `rootStyleOmissions` | 只省略生成文章根/正文外壳的指定CSS属性；微信默认包括margin/padding及各边、width/min-width/max-width、height/min-height/max-height，正文内部容器保持。 |
+
+把字段合并到现有步骤的 `parameters`，保留其它参数，不添加重复输出步骤。完整示例见[默认formatter](../../../resources/presets/platform/wechat-article/format/formatter.json)。旧配置省略新字段时保留原行为，其他平台自行配置。这不改变原稿、预览标签或PNG/PDF，不新增公众号合规判据。JSON可调整已注册策略，新算法仍需应用能力层实现；渲染引擎未剥离为库内插件。
+
+<a name="doc-source-rendering"></a>
+
+## 可选公式与 Mermaid 源码渲染
+
+向当前库 `formatter.steps[]` 加入下列已注册步骤，重载资料库并显式更新样式。默认三件套没有启用这两项；旧库/旧快照保持自身配置，参数不接受可执行代码或自定义信任策略。
+
+```json
+[
+  {"id":"math","operator":"markdown.math","enabled":true,"parameters":{"singleDollar":true,"maxLength":8192,"maxExpressions":128}},
+  {"id":"mermaid","operator":"markdown.mermaid","enabled":true,"parameters":{"theme":"neutral","maxLength":16384,"maxDiagrams":16}}
+]
+```
+
+| 能力 | 取值与输出 |
+|---|---|
+| markdown.math | singleDollar布尔；maxLength为1–16384；maxExpressions为1–256。支持行内/块公式及math代码块，KaTeX生成静态MathML；不加载外部字体/脚本，宏不跨公式共享。固定拒绝信任命令，限制扩展次数/尺寸；错误保留TeX和行号。 |
+| markdown.mermaid | theme为default/neutral/dark；maxLength为1–32768；maxDiagrams为1–32。支持流程/时序/状态/类/ER图，隔离帧静态PNG；不提供配置指令、交互或外部资源。语句预算256、边数100、图边长4096、结果8MiB，超限保留源码。 |
+
+公式正文示例（行内、块公式；也可放入语言标记为math的代码块）：
+
+```text
+行内：$E=mc^2$
+
+$$
+\frac{a}{b}
+$$
+```
+
+Mermaid正文使用语言标记为mermaid的代码块，其内容例如：
+
+```text
+flowchart TD
+  A[开始] --> B[完成]
+```
+
+渲染中不记通过、不复制/导出占位，也不把占位存入render.json/历史成品；原文可先保存，图完成后再保存或更新样式。坏语法在代码块位置报告，源码不静默删除。MathML的目标平台支持及PNG的接收结果需要实测；官方判据继续检查静态结果，不因启用步骤而豁免。此能力不扩张手写SVG的标签/事件允许范围。
+
+代码/实现和许可本地打包。Mermaid采用锁定官方模块重建以统一KaTeX版本，记录在 [resources/render](../../../resources/render/)；许可见 [public/licenses/math](../../../public/licenses/math/) 和 [public/licenses/mermaid](../../../public/licenses/mermaid/)。隔离帧不保证布局计算移出浏览器主线程；先用小图核对输入和滚动，复杂图可简化或提前制图。
+
+<a name="doc-resource-protocol"></a>
+
+## 资源引用、导入与输出协议
+
+| 资源 | 文稿引用 | 共享引用 | 行为 |
+|---|---|---|---|
+| 栅格图片 | media/image/文件名 | /shared/image/文件名 | 沿用图片校验、预览和描述索引 |
+| 一般附件 | media/file/文件名 | /shared/file/文件名 | 类型图标/按需下载，不执行或自动预览；未知类型回退文件图标 |
+
+文件名按完整URI编码，保留最终实际路径。图片描述索引维持既有 `images` 对象；附件目录的 `index.json` 为version1及 `files` 对象，按文件名保存description。新目录按需出现，旧库不整体迁移。类型登记见 [资源类型表](../../../resources/presets/resource/types.json)，23类/284后缀；扩展名/MIME用于图标，附件不会因声明图片MIME而自动预览。
+
+产品检查核对安全路径、目标归属、文件存在性和图片内容；导入中为未完成，失败/取消与缺失分别报告。`validator.meta.enabled=false`仍运行这些检查，关闭平台校验不关闭资源检查。CSS背景/字体和复杂嵌入未自动迁移项保留并提示，本地文档链接不递归携带。
+
+任务在 `imports/tasks/<id>.json`，绑定资料库/文稿/来源及资源最终名称；后台只写资源/状态，不写正在编辑的全文。并发2、64KiB传输块、100ms进度节流、一般附件64MiB；CORS/CSP/无凭证及权限失败明确反馈，可重试/补选。本地/知识源保留，知识索引位于目标库 `knowledge/`。
+
+复制与PNG/PDF前核对实际当前资源/渲染版本；变化则拒绝旧结果。一般附件不会被伪装为可直接粘贴的媒体。ZIP检查明确引用资源并包含文稿media及被引用shared文件，不含knowledge/imports；部分包需用户确认，跳过未close/失败/缺失文件并保留原引用，沿用256MB内存上限。检查、保存原文、保存渲染记录和输出分别反馈。
+
 <a name="doc-formatter-capabilities"></a>
 
 ## 格式化能力
@@ -143,6 +212,8 @@
 | markdown.soft-breaks | `mode`: `space`／`line-break` |
 | markdown.blank-lines | `preserve`、`betweenBlocks`、`atEdges` |
 | markdown.code-highlight | styles[]；可选engine（highlight/prism）、themeDefaults、prismStyles（词法样式键→CSS声明） |
+| markdown.math | singleDollar、maxLength、maxExpressions；可选静态MathML |
+| markdown.mermaid | theme、maxLength、maxDiagrams；可选静态PNG |
 | markdown.heading-ids | mode:auto/explicit；explicit保留{#id}且不自动造锚点 |
 | markdown.code-layout | wrapperClasses[]、preTag、contentClasses[]、copyClasses[]、copyHtml、copyLabel |
 | css.stylesheets | entry、publicRoot；可选allowUnknownClasses |
@@ -150,15 +221,31 @@
 | render.nodes | image（width/height/classes/style/alt）、link（classes/rootBase/externalTarget）；只补缺省属性 |
 | markdown.code-whitespace | `tabSize`，关闭此步骤保留原始代码空白 |
 | preview.surface | `lightBackground`、`darkBackground`、`fontFamily`、`color`、`stripThemeBackground` |
-| preview.dark-mode | `transform`: `preserve`或库内组件ID；`options`为JSON对象 |
+| preview.dark-mode | `mode`: algorithm或tokens；algorithm要求组件transform与options，tokens只含mode |
 | css.drop-properties | `properties[]`，可重复追加 |
 | css.utility-aliases | `aliases`，CSS 属性名称映射 |
-| output.css | `inlineProperties[]`、`dimensionProperties[]`、`preserveAutoDimensions`、`colorEncoding`: `rgb`／`preserve` |
-| output.html | `wrapperTag`、`preserveAttributes[]`、`removeClasses`、`stripRootBackground` |
+| output.css | `inlineProperties[]`、`dimensionProperties[]`、`preserveAutoDimensions`、`colorEncoding`: `rgb`／`preserve`；可选 `rootStyleOmissions[]` |
+| output.html | `wrapperTag`、`preserveAttributes[]`、`removeClasses`、`stripRootBackground`；可选 `tagMap` |
 | output.text | `maxConsecutiveNewlines`、`trim` |
 | output.visual | `width`、`pngBackground`、`pdfBackground`、`maxCanvasSide`、`pdfMargin` |
 
 加载时按数组顺序编译配置。执行仍分为 Markdown、CSS、预览和输出阶段；调整数组位置不能把输出操作搬到解析之前。除 `css.drop-properties` 外，同一能力不能同时启用两次，避免参数互相覆盖。关闭能力使用通用引擎的中性行为；关闭输出样式快照会失去对应样式，不等于关闭检查。
+
+富文本复制先按原标签计算样式，再按 `output.html.parameters.tagMap` 映射正文容器标签，例如微信模板的 `{"blockquote":"section"}`；生成的文章外壳仍由 `wrapperTag` 控制。`output.css.parameters.rootStyleOmissions` 只省略生成的文章/正文外壳样式，微信模板排除其 margin、padding 与宽高限制，正文卡片、段落和引用自身的间距/边框保持。两个可选项缺省时保留旧行为，不影响原稿、预览或PNG/PDF。已有资料库须显式更新自己的 formatter.json；旧稿若仍使用旧渲染快照，先“更新样式”再复制，原稿和历史不自动迁移。
+
+`preview.dark-mode.parameters` 的两种来源互斥。自动模式示例：
+
+```json
+{"mode":"algorithm","transform":"mp-darkmode","options":{"mode":"dark","whitelist":{"attribute":["data-no-dark"]},"needJudgeFirstPage":false,"noEmit":false}}
+```
+
+手工模式只写：
+
+```json
+{"mode":"tokens"}
+```
+
+自动模式的mode选择来源，options.mode仍是组件自己的参数。手工模式采用文章主题的dark.tokens，不调用算法组件；外置CSS的dark类及预览模式保留。旧参数不含mode时由transform推导：preserve对应tokens，组件ID对应algorithm；读取不改写旧文件。validator.product.theme可声明`"darkTokens":{"allowPartial":true,"fallback":"light"}`，缺省允许部分覆盖，键复用现有颜色token，拒绝未知键、非法值和循环引用。字体／排版共享，画布背景仍取preview.surface。format-support中的官方判据保持；手工模式若仍配置需要官方转换的深色规则，会报告未完成，不自动放行。
 
 默认 `mp-darkmode` 组件的选项为 `mode: dark`、`defaultDarkTextColor`、`defaultDarkBgColor`、`needJudgeFirstPage`、`noEmit`、`whitelist.attribute[]` 和 `whitelist.tagName[]`。官方默认模板不覆盖 SDK 的默认文字色；显式颜色选项属于该库的自定义配置。未设置 `defaultDarkBgColor` 时使用 `preview.surface` 的深色纸面。`noEmit: true` 仅计算转换记录而不生成转换样式，通常不用于可见预览。参数的业务含义由组件验证；通用层只要求有界的JSON对象，自定义组件增加参数不需要增加工作台prop。
 
@@ -214,7 +301,7 @@ window.ArticleAlgorithm = {
     "parameters": {
       "root": { "tag": "section", "id": "article-content", "classes": ["w-full", "min-w-0"] },
       "body": null, "beforeHtml": "", "afterHtml": "", "language": "zh-CN",
-      "preserveIds": true, "viewport": { "width": 1606, "height": 959, "contentWidth": 996 }
+      "preserveIds": true, "viewport": null
     } }
 ]
 ```
@@ -225,7 +312,7 @@ styles/globals.css可导入库内CSS模块及Tailwind内置样式，支持@theme
 
 拒绝越界、循环、远程CSS资源、JS插件及缺文件。上限：CSS256文件／32层／单文件1 MiB／合计8 MiB；资源2048个／合计256 MiB。目录@source须显式声明库内范围，最多256个匹配文件，不默认扫描全部文章。
 
-viewport决定CSS排版宽高，contentWidth决定正文宽度；显示缩放不改变排版。viewport设null时使用可用容器尺寸。beforeHtml和afterHtml只参与预览，不写入原稿、Markdown正文或富文本正文；原稿已有内容保留。
+viewport设null时按实际预览栏宽响应式排版，使用可用高度滚动，不额外缩放正文。显式viewport对象用于固定排版复现：width/height决定CSS视口，contentWidth决定正文宽度；其显示缩放不改变排版。beforeHtml和afterHtml只参与预览，不写入原稿、Markdown正文或富文本正文；原稿已有内容保留。
 
 自定义CSS类和生成utility共用检查。只作为内容钩子的类，可显式设css.stylesheets.parameters.allowUnknownClasses为true；默认检查未生成样式的类。此选项不关闭源码、安全或平台规则。
 
@@ -243,7 +330,7 @@ viewport决定CSS排版宽高，contentWidth决定正文宽度；显示缩放不
 
 ### 可见预览与当前检查
 
-文章编辑器的[三个预览开关](README.md#doc-preview-controls)是浏览器界面偏好，不写入格式三件套。仅保存刷新留存可见输入及其资源；当前工作画布仍使用当前正文、主题和配置，供校验、复制、导出与渲染记录使用。独立检查不刷新留存画面；成功保存后的编译才推进显示边界，失败或过期任务不推进。滚动对齐只使用同一输入的位置缓存，不读取资料库或重新编译；画面落后于源码时暂停联动。
+文章编辑器的[三个预览开关](README.md#doc-preview-controls)是浏览器界面偏好，不写入格式三件套。仅保存刷新留存可见输入及其资源；当前工作画布仍使用当前正文、主题和配置，供校验、复制、导出与渲染记录使用。独立检查不刷新留存画面；成功保存后的编译才推进显示边界，失败或过期任务不推进。滚动对齐绑定当前可见ShadowRoot或iframe，缓存保存源到当前源的有效节点关系；插删处用最近有效锚点，无对应时保留位置。开关、明暗、分栏与稿件变化后重建位置缓存，沿用被动事件/rAF及4ms分片；滚动不读取资料库或重新编译。开启仅保存刷新时，源码底部保存状态后显示“· 保存刷新预览”。
 
 <a name="doc-configuration-loading"></a>
 
@@ -275,3 +362,18 @@ viewport决定CSS排版宽高，contentWidth决定正文宽度；显示缩放不
 浏览器帧通过本地静态脚本启动，只读取不可执行的 JSON 配置；不使用内联启动代码或动态求值。共享源码生成该资源，开发与构建时自动更新，沿用静态服务的 CSP。
 
 能力参数的执行合同见 [contracts.ts](../../../src/lib/article-format/contracts.ts)。配置示例和约束测试见 [配置测试](../../../tests/article-format-config.test.mjs)。
+
+## 横向滚动与宽度豁免
+
+横向滚动采用[微信官方 §1.4.4](https://developers.weixin.qq.com/doc/service/guide/product/plugin_spec.html#_1-4-4-豁免机制：data-ignore-width)现有豁免：
+
+```html
+<section class="overflow-x-scroll pb-3">
+  <section data-ignore-width class="flex items-center justify-start gap-3">
+    <section class="shrink-0 w-[85%]">图片与图注</section>
+    <section class="shrink-0 w-[85%]">图片与图注</section>
+  </section>
+</section>
+```
+
+标记节点及其后代豁免全部宽度检测，外层容器仍检查，其他规则仍执行。不把 `flex` 设为全局放行，不新增 `usable` 或实测判据。

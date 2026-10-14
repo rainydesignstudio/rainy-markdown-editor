@@ -22,7 +22,7 @@ test('invalid, duplicate and unsupported startup arguments fail before binding o
     assert.throws(() => parseStaticServerOptions(args));
     const result = spawnSync(process.execPath, [startScript, ...args], { encoding: 'utf8' });
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /启动参数错误/);
+    assert.match(result.stderr, /Invalid startup options/);
     assert.doesNotMatch(result.stdout, /next build|静态服务/);
   }
 });
@@ -52,7 +52,7 @@ test('missing static output exits with an explicit build instruction', (t) => {
   symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(directory, 'node_modules'), 'dir');
   const result = spawnSync(process.execPath, [path.join(scripts, 'start-static.mjs')], { encoding: 'utf8', timeout: 5000 });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /缺少 out\/index\.html/);
+  assert.match(result.stderr, /out\/index\.html is missing/);
   assert.match(result.stderr, /npm run build/);
   assert.match(result.stderr, /npm start/);
   assert.equal(result.stdout, '');

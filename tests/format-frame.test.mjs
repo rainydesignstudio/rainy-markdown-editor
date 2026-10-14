@@ -6,6 +6,25 @@ import { parse } from 'parse5';
 import { formatPreviewDocument } from '../src/lib/article-format/frame.ts';
 import { getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
 
+test('responsive document frames retain natural content without a fixed-width crop', () => {
+  const snapshot = structuredClone(getFormatSnapshot());
+  snapshot.bundle.formatter.document = {
+    root: { tag: 'section', id: 'article-content', classes: [] }, body: null,
+    beforeHtml: '', afterHtml: '', language: 'zh-CN', preserveIds: true, viewport: null,
+  };
+  const content = '<section id="article-content"><p>Opening</p><img src="/images/article-sample.png"><p>End of long content</p></section>';
+  const responsive = parse(formatPreviewDocument('', content, false, snapshot));
+  const body = responsive.childNodes.find(node => node.tagName === 'html').childNodes.find(node => node.tagName === 'body');
+  assert.equal(body.childNodes.length, 1);
+  assert.equal(body.childNodes[0].tagName, 'section');
+  assert.equal(body.childNodes[0].childNodes.at(-1).childNodes[0].value, 'End of long content');
+  snapshot.bundle.formatter.document.viewport = { width: 1200, height: 800, contentWidth: 900 };
+  const fixed = parse(formatPreviewDocument('', content, false, snapshot));
+  const fixedBody = fixed.childNodes.find(node => node.tagName === 'html').childNodes.find(node => node.tagName === 'body');
+  assert.equal(fixedBody.childNodes[0].tagName, 'div');
+  assert.equal(fixedBody.childNodes[0].attrs.find(attribute => attribute.name === 'style').value, 'width:900px;margin-left:300px');
+});
+
 test('frame configuration is inert JSON, escapes closing tags, and runs only external scripts', () => {
   const snapshot = structuredClone(getFormatSnapshot());
   snapshot.bundle.support.meta.name = '</script><script>malicious()</script>';

@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { JSDOM } from 'jsdom';
 import { DEFAULT_FORMAT_BUNDLE, canonicalFormatJson, compileFormatBundle } from '../src/lib/article-format/config.ts';
 import { DEFAULT_ALGORITHMS, algorithmHash, readLibraryAlgorithms, initializeLibraryAlgorithms, validateAlgorithmPackage, validateAlgorithmManifest } from '../src/lib/article-format/algorithms.ts';
 import { activateFormatBundle, assertCurrentFormat, getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
@@ -138,22 +139,60 @@ test('trusted bridge validates all nodes, findings and resource references befor
   }
 });
 
+test('paint writeback preserves resolved variable-border geometry through HTML serialization', async () => {
+  const dom = new JSDOM('<article style="border:1px solid var(--line);border-left:3px dashed var(--line)"></article>');
+  const root = dom.window.document.querySelector('article');
+  root.getBoundingClientRect = () => ({ x: 0, y: 0, width: 750, height: 40 });
+  const frame = { style: {}, setAttribute() {}, getBoundingClientRect: () => ({ width: 750, height: 960 }), contentWindow: { postMessage() {} }, remove() {} };
+  const channels = [];
+  class Channel { constructor() { this.port1 = { close() {} }; this.port2 = { close() {} }; channels.push(this); } }
+  const window = { parent: {}, innerWidth: 750, innerHeight: 960, setTimeout: () => 1 };
+  const document = { baseURI: 'http://localhost:3500/themes/', fonts: { ready: Promise.resolve() },
+    head: { querySelectorAll: () => [], append() {} }, body: root.parentElement,
+    createElement: tag => tag === 'iframe' ? frame : dom.window.document.createElement(tag) };
+  document.body.append = () => frame.onload();
+  // jsdom has CSSOM shorthand mutation but no var() computed-value resolution.
+  // Supply the browser-resolved geometry; the actual inline style and HTML
+  // round trip below use its real CSSStyleDeclaration implementation.
+  const computed = property => /^border-(top|right|bottom|left)-width$/.test(property) ? (property.includes('-left-') ? '3px' : '1px')
+    : /^border-(top|right|bottom|left)-style$/.test(property) ? (property.includes('-left-') ? 'dashed' : 'solid')
+    : property.includes('color') ? 'rgb(20, 20, 20)' : 'none';
+  vm.runInNewContext(await readFile(new URL('../public/algorithm/article-algorithm-host.js', import.meta.url), 'utf8'), {
+    window, document, URL, MessageChannel: Channel, crypto: { randomUUID: () => 'border-request' },
+    CSS: { supports: () => true }, clearTimeout() {}, getComputedStyle: () => ({ getPropertyValue: computed }),
+  });
+  window.ArticleAlgorithmHost.configure(DEFAULT_ALGORITHMS);
+  const before = root.outerHTML, pending = window.ArticleAlgorithmHost.run(root, compileFormatBundle(DEFAULT_FORMAT_BUNDLE));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(root.outerHTML, before, 'no geometry or paint is written before packet validation');
+  const properties = Object.fromEntries(window.ArticleAlgorithmHost.paintProperties.map(property => [property, property.includes('color') ? 'rgb(115, 115, 115)' : 'none']));
+  channels[0].port1.onmessage({ data: { request: 'border-request', result: { paints: [{ node: 0, properties }], findings: [] } } });
+  await pending;
+  const restored = new JSDOM(root.outerHTML).window.document.querySelector('article');
+  for (const side of ['top', 'right', 'bottom', 'left']) {
+    assert.equal(restored.style.getPropertyValue('border-' + side + '-width'), side === 'left' ? '3px' : '1px');
+    assert.equal(restored.style.getPropertyValue('border-' + side + '-style'), side === 'left' ? 'dashed' : 'solid');
+    assert.equal(restored.style.getPropertyValue('border-' + side + '-color'), 'rgb(115, 115, 115)');
+  }
+});
+
 test('the bridge closes ports and frames on timeout, navigation and invalid output without applying partial paint', async () => {
   const source = await readFile(new URL('../public/algorithm/article-algorithm-host.js', import.meta.url), 'utf8');
   for (const cause of ['timeout', 'navigation', 'invalid-output']) {
     const writes = [], policies = [], ports = [], timers = [];
-    let removed = 0;
+    let removed = 0, inertCopies = 0;
     const frame = { style: {}, setAttribute(name, value) { this[name] = value; }, getBoundingClientRect() { return { width: 750, height: 960 }; }, contentWindow: { postMessage() {} }, remove() { removed++; } };
     class Channel { constructor() { this.port1 = { close() { ports.push(1); } }; this.port2 = { close() { ports.push(2); } }; channels.push(this); } }
     const channels = [];
     const window = { parent: {}, innerWidth: 750, innerHeight: 960, setTimeout(callback) { timers.push(callback); return 1; } };
-    const document = { baseURI: 'http://localhost:3501/editor/', fonts: { ready: Promise.resolve() }, head: { querySelectorAll() { return []; }, append(policy) { policies.push(policy.content); } }, body: { append(element) { element.onload(); } }, createElement(tag) { return tag === 'iframe' ? frame : {}; } };
+    const document = { baseURI: 'http://localhost:3501/editor/', fonts: { ready: Promise.resolve() }, head: { querySelectorAll() { return []; }, append(policy) { policies.push(policy.content); } }, body: { append(element) { element.onload(); } }, createElement(tag) { return tag === 'iframe' ? frame : tag === 'template' ? { content: { append() { inertCopies++; } } } : {}; } };
     const copy = { outerHTML: '<article></article>', querySelectorAll() { return []; }, setAttribute() {}, getAttribute() { return null; } };
     const root = { outerHTML: '<article></article>', parentElement: document.body, cloneNode() { return copy; }, getBoundingClientRect() { return { x: 0, y: 0, width: 750, height: 40 }; }, querySelectorAll() { return []; }, style: { setProperty(...args) { writes.push(args); } } };
     vm.runInNewContext(source, { window, document, URL, MessageChannel: Channel, crypto: { randomUUID: () => 'request' }, CSS: { supports: () => true }, clearTimeout() {}, getComputedStyle: () => ({ getPropertyValue: () => 'none' }) });
     window.ArticleAlgorithmHost.configure(DEFAULT_ALGORITHMS);
     const pending = window.ArticleAlgorithmHost.run(root, compileFormatBundle(DEFAULT_FORMAT_BUNDLE));
     await new Promise(resolve => setImmediate(resolve));
+    assert.equal(inertCopies, 1, 'transport resource tokens are prepared in an inert template');
     assert.equal(frame.sandbox, 'allow-scripts'); assert.ok(policies.includes("frame-src 'none'"));
     if (cause === 'timeout') {
       channels[0].port1.onmessage({ data: { request: 'wrong', result: {} } });

@@ -1,0 +1,9 @@
+{
+  "id": "rainy-closing",
+  "name": "Rainy Design · Closing",
+  "trigger": "//rainy-closing",
+  "description": "A fine rule and short closing note for the end of an article.",
+  "content": "<section class=\"mt-10 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-sm text-article-ink\">▌Let your AI teammates write; you handle the review and revisions.</p>\n  <p class=\"m-0 text-xs font-semibold tracking-widest text-article-muted\">RAINY DESIGN · NOTES</p>\n</section>",
+  "icon": "bookmark",
+  "categoryId": "rainy-design"
+}

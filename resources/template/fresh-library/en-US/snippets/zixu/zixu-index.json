@@ -1,0 +1,9 @@
+{
+  "id": "zixu-index",
+  "name": "Violet Notes · Reading guide",
+  "trigger": "//zixu-index",
+  "description": "Third-level headings, explicit numbering and rules. Fill in numbers and labels.",
+  "content": "### READING INDEX\n\n**Reading guide**\n\n### 01\n\n**First item heading▌**　Add a reading note here.\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n\n### 02\n\n**Second item heading**　Add a reading note here.\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n\n### 03\n\n**Third item heading**　Add a reading note here.\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n",
+  "icon": "book",
+  "categoryId": "zixu"
+}

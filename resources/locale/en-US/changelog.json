@@ -445,109 +445,330 @@
       "summary": "official dark-mode components, initialization templates, validation performance, drag-and-drop confirmation, preview scroll alignment and save behavior switches.",
       "sections": [
         {
-          "title": "Version opening and baseline",
+          "title": "Feature updates",
           "items": [
-            "Opened from the 0.2.2 engineering work while retaining pending review. Algorithm, template, private configuration, performance and import work comes first, followed by preview scroll alignment, save-report and save-only refresh switches. The final audit covers only this patch and directly affected paths."
+            {
+              "title": "Official dark-mode integration",
+              "items": [
+                "Included the article root in official dark conversion and prepared border and decorative paint inline. Original computed styles are captured before batch writes to an isolated copy, retaining declaration priority.",
+                "The official default template now uses the SDK's original text color and accepts an explicit library dark background. All 23 same-input Chrome comparisons passed; actual WeChat mobile output still needs checking."
+              ]
+            },
+            {
+              "title": "Library algorithm components",
+              "items": [
+                "Implementation and license load with each library and are checked file by file with SHA-256. Component IDs and JSON parameters are independent of workbench props; library switches, reloads and file changes update snapshot identity.",
+                "The official dark-mode adapter now lives in the public platform preset. Library code runs in an isolated sandbox; paint and findings are fully checked before application. Existing Blob images and fonts transfer in memory without scanning the whole library.",
+                "New render records retain the original algorithm code and license. Older libraries and records show a fallback when an algorithm is needed; damaged components, unknown capabilities and invalid results are never reported as passed."
+              ]
+            },
+            {
+              "title": "New-library platform template",
+              "items": [
+                "Library creation now offers a validation and processing template. WeChat Official Account is the only public option; its trio, algorithm code and license are initialized together. Unknown/private choices are rejected before directory selection, while cancellation and name-collision protections remain.",
+                "The default trio source now lives in resources/presets/platform/wechat-article/format. Private website preset directories are excluded from bundling."
+              ]
+            },
+            {
+              "title": "Private platform configuration",
+              "items": [
+                "Custom website libraries use independent format policies and CSS/resource dependencies without WeChat-specific limits or dark conversion. Private templates and dependencies remain local and are excluded from the public catalog and build."
+              ]
+            },
+            {
+              "title": "Explicit platform validation switch",
+              "items": [
+                "validator.meta.enabled can explicitly disable platform standards. The trio, algorithms and style dependencies still use shared loading and structural validation; product safety/resource checks remain and formatter behavior is independent. Missing or invalid configuration still fails; settings and reports show the state."
+              ]
+            }
           ]
         },
         {
-          "title": "Official dark-mode integration",
+          "title": "Experience improvements",
           "items": [
-            "Included the article root in official dark conversion and prepared border and decorative paint inline. Original computed styles are captured before batch writes to an isolated copy, retaining declaration priority.",
-            "The official default template now uses the SDK's original text color and accepts an explicit library dark background. All 23 same-input Chrome comparisons passed; actual WeChat mobile output still needs checking."
+            {
+              "title": "Library policy summary",
+              "items": [
+                "Settings → Local directory now shows the active validation policy and algorithm version from the loaded snapshot. Switching libraries updates the summary; custom policies, fallbacks, disabled conversion and unavailable configurations are identified without extra library scans."
+              ]
+            },
+            {
+              "title": "Confirm dropped images",
+              "items": [
+                "The Assets page accepts external image drops and reuses the shared dialog shell to show destination, names, formats, sizes and unsupported entries before writing shared assets. Cancellation, library changes and stale targets do not import files; existing format, name-collision and partial-failure protections remain."
+              ]
+            },
+            {
+              "title": "Writing and preview controls",
+              "items": [
+                "Three shared icon switches in the preview header remember per-origin preferences: source-to-preview scrolling, manual-save format reports and save-only visible refresh.",
+                "Passive scrolling events are coalesced per frame using cached positions. Body, image, font or width changes invalidate the index, which rebuilds in bounded slices without library reads or compilation during scrolling.",
+                "Save reports default to on; disabling them only hides the manual-save dialog, while auto-save never opens it. Save-only refresh defaults to off; when enabled, visible inputs and resources are retained until successful saving. Current-draft checks, copying, export and render records stay independent, and stale display alignment pauses."
+              ]
+            },
+            {
+              "title": "Source formatting shortcuts",
+              "items": [
+                "Article source supports Cmd/Ctrl+B bold, I italic and U underline. Insert-menu hints share the same selection action, preserving chosen text instead of replacing it with sample text.",
+                "Actions reuse native single-step editing and input-specific undo history, with composition/read-only/unavailable guards. Markdown and HTML paragraph text use their corresponding inline markers."
+              ]
+            },
+            {
+              "title": "Consistent editor theme controls",
+              "items": [
+                "Confirmed the three Slate button fills are consumed. All built-in and Rainy editor themes now expose matching surface references while retaining existing colors. Every theme offers 33 base roles and 13 surface controls, including fields, shadows, backdrops, wash and opacity; editing a surface does not change its base color."
+              ]
+            }
           ]
         },
         {
-          "title": "Library algorithm components",
+          "title": "Bug fixes",
           "items": [
-            "Implementation and license load with each library and are checked file by file with SHA-256. Component IDs and JSON parameters are independent of workbench props; library switches, reloads and file changes update snapshot identity.",
-            "The official dark-mode adapter now lives in the public platform preset. Library code runs in an isolated sandbox; paint and findings are fully checked before application. Existing Blob images and fonts transfer in memory without scanning the whole library.",
-            "New render records retain the original algorithm code and license. Older libraries and records show a fallback when an algorithm is needed; damaged components, unknown capabilities and invalid results are never reported as passed."
+            {
+              "title": "Expired rendition recovery",
+              "items": [
+                "When the source or theme changes, an expired rendition is rebuilt after its retained dependencies are verified. Source files and historical styles are preserved; damaged dependencies still report an error rather than silently adopting current library styles."
+              ]
+            },
+            {
+              "title": "Preview scroll recovery",
+              "items": [
+                "Fixed wheel handling in fixed-viewport letterbox areas and stale drag state when changing split-view identity. Existing iframe scrolling is reused without changing the article virtual viewport."
+              ]
+            },
+            {
+              "title": "Fast invalid-image diagnostics",
+              "items": [
+                "Fixed repeated waits after an image had already failed with complete=true and naturalWidth=0. The engine handles settlement without reducing standards-JSON timeouts or requirements.",
+                "Empty/invalid addresses and loading/decoding failures are product resource errors for HTML/SVG images and local placeholders. Loading and resource-dependent incomplete states stay explicit; known missing files return diagnostics first."
+              ]
+            }
           ]
         },
         {
-          "title": "Static resource organization",
+          "title": "Documentation and delivery",
           "items": [
-            "Bundled fonts and OFL notices live in public/fonts, static licenses in public/licenses, and the sample image in public/images. Snippets/starters use the real /images/article-sample.png URL; old aliases and relative-image sample substitution are removed.",
-            "UI catalogs, release data and presets move into resources. Platform sources use resources/presets/platform; built-in themes/snippets/starters become files in resources/template/fresh-library. Browser scripts use public/format and public/algorithm, and initialization assembles the chosen public platform configuration."
+            {
+              "title": "Version opening and baseline",
+              "items": [
+                "Opened from the 0.2.2 engineering work while retaining pending review. Algorithm, template, private configuration, performance and import work comes first, followed by preview scroll alignment, save-report and save-only refresh switches. The final audit covers only this patch and directly affected paths."
+              ]
+            },
+            {
+              "title": "Static resource organization",
+              "items": [
+                "Bundled fonts and OFL notices live in public/fonts, static licenses in public/licenses, and the sample image in public/images. Snippets/starters use the real /images/article-sample.png URL; old aliases and relative-image sample substitution are removed.",
+                "UI catalogs, release data and presets move into resources. Platform sources use resources/presets/platform; built-in themes/snippets/starters become files in resources/template/fresh-library. Browser scripts use public/format and public/algorithm, and initialization assembles the chosen public platform configuration."
+              ]
+            },
+            {
+              "title": "Human review and follow-up fixes",
+              "items": [
+                "Human review is closed for this release. Clipboard-receiver surfaces, shortcut spacing and combined save-only refresh/scroll alignment fixes are deferred to 0.3.0 and remain tracked as unresolved.",
+                "Broken images are reported by the full format check. Source-line regression checks and returning to unsaved editors with clear draft indicators continue in 0.3.0. Source saving remains separate from format results."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "v0_3_0": {
+      "summary": "Read-only knowledge and Markdown/resource import with math/static diagrams, plus image zoom, folder renaming, WeChat copy fixes, global feedback and external complete fonts.",
+      "sections": [
+        {
+          "title": "Feature updates",
+          "items": [
+            {
+              "title": "Read-only knowledge and relations",
+              "items": [
+                "Each manuscript library can bind one independent read-only source. Indexes live in the manuscript library; explicit incremental/force scans, search, safe reading and link graphs retain missing/ambiguous/incomplete states.",
+                "Knowledge originals remain. Import editable copies with selected article themes; guards reject overlapping roots and stale writes."
+              ]
+            },
+            {
+              "title": "Import and background tasks",
+              "items": [
+                "Single UTF-8 Markdown creates body, theme snapshot and final references first. Local/HTTPS resources stream with bounded concurrency while editing, undo and save continue; arrivals never rewrite old full text.",
+                "Tasks offer pause/cancel/retry and source file/directory or replacement selection. Library switches/permission loss pause work; reopening requires manual recovery and conflicting files remain."
+              ]
+            },
+            {
+              "title": "General assets and output",
+              "items": [
+                "Image paths remain; attachments use media/file and shared/file. Twenty-three type icons, filtering, import confirmation, management and adoption share existing asset flows; non-images do not automatically preview or execute.",
+                "Checks distinguish importing/failed/missing resources and selective caches avoid rereading all images on arrival. Output rejects stale resource versions; ZIP carries explicit shared references with partial-output confirmation and excludes knowledge indexes/tasks."
+              ]
+            },
+            {
+              "title": "Math and static diagrams",
+              "items": [
+                "Optional markdown.math/markdown.mermaid steps produce local static MathML/isolated PNG. Older/default-disabled libraries keep behavior; invalid/oversized source is retained with diagnostics.",
+                "Trusted math commands and Mermaid config directives/interactions/external resources remain restricted. Pending diagrams cannot be copied/exported or saved as completed artifacts. Bilingual guides cover use, recovery, configuration, output and destination checks."
+              ]
+            },
+            {
+              "title": "Article theme dark colors",
+              "items": [
+                "Article color tables have light/dark columns. Library algorithm results are read only with multiple/unused/pending/failed states; one conversion supplies the entire table and preview.",
+                "Optional dark.tokens supplies manual overrides with light inheritance/reset. Variables apply before computed styles; fixed colors, old configurations/history and light output remain independent."
+              ]
+            },
+            {
+              "title": "Bilingual library defaults",
+              "items": [
+                "Complete Chinese and English themes, snippets, starter templates and categories share technical IDs and visual design. New libraries choose content from the interface language at creation.",
+                "The interface, missing translations and unsupported languages fall back to English; manual choice precedes browser languages. Libraries remember their seed language for initialization and Load defaults. Changing UI language leaves existing content untouched, and failed initialization retains its original choice.",
+                "Article themes share a library-level themes/preview.md sample for previews, save checks and color inspection. Missing files use the remembered seed language with an explicit default source; existing libraries and custom samples are not silently rewritten."
+              ]
+            },
+            {
+              "title": "Manuscript folder renaming",
+              "items": [
+                "Edit the article folder name in manuscript details. Applying it updates the index, project and ordering records, then reloads the manuscript. The information card and source header show the folder name; the body filename remains article.md."
+              ]
+            },
+            {
+              "title": "External complete fonts",
+              "items": [
+                "Complete Sen, Noto Sans SC and Roboto Mono fonts are excluded from the app and new builds, and still load from the library. Existing fonts and custom files are preserved.",
+                "Choose a font source in Settings before connecting a library: Google Fonts by default, or the free JSDMirror mirror for China. Missing files are checked for size and SHA-256 before writing. Failures fall back to system fonts, with cancellation, source switching and retry.",
+                "First-load guidance uses system fonts. README artwork shares the font source manifest and embeds verified complete fonts."
+              ]
+            }
           ]
         },
         {
-          "title": "Expired rendition recovery",
+          "title": "Experience improvements",
           "items": [
-            "When the source or theme changes, an expired rendition is rebuilt after its retained dependencies are verified. Source files and historical styles are preserved; damaged dependencies still report an error rather than silently adopting current library styles."
+            {
+              "title": "Width exemption and editor interaction",
+              "items": [
+                "The horizontal-image snippet declares the official data-ignore-width exemption on its inner list. Outer width and other checks remain active; existing manuscripts are not rewritten.",
+                "Body findings from completed save, manual and output checks now appear in the source gutter. Editing or configuration changes invalidate old findings without adding layout checks during typing or scrolling."
+              ]
+            },
+            {
+              "title": "History actions and layout",
+              "items": [
+                "The restore action sits beside the source/render comparison tabs, using the shared button bar and history icon with the existing confirmation and checkpoint flow.",
+                "Wide layouts place article information and theme comparisons beside the history Fork form; narrow layouts stack them and retain access to long content."
+              ]
+            },
+            {
+              "title": "Clipboard receiver paper",
+              "items": [
+                "The receiver uses the current library’s light paper and text color across article preview modes. Native and button-based paste retain actual inline colors."
+              ]
+            },
+            {
+              "title": "Formatting shortcut hints",
+              "items": [
+                "B/I/U menu hints use spaced chords such as ⌘ B / Ctrl + B in both languages. Actual shortcuts, actions and keyboard semantics are unchanged."
+              ]
+            },
+            {
+              "title": "Save-only refresh and scroll alignment",
+              "items": [
+                "Alignment finds the visible ShadowRoot or iframe, combines with save-only refresh and rebinds after mode, width or document changes. Edited manuscripts retain their existing visible canvas when enabled; newly opened documents wait for their own styles.",
+                "Retained displays map saved source to the current draft. Edited gaps use the nearest valid node; no match retains the current position. Warm scrolling reads cached positions, with passive events, requestAnimationFrame and 4 ms rebuild slices.",
+                "The top retention notice is removed. Save-only mode adds “· Save to refresh preview” to the source footer’s saved state."
+              ]
+            },
+            {
+              "title": "Unsaved drafts and return to editing",
+              "items": [
+                "Continue editing returns to the protected manuscript, information dialog, theme, snippet, starter template, appearance or asset editing position. Close and Escape only dismiss the prompt; failed saves retain the draft.",
+                "Navigation and object entries reuse unsaved dots, while article rows add a danger-colored Unsaved tag. Saving, discarding or undoing back to saved content clears the mark. Filters and background tasks are not unsaved edits."
+              ]
+            },
+            {
+              "title": "Scrollable containers and updated snippets",
+              "items": [
+                "Clarified the existing vertical-scroll height exemption. Both built-in languages now have 21 snippets, including four-image rows with and without padding. Width exemption stays on the inner list; SVG click behavior remains frozen."
+              ]
+            },
+            {
+              "title": "Image viewing and zoom",
+              "items": [
+                "The local article image view-and-rename dialog shows full images within the available width and supports vertical scrolling. Rename controls remain reachable in short windows; the separate image preview retains zoom and navigation.",
+                "Image viewers support Ctrl/⌘ + wheel zoom. Centered controls at the bottom zoom in, zoom out, or fit the width; ordinary wheel scrolling still moves through long images."
+              ]
+            },
+            {
+              "title": "Manuscript details layout",
+              "items": [
+                "The folder heading sits above the path card in manuscript details, with combined guidance for applying folder changes and saving the article. Narrow screens retain a scrolling form and bottom actions."
+              ]
+            },
+            {
+              "title": "Global action feedback",
+              "items": [
+                "Folder rename results appear below the toolbar as global notifications. Success says only “Folder updated”; manuscript details no longer retain a result row.",
+                "Success notifications disappear after three seconds. Errors and warnings retain details and can be dismissed. New results replace earlier ones for the same operation, with at most two visible; dialog keyboard and focus behavior is preserved."
+              ]
+            }
           ]
         },
         {
-          "title": "New-library platform template",
+          "title": "Bug fixes",
           "items": [
-            "Library creation now offers a validation and processing template. WeChat Official Account is the only public option; its trio, algorithm code and license are initialized together. Unknown/private choices are rejected before directory selection, while cancellation and name-collision protections remain.",
-            "The default trio source now lives in resources/presets/platform/wechat-article/format. Private website preset directories are excluded from bundling."
+            {
+              "title": "Caret and preview switching",
+              "items": [
+                "Fixed source clicks jumping to the old caret after saving or replacement. Typing // or opening the snippet picker closes find while retaining its form values.",
+                "Save-only refresh identifies previews by library, month, manuscript directory and opening generation, fixing the previous manuscript's canvas remaining after switching articles. Unsaved edits within one manuscript still keep its saved preview."
+              ]
+            },
+            {
+              "title": "Older render record compatibility",
+              "items": [
+                "Fixed older render records being rejected after adding the dark-source field. Existing manuscripts and history retain their original configuration without bulk migration; body, theme and dependency checks remain active."
+              ]
+            },
+            {
+              "title": "Folder punctuation preservation",
+              "items": [
+                "Folder names preserve valid Chinese and full-width punctuation through saving and reopening. Path separators, reserved characters and collision checks remain protected."
+              ]
+            },
+            {
+              "title": "Quote copying and preview shells",
+              "items": [
+                "WeChat rich-text copying outputs quotes as section elements while retaining their theme styles. Source and preview continue to use blockquote.",
+                "Copied content no longer includes preview-shell page padding, centering or width/height constraints. Spacing inside content cards, paragraphs and quotes is preserved. The library formatter controls these policies; older configurations retain their existing behavior until explicitly updated."
+              ]
+            },
+            {
+              "title": "Dark-preview borders and background hierarchy",
+              "items": [
+                "Fixed inline borders containing CSS variables losing their width and style when dark-mode colors were applied. Each side retains its original geometry, written only to the isolated copy after result validation.",
+                "Aligned the outer quote surface in Rainy Design with the Basic theme to restore background hierarchy after the official dark-mode conversion. The official algorithm, manuscript source and historical theme snapshots remain unchanged."
+              ]
+            },
+            {
+              "title": "Refresh after adopting an article theme",
+              "items": [
+                "Adopting or updating an article theme immediately recompiles styles and refreshes the current preview after success, including one explicit refresh in save-only mode. Subsequent typing still follows that preference. Unsaved state is preserved; failed or superseded compilation never advances the preview. Copy and export use valid results for the current theme."
+              ]
+            }
           ]
         },
         {
-          "title": "Private platform configuration",
+          "title": "Documentation and delivery",
           "items": [
-            "Custom website libraries use independent format policies and CSS/resource dependencies without WeChat-specific limits or dark conversion. Private templates and dependencies remain local and are excluded from the public catalog and build."
-          ]
-        },
-        {
-          "title": "Library policy summary",
-          "items": [
-            "Settings → Local directory now shows the active validation policy and algorithm version from the loaded snapshot. Switching libraries updates the summary; custom policies, fallbacks, disabled conversion and unavailable configurations are identified without extra library scans."
-          ]
-        },
-        {
-          "title": "Confirm dropped images",
-          "items": [
-            "The Assets page accepts external image drops and reuses the shared dialog shell to show destination, names, formats, sizes and unsupported entries before writing shared assets. Cancellation, library changes and stale targets do not import files; existing format, name-collision and partial-failure protections remain."
-          ]
-        },
-        {
-          "title": "Writing and preview controls",
-          "items": [
-            "Three shared icon switches in the preview header remember per-origin preferences: source-to-preview scrolling, manual-save format reports and save-only visible refresh.",
-            "Passive scrolling events are coalesced per frame using cached positions. Body, image, font or width changes invalidate the index, which rebuilds in bounded slices without library reads or compilation during scrolling.",
-            "Save reports default to on; disabling them only hides the manual-save dialog, while auto-save never opens it. Save-only refresh defaults to off; when enabled, visible inputs and resources are retained until successful saving. Current-draft checks, copying, export and render records stay independent, and stale display alignment pauses."
-          ]
-        },
-        {
-          "title": "Source formatting shortcuts",
-          "items": [
-            "Article source supports Cmd/Ctrl+B bold, I italic and U underline. Insert-menu hints share the same selection action, preserving chosen text instead of replacing it with sample text.",
-            "Actions reuse native single-step editing and input-specific undo history, with composition/read-only/unavailable guards. Markdown and HTML paragraph text use their corresponding inline markers."
-          ]
-        },
-        {
-          "title": "Preview scroll recovery",
-          "items": [
-            "Fixed wheel handling in fixed-viewport letterbox areas and stale drag state when changing split-view identity. Existing iframe scrolling is reused without changing the article virtual viewport."
-          ]
-        },
-        {
-          "title": "Fast invalid-image diagnostics",
-          "items": [
-            "Fixed repeated waits after an image had already failed with complete=true and naturalWidth=0. The engine handles settlement without reducing standards-JSON timeouts or requirements.",
-            "Empty/invalid addresses and loading/decoding failures are product resource errors for HTML/SVG images and local placeholders. Loading and resource-dependent incomplete states stay explicit; known missing files return diagnostics first."
-          ]
-        },
-        {
-          "title": "Consistent editor theme controls",
-          "items": [
-            "Confirmed the three Slate button fills are consumed. All built-in and Rainy editor themes now expose matching surface references while retaining existing colors. Every theme offers 33 base roles and 13 surface controls, including fields, shadows, backdrops, wash and opacity; editing a surface does not change its base color."
-          ]
-        },
-        {
-          "title": "Explicit platform validation switch",
-          "items": [
-            "validator.meta.enabled can explicitly disable platform standards. The trio, algorithms and style dependencies still use shared loading and structural validation; product safety/resource checks remain and formatter behavior is independent. Missing or invalid configuration still fails; settings and reports show the state."
-          ]
-        },
-        {
-          "title": "Human review and follow-up fixes",
-          "items": [
-            "Human review is closed for this release. Clipboard-receiver surfaces, shortcut spacing and combined save-only refresh/scroll alignment fixes are deferred to 0.3.0 and remain tracked as unresolved.",
-            "Broken images are reported by the full format check. Source-line regression checks and returning to unsaved editors with clear draft indicators continue in 0.3.0. Source saving remains separate from format results."
+            {
+              "title": "Version and MVP scope",
+              "items": [
+                "Continues from the 0.2.2.1 engineering branch with earlier review records and native-browser gaps preserved. Read-only binding, indexing/search/graph, import/resources and math/Mermaid are implemented, audited and committed one item at a time without releasing."
+              ]
+            },
+            {
+              "title": "Release-log separation and responsive configuration",
+              "items": [
+                "Public release data moved to resources/changelog/public.json. Local development and review notes use resources/changelog/local.md, excluded from Git and public exports; historical notices and bilingual pairs remain intact.",
+                "Documentation examples use viewport:null to lay out at the actual preview-column width and scroll within the available height. Explicit viewport objects remain available for fixed-layout reproduction."
+              ]
+            }
           ]
         }
       ]

@@ -6,7 +6,7 @@ import { ProductError, productCause, productMessage, productLabel, productText, 
 import { cliLocale, createCliTranslation } from '../scripts/cli-locale.mjs';
 import { parseStaticServerOptions } from '../scripts/static-server-options.mjs';
 import { articleFormatMessage, articleFormatMessageReference } from '../src/lib/articleFormat.ts';
-import { formatDiagnosticMessage } from '../src/lib/i18n/productMessages.ts';
+import { formatDiagnosticMessage, formatDiagnosticName } from '../src/lib/i18n/productMessages.ts';
 import { groupSourceLineIssues, sourceLineMessages } from '../src/lib/sourceLineDiagnostics.ts';
 
 test('product messages retain their canonical value and translate an existing record without regeneration', () => {
@@ -47,8 +47,8 @@ test('CLI locale selection uses locale precedence and unsupported languages fall
   assert.equal(cliLocale({ LC_ALL: 'zh_CN.UTF-8', LANG: 'en_US.UTF-8' }), 'zh-CN');
   assert.equal(cliLocale({ LC_MESSAGES: 'en_GB.UTF-8', LANG: 'zh_CN.UTF-8' }), 'en-US');
   assert.equal(cliLocale({ LANG: 'en' }), 'en-US');
-  assert.equal(cliLocale({ LANG: 'fr_FR.UTF-8' }), 'zh-CN');
-  assert.equal(cliLocale({}), 'zh-CN');
+  assert.equal(cliLocale({ LANG: 'fr_FR.UTF-8' }), 'en-US');
+  assert.equal(cliLocale({}), 'en-US');
 });
 
 test('CLI errors retain stable IDs and parameters with unchanged option and exit behavior', () => {
@@ -88,6 +88,18 @@ test('custom standards text identical to a product notice is preserved in report
   const concern = groupSourceLineIssues([rule], 1).get(1);
   assert.deepEqual(sourceLineMessages(concern, en), ['作者规则：深色转换已取消。']);
   assert.equal(concern.messages[0], '作者规则：深色转换已取消。');
+});
+
+test('resource, math and diagram diagnostic names translate in reports and gutters without altering authored rule names', () => {
+  const en = createUII18n('en-US').getFixedT('en-US', 'messages');
+  for (const key of ['resources.referenceName', 'resources.outputName', 'resources.documentLinkName', 'math.name', 'mermaid.name']) {
+    const issue = { kind: 'element', name: productText(key), domain: 'product', source: '当前文章正文', tier: 'error', line: 1, ...productMessage('resources.missing', { name: 'original.txt' }) };
+    const original = JSON.stringify(issue);
+    assert.equal(formatDiagnosticName(issue, en), en(key));
+    assert.ok(sourceLineMessages(groupSourceLineIssues([issue], 1).get(1), en)[0].startsWith(en(key)));
+    assert.equal(formatDiagnosticName({ ...issue, domain: 'standard' }, en), issue.name);
+    assert.equal(JSON.stringify(issue), original);
+  }
 });
 
 test('error labels and reports retain nested message identity and raw user parameters', () => {

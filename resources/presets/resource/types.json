@@ -1,0 +1,506 @@
+{
+  "schemaVersion": 1,
+  "types": [
+    {
+      "id": "image",
+      "icon": "image",
+      "badge": "IMG",
+      "extensions": {
+        "png": "image/png",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "jpe": "image/jpeg",
+        "gif": "image/gif",
+        "webp": "image/webp",
+        "bmp": "image/bmp",
+        "avif": "application/octet-stream"
+      },
+      "preview": "image",
+      "mimeAliases": []
+    },
+    {
+      "id": "image-file",
+      "icon": "image",
+      "badge": "IMG",
+      "extensions": {
+        "icns": "application/octet-stream",
+        "ico": "image/x-icon",
+        "heic": "application/octet-stream",
+        "heif": "application/octet-stream",
+        "tiff": "image/tiff",
+        "tif": "image/tiff"
+      },
+      "mimeAliases": [],
+      "preview": "none"
+    },
+    {
+      "id": "svg",
+      "icon": "image",
+      "badge": "SVG",
+      "extensions": {
+        "svg": "image/svg+xml"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "vector",
+      "icon": "image",
+      "badge": "VEC",
+      "extensions": {
+        "svgz": "image/svg+xml",
+        "ai": "application/postscript",
+        "eps": "application/postscript",
+        "ps": "application/postscript",
+        "psd": "image/vnd.adobe.photoshop",
+        "sketch": "application/octet-stream",
+        "fig": "application/octet-stream",
+        "xcf": "application/octet-stream",
+        "afdesign": "application/octet-stream",
+        "afphoto": "application/octet-stream",
+        "cdr": "application/octet-stream",
+        "indd": "application/octet-stream",
+        "idml": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": [
+        "application/postscript",
+        "image/vnd.adobe.photoshop"
+      ]
+    },
+    {
+      "id": "pdf",
+      "icon": "document",
+      "badge": "PDF",
+      "extensions": {
+        "pdf": "application/pdf"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "document",
+      "icon": "document",
+      "badge": "DOC",
+      "extensions": {
+        "doc": "application/msword",
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "docm": "application/vnd.ms-word.document.macroenabled.12",
+        "dot": "application/msword",
+        "dotx": "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+        "dotm": "application/vnd.ms-word.template.macroenabled.12",
+        "rtf": "application/rtf",
+        "odt": "application/vnd.oasis.opendocument.text",
+        "ott": "application/vnd.oasis.opendocument.text-template",
+        "pages": "application/octet-stream",
+        "wps": "application/vnd.ms-works",
+        "wp6": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "spreadsheet",
+      "icon": "table",
+      "badge": "XLS",
+      "extensions": {
+        "xls": "application/vnd.ms-excel",
+        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "xlsm": "application/vnd.ms-excel.sheet.macroenabled.12",
+        "xlsb": "application/vnd.ms-excel.sheet.binary.macroenabled.12",
+        "xlt": "application/vnd.ms-excel",
+        "xltx": "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+        "ods": "application/vnd.oasis.opendocument.spreadsheet",
+        "ots": "application/vnd.oasis.opendocument.spreadsheet-template",
+        "csv": "text/csv",
+        "tsv": "text/tab-separated-values",
+        "numbers": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "presentation",
+      "icon": "layers",
+      "badge": "PPT",
+      "extensions": {
+        "ppt": "application/vnd.ms-powerpoint",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "pptm": "application/vnd.ms-powerpoint.presentation.macroenabled.12",
+        "pot": "application/vnd.ms-powerpoint",
+        "potx": "application/vnd.openxmlformats-officedocument.presentationml.template",
+        "odp": "application/vnd.oasis.opendocument.presentation",
+        "otp": "application/vnd.oasis.opendocument.presentation-template",
+        "key": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "markdown",
+      "icon": "book",
+      "badge": "MD",
+      "extensions": {
+        "md": "text/markdown",
+        "markdown": "text/markdown",
+        "mdown": "application/octet-stream",
+        "mkd": "text/x-markdown",
+        "mkdn": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "text",
+      "icon": "document",
+      "badge": "TXT",
+      "extensions": {
+        "txt": "text/plain",
+        "text": "text/plain",
+        "log": "text/plain",
+        "rst": "application/octet-stream",
+        "adoc": "application/octet-stream",
+        "asciidoc": "application/octet-stream",
+        "org": "application/vnd.lotus-organizer",
+        "tex": "application/x-tex",
+        "bib": "application/octet-stream",
+        "nfo": "text/x-nfo",
+        "readme": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "code",
+      "icon": "code",
+      "badge": "CODE",
+      "extensions": {
+        "js": "application/javascript",
+        "jsx": "text/jsx",
+        "ts": "text/plain",
+        "tsx": "application/octet-stream",
+        "mjs": "application/javascript",
+        "cjs": "application/octet-stream",
+        "vue": "application/octet-stream",
+        "svelte": "application/octet-stream",
+        "py": "application/octet-stream",
+        "pyw": "application/octet-stream",
+        "rb": "application/octet-stream",
+        "rs": "text/plain",
+        "go": "application/octet-stream",
+        "java": "text/x-java-source",
+        "kt": "application/octet-stream",
+        "kts": "application/octet-stream",
+        "c": "text/x-c",
+        "h": "text/x-c",
+        "cpp": "text/x-c",
+        "cxx": "text/x-c",
+        "cc": "text/x-c",
+        "hpp": "application/octet-stream",
+        "cs": "application/octet-stream",
+        "swift": "application/octet-stream",
+        "m": "application/octet-stream",
+        "mm": "application/octet-stream",
+        "php": "application/x-httpd-php",
+        "r": "application/octet-stream",
+        "lua": "text/x-lua",
+        "pl": "application/x-perl",
+        "pm": "application/x-perl",
+        "raku": "application/octet-stream",
+        "sh": "application/x-sh",
+        "bash": "application/octet-stream",
+        "zsh": "application/octet-stream",
+        "fish": "application/octet-stream",
+        "ps1": "application/octet-stream",
+        "psd1": "application/octet-stream",
+        "psm1": "application/octet-stream",
+        "bat": "application/x-msdownload",
+        "cmd": "application/octet-stream",
+        "vbs": "application/octet-stream",
+        "vb": "application/octet-stream",
+        "dart": "application/vnd.dart",
+        "scala": "application/octet-stream",
+        "sc": "text/plain",
+        "groovy": "application/octet-stream",
+        "gradle": "application/octet-stream",
+        "sql": "application/x-sql",
+        "asm": "text/x-asm",
+        "s": "text/x-asm",
+        "ex": "application/octet-stream",
+        "exs": "application/octet-stream",
+        "erl": "application/octet-stream",
+        "hrl": "application/octet-stream",
+        "clj": "application/octet-stream",
+        "cljs": "application/octet-stream",
+        "fs": "application/octet-stream",
+        "fsx": "application/octet-stream",
+        "pas": "text/x-pascal",
+        "jl": "application/octet-stream",
+        "nim": "application/octet-stream",
+        "zig": "application/octet-stream",
+        "sol": "application/octet-stream",
+        "ipynb": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": [
+        "application/javascript"
+      ]
+    },
+    {
+      "id": "stylesheet",
+      "icon": "code",
+      "badge": "CSS",
+      "extensions": {
+        "css": "text/css",
+        "scss": "text/x-scss",
+        "sass": "text/x-sass",
+        "less": "text/less",
+        "styl": "text/stylus",
+        "stylus": "text/stylus"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "web",
+      "icon": "code",
+      "badge": "HTML",
+      "extensions": {
+        "html": "text/html",
+        "htm": "text/html",
+        "xhtml": "application/xhtml+xml",
+        "mhtml": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": [
+        "application/xhtml+xml"
+      ]
+    },
+    {
+      "id": "data",
+      "icon": "code",
+      "badge": "DATA",
+      "extensions": {
+        "json": "application/json",
+        "jsonc": "application/octet-stream",
+        "json5": "application/json5",
+        "jsonl": "application/octet-stream",
+        "ndjson": "application/octet-stream",
+        "yaml": "text/yaml",
+        "yml": "text/yaml",
+        "toml": "application/octet-stream",
+        "ini": "text/plain",
+        "cfg": "application/octet-stream",
+        "conf": "text/plain",
+        "xml": "application/xml",
+        "plist": "application/octet-stream",
+        "env": "application/octet-stream",
+        "properties": "application/octet-stream",
+        "lock": "application/octet-stream",
+        "har": "application/octet-stream",
+        "map": "application/json"
+      },
+      "preview": "none",
+      "mimeAliases": [
+        "text/xml"
+      ]
+    },
+    {
+      "id": "archive",
+      "icon": "layers",
+      "badge": "ZIP",
+      "extensions": {
+        "zip": "application/zip",
+        "rar": "application/x-rar-compressed",
+        "7z": "application/x-7z-compressed",
+        "tar": "application/x-tar",
+        "gz": "application/gzip",
+        "bz2": "application/x-bzip2",
+        "xz": "application/x-xz",
+        "tgz": "application/octet-stream",
+        "tbz2": "application/octet-stream",
+        "txz": "application/octet-stream",
+        "zst": "application/octet-stream",
+        "lz4": "application/octet-stream",
+        "br": "application/octet-stream",
+        "lzh": "application/x-lzh-compressed",
+        "cab": "application/vnd.ms-cab-compressed",
+        "ace": "application/x-ace-compressed",
+        "ar": "application/octet-stream",
+        "deb": "application/octet-stream",
+        "rpm": "application/x-redhat-package-manager",
+        "apk": "application/vnd.android.package-archive",
+        "apks": "application/octet-stream",
+        "aab": "application/x-authorware-bin",
+        "dmg": "application/octet-stream",
+        "iso": "application/octet-stream",
+        "img": "application/octet-stream",
+        "pkg": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "audio",
+      "icon": "quote",
+      "badge": "AUDIO",
+      "extensions": {
+        "mp3": "audio/mpeg",
+        "wav": "audio/wav",
+        "flac": "audio/x-flac",
+        "ogg": "audio/ogg",
+        "opus": "application/octet-stream",
+        "m4a": "audio/mp4",
+        "aac": "audio/x-aac",
+        "aiff": "audio/x-aiff",
+        "aif": "audio/x-aiff",
+        "amr": "application/octet-stream",
+        "mid": "audio/midi",
+        "midi": "audio/midi",
+        "wma": "audio/x-ms-wma",
+        "caf": "audio/x-caf",
+        "mka": "audio/x-matroska"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "video",
+      "icon": "image",
+      "badge": "VIDEO",
+      "extensions": {
+        "mp4": "video/mp4",
+        "m4v": "video/x-m4v",
+        "mkv": "video/x-matroska",
+        "webm": "video/webm",
+        "mov": "video/quicktime",
+        "avi": "video/x-msvideo",
+        "wmv": "video/x-ms-wmv",
+        "flv": "video/x-flv",
+        "mts": "application/octet-stream",
+        "m2ts": "application/octet-stream",
+        "m2t": "application/octet-stream",
+        "mpg": "video/mpeg",
+        "mpeg": "video/mpeg",
+        "3gp": "video/3gpp",
+        "3g2": "video/3gpp2",
+        "vob": "video/x-ms-vob",
+        "ogv": "video/ogg"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "font",
+      "icon": "tag",
+      "badge": "FONT",
+      "extensions": {
+        "ttf": "font/ttf",
+        "otf": "font/otf",
+        "woff": "font/woff",
+        "woff2": "font/woff2",
+        "eot": "application/vnd.ms-fontobject"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "ebook",
+      "icon": "book",
+      "badge": "BOOK",
+      "extensions": {
+        "epub": "application/epub+zip",
+        "mobi": "application/x-mobipocket-ebook",
+        "azw": "application/vnd.amazon.ebook",
+        "azw3": "application/octet-stream",
+        "djvu": "image/vnd.djvu",
+        "fb2": "application/octet-stream",
+        "cbr": "application/x-cbr",
+        "cbz": "application/x-cbr",
+        "cb7": "application/x-cbr"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "database",
+      "icon": "table",
+      "badge": "DB",
+      "extensions": {
+        "db": "application/octet-stream",
+        "sqlite": "application/octet-stream",
+        "sqlite3": "application/octet-stream",
+        "mdb": "application/x-msaccess",
+        "accdb": "application/octet-stream",
+        "realm": "application/octet-stream",
+        "parquet": "application/octet-stream",
+        "arrow": "application/octet-stream",
+        "feather": "application/octet-stream",
+        "h5": "application/octet-stream",
+        "hdf5": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": [
+        "application/x-sqlite3"
+      ]
+    },
+    {
+      "id": "model",
+      "icon": "layers",
+      "badge": "3D",
+      "extensions": {
+        "obj": "application/octet-stream",
+        "fbx": "application/octet-stream",
+        "gltf": "model/gltf+json",
+        "glb": "model/gltf-binary",
+        "stl": "application/octet-stream",
+        "dae": "model/vnd.collada+xml",
+        "blend": "application/octet-stream",
+        "step": "application/octet-stream",
+        "stp": "application/octet-stream",
+        "dwg": "image/vnd.dwg",
+        "dxf": "image/vnd.dxf",
+        "max": "application/octet-stream",
+        "3ds": "image/x-3ds",
+        "usd": "application/octet-stream",
+        "usdz": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "binary",
+      "icon": "document",
+      "badge": "BIN",
+      "extensions": {
+        "exe": "application/octet-stream",
+        "dll": "application/octet-stream",
+        "so": "application/octet-stream",
+        "dylib": "application/octet-stream",
+        "bin": "application/octet-stream",
+        "wasm": "application/wasm",
+        "pdb": "application/vnd.palm",
+        "class": "application/java-vm",
+        "pyc": "application/octet-stream",
+        "pyo": "application/octet-stream",
+        "o": "application/octet-stream",
+        "a": "application/octet-stream",
+        "lib": "application/octet-stream",
+        "elf": "application/octet-stream",
+        "com": "application/x-msdownload",
+        "sys": "application/octet-stream",
+        "dat": "application/octet-stream"
+      },
+      "preview": "none",
+      "mimeAliases": []
+    },
+    {
+      "id": "file",
+      "icon": "document",
+      "badge": "",
+      "extensions": {},
+      "preview": "none",
+      "mimeAliases": []
+    }
+  ]
+}

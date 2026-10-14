@@ -161,6 +161,50 @@ test('input and highlight share one scrolling ancestor, with no independently sc
   assert.equal(f.element.scrollTop, 0);
 });
 
+test('pointer focus preserves the scrolled viewport before the click places a new caret', () => {
+  const f = inputFixture('First\nLast', []);
+  const viewport = { scrollTop: 900, scrollLeft: 0 };
+  f.nodes().find(n => n.props['data-source-viewport']).props.ref.current = viewport;
+  f.element.setSelectionRange(0, 0);
+  f.input().props.onPointerDown();
+  viewport.scrollTop = 0; // Browser focus attempted to reveal the old caret.
+  f.input().props.onFocus();
+  assert.equal(viewport.scrollTop, 900);
+  f.element.setSelectionRange(8, 8);
+  f.input().props.onSelect({ currentTarget: f.element });
+  f.input().props.onPointerUp();
+  f.input().props.onClick({ currentTarget: f.element });
+  assert.equal(viewport.scrollTop, 900);
+  assert.equal(f.element.selectionStart, 8);
+});
+
+test('typing a valid snippet trigger closes find, retains form values, and opens the snippet tree', () => {
+  const openFindRef = { current: null }, f = inputFixture('Body', [opening], true, { openFindRef });
+  const bar = () => f.nodes().find(n => n.type === 'source-find');
+  openFindRef.current(); f.render();
+  bar().props.onQuery('Body'); bar().props.onReplacement('Text'); f.render();
+  f.element.value = 'Body\n//'; f.element.setSelectionRange(7, 7);
+  f.input().props.onChange({ currentTarget: f.element }); f.render();
+  assert.equal(bar(), undefined);
+  assert.equal(f.input().props['aria-expanded'], true);
+  openFindRef.current(); f.render();
+  assert.equal(bar().props.query, 'Body'); assert.equal(bar().props.replacement, 'Text');
+});
+
+test('snippet picker also closes find, while URLs, code fences and IME keep their ordinary behavior', () => {
+  const openFindRef = { current: null }, openPickerRef = { current: null };
+  const f = inputFixture('Body', [opening], true, { openFindRef, openPickerRef });
+  openFindRef.current(); f.render(); openPickerRef.current(); f.render();
+  assert.equal(f.nodes().some(n => n.type === 'source-find'), false);
+  assert.equal(f.input().props['aria-expanded'], true);
+  for (const value of ['https://example.test//', '```md\n//']) {
+    const opener = { current: null }, g = inputFixture('Body', [opening], true, { openFindRef: opener });
+    opener.current(); g.render(); g.element.value = value; g.element.setSelectionRange(value.length, value.length);
+    g.input().props.onChange({ currentTarget: g.element }); g.render();
+    assert.equal(g.nodes().some(n => n.type === 'source-find'), true);
+  }
+});
+
 test('an active IME composition blocks stale replacement callbacks until composition finishes', () => {
   const openFindRef = { current: null }, original = 'Alpha alpha';
   const f = inputFixture(original, [], true, { openFindRef });
@@ -204,11 +248,14 @@ test('the source toolbar uses the same undoable insert ref as the input', async 
       if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
-      if (id === 'react') return { useRef: value => ({ current: value }), useState: value => [value, () => {}], useMemo: fn => fn(), useEffect() {} };
+      if (id.endsWith('/usePreviewPreferences')) return { usePreviewPreferences: () => ({ preferences: { saveOnly: false } }) };
+      if (id === 'react') return { useRef: value => ({ current: value }), useState: value => [value, () => {}], useMemo: fn => fn(), useEffect() {}, useLayoutEffect() {} };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/articleAuthoringFormat')) return { validateArticleAuthoringMarkdown: async () => [] };
       if (id.endsWith('/sourceLineDiagnostics')) return lineDiagnostics;
       if (id.endsWith('/mediaManagement')) return { inspectLocalArticleImages: async () => [] };
+      if (id.endsWith('/resources/inspection')) return { inspectArticleResources: async () => [] };
+      if (id.endsWith('/useResourceVersion')) return { useResourceDocumentVersion: () => 0 };
       if (id.endsWith('/useMediaPreferences')) return { useAuthoringChecks: () => [true, () => {}] };
       if (id.endsWith('/useSourceLineNumbers')) return { useSourceLineNumbers: () => ({ showLineNumbers: false, toggle() { lineToggles++; } }) };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'snippet-input' };
@@ -217,8 +264,9 @@ test('the source toolbar uses the same undoable insert ref as the input', async 
       throw new Error(id);
     }),
   });
-  const tree = module.exports.SourcePanel({ article: {}, parsed: { body: 'Kept source', diagnostics: [] }, sourceTextareaRef: { current: {} }, status: {}, onChangeBody() { throw new Error('Toolbar must not replace controlled source directly'); } });
+  const tree = module.exports.SourcePanel({ article: {}, parsed: { body: 'Kept source\nCard two\nCard three', diagnostics: [] }, sourceFormatIssues: [{ kind: 'element', name: 'width', source: '当前正文实际渲染', tier: 'error', line: 2, message: '横向溢出' }], sourceTextareaRef: { current: {} }, status: {}, onChangeBody() { throw new Error('Toolbar must not replace controlled source directly'); } });
   const nodes = walk(tree), input = nodes.find(n => n.type === 'snippet-input'), menu = nodes.find(n => n.type === 'insert-menu'), calls = [];
+  assert.equal(input.props.lineConcerns.get(2).severity, 'error', 'the existing gutter receives rendered body findings');
   input.props.insertTextRef.current = (...args) => calls.push(args);
   menu.props.onInsert('**bold**', 2);
   assert.deepEqual(calls, [['**bold**', 2]]);
@@ -357,7 +405,7 @@ test('insert menu labels expose B/I/U and formatting routes through the shared s
   const tree = module.exports.InsertElementsMenu({ disabled: false, readOnly: false, onFormat: kind => calls.push(kind), onInsert() { throw new Error('format must preserve the chosen text'); } });
   const nodes = walk(tree), kbd = nodes.filter(node => node.type === 'kbd');
   const content = node => Array.isArray(node) ? node.map(content).join('') : node?.props ? content(node.props.children) : typeof node === 'string' ? node : '';
-  assert.deepEqual(kbd.map(content), ['⌘B / Ctrl+B', '⌘I / Ctrl+I', '⌘U / Ctrl+U']);
+  assert.deepEqual(kbd.map(content), ['⌘ B / Ctrl + B', '⌘ I / Ctrl + I', '⌘ U / Ctrl + U']);
   for (const label of ['粗体', '斜体', '下划线']) {
     const button = nodes.find(node => node.type === 'button' && content(node).startsWith(label));
     assert.ok(button); button.props.onClick({ currentTarget: { closest: () => ({ open: true }) } });

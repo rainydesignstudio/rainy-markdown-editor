@@ -14,3 +14,4 @@ test-results/
 /resources/presets/platform/*
 !/resources/presets/platform/wechat-article/
 /*.zip
+/resources/changelog/local.md

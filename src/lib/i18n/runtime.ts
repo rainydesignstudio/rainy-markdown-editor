@@ -20,6 +20,8 @@ import zhDialogs from '../../../resources/locale/zh-CN/dialogs.json' with { type
 import enDialogs from '../../../resources/locale/en-US/dialogs.json' with { type: 'json' };
 import zhMessages from '../../../resources/locale/zh-CN/messages.json' with { type: 'json' };
 import enMessages from '../../../resources/locale/en-US/messages.json' with { type: 'json' };
+import zhKnowledge from '../../../resources/locale/zh-CN/knowledge.json' with { type: 'json' };
+import enKnowledge from '../../../resources/locale/en-US/knowledge.json' with { type: 'json' };
 import zhChangelog from '../../../resources/locale/zh-CN/changelog.json' with { type: 'json' };
 import enChangelog from '../../../resources/locale/en-US/changelog.json' with { type: 'json' };
 import { chineseReleaseTexts } from './changelog';
@@ -27,8 +29,8 @@ import { formatUINumber } from './formatters';
 import { UI_LOCALES, type UILocale } from './preferences';
 
 export const UI_RESOURCES = {
-  'zh-CN': { common: zhCommon, shell: zhShell, articles: zhArticles, editor: zhEditor, themes: zhThemes, content: zhContent, media: zhMedia, settings: zhSettings, dialogs: zhDialogs, messages: zhMessages, changelog: { ...zhChangelog, releases: chineseReleaseTexts } },
-  'en-US': { common: enCommon, shell: enShell, articles: enArticles, editor: enEditor, themes: enThemes, content: enContent, media: enMedia, settings: enSettings, dialogs: enDialogs, messages: enMessages, changelog: enChangelog },
+  'zh-CN': { common: zhCommon, shell: zhShell, articles: zhArticles, editor: zhEditor, themes: zhThemes, content: zhContent, media: zhMedia, settings: zhSettings, knowledge: zhKnowledge, dialogs: zhDialogs, messages: zhMessages, changelog: { ...zhChangelog, releases: chineseReleaseTexts } },
+  'en-US': { common: enCommon, shell: enShell, articles: enArticles, editor: enEditor, themes: enThemes, content: enContent, media: enMedia, settings: enSettings, knowledge: enKnowledge, dialogs: enDialogs, messages: enMessages, changelog: enChangelog },
 };
 
 // Use i18next's registered formatter for display interpolation. Only numeric values are
@@ -43,13 +45,13 @@ function displayResources(resources: Resource): Resource {
   return visit(resources) as Resource;
 }
 
-export function createUII18n(locale: UILocale = 'zh-CN'): i18n {
+export function createUII18n(locale: UILocale = 'en-US'): i18n {
   const instance = createInstance();
   void instance.use(initReactI18next).init({
     resources: displayResources(UI_RESOURCES),
     lng: locale,
     supportedLngs: [...UI_LOCALES],
-    fallbackLng: 'zh-CN',
+    fallbackLng: 'en-US',
     defaultNS: 'common',
     ns: Object.keys(UI_RESOURCES['zh-CN']),
     initAsync: false,
@@ -57,6 +59,6 @@ export function createUII18n(locale: UILocale = 'zh-CN'): i18n {
     returnNull: false,
     react: { useSuspense: false },
   });
-  instance.services.formatter?.add('uiValue', (value, language) => typeof value === 'number' ? formatUINumber(value, language === 'en-US' ? 'en-US' : 'zh-CN') : value);
+  instance.services.formatter?.add('uiValue', (value, language) => typeof value === 'number' ? formatUINumber(value, language === 'zh-CN' ? 'zh-CN' : 'en-US') : value);
   return instance;
 }

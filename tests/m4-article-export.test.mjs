@@ -12,8 +12,12 @@ test('website Markdown export preserves body bytes and rejects uncertain metadat
 import { articlePdfPageCuts } from '../src/lib/articleVisualExport.ts';
 
 function directory(items) {
-  return {
+  const handles = new Map();
+  const result = {
     kind: 'directory',
+    name: 'root', parent: null,
+    queryPermission: async () => 'granted',
+    async resolve(other) { const path = []; for (let cursor = other; cursor; cursor = cursor.parent) { if (cursor === result) return path.reverse(); path.push(cursor.name); } return null; },
     async *entries() { for (const [name, value] of Object.entries(items)) yield [name, { kind: value.kind ?? 'file' }]; },
     async getDirectoryHandle(name) {
       const value = items[name];
@@ -23,19 +27,22 @@ function directory(items) {
     async getFileHandle(name) {
       const value = items[name];
       if (!(value instanceof Blob)) throw new DOMException('Not found', 'NotFoundError');
-      return { kind: 'file', async getFile() { return value; } };
+      if (!handles.has(name)) handles.set(name, { name, parent: result, kind: 'file', async getFile() { return new File([value], name); } }); return handles.get(name);
     },
   };
+  for (const [name, value] of Object.entries(items)) if (value.kind === 'directory') { value.name = name; value.parent = result; }
+  return result;
 }
 
 test('document package preserves current markdown and the existing media tree', async () => {
-  const media = directory({ image: directory({ '封面.png': new Blob([Uint8Array.from([1, 2, 3])]) }), 'note.txt': new Blob(['附注']) });
-  const root = directory({ articles: directory({ '2026-10': directory({ draft: directory({ media }) }) }) });
+  const png = [137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3];
+  const media = directory({ image: directory({ '封面.png': new Blob([Uint8Array.from(png)]) }), 'note.txt': new Blob(['附注']) });
+  const root = directory({ articles: directory({ '2026-10': directory({ draft: directory({ media, 'article.md': new Blob(['saved']) }) }) }) });
   const source = '---\ntitle: "当前稿"\n---\n\n![封面](media/image/%E5%B0%81%E9%9D%A2.png)\n';
   const { blob, mediaFiles } = await createArticleDocumentPackage(source, root, '2026-10', 'draft');
   const entries = unzipSync(new Uint8Array(await blob.arrayBuffer()));
   assert.equal(strFromU8(entries['article.md']), source);
-  assert.deepEqual(Array.from(entries['media/image/封面.png']), [1, 2, 3]);
+  assert.deepEqual(Array.from(entries['media/image/封面.png']), png);
   assert.equal(strFromU8(entries['media/note.txt']), '附注');
   assert.equal(mediaFiles, 2);
 });

@@ -1,19 +1,17 @@
 'use client';
 
-import { ProductError } from "../../lib/i18n/productMessages";
+import { ProductError, productCause } from "../../lib/i18n/productMessages";
 import { useUITranslation } from '../global/UILocaleProvider';
 
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { memo, useEffect, useRef, useState, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import { articleMarkdownPlugins, articleHtmlPlugins, rehypePreviewOnly } from '../../lib/article-format/pipeline';
 import {
   articleImageFileNameFromSource,
   articleImageSourceSetCandidates,
-  inspectArticleImage,
   replaceArticleImageSourceSetUrls,
   type ArticleMediaAsset,
 } from '../../lib/articleMedia';
-import { getArticleMediaDirectory } from '../../lib/fileSystem';
 import type { StoredArticle } from '../../lib/types';
 import { ArticleImagePreview } from '../media/ArticleImagePreview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
@@ -22,6 +20,12 @@ import type { FormatSnapshot } from '../../lib/article-format/runtime';
 import { ArticleCodeBlock } from './ArticleCodeBlock';
 import { LibraryArticleImage } from './LibraryArticleImage';
 import { normalizeLibraryPath, stylesheetAssetPath } from '../../lib/article-format/styles';
+import { useResourceVersion } from '../../hooks/imports/useResourceVersion';
+import { resourceState } from '../../lib/resources/state';
+import { cachedArticleImage, readArticleImage, type CachedArticleImage } from '../../lib/resources/imageCache';
+import { resourceReferenceIntent } from '../../lib/resources/references';
+import { LocalFileLink } from './LocalFileLink';
+import { MermaidDiagram } from './MermaidDiagram';
 
 export type ArticleMediaContext = {
   root: FileSystemDirectoryHandle | null;
@@ -30,6 +34,7 @@ export type ArticleMediaContext = {
   sessionKey: string | number;
   isCurrent: () => boolean;
   onOpen?: (asset: ArticleMediaAsset) => void;
+  onResourceError?: (error: unknown) => void;
 };
 
 type LocalImageProps = {
@@ -50,7 +55,9 @@ type LocalImageProps = {
 
 function LocalArticleImage(props: LocalImageProps) {
   const { t } = useUITranslation('messages');
-  const [asset, setAsset] = useState<{ handle: FileSystemFileHandle; mimeType: string; size: number } | null>(null);
+  const reference = 'media/image/' + encodeURIComponent(props.fileName), version = useResourceVersion(props.root, props.article.id, [reference]);
+  const scope = `${props.sessionKey}:${version}`, importState = resourceState(props.root, props.article.id, reference);
+  const [asset, setAsset] = useState<CachedArticleImage | null>(() => cachedArticleImage(props.root, props.article.id, props.fileName, scope));
   const [issue, setIssue] = useState<string | null>(null);
   const currentRef = useRef(props.isCurrent);
   const onOpenRef = useRef(props.onOpen);
@@ -59,24 +66,25 @@ function LocalArticleImage(props: LocalImageProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setAsset(null);
+    setAsset(cachedArticleImage(props.root, props.article.id, props.fileName, scope));
     setIssue(null);
     const current = () => !cancelled && currentRef.current();
     const load = async () => {
       try {
-        const imageDirectory = await getArticleMediaDirectory(props.root, props.article.month, props.article.folder, false);
-        const handle = await imageDirectory.getFileHandle(props.fileName);
-        const file = await handle.getFile();
-        const format = await inspectArticleImage(file);
+        if (importState?.state && importState.state !== 'complete') {
+          if (importState.state === 'failed' || importState.state === 'cancelled') throw new ProductError('resources.importFailed', { name: props.fileName, cause: importState.error ? productCause(importState.error) : '' });
+          return;
+        }
+        const value = await readArticleImage(props.root, { kind: 'article', articleId: props.article.id, month: props.article.month, folder: props.article.folder, title: props.articleTitle }, props.fileName, scope, current);
         if (!current()) return;
-        setAsset({ handle, mimeType: format.mimeType, size: file.size });
+        setAsset(value);
       } catch (error) {
         if (current()) setIssue(error instanceof Error ? error.message : String(error));
       }
     };
     void load();
     return () => { cancelled = true; };
-  }, [props.article.folder, props.article.month, props.fileName, props.root, props.sessionKey]);
+  }, [props.article.folder, props.article.month, props.fileName, props.root, scope]);
 
   if (issue || !asset) {
     const label = t(issue ? 'messages:image.unavailableLabel' : 'messages:image.loadingLabel', { fileName: props.fileName });
@@ -109,6 +117,7 @@ function LocalArticleImage(props: LocalImageProps) {
   return (
     <ArticleImagePreview
       handle={asset.handle}
+      file={asset.file}
       fileName={props.fileName}
       alt={props.alt}
       variant="article"
@@ -117,7 +126,7 @@ function LocalArticleImage(props: LocalImageProps) {
       clipboardSource={props.clipboardSource}
       clipboardSourceSet={props.clipboardSourceSet}
       imageProps={props.imageProps}
-      sessionKey={props.sessionKey}
+      sessionKey={scope}
       isCurrent={props.isCurrent}
       onOpen={onOpenRef.current ? () => onOpenRef.current?.(mediaAsset) : undefined}
     />
@@ -148,6 +157,7 @@ async function decodeTemporaryUrl(url: string): Promise<void> {
 
 function LocalArticleSourceSet(props: LocalSourceSetProps) {
   const candidates = articleImageSourceSetCandidates(props.sourceSet).filter((candidate) => candidate.fileName);
+  const version = useResourceVersion(props.root, props.article.id, candidates.map(candidate => candidate.url));
   const remoteOnlySourceSet = replaceArticleImageSourceSetUrls(
     props.sourceSet,
     new Map(candidates.map((candidate) => [candidate.url, null])),
@@ -164,15 +174,15 @@ function LocalArticleSourceSet(props: LocalSourceSetProps) {
 
     const resolve = async () => {
       try {
-        const imageDirectory = await getArticleMediaDirectory(props.root, props.article.month, props.article.folder, false);
         const replacements = new Map<string, string | null>();
         for (const candidate of candidates) {
           if (!candidate.fileName || !current()) return;
+          const entry = resourceState(props.root, props.article.id, candidate.url);
+          if (entry?.state && entry.state !== 'complete') { replacements.set(candidate.url, null); continue; }
           let objectUrl: string | null = null;
           try {
-            const handle = await imageDirectory.getFileHandle(candidate.fileName);
-            const file = await handle.getFile();
-            await inspectArticleImage(file);
+            const epoch = resourceState(props.root, props.article.id, candidate.url)?.version ?? 0;
+            const { file } = await readArticleImage(props.root, { kind: 'article', articleId: props.article.id, month: props.article.month, folder: props.article.folder, title: props.article.folder }, candidate.fileName, `${props.sessionKey}:${epoch}`, current);
             objectUrl = URL.createObjectURL(file);
             objectUrls.push(objectUrl);
             await decodeTemporaryUrl(objectUrl);
@@ -197,7 +207,7 @@ function LocalArticleSourceSet(props: LocalSourceSetProps) {
       cancelled = true;
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [props.article.folder, props.article.month, props.root, props.sessionKey, props.sourceSet]);
+  }, [props.article.folder, props.article.month, props.root, props.sessionKey, props.sourceSet, version]);
 
   return (
     <source
@@ -209,17 +219,16 @@ function LocalArticleSourceSet(props: LocalSourceSetProps) {
   );
 }
 
-export function MarkdownPreview({
+type MarkdownPreviewProps = { source: string; media?: ArticleMediaContext | null; snapshot?: FormatSnapshot; previewOnly?: boolean };
+export function sameMarkdownPreviewInput(previous: MarkdownPreviewProps, next: MarkdownPreviewProps) {
+  return previous.source === next.source && previous.snapshot === next.snapshot && previous.previewOnly === next.previewOnly && previous.media?.root === next.media?.root && previous.media?.article?.id === next.media?.article?.id && previous.media?.articleTitle === next.media?.articleTitle && previous.media?.sessionKey === next.media?.sessionKey && previous.media?.onOpen === next.media?.onOpen && previous.media?.onResourceError === next.media?.onResourceError;
+}
+function MarkdownPreviewContent({
   source,
   media,
   snapshot,
   previewOnly = false,
-}: {
-  source: string;
-  media?: ArticleMediaContext | null;
-  snapshot?: FormatSnapshot;
-  previewOnly?: boolean;
-}) {
+}: MarkdownPreviewProps) {
   const { t } = useUITranslation('messages');
   const translationRef = useRef(t);
   translationRef.current = t;
@@ -234,15 +243,21 @@ export function MarkdownPreview({
 
   if (!componentsRef.current) {
     componentsRef.current = {
+      a: ({ node: _node, href, children, ...props }) => {
+        const fileLink = typeof href === 'string' && resourceReferenceIntent(href) === 'file';
+        return fileLink ? <LocalFileLink {...props} href={href!} context={mediaRef.current ?? null}>{children}</LocalFileLink> : <a {...props} href={href}>{children}</a>;
+      },
       code: ({ node: _node, children, className, ...props }) => {
         const formatter = snapshotRef.current.bundle.formatter;
         const language = /language-([\w-]+)/.exec(className ?? '')?.[1];
+        if (language === 'mermaid' && formatter.mermaid && (props as Record<string, unknown>)['data-mermaid-source'] === 'true') return <MermaidDiagram source={String(children).replace(/\n$/, '')} policy={formatter.mermaid} session={snapshotRef.current.id} line={_node?.position?.start.line} rejected={String((props as Record<string, unknown>)['data-mermaid-rejected'] ?? '') || undefined} />;
         if (language && formatter.codeHighlight.engine === 'prism') return <ArticleCodeBlock text={String(children)} language={language} formatter={formatter} />;
         return <code {...props} className={className}>{children}</code>;
       },
       img: ({ node: _node, src, srcSet, alt, ...imageProps }) => {
         const originalSrc = typeof src === 'string' ? src : '';
         const format = snapshotRef.current, currentLibrary = mediaRef.current;
+        if (resourceReferenceIntent(originalSrc) === 'file') return <span role="img" data-local-asset-src={originalSrc} data-asset-state="error">{translationRef.current('messages:resources.imageInFileStorage')}</span>;
         // Application sample assets keep their own namespace in stylesheet libraries.
         if (originalSrc === ARTICLE_EXAMPLE_IMAGE) {
           return <img {...imageProps} src={ARTICLE_EXAMPLE_IMAGE} alt={alt || '示例图片'} data-example-image="true" />;
@@ -251,7 +266,7 @@ export function MarkdownPreview({
           const base = currentLibrary?.article ? 'articles/' + currentLibrary.article.month + '/' + currentLibrary.article.folder : '';
           try {
             const path = originalSrc.startsWith('/') ? stylesheetAssetPath(originalSrc, '', format.bundle.formatter.stylesheets.publicRoot)?.path : normalizeLibraryPath(originalSrc, base);
-            if (path) return <LibraryArticleImage root={currentLibrary?.root ?? null} path={path} cachedUrl={format.environment?.assets.find(asset => asset.path === path)?.url} source={originalSrc} imageProps={{ ...imageProps, alt }} />;
+            if (path) return <ReactiveLibraryImage media={currentLibrary ?? null} path={path} cachedUrl={format.environment?.assets.find(asset => asset.path === path)?.url} source={originalSrc} imageProps={{ ...imageProps, alt }} />;
           } catch { return <span role="img" aria-label={translationRef.current('messages:image.invalidPathLabel', { path: originalSrc })}>{translationRef.current('messages:image.invalidPath', { path: originalSrc })}</span>; }
         }
         const originalSourceSet = typeof srcSet === 'string' ? srcSet : '';
@@ -353,3 +368,11 @@ export function MarkdownPreview({
     </ReactMarkdown>
   );
 }
+
+function ReactiveLibraryImage({ media, ...props }: Omit<ComponentProps<typeof LibraryArticleImage>, 'root'> & { media: ArticleMediaContext | null }) {
+  const version = useResourceVersion(media?.root ?? null, media?.article?.id ?? 'draft', [props.source]);
+  const { t } = useUITranslation('messages'), state = media?.root ? resourceState(media.root, media.article?.id ?? 'draft', props.source) : null;
+  if (state?.state && state.state !== 'complete') return <span role="img" aria-busy={state.state === 'pending' || state.state === 'running'} data-local-asset-src={props.source} data-asset-state={state.state === 'failed' || state.state === 'cancelled' ? 'error' : 'loading'}>{t(state.state === 'failed' || state.state === 'cancelled' ? 'messages:resources.importFailed' : 'messages:resources.importPending', { name: props.source, cause: '' })}</span>;
+  return <LibraryArticleImage {...props} root={media?.root ?? null} refreshKey={`${media?.sessionKey}:${version}`} />;
+}
+export const MarkdownPreview = memo(MarkdownPreviewContent, sameMarkdownPreviewInput);

@@ -1,0 +1,9 @@
+{
+  "id": "rich-blockquote",
+  "name": "Rich quotation",
+  "trigger": "//rich-blockquote",
+  "description": "A two-part quotation block for the main quote and its attribution.",
+  "content": "<blockquote>\n  <p class=\"font-bold text-xl\">Main content<p>\n  <span class=\"text-article-muted\">- Supporting text ▌</span>\n</blockquote>",
+  "icon": "snippet",
+  "categoryId": "default"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "zixu-opening",
+  "name": "Violet Notes · Opening card",
+  "trigger": "//zixu-opening",
+  "description": "A pale violet opening card with a section label, title, subtitle and introduction.",
+  "content": "<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">CHANNEL / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 pb-4 border-b border-article-line text-[26px]/[1.5] font-bold text-article-heading\">▌Article title<br />Subtitle<span class=\"text-article-accent\">Key phrase</span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">Introduce the question, the reading path and the value of this article.</p>\n</section>",
+  "icon": "document",
+  "categoryId": "zixu"
+}

@@ -74,7 +74,7 @@ export function ThemeInspectionPreview({ inspection, dialogOwner, children, clas
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
-    const root = frameRef ? frameRef.current?.contentDocument?.querySelector<HTMLElement>('article') : rootRef?.current ?? wrapper.firstElementChild as HTMLElement | null;
+    const root = frameRef ? frameRef.current?.contentDocument?.querySelector<HTMLElement>('[data-article-content-root],article') : rootRef?.current ?? wrapper.firstElementChild as HTMLElement | null;
     if (!root) return;
     let elements: HTMLElement[] = [];
     const refresh = () => { elements = [root, ...root.querySelectorAll<HTMLElement>('*')].filter(element => !element.matches('style,script,link')); elements.forEach(element => element.classList.add(...INSPECTION_CLASSES)); };
@@ -140,7 +140,7 @@ export function ThemeInspectionPreview({ inspection, dialogOwner, children, clas
   useEffect(() => {
     close();
     const wrapper = wrapperRef.current;
-    const root = frameRef ? frameRef.current?.contentDocument?.querySelector<HTMLElement>('article') : rootRef?.current ?? wrapper?.firstElementChild as HTMLElement | null;
+    const root = frameRef ? frameRef.current?.contentDocument?.querySelector<HTMLElement>('[data-article-content-root],article') : rootRef?.current ?? wrapper?.firstElementChild as HTMLElement | null;
     if (!root) return;
     const elements = [root, ...root.querySelectorAll<HTMLElement>('*')].filter(element => !element.matches('style,script,link'));
     const hits = inspection.hovered ? elements.filter(element => resolve(element, root).some(binding => binding.key === inspection.hovered)) : [];

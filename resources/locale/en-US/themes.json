@@ -36,7 +36,10 @@
     "connectALibraryToApply": "Connect a library to apply",
     "articleBelongsToAnotherLibrary": "Article belongs to another library",
     "noThemesAvailable": "No themes available",
-    "importThemeJsonOrCreateAThemeTo": "Import theme JSON or create a theme to start styling."
+    "importThemeJsonOrCreateAThemeTo": "Import theme JSON or create a theme to start styling.",
+    "previewSampleLoading": "Loading the library theme preview sample…",
+    "previewSampleUnavailable": "The library theme preview sample is unavailable. {{cause}}",
+    "previewSampleDefault": "Default theme preview sample ({{locale}}); themes/preview.md is missing from this library."
   },
   "templates": {
     "previewTheme": "Preview theme {{name}}",

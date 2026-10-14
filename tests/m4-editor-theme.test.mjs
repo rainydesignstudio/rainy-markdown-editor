@@ -6,6 +6,7 @@ import test from 'node:test';
 const {
   BASE_EDITOR_THEME,
   BUILTIN_EDITOR_THEMES,
+  getBuiltinEditorThemes,
   EDITOR_COLOR_ROLES,
   composeLegacyEditorTheme,
   parseEditorThemeJson,
@@ -51,7 +52,7 @@ test('bundled editor theme catalog contains the current library selection', () =
     'sea-glass', 'linen', 'mist', 'rainy-design-slate', 'flowing-violet', 'evening-snow',
     'sunshine', 'ink-white', 'flowing-violet-ii', 'evening-snow-ii', 'dreaming',
   ]);
-  assert.equal(BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'dreaming')?.name, '梦华');
+  assert.equal(BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'dreaming')?.name, 'Dreaming');
 });
 
 test('Ink White is monochrome across every role, including feedback colors', () => {
@@ -178,7 +179,7 @@ test('Mist uses neutral grays and serif headings while feedback and other fonts 
 
 test('published editor template includes an independent heading font and all fallback colors', () => {
   const template = parseEditorThemeJson(readFileSync(new URL('../resources/template/editor-theme-template.json', import.meta.url), 'utf8'));
-  assert.deepEqual(template, BASE_EDITOR_THEME);
+  assert.deepEqual(template, getBuiltinEditorThemes('zh-CN')[0]);
   const composed = { ...template, id: 'mixed-heading-test', fonts: { ...BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'mist').fonts } };
   const restored = parseEditorThemeJson(JSON.stringify(composed));
   assert.equal(restored.fonts.heading, restored.fonts.serif);
@@ -194,7 +195,7 @@ test('existing article theme snapshots remain readable with or without the new k
   assert.equal(parseThemeConfigJson(JSON.stringify(legacy)).id, 'basic');
 });
 
-test('Rainy Studio uses complete slate colors and locally bundled Google fonts', () => {
+test('Rainy Studio uses complete slate colors and verified complete Google fonts loaded from libraries', () => {
   const studio = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'rainy-design-slate');
   assert.ok(studio);
   assert.equal(resolveEditorThemeColors(studio, 'light').accent, '#62748e');
@@ -205,7 +206,12 @@ test('Rainy Studio uses complete slate colors and locally bundled Google fonts',
     ['Roboto Mono Local', 'roboto-mono-variable.ttf', 'roboto-mono-OFL.txt'],
   ]) {
     assert.ok(Object.values(studio.fonts).some((stack) => stack.includes(family)));
-    assert.ok(existsSync(new URL(`../public/fonts/${asset}`, import.meta.url)));
+    const manifest = JSON.parse(readFileSync(new URL('../resources/font-sources.json', import.meta.url), 'utf8'));
+    const font = manifest.fonts.find(item => item.file === asset);
+    assert.equal(font.family, family);
+    assert.equal(existsSync(new URL(`../public/fonts/${asset}`, import.meta.url)), false);
+    assert.match(font.urls['google-fonts'], /^https:\/\/raw\.githubusercontent\.com\/google\/fonts\/[a-f0-9]{40}\//);
+    assert.match(font.urls.jsdmirror, /^https:\/\/cdn\.jsdmirror\.com\/gh\/google\/fonts@[a-f0-9]{40}\//);
     assert.match(readFileSync(new URL(`../public/fonts/${license}`, import.meta.url), 'utf8'), /SIL OPEN FONT LICENSE/);
   }
   const css = readFileSync(new URL('../src/styles/editor-theme.css', import.meta.url), 'utf8');

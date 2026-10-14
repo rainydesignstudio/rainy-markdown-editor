@@ -1,16 +1,18 @@
-import { BUILTIN_EDITOR_THEMES } from './editorThemes';
-import { THEMES } from '../themes/article-themes/index';
+import { getBuiltinEditorThemes } from './editorThemes';
+import { getBuiltinArticleThemes } from '../themes/article-themes/index';
 import { getThemeDirectory } from './themeDirectories';
 import { ProductError, productDiagnosticReference, productErrorMessage, productJoin } from './i18n/productMessages';
+import { initializeThemePreviewSample } from './themePreviewSample';
 
-const MARKER = 'default-themes.loaded';
+import { LIBRARY_SEED_MARKER as MARKER, readLibrarySeedLocale, readLibrarySeedRecord, resolveSeedLocale, type LibrarySeedRecord } from './librarySeeds';
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
 export type ThemeDefaultResult = { added: number; skipped: number; issues: { file: string; message: string }[] };
 
-export async function copyDefaultThemes(root: FileSystemDirectoryHandle, kind: 'article-themes' | 'editor-themes'): Promise<ThemeDefaultResult> {
+export async function copyDefaultThemes(root: FileSystemDirectoryHandle, kind: 'article-themes' | 'editor-themes', locale?: string): Promise<ThemeDefaultResult> {
+  const seedLocale = locale === undefined ? await readLibrarySeedLocale(root) : resolveSeedLocale(locale);
   const { directory } = await getThemeDirectory(root, kind);
   const result: ThemeDefaultResult = { added: 0, skipped: 0, issues: [] };
-  const defaults = kind === 'article-themes' ? THEMES : BUILTIN_EDITOR_THEMES;
+  const defaults = kind === 'article-themes' ? getBuiltinArticleThemes(seedLocale) : getBuiltinEditorThemes(seedLocale);
   for (const theme of defaults) {
     const name = `${theme.id}.json`;
     try {
@@ -26,17 +28,31 @@ export async function copyDefaultThemes(root: FileSystemDirectoryHandle, kind: '
   return result;
 }
 
-// One-time directory initialization. Explicit "load defaults" remains additive;
-// normal reloads never restore a theme the user chose to remove.
-export async function initializeThemeDefaults(root: FileSystemDirectoryHandle): Promise<void> {
-  const themes = await root.getDirectoryHandle('themes', { create: true });
-  try { await themes.getFileHandle(MARKER); return; }
-  catch (error) { if (!missing(error)) throw error; }
-  const article = await copyDefaultThemes(root, 'article-themes');
-  const editor = await copyDefaultThemes(root, 'editor-themes');
-  if (article.issues.length || editor.issues.length) throw new ProductError('shared.compose', { parts: productJoin([...article.issues, ...editor.issues].map(issue => productJoin([issue.file, '：', productDiagnosticReference(issue)])), '；') });
-  const file = await themes.getFileHandle(MARKER, { create: true });
+async function writeSeedReceipt(themes: FileSystemDirectoryHandle, record: LibrarySeedRecord): Promise<void> {
+  let created = false;
+  let file: FileSystemFileHandle;
+  try { file = await themes.getFileHandle(MARKER); }
+  catch (error) { if (!missing(error)) throw error; file = await themes.getFileHandle(MARKER, { create: true }); created = true; }
   let writable: FileSystemWritableFileStream | undefined;
-  try { writable = await file.createWritable(); await writable.write(JSON.stringify({ version: 1 })); await writable.close(); }
-  catch (error) { try { await writable?.abort(); } catch { /* retain failure */ } try { await themes.removeEntry(MARKER); } catch { /* retain failure */ } throw error; }
+  try { writable = await file.createWritable(); await writable.write(JSON.stringify(record)); await writable.close(); }
+  catch (error) {
+    try { await writable?.abort(); } catch { /* retain failure */ }
+    if (created) try { await themes.removeEntry(MARKER); } catch { /* retain failure */ }
+    throw error;
+  }
+}
+
+// Keep the seed choice through a failed initialization. Legacy receipts without
+// `initialized` already mean complete and are never rewritten or reseeded.
+export async function initializeThemeDefaults(root: FileSystemDirectoryHandle, locale: string = 'en-US', options: { previewSample?: boolean } = {}): Promise<void> {
+  const themes = await root.getDirectoryHandle('themes', { create: true });
+  const record = await readLibrarySeedRecord(root);
+  if (record && record.initialized !== false) return;
+  const seedLocale = record?.locale ?? resolveSeedLocale(locale);
+  if (!record) await writeSeedReceipt(themes, { version: 1, locale: seedLocale, initialized: false });
+  const article = await copyDefaultThemes(root, 'article-themes', seedLocale);
+  const editor = await copyDefaultThemes(root, 'editor-themes', seedLocale);
+  if (article.issues.length || editor.issues.length) throw new ProductError('shared.compose', { parts: productJoin([...article.issues, ...editor.issues].map(issue => productJoin([issue.file, '：', productDiagnosticReference(issue)])), '；') });
+  if (options.previewSample) await initializeThemePreviewSample(root, seedLocale);
+  await writeSeedReceipt(themes, { version: 1, locale: seedLocale, initialized: true });
 }

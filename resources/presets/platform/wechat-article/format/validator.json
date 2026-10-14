@@ -140,7 +140,11 @@
       "kind": "article-theme",
       "idPattern": "^[a-z0-9][a-z0-9-]{0,47}$",
       "versionPattern": "^\\d+(?:\\.\\d+){0,2}$",
-      "valuePattern": "^[\\p{L}\\p{N}\\s#%.,/\\x27\"()_+*!:-]+$"
+      "valuePattern": "^[\\p{L}\\p{N}\\s#%.,/\\x27\"()_+*!:-]+$",
+      "darkTokens": {
+        "allowPartial": true,
+        "fallback": "light"
+      }
     }
   },
   "rules": [

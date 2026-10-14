@@ -3,11 +3,13 @@ import { DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, initializeLibraryF
 import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { parseArticle, updateFrontMatter } from './frontMatter';
 import { getTheme } from './themes';
+import { initializeThemeDefaults } from './themeDefaults';
 import { parseThemeConfigJson, validateThemeConfig, validateThemeFormat } from './themeValidation';
 import { getThemeDirectory } from './themeDirectories';
 import type { ArticleDiagnostic, ArticleMeta, ArticleSummary, ArticleIndexIssue, SaveResult, StoredArticle, ThemeConfig } from './types';
 
 type DirectoryHandle = FileSystemDirectoryHandle;
+export type ArticleWriteGuard = (handle: FileSystemHandle, path: readonly string[]) => Promise<void>;
 
 function isDirectoryHandle(value: unknown): value is DirectoryHandle {
   return typeof value === 'object' && value !== null && (value as { kind?: string }).kind === 'directory';
@@ -26,7 +28,7 @@ function assertMonthKey(value: string): string {
   return value;
 }
 
-async function ensurePermission(handle: DirectoryHandle): Promise<void> {
+async function ensurePermission(handle: DirectoryHandle, request = true): Promise<void> {
   const candidate = handle as DirectoryHandle & {
     queryPermission?: (descriptor?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>;
     requestPermission?: (descriptor?: { mode?: 'read' | 'readwrite' }) => Promise<PermissionState>;
@@ -34,7 +36,7 @@ async function ensurePermission(handle: DirectoryHandle): Promise<void> {
   if (!candidate.queryPermission) return;
   const descriptor = { mode: 'readwrite' as const };
   let permission = await candidate.queryPermission(descriptor);
-  if (permission !== 'granted' && candidate.requestPermission) permission = await candidate.requestPermission(descriptor);
+  if (request && permission !== 'granted' && candidate.requestPermission) permission = await candidate.requestPermission(descriptor);
   if (permission !== 'granted') throw new ProductError("fileSystem.theLibraryLacksReadWritePermissionAuthorizeItAgainBeforeSaving");
 }
 
@@ -96,7 +98,7 @@ export function normalizeDataDirectoryName(input: string): string {
   return name;
 }
 
-export async function createNamedDataDirectory(parent: DirectoryHandle, input: string, presetId: string = DEFAULT_PLATFORM_PRESET_ID): Promise<DirectoryHandle> {
+export async function createNamedDataDirectory(parent: DirectoryHandle, input: string, presetId: string = DEFAULT_PLATFORM_PRESET_ID, seedLocale: string = 'en-US'): Promise<DirectoryHandle> {
   getPublicPlatformPreset(presetId);
   await ensurePermission(parent);
   const name = normalizeDataDirectoryName(input);
@@ -112,6 +114,7 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
   try {
     await ensureArticleDirectories(child);
     await initializeLibraryFormat(child, presetId);
+    await initializeThemeDefaults(child, seedLocale, { previewSample: true });
   } catch (error) {
     let rollbackSafe = true;
     for await (const [entryName, entry] of child.entries()) {
@@ -150,8 +153,7 @@ export function monthKey(date = new Date()): string {
 }
 
 export function sanitizeFolderName(value: string): string {
-  const normalized = value.normalize('NFKC');
-  const cleaned = normalized
+  const cleaned = value
     .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')
     .replace(/\s+/g, ' ')
     .replace(/^\.+|\.+$/g, '')
@@ -473,8 +475,9 @@ export async function getStoredArticleDirectory(
   root: DirectoryHandle,
   month: string,
   folder: string,
+  options: { requestPermission?: boolean } = {},
 ): Promise<DirectoryHandle> {
-  await ensurePermission(root);
+  await ensurePermission(root, options.requestPermission !== false);
   assertStoredTarget(month, folder);
   const articlesDirectory = await root.getDirectoryHandle('articles');
   const monthDirectory = await articlesDirectory.getDirectoryHandle(month);
@@ -692,7 +695,7 @@ function parsedWithThemeDiagnostics(parsed: ReturnType<typeof parseArticle>, the
   };
 }
 
-function indexEntry(article: StoredArticle): Record<string, unknown> {
+export function indexEntry(article: StoredArticle): Record<string, unknown> {
   return {
     summaryVersion: 1,
     title: article.parse.metadata.title,
@@ -724,9 +727,36 @@ export async function saveStoredArticle(
   theme: ThemeConfig,
   existingFolder?: string | null,
   existingMonth?: string | null,
-  options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string; renderRecord?: RenderRecord | null } = {},
+  options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string; renderRecord?: RenderRecord | null; guard?: ArticleWriteGuard; requestPermission?: boolean } = {},
 ): Promise<SaveResult> {
-  await ensurePermission(root);
+  await ensurePermission(root, options.requestPermission !== false);
+  await options.guard?.(root, []);
+  if (options.guard && options.renderRecord !== undefined) throw new ProductError('resources.unsafeTarget');
+  const directory = async (parent: DirectoryHandle, name: string, path: string[], exclusive = false) => {
+    if (!options.guard) return getOrCreateDirectory(parent, name);
+    await options.guard(parent, path.slice(0, -1));
+    let target: DirectoryHandle;
+    try { target = await parent.getDirectoryHandle(name); if (exclusive) throw new ProductError('resources.exists', { name }); }
+    catch (error) { if (!isNotFound(error)) throw error; await options.guard(parent, path.slice(0, -1)); target = await parent.getDirectoryHandle(name, { create: true }); }
+    await options.guard(target, path); return target;
+  };
+  const write = async (parent: DirectoryHandle, name: string, content: string, path: string[]) => {
+    if (!options.guard) return writeText(parent, name, content);
+    await options.guard(parent, path.slice(0, -1));
+    let file: FileSystemFileHandle;
+    try { file = await parent.getFileHandle(name); }
+    catch (error) { if (!isNotFound(error)) throw error; await options.guard(parent, path.slice(0, -1)); file = await parent.getFileHandle(name, { create: true }); }
+    await options.guard(file, path);
+    const writer = await file.createWritable();
+    try { await writer.write(content); await options.guard(file, path); await writer.close(); }
+    catch (error) { try { await writer.abort(); } catch { /* preserve the original error */ } throw error; }
+  };
+  const read = async (parent: DirectoryHandle, name: string, path: string[]) => {
+    if (!options.guard) return readText(parent, name);
+    await options.guard(parent, path.slice(0, -1));
+    const file = await parent.getFileHandle(name); await options.guard(file, path);
+    return (await file.getFile()).text();
+  };
   if (Boolean(existingFolder) !== Boolean(existingMonth)) throw new ProductError("fileSystem.existingArticlesRequireBothAFixedDirectoryNameAndAMonthDirectory");
   if (options.writeTheme !== false) {
     const themeErrors = validateThemeConfig(theme);
@@ -734,8 +764,10 @@ export async function saveStoredArticle(
   }
   const parsed = parseArticle(source);
   const month = existingMonth ? assertMonthKey(existingMonth) : monthKey();
-  const articlesDirectory = options.expectedSource !== undefined ? await root.getDirectoryHandle('articles') : await getOrCreateDirectory(root, 'articles');
-  const monthDirectory = options.expectedSource !== undefined ? await articlesDirectory.getDirectoryHandle(month) : await getOrCreateDirectory(articlesDirectory, month);
+  const articlesDirectory = options.expectedSource !== undefined ? await root.getDirectoryHandle('articles') : await directory(root, 'articles', ['articles']);
+  await options.guard?.(articlesDirectory, ['articles']);
+  const monthDirectory = options.expectedSource !== undefined ? await articlesDirectory.getDirectoryHandle(month) : await directory(articlesDirectory, month, ['articles', month]);
+  await options.guard?.(monthDirectory, ['articles', month]);
   let folder: string;
   if (existingFolder) {
     if (sanitizeFolderName(existingFolder) !== existingFolder) throw new ProductError("fileSystem.theExistingArticleDirectoryNameIsUnsafeRewritingWasRejected");
@@ -743,12 +775,14 @@ export async function saveStoredArticle(
   } else {
     folder = await uniqueFolderName(monthDirectory, parsed.metadata.title);
   }
-  const articleDirectory = options.expectedSource !== undefined ? await monthDirectory.getDirectoryHandle(folder) : await getOrCreateDirectory(monthDirectory, folder);
-  if (options.expectedSource !== undefined && await readText(articleDirectory, 'article.md') !== options.expectedSource) {
+  const articlePath = ['articles', month, folder];
+  const articleDirectory = options.expectedSource !== undefined ? await monthDirectory.getDirectoryHandle(folder) : await directory(monthDirectory, folder, articlePath, !existingFolder);
+  await options.guard?.(articleDirectory, articlePath);
+  if (options.expectedSource !== undefined && await read(articleDirectory, 'article.md', [...articlePath, 'article.md']) !== options.expectedSource) {
     throw new ProductError("fileSystem.theArticleChangedExternallyAndWasNotOverwrittenRefreshAndRetry");
   }
   try {
-    await writeText(articleDirectory, 'article.md', source);
+    await write(articleDirectory, 'article.md', source, [...articlePath, 'article.md']);
   } catch (error) {
     throw new ProductError("fileSystem.articleMdSavingFailed", { "cause": productCause(error) });
   }
@@ -758,11 +792,12 @@ export async function saveStoredArticle(
   let themeWriteError: string | undefined;
   if (writeTheme) {
     try {
-      await writeText(articleDirectory, 'theme.json', JSON.stringify(theme, null, 2));
+      await write(articleDirectory, 'theme.json', JSON.stringify(theme, null, 2), [...articlePath, 'theme.json']);
+      if (options.guard) await read(articleDirectory, 'theme.json', [...articlePath, 'theme.json']);
       themeResult = await readTheme(articleDirectory, parsed.metadata);
     } catch (error) {
       themeWriteError = productText("fileSystem.themeJsonSavingFailed", { "cause": productCause(error) });
-      themeResult = await readTheme(articleDirectory, parsed.metadata);
+      themeResult = options.guard ? { theme, valid: false, diagnostics: [] } : await readTheme(articleDirectory, parsed.metadata);
       themeResult = {
         ...themeResult,
         valid: false,
@@ -770,6 +805,7 @@ export async function saveStoredArticle(
       };
     }
   } else {
+    if (options.guard) await read(articleDirectory, 'theme.json', [...articlePath, 'theme.json']);
     themeResult = await readTheme(articleDirectory, parsed.metadata);
   }
 
@@ -804,13 +840,16 @@ export async function saveStoredArticle(
     indexError = productText("fileSystem.themeSnapshotValidationDidNotPassSourceWasSavedButTheIndex", { "details": themeResult.diagnostics.map((item) => item.message).join('；') });
   } else {
     try {
-      const current = await readText(monthDirectory, 'index.json').catch(() => '{}');
+      const current = await read(monthDirectory, 'index.json', ['articles', month, 'index.json']).catch(error => { if (options.guard && !isNotFound(error)) throw error; return '{}'; });
       const index = JSON.parse(current) as unknown;
       if (!index || typeof index !== 'object' || Array.isArray(index)) throw new ProductError("fileSystem.indexJsonIsNotAnObjectItWillBeRebuiltFromArticle");
-      (index as Record<string, unknown>)[folder] = indexEntry(savedArticle);
-      await writeText(monthDirectory, 'index.json', JSON.stringify(index, null, 2));
+      const nextIndex = { ...(index as Record<string, unknown>), [folder]: indexEntry(savedArticle) };
+      await write(monthDirectory, 'index.json', JSON.stringify(nextIndex, null, 2), ['articles', month, 'index.json']);
       indexUpdated = true;
     } catch (error) {
+      if (options.guard) {
+        indexError = productText("fileSystem.sourceSavedMonthlyIndexUpdateFailed", { "cause": productCause(error) });
+      } else {
       try {
         const rebuilt = await rebuildMonthIndex(monthDirectory);
         rebuilt[folder] = indexEntry(savedArticle);
@@ -819,6 +858,7 @@ export async function saveStoredArticle(
         indexError = productText("fileSystem.theOriginalIndexJsonCouldNotBeReadAndWasRebuiltFrom", { "cause": productCause(error) });
       } catch (rebuildError) {
         indexError = productText("fileSystem.sourceSavedMonthlyIndexUpdateFailed", { "cause": productCause(rebuildError) });
+      }
       }
     }
   }

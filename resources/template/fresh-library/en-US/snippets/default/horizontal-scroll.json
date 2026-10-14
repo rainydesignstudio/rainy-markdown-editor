@@ -1,0 +1,9 @@
+{
+  "id": "horizontal-scroll",
+  "name": "Four-image horizontal scroll",
+  "trigger": "//horizontal-scroll",
+  "description": "Four sample images in a horizontally scrolling row. Replace images and captions; the existing trigger is retained.",
+  "content": "<section class=\"overflow-x-auto pb-3\">\n  <section data-ignore-width class=\"flex items-center justify-start gap-3\">\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">Sample image one</figcaption>\n      </figure>\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">Sample image two</figcaption>\n      </figure>\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">Sample image three</figcaption>\n      </figure>\n    </section>\n    <section class=\"flex-shrink-0 w-4/5 rounded-xl box-border shadow-sm\">\n      <figure class=\"mt-0 mb-0 mx-2\">\n        <img class=\"block max-w-full h-auto rounded-lg shadow-md mx-auto mt-0.5 mb-2\" src=\"/images/article-sample.png\" />\n        <figcaption class=\"text-center text-sm text-article-muted\">Sample image four</figcaption>\n      </figure>\n    </section>\n  </section>\n</section>",
+  "icon": "image",
+  "categoryId": "default"
+}

@@ -12,7 +12,7 @@
 | article-theme | 文章预览、排版及复制输出 | JSON，kind为article-theme，formatVersion为1 |
 | 片段 | 可插入正文的小段 Markdown／HTML | JSON，含内容和触发词 |
 | 起稿模板 | 新文章的完整起点 | Markdown，含 Front Matter |
-| 完整文章 | 最终正文与文章元数据 | article.md，配套独立theme.json与图片 |
+| 完整文章 | 最终正文与文章元数据 | article.md，配套独立theme.json、图片与附件 |
 
 应用版本、主题 version 与格式 formatVersion 是三件事。制作新内容使用唯一 ID，避免与内置或用户文件冲突；ID及分类目录名只用小写字母、数字、连字符，长度1～48且首字符为字母或数字。保持旧文章快照，不能以修改主题库替换旧稿的theme.json。
 
@@ -56,7 +56,7 @@ ui serif mono editorSource articleSource heading subHeading eyebrow
 
 先设计调色板，再映射语义角色；不要把字面色值直接填入colors，也不要增添未实现的角色。浅色和深色分别设计；跟随系统是显示模式，文件仍只有light／dark。
 
-fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题、副标题和上标；editorSource用于内容类编辑，articleSource用于文章源码；代码字体采用mono及其回退。先确认用户指定字体可用，再加入系统回退。随应用提供的Sen Local、Noto Sans SC Local、Roboto Mono Local也可采用，原许可文件随字体资源保留。文章主题与微信输出不依赖这些界面字体。
+fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题、副标题和上标；editorSource用于内容类编辑，articleSource用于文章源码；代码字体采用mono及其回退。先确认用户指定字体可用，再加入系统回退。Sen Local、Noto Sans SC Local、Roboto Mono Local 从所选外部源补齐到资料库后也可采用；来源、失败重试与离线使用见[字体下载说明](README.md#doc-font-downloads)，原许可保留。文章主题与微信输出不依赖这些界面字体。
 
 可选surfaces由light／dark两套组成；各项可省略，省略保留既有角色回退。正式字段为primaryButton、primaryText、primaryHover、primaryLine、secondaryButton、eyebrow、dangerSurface、field、shadow、panelShadow、toggleShadow、backdrop和canvasWash。颜色全部引用palette键；primaryHover为一个键或四个渐变键；field／shadow／panelShadow／toggleShadow／backdrop为`{ color, opacity }`，opacity范围0～100；canvasWash为三色键数组与opacity。以[正式类型和校验器](../../../src/lib/editorThemes.ts)为准，不能用该字段注入任意CSS。
 
@@ -204,12 +204,15 @@ fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题�
 
 文件位置为 `themes/article-themes/<id>.json`。在“主题”页面导入JSON，先检查完整排印。已保存文章使用“复制并应用”，保留原稿和主题快照；未保存新稿使用“应用到当前稿”。新建文章时也可直接选择这套主题。
 
+所有文章主题共用资料库的 Markdown 样张 `themes/preview.md`。主题库、主题编辑器、颜色检查和保存校验使用同一份内容；文章内选择主题仍预览当前正文。新库带有对应种子语言的样张；缺文件时采用库中记住的语言，语言缺失或不支持则回退英文，并标明默认来源。样张读取失败或内容无效时明确报错。打开旧库不补写缺失样张，已有自改样张保持。修改文件后重新载入资料库；切换界面语言不会翻译或替换它。
+
 | 字段 | 约束 |
 |---|---|
 | kind | 新文件明确填article-theme；旧的无kind快照仍可读取 |
 | id / name / version | 安全ID、非空名称、数字版本；建议三段数字 |
 | formatVersion | 固定为1 |
 | tokens | 完整包含下方11个受支持颜色键，值为安全CSS值 |
+| dark.tokens | 可选；手工深色颜色覆盖，只允许上方tokens中的颜色键；缺项继承浅色 |
 | css | 字符串，限定文章预览作用域；不超过20,000程序字符串长度 |
 | nodes | 可选；只用于正式支持的节点与fontSize／lineHeight／color覆盖 |
 
@@ -234,6 +237,10 @@ color-article-code-tint
 节点键为h1～h6、paragraph、blockquote、inlineCode、codeBlock、table、caption、divider；覆盖属性仅fontSize、lineHeight、color。完整属性、值与长度边界见[校验器](../../../src/lib/themeValidation.ts)。
 
 文章明暗纸面、预览字体、深色转换及输出策略由当前资料库的 `format/formatter.json` 决定。内置微信公众号默认通过官方 `mp-darkmode` 转换隔离副本，包含彩色、渐变及背景图片的处理；不再采用仅镜像中性灰的旧模型。其它平台可禁用转换或调整配置。制作时分别核对浅色、深色和接收方效果，原稿与浅色复制不会被深色预览改写。
+
+文章主题的颜色表有浅色／深色两列。`preview.dark-mode.parameters.mode` 为 `algorithm` 时，深色列只读，显示当前样张实际转换后的色值；一个角色可能有多个结果，未使用、计算中与失败分别显示。为 `tokens` 时，两列均可编辑，深色只保存到 `dark.tokens`；点击“继承浅色”可移除单项覆盖。颜色变量在计算样式前应用，固定CSS色值及节点字面颜色仍按原声明生效。字体和排版共用；背景取 `preview.surface`，不增设纸面颜色键。切到自动模式会保留手工组，但不使用或覆盖它。
+
+旧主题未设置dark时保持原有样式；旧formatter未写mode时由原transform推导，preserve保留外置CSS的dark行为。主题和历史不会隐式迁移。深色查看仍只操作隔离副本，浅色复制／导出保持原策略。
 
 主题结构／安全检查与平台格式报告分别反馈。当前资料库的 `format/validator.json` 定义主题 token、节点映射及结构限制，并以已注册能力执行平台规则；规则文案、强度和来源见 `format-support.json`。详情见 [FORMAT.md](FORMAT.md)。有效 JSON 不等于平台合规，实际布局及人工核对未完成时不能记通过。
 
@@ -273,7 +280,15 @@ color-article-code-tint
     "color-article-code-surface": "#0f172a",
     "color-article-code-tint": "#e2e8f0"
   },
-  "css": ".article-preview { color: var(--color-article-ink); }\n.article-preview .article-body { max-width: 42rem; margin: 0 auto; padding: 1.25rem; font-size: 1rem; line-height: 1.8; }\n.article-preview .article-body h1, .article-preview .article-body h2, .article-preview .article-body h3 { color: var(--color-article-heading); font-weight: 700; margin: 1.5rem 0 0.75rem; }\n.article-preview .article-body h1 { font-size: 2rem; }\n.article-preview .article-body h2 { font-size: 1.375rem; }\n.article-preview .article-body p { margin: 1rem 0; }\n.article-preview .article-body a { color: var(--color-article-link); text-decoration: underline; }\n.article-preview .article-body blockquote { color: var(--color-article-muted); background-color: var(--color-article-quote-surface); border-left: 0.1875rem solid var(--color-article-line); padding: 0.75rem 1rem; }\n.article-preview .article-body img { max-width: 100%; height: auto; display: block; }\n.article-preview .article-body hr { border: 0; border-bottom: 0.0625rem solid var(--color-article-line); margin: 1.5rem 0; }\n.article-preview .article-body code { color: var(--color-article-code); background-color: var(--color-article-code-tint); padding: 0.125rem 0.25rem; }\n"
+  "css": ".article-preview { color: var(--color-article-ink); }\n.article-preview .article-body { max-width: 42rem; margin: 0 auto; padding: 1.25rem; font-size: 1rem; line-height: 1.8; }\n.article-preview .article-body h1, .article-preview .article-body h2, .article-preview .article-body h3 { color: var(--color-article-heading); font-weight: 700; margin: 1.5rem 0 0.75rem; }\n.article-preview .article-body h1 { font-size: 2rem; }\n.article-preview .article-body h2 { font-size: 1.375rem; }\n.article-preview .article-body p { margin: 1rem 0; }\n.article-preview .article-body a { color: var(--color-article-link); text-decoration: underline; }\n.article-preview .article-body blockquote { color: var(--color-article-muted); background-color: var(--color-article-quote-surface); border-left: 0.1875rem solid var(--color-article-line); padding: 0.75rem 1rem; }\n.article-preview .article-body img { max-width: 100%; height: auto; display: block; }\n.article-preview .article-body hr { border: 0; border-bottom: 0.0625rem solid var(--color-article-line); margin: 1.5rem 0; }\n.article-preview .article-body code { color: var(--color-article-code); background-color: var(--color-article-code-tint); padding: 0.125rem 0.25rem; }\n",
+  "dark": {
+    "tokens": {
+      "color-article-ink": "#e2e8f0",
+      "color-article-heading": "#f8fafc",
+      "color-article-muted": "#94a3b8",
+      "color-article-line": "#475569"
+    }
+  }
 }
 ```
 
@@ -284,6 +299,8 @@ color-article-code-tint
 位置为 `snippets/<分类>/<id>.json`；分类与顺序记于 `snippets/index.json`，正文文件不重复保存categoryId。优先在“模板 → 片段”新建，填写信息、选择分类，然后编辑正文并“保存内容”；Agent也可在用户明确授权的资料目录创建唯一文件，刷新应用后核对。
 
 字段包含id、name、trigger、description、content，可选icon。trigger为 `//` 加小写字母、数字和连字符；name最长80、description最长240、content最长64,000（程序字符串长度）。光标标记 `▌` 最多一个，在插入时移除并定位光标。同名文件或重复触发词先处理冲突，不覆盖未知内容。
+
+默认片段包含四图横排及无内边距变体；滚动容器固定纵向高度按现有规则豁免，宽度豁免仍限实际横向列表内层。引用和生成外壳的复制取[输出策略](FORMAT.md#doc-copy-output)，正文宽度检查保持。
 
 <a name="doc-snippet-example"></a>
 
@@ -311,6 +328,8 @@ color-article-code-tint
 位置为 `templates/<分类>/<id>.md`；分类索引位于 `templates/index.json`。模板ID由文件名决定，名称来自Front Matter的title，说明来自description；可用templateIcon指定正式图标。正文不可为空，最长250,000（程序字符串长度）。
 
 Front Matter放在源码开头，用两条 `---` 包住合法YAML。title、description、author、createdAt、updatedAt为字符串；categories为字符串数组；theme为包含id／version的对象。新稿会使用新日期与所选文章主题，不能把模板时间当作最终稿的保存时间。
+
+模板生成文稿后可独立修改文章目录；模板ID、文章标题和 `article.md` 文件名各自保持职责。模板正文卡片/引用的内部间距在复制时保留。
 
 <a name="doc-starter-example"></a>
 
@@ -411,7 +430,24 @@ theme:
 
 验证后交付文件、采用方式、通过项与未验证项；模板的填充提示允许保留，完整文章则应清除占位内容。发生读写、主题生成或图片问题时保留稿件，定位失败环节后重试。
 
-界面语言不会翻译本文件示例或已保存的库内名称、正文、规则描述。本文两语示例使用相同技术字段和 ID，示例文字可按读者语言调整。
+界面语言不会翻译本文件示例或已保存的库内名称、正文、规则描述。 内置种子在 `resources/template/fresh-library/zh-CN/` 与 `en-US/` 分别编写完整内容，ID、文件名和设计tokens对应；对象本身不增加i18n字段。新库确定语言后，切换界面不会改写已保存内容，默认英文回退。本文两语示例使用相同技术字段和 ID，示例文字可按读者语言调整。
+
+<a name="doc-resource-references"></a>
+
+## 图片、附件与源码渲染
+
+片段/模板引用应用样图时使用完整 `/images/article-sample.png`。制作真实文稿时，先导入或采用资源，再使用实际分配的文稿路径；共享资源采用后是独立副本，不复制源目录的写权限。
+
+```text
+![图片](media/image/photo.png)
+[附件](media/file/report.pdf)
+```
+
+图片与附件沿用各自描述索引；附件显示类型图标，未知文件回退通用图标，不自动预览/执行。跨稿复制片段或模板时不会连带复制原稿媒体，需重新导入并更新引用。检查导入中/失败/缺失，保存重开后再确认；来源知识文件只读。
+
+公式和Mermaid由库内formatter可选步骤决定，配法与限额见 [FORMAT.md](FORMAT.md#doc-source-rendering)。片段只保存源码，可含行内/块公式或语言标记为math/mermaid的代码块。主题负责周围的标题、段落、间距与配色，不注入执行脚本；Mermaid的图形主题由该步骤控制。
+
+在短/长稿中一起验证源码位置、等待/错误、深浅/窄宽、滚动、保存重开、历史和输出。MathML/静态PNG各有接收限制；未启用库应保持原源码展示。制作内容不能以本机预览替代平台验收。
 
 ## 正式实现入口
 

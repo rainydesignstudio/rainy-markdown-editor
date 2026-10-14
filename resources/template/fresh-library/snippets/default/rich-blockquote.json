@@ -1,8 +1,0 @@
-{
-  "id": "rich-blockquote",
-  "name": "富引用",
-  "trigger": "//rich-blockquote",
-  "description": "分上下两层的引用栏，方便填写引用内容与作者。",
-  "content": "<blockquote>\n  <p class=\"font-bold text-xl\">我是主要内容<p>\n  <span class=\"text-article-muted\">- 我是说明文本 ▌</span>\n</blockquote>",
-  "categoryId": "default"
-}

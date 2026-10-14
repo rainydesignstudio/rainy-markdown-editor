@@ -4,12 +4,12 @@ import vm from 'node:vm';
 import { resolveUILocale, readUILocale, saveUILocale, UI_LOCALE_STORAGE_KEY, UI_LOCALE_BOOTSTRAP_SCRIPT } from '../src/lib/i18n/preferences.ts';
 import { createUII18n, UI_RESOURCES } from '../src/lib/i18n/runtime.ts';
 
-test('explicit locale wins, supported browser languages are matched in order, otherwise Chinese', () => {
+test('explicit locale wins, supported browser languages are matched in order, otherwise English', () => {
   assert.equal(resolveUILocale('en-US', ['zh-CN']), 'en-US');
   assert.equal(resolveUILocale('zh-CN', ['en-GB']), 'zh-CN');
   assert.equal(resolveUILocale('bad', ['fr-FR', 'en-GB', 'zh-TW']), 'en-US');
   assert.equal(resolveUILocale(null, ['zh-HK', 'en-US']), 'zh-CN');
-  assert.equal(resolveUILocale(null, ['de-DE']), 'zh-CN');
+  assert.equal(resolveUILocale(null, ['de-DE']), 'en-US');
 });
 
 test('preference failure is non-blocking and only the origin UI preference key is written', () => {
@@ -22,15 +22,16 @@ test('preference failure is non-blocking and only the origin UI preference key i
   assert.deepEqual(writes, [[UI_LOCALE_STORAGE_KEY, 'en-US']]);
 });
 
-test('bundled translations are synchronously ready, support interpolation, plurals and Chinese fallback', async () => {
+test('bundled translations are synchronously ready, support interpolation, plurals and English fallback', async () => {
   const instance = createUII18n('en-US');
   assert.equal(instance.isInitialized, true);
   assert.equal(instance.t('articleCount', { count: 0 }), '0 articles');
   assert.equal(instance.t('articleCount', { count: 1 }), '1 article');
   assert.equal(instance.t('articleCount', { count: 2 }), '2 articles');
   assert.equal(instance.t('language.current', { language: 'English' }), 'Interface language: English');
-  instance.removeResourceBundle('en-US', 'common');
-  assert.equal(instance.t('loading.label'), '正在载入资料库');
+  await instance.changeLanguage('zh-CN');
+  instance.removeResourceBundle('zh-CN', 'common');
+  assert.equal(instance.t('loading.label'), 'Loading library');
   const separate = createUII18n('en-US');
   assert.equal(separate.t('loading.label'), 'Loading library');
   await separate.changeLanguage('zh-CN');
@@ -56,7 +57,7 @@ test('both catalogs have identical keys and interpolation parameters', () => {
 });
 
 test('early bootstrap picks the same preference and language before hydration, including denied storage', () => {
-  for (const [saved, denied, language, expected] of [['en-US', false, 'zh-CN', 'en-US'], ['zh-CN', false, 'en-US', 'zh-CN'], [null, true, 'en-GB', 'en-US']]) {
+  for (const [saved, denied, language, expected] of [['en-US', false, 'zh-CN', 'en-US'], ['zh-CN', false, 'en-US', 'zh-CN'], [null, true, 'en-GB', 'en-US'], [null, false, 'fr-FR', 'en-US']]) {
     const document = { documentElement: { lang: 'zh-CN', dataset: {} }, title: '' };
     vm.runInNewContext(UI_LOCALE_BOOTSTRAP_SCRIPT, {
       document, navigator: { languages: [language], language },
