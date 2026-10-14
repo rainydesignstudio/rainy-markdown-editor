@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { strFromU8, unzipSync } from 'fflate';
-import { articleExportBaseName, createArticleDocumentPackage } from '../src/lib/articleExport.ts';
+import { articleExportBaseName, articleMarkdownBody, createArticleDocumentPackage } from '../src/lib/articleExport.ts';
+
+test('website Markdown export preserves body bytes and rejects uncertain metadata boundaries', () => {
+  const body = '# 标题\r\n\r\n<div class="callout">源码</div>\r\n![图](media/image/a.png)\r\n';
+  assert.equal(articleMarkdownBody('---\r\ntitle: 文稿\r\n---\r\n' + body), body);
+  assert.equal(articleMarkdownBody(body), body);
+  assert.throws(() => articleMarkdownBody('---\ntitle: bad\n正文'), /元数据/);
+});
 import { articlePdfPageCuts } from '../src/lib/articleVisualExport.ts';
 
 function directory(items) {

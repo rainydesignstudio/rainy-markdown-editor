@@ -46,7 +46,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   const snapshot = getFormatSnapshot();
   const body = parseArticle(source).body;
   const bodyPassed = new Set<string>();
-  const bodyIssues = await validateArticleAuthoringMarkdown(body, '当前文章正文', bodyPassed);
+  const bodyIssues = await validateArticleAuthoringMarkdown(body, '当前文章正文', bodyPassed, theme);
   if (media) bodyIssues.push(...await inspectLocalArticleImages(body, media.root, media.month, media.folder));
   const themePassed = new Set<string>();
   let themeIssues: ArticleFormatIssue[] = [];
@@ -65,7 +65,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   if (body.trim() && options.deep !== false && preview) {
     try {
       const shadow = preview.getRootNode();
-      const css = shadow instanceof ShadowRoot ? shadow.querySelector('style')?.textContent ?? '' : (await compileArticleStyles(body, theme)).css;
+      const css = shadow instanceof ShadowRoot ? shadow.querySelector('style')?.textContent ?? '' : preview.ownerDocument.querySelector('style[data-article-style]')?.textContent ?? (await compileArticleStyles(body, theme)).css;
       const assets = await prepareInspectionAssets(preview, media, snapshot, options.signal);
       let checked;
       try { checked = await inspectRenderedFormat(assets.root, css, snapshot, options.signal); }

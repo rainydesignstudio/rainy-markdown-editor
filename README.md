@@ -104,6 +104,8 @@ npm start
 
 `editor-theme` 控制文稿台界面；`article-theme` 控制文章排版与输出。更换界面外观不会重写文章主题快照。
 
+网站类库可加载自己的CSS模块、SVG和字体，配置正文容器及排版视口；预览与工作台隔离，文章和历史可留存渲染依赖。制作方法见 [FORMAT.md](FORMAT.md#库级样式与独立画布)。发到网站时可导出“Markdown正文”，再处理图片地址；富文本接收方是否保留网站CSS须实测。
+
 这些教程由你正在使用的外部 Agent 读取并引导。文稿台没有内置 AI，也不会自行登录公众号或发布文章。
 
 ## 资料库与备份
@@ -133,7 +135,15 @@ npm start
 │       ├── article.md
 │       ├── theme.json                # 文章独立主题快照
 │       ├── media/image/              # 文章图片及可选描述索引
-│       └── history/snapshot-…/       # 源码、主题与快照清单
+│       ├── render.json              # 可选渲染成品与依赖引用
+│       └── history/snapshot-…/       # 源码、主题、清单与可选渲染记录
+├── styles/                          # 可选库级CSS及不可变渲染版本
+│   ├── globals.css
+│   └── .versions/<hash>/manifest.json
+├── assets/                          # 库级图片/SVG/字体，按需出现
+│   ├── image/
+│   ├── fonts/
+│   └── .objects/<hash>              # 历史引用的资源对象
 └── shared/image/                     # 首次导入共享图片时创建
 ```
 

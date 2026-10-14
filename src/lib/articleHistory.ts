@@ -1,4 +1,5 @@
 import { parseArticle } from './frontMatter';
+import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { sanitizeFolderName } from './fileSystem';
 import { parseThemeConfigJson, validateThemeConfig } from './themeValidation';
 import type { ParsedArticle, ThemeConfig } from './types';
@@ -6,6 +7,8 @@ import type { ParsedArticle, ThemeConfig } from './types';
 export type ArticleHistoryKind = 'automatic' | 'manual' | 'before-restore' | 'before-theme-change';
 
 export type ArticleHistorySnapshot = {
+  renderRecord?: RenderRecord | null;
+  renderIssue?: string;
   id: string;
   createdAt: string;
   kind: ArticleHistoryKind;
@@ -20,6 +23,7 @@ export type ArticleHistorySnapshot = {
 export type ArticleHistoryIssue = { snapshotId: string; message: string };
 export type ArticleHistoryListResult = { snapshots: ArticleHistorySnapshot[]; issues: ArticleHistoryIssue[] };
 export type CreateArticleSnapshotOptions = {
+  renderRecord?: RenderRecord | null;
   id?: string;
   kind: ArticleHistoryKind;
   retained?: boolean;
@@ -145,6 +149,11 @@ async function readSnapshot(directory: FileSystemDirectoryHandle, directoryName:
   if (themeErrors.length) throw new Error(`主题快照无效：${themeErrors.join('；')}`);
   const parsed = parseArticle(source);
   const themeMatches = parsed.metadata.theme?.id === theme.id && parsed.metadata.theme?.version === theme.version;
+  let renderRecord: RenderRecord | null = null, renderIssue: string | undefined;
+  try {
+    renderRecord = await readRenderRecord(directory);
+    if (renderRecord && !await renderRecordMatches(renderRecord, source, theme)) renderIssue = '历史渲染记录与正文或主题不匹配。';
+  } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
   return {
     ...manifest,
     title: parsed.metadata.title || '未命名文稿',
@@ -152,6 +161,7 @@ async function readSnapshot(directory: FileSystemDirectoryHandle, directoryName:
     theme,
     parsed,
     themeMatches,
+    renderRecord, renderIssue,
   };
 }
 
@@ -227,8 +237,10 @@ export async function createArticleSnapshot(
   const articleDirectory = await getArticleDirectory(root, month, folder);
   const existing = await listArticleHistory(root, month, folder);
   const serializedTheme = JSON.stringify(theme);
+  const storedRender = options.renderRecord !== undefined ? options.renderRecord : await readRenderRecord(articleDirectory);
+  const renderRecord = storedRender && await renderRecordMatches(storedRender, source, theme) ? storedRender : null;
   const duplicate = options.kind === 'automatic'
-    ? existing.snapshots.find((snapshot) => snapshot.source === source && JSON.stringify(snapshot.theme) === serializedTheme)
+    ? existing.snapshots.find((snapshot) => snapshot.source === source && JSON.stringify(snapshot.theme) === serializedTheme && snapshot.renderRecord?.environmentHash === renderRecord?.environmentHash)
     : undefined;
   const maxAutoSnapshots = options.maxAutoSnapshots ?? 20;
   if (!Number.isInteger(maxAutoSnapshots) || maxAutoSnapshots < 1 || maxAutoSnapshots > 100) {
@@ -255,6 +267,7 @@ export async function createArticleSnapshot(
   try {
     await writeNewText(snapshotDirectory, 'article.md', source);
     await writeNewText(snapshotDirectory, 'theme.json', JSON.stringify(theme, null, 2));
+    if (renderRecord) await writeRenderRecord(snapshotDirectory, renderRecord);
     // The manifest is written last; readers never expose a partial snapshot.
     await writeNewText(snapshotDirectory, 'snapshot.json', JSON.stringify(manifest, null, 2));
     const snapshot = await readSnapshot(snapshotDirectory, id);

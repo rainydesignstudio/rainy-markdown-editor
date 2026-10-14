@@ -1,4 +1,5 @@
 import { initializeLibraryFormat } from './article-format/library';
+import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { parseArticle, updateFrontMatter } from './frontMatter';
 import { getTheme } from './themes';
 import { parseThemeConfigJson, validateThemeConfig, validateThemeFormat } from './themeValidation';
@@ -398,7 +399,13 @@ export function articleSummary(article: StoredArticle): ArticleSummary {
 }
 
 export async function readStoredArticleById(root: DirectoryHandle, month: string, folder: string): Promise<StoredArticle> {
-  return readStoredArticle(month, folder, await getStoredArticleDirectory(root, month, folder));
+  const directory = await getStoredArticleDirectory(root, month, folder);
+  const article = await readStoredArticle(month, folder, directory);
+  try {
+    article.renderRecord = await readRenderRecord(directory);
+    if (article.renderRecord && !await renderRecordMatches(article.renderRecord, article.source, article.theme)) article.renderIssue = '渲染记录与正文或主题不匹配；请显式更新样式后保存。';
+  } catch (error) { article.renderIssue = '渲染记录无法读取：' + (error instanceof Error ? error.message : String(error)); }
+  return article;
 }
 
 export async function listArticleSummaries(root: DirectoryHandle): Promise<{ articles: ArticleSummary[]; issues: ArticleIndexIssue[]; months: string[] }> {
@@ -615,7 +622,9 @@ export async function copyStoredArticle(
       }
     }
 
-    const copied = await readStoredArticle(targetMonth, targetFolder, destinationDirectory);
+    const originalRender = await readRenderRecord(sourceDirectory);
+    if (originalRender && await renderRecordMatches(originalRender, nextSource, copiedTheme)) await writeRenderRecord(destinationDirectory, originalRender);
+    const copied = await readStoredArticleById(root, targetMonth, targetFolder);
     const index = await writeMonthIndexEntry(targetMonthDirectory, targetFolder, indexEntry(copied));
     return {
       article: copied,
@@ -710,7 +719,7 @@ export async function saveStoredArticle(
   theme: ThemeConfig,
   existingFolder?: string | null,
   existingMonth?: string | null,
-  options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string } = {},
+  options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string; renderRecord?: RenderRecord | null } = {},
 ): Promise<SaveResult> {
   await ensurePermission(root);
   if (Boolean(existingFolder) !== Boolean(existingMonth)) throw new Error('已有文章必须同时提供固定目录名和年月目录。');
@@ -760,6 +769,13 @@ export async function saveStoredArticle(
   }
 
   const storedParse = parsedWithThemeDiagnostics(parsed, themeResult);
+  let renderIssue: string | undefined;
+  if (options.renderRecord !== undefined) {
+    try {
+      if (options.renderRecord && !await renderRecordMatches(options.renderRecord, source, themeResult.theme)) throw new Error('正文或主题与渲染记录不匹配。');
+      await writeRenderRecord(articleDirectory, options.renderRecord);
+    } catch (error) { renderIssue = '原文已保存；渲染依赖未保存：' + (error instanceof Error ? error.message : String(error)); }
+  }
   const savedArticle: StoredArticle = {
     id: `${month}/${folder}`,
     folder,
@@ -769,6 +785,8 @@ export async function saveStoredArticle(
     filePath: `articles/${month}/${folder}/article.md`,
     parse: storedParse,
     themeValid: themeResult.valid,
+    ...(options.renderRecord !== undefined ? { renderRecord: options.renderRecord } : {}),
+    ...(renderIssue ? { renderIssue } : {}),
   };
 
   let indexUpdated = false;

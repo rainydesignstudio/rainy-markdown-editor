@@ -26,11 +26,22 @@ function slugBase(title: string): string {
     .replace(/[\s-]+/g, '-') || 'section';
 }
 
-export function remarkHeadingIds() {
+export function remarkHeadingIds(options: { mode?: 'auto' | 'explicit' } = {}) {
   return (tree: MarkdownNode) => {
     const usedIds = new Set<string>();
     const visit = (node: MarkdownNode) => {
       if (node.type === 'heading') {
+        if (options.mode === 'explicit') {
+          const last = node.children?.at(-1);
+          if (last?.type === 'text' && typeof last.value === 'string') {
+            const match = /\s*\{#([^\s{}"'<>]+)\}\s*$/.exec(last.value);
+            if (match) {
+              last.value = last.value.slice(0, match.index);
+              node.data = { ...node.data, hProperties: { ...node.data?.hProperties, id: match[1] } };
+            }
+          }
+          return;
+        }
         const title = plainText(node).replace(/\s+/g, ' ').trim();
         if (title) {
           const base = slugBase(title);
@@ -50,7 +61,7 @@ export function remarkHeadingIds() {
   };
 }
 
-export function rehypeAlignSanitizedFragmentLinks() {
+export function rehypeAlignSanitizedFragmentLinks(options: { prefix?: string } = {}) {
   return (tree: MarkdownNode) => {
     const ids = new Set<string>();
     const collect = (node: MarkdownNode) => {
@@ -65,7 +76,7 @@ export function rehypeAlignSanitizedFragmentLinks() {
       if (node.type === 'element' && typeof href === 'string' && href.startsWith('#')) {
         try {
           const target = decodeURIComponent(href.slice(1));
-          if (ids.has(target)) node.properties = { ...node.properties, href: `#${SANITIZED_ID_PREFIX}${target}` };
+          if (ids.has(target)) node.properties = { ...node.properties, href: '#' + (options.prefix ?? SANITIZED_ID_PREFIX) + target };
         } catch {
           // Leave malformed fragments for the sanitizer/browser to handle without rewriting content.
         }

@@ -1,21 +1,23 @@
 'use client';
+import { getArticleRenderSnapshot } from '../../lib/article-format/runtime';
 
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { useRef, useState, type MutableRefObject } from 'react';
-import { articleExportBaseName, createArticleDocumentPackage, downloadArticleBlob } from '../../lib/articleExport';
+import { articleExportBaseName, articleMarkdownBody, createArticleDocumentPackage, downloadArticleBlob } from '../../lib/articleExport';
 import { articleCanvasToPdf, articleCanvasToPng, renderArticleExportCanvas } from '../../lib/articleVisualExport';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 
-type Format = 'package' | 'markdown' | 'png' | 'pdf';
+type Format = 'package' | 'markdown' | 'body' | 'png' | 'pdf';
 
 const FORMATS: { id: Format; title: string; extension: string; detail: string }[] = [
-  { id: 'package', title: '文档包', extension: 'zip', detail: 'article.md 与 ./media/ 资源目录，打包为 ZIP。' },
+  { id: 'package', title: '文档包', extension: 'zip', detail: '源码、主题、文章资源及已保存的渲染依赖，打包为 ZIP。' },
   { id: 'markdown', title: 'Markdown', extension: 'md', detail: '只下载当前 .md 源码；本地图片路径保持原样。' },
+  { id: 'body', title: 'Markdown 正文', extension: 'md', detail: '只下载正文，不包含应用元数据；可用于官网内容入口，图片地址保持原样。' },
   { id: 'png', title: '长图片', extension: 'png', detail: '按当前主题的浅色排版生成完整单张图片。' },
   { id: 'pdf', title: 'PDF', extension: 'pdf', detail: '按浅色排版生成 A4 多页 PDF；文字以图片形式排入。' },
 ];
 
-export function ArticleExportDialog({ source, title, dirty, root, month, folder, visualAvailable, previewRef, isCurrent, prepareVisual, onExported, onClose }: {
+export function ArticleExportDialog({ source, title, dirty, root, month, folder, visualAvailable, previewRef, isCurrent, prepareVisual, onExported, onClose, focusActive = true }: {
   source: string;
   title: string;
   dirty: boolean;
@@ -28,6 +30,7 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
   prepareVisual: () => Promise<boolean>;
   onExported: (fileName: string, mediaFiles?: number) => void;
   onClose: () => void;
+  focusActive?: boolean;
 }) {
   const formatSnapshot = useFormatSnapshot();
   const [format, setFormat] = useState<Format>('package');
@@ -46,8 +49,8 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
     try {
       let blob: Blob;
       let mediaFiles: number | undefined;
-      if (format === 'markdown') {
-        blob = new Blob([source], { type: 'text/markdown;charset=utf-8' });
+      if (format === 'markdown' || format === 'body') {
+        blob = new Blob([format === 'body' ? articleMarkdownBody(source) : source], { type: 'text/markdown;charset=utf-8' });
       } else if (format === 'package') {
         const result = await createArticleDocumentPackage(source, root, month, folder);
         blob = result.blob;
@@ -56,8 +59,9 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
         if (!visualAvailable || !await prepareVisual() || !isCurrent() || !previewRef.current) {
           throw new Error('当前排版尚未就绪，请处理文稿或主题问题后重试。');
         }
+        const renderSnapshot = getArticleRenderSnapshot(previewRef.current);
         const { canvas, blockEnds } = await renderArticleExportCanvas(previewRef.current);
-        blob = format === 'png' ? await articleCanvasToPng(canvas) : await articleCanvasToPdf(canvas, blockEnds);
+        blob = format === 'png' ? await articleCanvasToPng(canvas) : await articleCanvasToPdf(canvas, blockEnds, renderSnapshot);
       }
       if (!isCurrent()) throw new Error('导出期间文稿或资料库已切换；没有下载旧内容。');
       downloadArticleBlob(blob, fileName);
@@ -71,7 +75,7 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
       if (!completed) setBusy(false);
     }
   };
-  return <DialogFrame titleId="article-export-title" descriptionId="article-export-description" onClose={onClose} dismissible={!busy} className="flex min-h-0 max-w-2xl flex-col overflow-hidden">
+  return <DialogFrame titleId="article-export-title" descriptionId="article-export-description" onClose={onClose} focusActive={focusActive} dismissible={!busy} className="flex min-h-0 max-w-2xl flex-col overflow-hidden">
     <DialogHeader titleId="article-export-title" eyebrow="EXPORT ARTICLE" title="导出文章" onClose={onClose} closeDisabled={busy} />
     <form className="flex min-h-0 flex-col" onSubmit={event => { event.preventDefault(); void exportArticle(); }}>
       <div className="grid min-h-0 gap-4 overflow-x-clip overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">

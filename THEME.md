@@ -233,6 +233,10 @@ CSS选择器从 `.article-preview .article-body` 出发；外层 `.article-previ
 
 ### 完整 article-theme 示例
 
+使用库级CSS时，基础样式由formatter的css.stylesheets加载，可在本地模块维护preflight、媒体规则、嵌套、图标与字体，见 [FORMAT.md](FORMAT.md#库级样式与独立画布)。article-theme保留原JSON结构及节点覆盖；文章选择器按render.document映射至实际容器，editor-theme不参与。
+
+先配置正文容器及继承的字体、颜色和背景，再做覆盖；片段使用这个环境的类与token。网站发布用Markdown正文输出，备份保留render.json及共享依赖；无记录旧稿不能承诺复原当时的库级CSS。
+
 保存为 `guide-paper.json`。css字符串中的 `\n` 表示换行，JSON不能含注释或未转义换行；应用编辑器也可在CSS标签页查看和修改。
 
 ```json

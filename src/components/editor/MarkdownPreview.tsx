@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
-import { articleMarkdownPlugins, articleHtmlPlugins } from '../../lib/article-format/pipeline';
+import { articleMarkdownPlugins, articleHtmlPlugins, rehypePreviewOnly } from '../../lib/article-format/pipeline';
 import {
   articleImageFileNameFromSource,
   articleImageSourceSetCandidates,
@@ -15,6 +15,10 @@ import type { StoredArticle } from '../../lib/types';
 import { ArticleImagePreview } from '../media/ArticleImagePreview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { ARTICLE_EXAMPLE_IMAGE, isLegacyExampleImage } from '../../lib/articleExamples';
+import type { FormatSnapshot } from '../../lib/article-format/runtime';
+import { ArticleCodeBlock } from './ArticleCodeBlock';
+import { LibraryArticleImage } from './LibraryArticleImage';
+import { normalizeLibraryPath, stylesheetAssetPath } from '../../lib/article-format/styles';
 
 export type ArticleMediaContext = {
   root: FileSystemDirectoryHandle | null;
@@ -204,12 +208,19 @@ export function MarkdownPreview({
   source,
   media,
   placeholderRelativeImages = false,
+  snapshot,
+  previewOnly = false,
 }: {
   source: string;
   media?: ArticleMediaContext | null;
   placeholderRelativeImages?: boolean;
+  snapshot?: FormatSnapshot;
+  previewOnly?: boolean;
 }) {
-  const formatSnapshot = useFormatSnapshot();
+  const activeSnapshot = useFormatSnapshot();
+  const formatSnapshot = snapshot ?? activeSnapshot;
+  const snapshotRef = useRef(formatSnapshot);
+  snapshotRef.current = formatSnapshot;
   const [hydrated, setHydrated] = useState(false);
   const mediaRef = useRef(media);
   mediaRef.current = media;
@@ -219,8 +230,22 @@ export function MarkdownPreview({
 
   if (!componentsRef.current) {
     componentsRef.current = {
+      code: ({ node: _node, children, className, ...props }) => {
+        const formatter = snapshotRef.current.bundle.formatter;
+        const language = /language-([\w-]+)/.exec(className ?? '')?.[1];
+        if (language && formatter.codeHighlight.engine === 'prism') return <ArticleCodeBlock text={String(children)} language={language} formatter={formatter} />;
+        return <code {...props} className={className}>{children}</code>;
+      },
       img: ({ node: _node, src, srcSet, alt, ...imageProps }) => {
         const originalSrc = typeof src === 'string' ? src : '';
+        const format = snapshotRef.current, currentLibrary = mediaRef.current;
+        if (format.bundle.formatter.stylesheets && originalSrc && !/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(originalSrc)) {
+          const base = currentLibrary?.article ? 'articles/' + currentLibrary.article.month + '/' + currentLibrary.article.folder : '';
+          try {
+            const path = originalSrc.startsWith('/') ? stylesheetAssetPath(originalSrc, '', format.bundle.formatter.stylesheets.publicRoot)?.path : normalizeLibraryPath(originalSrc, base);
+            if (path) return <LibraryArticleImage root={currentLibrary?.root ?? null} path={path} cachedUrl={format.environment?.assets.find(asset => asset.path === path)?.url} source={originalSrc} imageProps={{ ...imageProps, alt }} />;
+          } catch { return <span role="img" aria-label={'资源路径无效：' + originalSrc}>资源路径无效 · {originalSrc}</span>; }
+        }
         if (isLegacyExampleImage(originalSrc) || (relativeImagePolicyRef.current && originalSrc && !/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(originalSrc))) {
           return <img {...imageProps} src={ARTICLE_EXAMPLE_IMAGE} alt={alt || '示例图片'} data-example-image="true" />;
         }
@@ -311,9 +336,9 @@ export function MarkdownPreview({
 
   return (
     <ReactMarkdown
-      remarkPlugins={articleMarkdownPlugins()}
+      remarkPlugins={articleMarkdownPlugins(formatSnapshot)}
       remarkRehypeOptions={{ allowDangerousHtml: true }}
-      rehypePlugins={articleHtmlPlugins(formatSnapshot)}
+      rehypePlugins={[...articleHtmlPlugins(formatSnapshot), [rehypePreviewOnly, { enabled: previewOnly }]]}
       components={componentsRef.current}
     >
       {source}

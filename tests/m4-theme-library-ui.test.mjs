@@ -15,6 +15,8 @@ function page(fileSystem = {}) {
   const props = { root, themes: [...themes.THEMES], issues: [], currentTheme: themes.BASIC_THEME, defaultThemeId: null, currentArticleSaved: false, canApply: true, isRootCurrent: value => value === props.root, onLibraryChange: (...values) => writes.push(values), onApply: value => applied.push(value), async onSetDefault(id, selectedRoot) { defaults.push([id, selectedRoot]); props.defaultThemeId = id; } };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+    if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
+    if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
     if (id.endsWith('/article-format/runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };

@@ -74,7 +74,7 @@ async function runFormatFrameBootstrap() {
     try {
         payload = JSON.parse(data.textContent ?? '');
         const api = window;
-        const root = document.querySelector('.article-preview');
+        const root = document.querySelector('[data-article-content-root],.article-preview');
         if (!root)
             throw new Error('文章预览根节点缺失。');
         if (payload.kind === 'inspection') {
@@ -89,6 +89,7 @@ async function runFormatFrameBootstrap() {
         }
         else
             throw new Error('未知文章帧类型。');
+        document.body.dataset.previewReady = 'true';
     }
     catch (cause) {
         const error = cause instanceof Error ? cause.message : String(cause);

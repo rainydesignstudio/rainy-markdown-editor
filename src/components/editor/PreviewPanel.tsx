@@ -14,6 +14,8 @@ import { PreviewModeSwitch } from './PreviewModeSwitch';
 import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
 import { ThemeUpdateTag } from '../themes/ThemeUpdateTag';
+import { useArticleRenderMount } from '../../hooks/useArticleRenderMount';
+import { ArticleDocument } from './ArticleDocument';
 
 type Props = {
   article: WorkingArticle;
@@ -46,14 +48,15 @@ export function PreviewPanel({
   readOnly,
   onOpenTheme,
 }: Props) {
-  const formatSnapshot = useFormatSnapshot();
+  const liveFormatSnapshot = useFormatSnapshot();
+  const formatSnapshot = article.renderSnapshot?.id === liveFormatSnapshot.id ? article.renderSnapshot : liveFormatSnapshot;
   const { dark, toggle } = useArticlePreviewMode();
   const [darkDocument, setDarkDocument] = useState('');
   const [darkError, setDarkError] = useState(false);
   const darkFrameRef = useRef<HTMLIFrameElement | null>(null);
   const lastSnapshotRef = useRef('');
   const lightHostRef = useRef<HTMLDivElement | null>(null);
-  const [lightTarget, setLightTarget] = useState<HTMLElement | null>(null);
+  const { target: lightTarget, native, darkIssue } = useArticleRenderMount(lightHostRef, formatSnapshot, compiledCss, dark);
   // The clipboard dock opens to half the preview panel, measured once against the panel so the
   // target does not chase the preview as the dock itself takes space away from it.
   const [dockOpen, setDockOpen] = useState(false);
@@ -90,17 +93,8 @@ export function PreviewPanel({
     observer.observe(node, { childList: true, subtree: true, characterData: true });
     return () => observer.disconnect();
   }, [clipboardReceiverRef]);
-  useLayoutEffect(() => {
-    const host = lightHostRef.current;
-    if (!host) return;
-    // Author utilities must never participate in the editor UI's CSS cascade.
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
-    let mount = shadow.querySelector<HTMLElement>('[data-article-preview]');
-    if (!mount) { mount = document.createElement('div'); mount.dataset.articlePreview = ''; shadow.append(mount); }
-    setLightTarget(mount);
-  }, []);
   useEffect(() => {
-    if (!dark || !previewRef.current) return;
+    if (native || !dark || !previewRef.current) return;
     // Clone React's already sanitized article, never the user's raw HTML.
     return observeArticlePreview(previewRef.current, () => {
       try {
@@ -116,7 +110,7 @@ export function PreviewPanel({
         setDarkError(true);
       }
     });
-  }, [dark, compiledCss, previewRef, formatSnapshot.id]);
+  }, [native, dark, compiledCss, previewRef, formatSnapshot.id]);
     return (
     <section ref={panelRef} className="panel preview-panel" data-mobile-hidden={mobilePane === 'source'}>
       <div className="panel-header h-18 min-h-18 bg-list px-3 md:px-7.5">
@@ -127,14 +121,14 @@ export function PreviewPanel({
         <span className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-faint" role="status"><svg className="size-3.5 text-accent-text" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{article.dirty ? <circle cx="12" cy="12" r="7" /> : <path d="m4 12 5 5L20 6" />}</svg>{article.dirty ? '未保存' : '已保存'}</span>
       </div>
       <div className="preview-shell" data-preview-mode={dark ? 'dark' : 'light'}>
-        <div ref={lightHostRef} className="min-h-full min-w-0 " style={previewSurfaceStyle()} hidden={dark} />
-        {lightTarget ? createPortal(<><style data-article-style="true">{articlePreviewStyle(compiledCss)}</style><article ref={attachPreview} className="article-preview" data-theme={article.theme.id}>
-          <div className="article-body">
-            {parsed.canCopy && article.themeValid ? <MarkdownPreview source={parsed.body} media={media} /> : <div className="empty-state"><strong>预览已阻止</strong><p>请先处理 Front Matter 或主题快照诊断。</p></div>}
-          </div>
-        </article></>, lightTarget) : null}
-        {dark && darkError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">深色预览加载失败，可切回浅色后重试。原稿与复制内容不受影响。</p> : null}
-        {dark ? <iframe ref={darkFrameRef} className="block h-full w-full border-0" title="深色文章预览" sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} /> : null}
+        {darkIssue ? <p className="content-library-note" data-tone="error" role="alert">深色转换未完成：{darkIssue}</p> : null}
+        <div ref={lightHostRef} className="min-h-full min-w-0 " style={previewSurfaceStyle()} hidden={dark && !native} />
+        {lightTarget ? createPortal(<>{!native ? <style data-article-style="true">{articlePreviewStyle(compiledCss)}</style> : null}
+          <ArticleDocument snapshot={formatSnapshot} themeId={article.theme.id} attach={attachPreview} media={media}>
+            {parsed.canCopy && article.themeValid ? <MarkdownPreview source={parsed.body} media={media} snapshot={formatSnapshot} /> : <div className="empty-state"><strong>预览已阻止</strong><p>请先处理 Front Matter 或主题快照诊断。</p></div>}
+          </ArticleDocument></>, lightTarget) : null}
+        {dark && !native && darkError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">深色预览加载失败，可切回浅色后重试。原稿与复制内容不受影响。</p> : null}
+        {dark && !native ? <iframe ref={darkFrameRef} className="block h-full w-full border-0" title="深色文章预览" sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} /> : null}
       </div>
       <div className="panel-body">
         <section className="clipboard-dock">

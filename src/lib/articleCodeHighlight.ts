@@ -10,9 +10,8 @@ export function rehypeArticleCodeHighlight() {
 }
 
 // A configured HTML whitespace representation keeps code lines/tabs during rich-text paste.
-export function rehypeArticleCodeWhitespace() {
+export function rehypeArticleCodeWhitespace(options = getFormatSnapshot().bundle.formatter.codeWhitespace) {
   return (tree: CodeNode) => {
-    const options = getFormatSnapshot().bundle.formatter.codeWhitespace;
     if (!options.enabled) return;
     const preserve = (node: CodeNode) => {
       if (!node.children) return;

@@ -1,4 +1,13 @@
 import { getStoredArticleDirectory } from './fileSystem';
+import { readRenderRecord, renderRecordMatches } from './article-format/renderRecords';
+import { readLibraryFile, contentHash } from './article-format/styles';
+import { parseArticle } from './frontMatter';
+
+export function articleMarkdownBody(source: string): string {
+  const parsed = parseArticle(source);
+  if (!parsed.canCopy) throw new Error('元数据边界或内容无效，无法可靠提取Markdown正文。');
+  return parsed.body;
+}
 
 const MAX_PACKAGE_BYTES = 256 * 1024 * 1024;
 
@@ -50,6 +59,30 @@ export async function createArticleDocumentPackage(source: string, root: FileSys
   };
   if (month && folder) {
     const articleDirectory = await getStoredArticleDirectory(root, month, folder);
+    const include = async (name: string, file: Blob) => {
+      totalBytes += file.size;
+      if (totalBytes > MAX_PACKAGE_BYTES) throw new Error('文档包超过256 MB，未生成。');
+      entries[name] = new Uint8Array(await file.arrayBuffer());
+    };
+    try { await include('theme.json', await (await articleDirectory.getFileHandle('theme.json')).getFile()); }
+    catch (error) { if (!(error instanceof DOMException && error.name === 'NotFoundError')) throw error; }
+    const record = await readRenderRecord(articleDirectory);
+    if (record) {
+      const theme = JSON.parse(await (await articleDirectory.getFileHandle('theme.json')).getFile().then(file => file.text()));
+      if (!await renderRecordMatches(record, source, theme)) throw new Error('渲染记录与待导出原文不一致，请更新样式并保存后重试。');
+      const manifestPath = 'styles/.versions/' + record.environmentHash + '/manifest.json';
+      const manifest = await readLibraryFile(root, manifestPath);
+      if (await contentHash(await manifest.text()) !== record.environmentHash) throw new Error('渲染版本清单校验失败，文档包未生成。');
+      await include('render.json', new Blob([JSON.stringify(record)]));
+      await include(manifestPath, manifest);
+      for (const asset of record.assets) {
+        const name = 'assets/.objects/' + asset.hash;
+        if (entries[name]) continue;
+        const file = await readLibraryFile(root, name);
+        if (await contentHash(file) !== asset.hash) throw new Error('渲染资源缺失或损坏：' + asset.path);
+        await include(name, file);
+      }
+    }
     let mediaDirectory: FileSystemDirectoryHandle | null = null;
     try {
       mediaDirectory = await articleDirectory.getDirectoryHandle('media');

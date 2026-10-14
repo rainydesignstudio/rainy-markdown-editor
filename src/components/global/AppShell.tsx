@@ -101,7 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onOpenHistory={openHistory}
             onSave={() => void controller.saveCurrent()}
             onCopy={() => void controller.copyRichText()}
-            onCompile={() => void controller.compileCurrent()}
+            onCompile={() => void controller.updateCurrentStyles()}
             onCheckFormat={() => void controller.checkCurrentFormat()}
           />
           {format.library && format.error !== '正在载入资料库格式配置…' && (format.error || format.source === 'built-in') ? <p className="shrink-0 border-b border-warning-line bg-warning-surface px-4 py-2 text-xs text-warning-strong" role={format.error ? 'alert' : 'status'}>{format.error ?? '当前资料库未提供格式三件套，正在使用内置默认整套配置。'}{format.error && format.error !== '正在载入资料库格式配置…' ? ' 请按 FORMAT.md 修复三件套，再重新打开当前资料库。' : ''}</p> : null}
@@ -138,7 +138,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </section>
       </div>
-      <AppDialogs />
       {statisticsOpen ? <ArticleStatisticsDialog title={controller.currentTitle} dirty={controller.article.dirty} statistics={controller.parsed.canCopy && controller.article.themeValid && controller.previewRef.current?.querySelector('.article-body') ? articleStatisticsFromHtml(controller.previewRef.current.querySelector('.article-body')!.innerHTML) : null} issue={!controller.parsed.canCopy || !controller.article.themeValid ? '请先修复元数据或主题快照，再查看正文统计。' : undefined} onClose={() => setStatisticsOpen(false)} /> : null}
       {templateSnapshot ? <CreateTemplateFromArticleDialog source={templateSnapshot.source} dirty={templateSnapshot.dirty} root={templateSnapshot.root} categories={controller.templateCategories} templates={controller.templates} isCurrent={() => controller.directoryRef.current === templateSnapshot.root && controller.contentLibraryRootSessionRef.current === templateSnapshot.sessionKey} onCreated={(template, formatIssueCount, hasLocalMedia) => {
         if (controller.directoryRef.current === templateSnapshot.root && controller.contentLibraryRootSessionRef.current === templateSnapshot.sessionKey) {
@@ -147,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         }
         setTemplateSnapshot(null);
       }} onClose={() => setTemplateSnapshot(null)} /> : null}
-      {exportSnapshot ? <ArticleExportDialog source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
+      {exportSnapshot ? <ArticleExportDialog focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
         const current = controller.articleRef.current;
         return getFormatSnapshot().id === exportSnapshot.formatId && controller.directoryRef.current === exportSnapshot.root && controller.contentLibraryRootSessionRef.current === exportSnapshot.sessionKey
           && current.month === exportSnapshot.month && current.folder === exportSnapshot.folder
@@ -155,6 +154,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           && parseArticle(current.source).body === exportSnapshot.body;
       }} prepareVisual={controller.prepareVisualExport} onExported={(fileName, mediaFiles) => controller.setStatus({ label: `已导出 ${fileName}${mediaFiles === undefined ? '' : ` · 包含 ${mediaFiles} 个媒体文件`}`, tone: 'success' })} onClose={() => setExportSnapshot(null)} /> : null}
       {changelogOpen ? <ChangelogDialog onClose={() => setChangelogOpen(false)} /> : null}
+      <AppDialogs />
     </main>
   );
 }

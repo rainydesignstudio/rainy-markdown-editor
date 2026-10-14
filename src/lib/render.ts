@@ -50,8 +50,8 @@ export function clipboardPlainText(node: Node, inCodeBlock = false): string {
   return [...node.childNodes].map(child => clipboardPlainText(child, codeBlock)).join('');
 }
 
-export function buildClipboardPayload(root: HTMLElement): ClipboardPayload {
-  const snapshot = getFormatSnapshot(); assertFormatReady(snapshot);
+export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSnapshot()): ClipboardPayload {
+  assertFormatReady(snapshot);
   const output = snapshot.bundle.formatter.output;
   const keptAttributes = new Set(output.preserveAttributes);
   const body = root.querySelector('.article-body') ?? root;
@@ -59,6 +59,7 @@ export function buildClipboardPayload(root: HTMLElement): ClipboardPayload {
   // clipboard, using the configured output container.
   const bodyClone = body === root ? body.cloneNode(true) as HTMLElement : root.ownerDocument.createElement(output.wrapperTag);
   if (body !== root) for (const child of Array.from(body.childNodes ?? body.children)) bodyClone.append(child.cloneNode(true));
+  bodyClone.querySelectorAll('[data-preview-only]').forEach(node => { if (node.hasAttribute?.('data-preview-only')) node.remove(); });
   const rawText = clipboardPlainText(bodyClone);
   const maximum = output.plainText.maxConsecutiveNewlines;
   const boundedText = maximum > 0 ? rawText.replace(new RegExp(`\\n{${maximum + 1},}`, 'g'), '\n'.repeat(maximum)) : rawText;
@@ -75,7 +76,7 @@ export function buildClipboardPayload(root: HTMLElement): ClipboardPayload {
   // Restore filesystem references only in an inert document: detached <img> elements
   // in the live document can otherwise start unwanted localhost HTTP requests.
   root.ownerDocument?.createElement('template').content?.append(clone);
-  const sourceElements = [...(body === root ? [] : [root]), body, ...Array.from(body.querySelectorAll('*'))];
+  const sourceElements = [...(body === root ? [] : [root]), body, ...Array.from(body.querySelectorAll('*')).filter(node => !node.closest?.('[data-preview-only]'))];
   const cloneElements = [...(clone === bodyClone ? [] : [clone]), bodyClone, ...Array.from(bodyClone.querySelectorAll('*'))];
   const view = root.ownerDocument?.defaultView ?? window;
   const { normalizePaint } = createArticleColorNormalizer(root.ownerDocument);

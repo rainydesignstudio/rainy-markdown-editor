@@ -1,4 +1,6 @@
 'use client';
+import { useArticleRenderMount } from '../../hooks/useArticleRenderMount';
+import { ArticleDocument } from '../editor/ArticleDocument';
 
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { articlePreviewStyle, previewSurfaceStyle } from '../../lib/article-format/preview';
@@ -152,21 +154,14 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
   const lastSnapshotRef = useRef('');
   const [darkDocument, setDarkDocument] = useState('');
   const [failed, setFailed] = useState(false);
-  const [lightTarget, setLightTarget] = useState<HTMLElement | null>(null);
+
   const [compiledCss, setCompiledCss] = useState('');
   const [compileError, setCompileError] = useState('');
   const provenanceRef = useRef<ReturnType<typeof createArticleColorInspection> | null>(null);
   const [inspectionRevision, setInspectionRevision] = useState(0);
   const utilitiesRef = useRef('');
   const articleCss = articlePreviewStyle(`${compiledCss}\narticle.article-preview { min-height: 100%; min-width: 0; width: 100%; }`);
-  useLayoutEffect(() => {
-    const host = lightHostRef.current;
-    if (!host) return;
-    const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
-    let mount = shadow.querySelector<HTMLElement>('[data-theme-preview]');
-    if (!mount) { mount = document.createElement('div'); mount.dataset.themePreview = ''; shadow.append(mount); }
-    setLightTarget(mount);
-  }, []);
+  const { target: lightTarget, native } = useArticleRenderMount(lightHostRef, formatSnapshot, compiledCss, dark);
   useEffect(() => {
     let active = true;
     setCompiledCss(''); setCompileError('');
@@ -216,7 +211,7 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
     return () => { active = false; };
   }, [Boolean(inspection)]);
   useEffect(() => {
-    if (!dark || !compiledCss || !articleRef.current) return;
+    if (native || !dark || !compiledCss || !articleRef.current) return;
     return observeArticlePreview(articleRef.current, () => {
       try {
         const clone = cloneArticleForDarkPreview(articleRef.current!);
@@ -229,11 +224,11 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
     });
   }, [dark, articleCss, compiledCss, formatSnapshot.id]);
     const content = <div className={`${className} ${scopeClass}`} style={previewSurfaceStyle(dark)} data-preview-mode={dark ? 'dark' : 'light'}>
-    <div ref={lightHostRef} hidden={dark} className={framed ? 'mx-auto min-h-full min-w-0 w-full max-w-3xl rounded-lg shadow-panel' : 'min-h-full min-w-0 w-full border-0'} aria-busy={!compiledCss && !compileError} />
-    {lightTarget ? createPortal(<><style>{`:host { display: block; min-height: 100%; }\n${articleCss}`}</style><div className={scopeClass}><article ref={articleRef} className="article-preview" data-theme={theme.id}><div className="article-body"><MarkdownPreview source={source} placeholderRelativeImages /></div></article></div></>, lightTarget) : null}
+    <div ref={lightHostRef} hidden={dark && !native} className={framed ? 'mx-auto min-h-full min-w-0 w-full max-w-3xl rounded-lg shadow-panel' : 'min-h-full min-w-0 w-full border-0'} aria-busy={!compiledCss && !compileError} />
+    {lightTarget ? createPortal(<>{!native ? <style>{articleCss}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }}><MarkdownPreview source={source} placeholderRelativeImages snapshot={formatSnapshot} /></ArticleDocument></>, lightTarget) : null}
     {compileError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">主题预览编译失败：{compileError}</p> : null}
-    {dark && failed ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">深色预览加载失败，可切回浅色后重试。</p> : null}
-    {dark ? <iframe ref={frameRef} className="block h-full min-w-0 w-full border-0" title="文章主题深色预览" sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} onLoad={() => { const target = frameRef.current?.contentDocument; if (inspection && target) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; target.head.append(style); setInspectionRevision(value => value + 1); } }} /> : null}
+    {dark && !native && failed ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">深色预览加载失败，可切回浅色后重试。</p> : null}
+    {dark && !native ? <iframe ref={frameRef} className="block h-full min-w-0 w-full border-0" title="文章主题深色预览" sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} onLoad={() => { const target = frameRef.current?.contentDocument; if (inspection && target) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; target.head.append(style); setInspectionRevision(value => value + 1); } }} /> : null}
   </div>;
   return inspection ? <ThemeInspectionPreview inspection={inspection} dialogOwner="theme-stylebook-title" rootRef={articleRef} frameRef={dark ? frameRef : undefined} revision={`${inspectionRevision}:${dark}:${articleCss}`} className="flex min-h-0 flex-1 flex-col" onLocate={onLocate} resolve={(element, root) => {
     const light = articleRef.current;

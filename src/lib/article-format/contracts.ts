@@ -31,6 +31,27 @@ export const attribute: Guard = (value, path) => { text(value, path); if (!/^[a-
 export const cssValue: Guard = (value, path) => { text(value, path); if (/[;{}<>\\]|url\s*\(|expression\s*\(|javascript:/i.test(String(value))) fail(path, '不是安全CSS值'); };
 export const selector: Guard = (value, path) => { text(value, path); if (typeof document !== 'undefined') { try { document.createDocumentFragment().querySelector(String(value)); } catch { fail(path, '选择器语法无效'); } } if (/[{}<]|@/.test(String(value))) fail(path, '无效选择器'); };
 export const tag: Guard = (value, path) => { text(value, path); if (!/^[a-z][a-z0-9-]*$/.test(String(value)) || ['script', 'style', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'area', 'br', 'col', 'hr', 'img', 'input', 'param', 'source', 'track', 'wbr', 'svg', 'body', 'html'].includes(String(value))) fail(path, '无效或不安全的容器标签'); };
+export const boundedString = (maximum: number): Guard => (value, path) => {
+  if (typeof value !== 'string' || value.length > maximum) fail(path, '文本类型或长度无效');
+};
+export const libraryPath: Guard = (value, path) => {
+  text(value, path);
+  if (typeof value !== 'string' || value.startsWith('/') || /[\\\u0000-\u001f?#]/.test(value) || value.split('/').some(part => !part || part === '.' || part === '..') || /^[a-z][a-z\d+.-]*:/i.test(value)) fail(path, '必须是授权资料库内的相对路径');
+};
+const container = shape({ tag, classes: strings }, { id: (value, path) => {
+  text(value, path); if (!/^[a-zA-Z][\w:-]*$/.test(String(value))) fail(path, '无效容器ID');
+} });
+const nullable = (guard: Guard): Guard => (value, path) => { if (value !== null) guard(value, path); };
+const httpBase: Guard = (value, path) => {
+  if (value === '') return;
+  text(value, path); let parsed: URL;
+  try { parsed = new URL(String(value)); } catch { fail(path, '链接基址无效'); }
+  if (!['https:', 'http:'].includes(parsed!.protocol) || parsed!.username || parsed!.password) fail(path, '链接基址必须是无凭据的HTTP地址');
+};
+const highlightStyleKey: Guard = (value, path) => {
+  text(value, path);
+  if (String(value).length > 512 || /[{};@\u0000-\u001f]/.test(String(value)) || ['__proto__', 'constructor', 'prototype'].includes(String(value))) fail(path, '代码高亮样式键无效');
+};
 export const darkOptions = shape({}, {
   mode: choice('dark'), defaultDarkTextColor: cssValue, needJudgeFirstPage: bool, noEmit: bool,
   whitelist: shape({}, { attribute: array(attribute), tagName: strings }),
@@ -57,12 +78,24 @@ export const VALIDATOR_CAPABILITIES: Record<string, { stages: string[]; paramete
 export const FORMATTER_CAPABILITIES: Record<string, { phase: string; multiple?: boolean; parameters: Guard }> = {
   'markdown.soft-breaks': { phase: 'markdown', parameters: shape({ mode: choice('space', 'line-break') }) },
   'markdown.blank-lines': { phase: 'markdown', parameters: shape({ preserve: bool, betweenBlocks: number(1, 100, true), atEdges: number(1, 100, true) }) },
-  'markdown.code-highlight': { phase: 'markdown', parameters: shape({ styles: array(shape({ selectors: array(selector, 1), declarations: mapping(cssValue, property) })) }) },
+  'markdown.code-highlight': { phase: 'markdown', parameters: shape({ styles: array(shape({ selectors: array(selector, 1), declarations: mapping(cssValue, property) })) }, { engine: choice('highlight', 'prism'), themeDefaults: bool, prismStyles: mapping(mapping(cssValue, property), highlightStyleKey) }) },
+  'markdown.heading-ids': { phase: 'markdown', parameters: shape({ mode: choice('auto', 'explicit') }) },
+  'markdown.code-layout': { phase: 'markdown', parameters: shape({ wrapperClasses: strings, preTag: choice('div', 'pre'), contentClasses: strings, copyClasses: strings, copyHtml: boundedString(65536), copyLabel: text }) },
   'markdown.code-whitespace': { phase: 'markdown', parameters: shape({ tabSize: number(1, 16, true) }) },
   'preview.surface': { phase: 'preview', parameters: shape({ lightBackground: cssValue, darkBackground: cssValue, fontFamily: cssValue, color: cssValue, stripThemeBackground: bool }) },
   'preview.dark-mode': { phase: 'preview', parameters: shape({ transform: choice('preserve', 'mp-darkmode'), options: darkOptions }) },
   'css.drop-properties': { phase: 'css', multiple: true, parameters: shape({ properties: array(property) }) },
   'css.utility-aliases': { phase: 'css', parameters: shape({ aliases: mapping(property, property) }) },
+  'css.stylesheets': { phase: 'css', parameters: shape({ entry: libraryPath, publicRoot: libraryPath }, { allowUnknownClasses: bool }) },
+  'render.document': { phase: 'preview', parameters: shape({
+    root: container, body: nullable(container), beforeHtml: boundedString(65536), afterHtml: boundedString(65536),
+    language: text, preserveIds: bool,
+    viewport: nullable(shape({ width: number(1, 10000, true), height: number(1, 10000, true), contentWidth: number(1, 10000, true) })),
+  }) },
+  'render.nodes': { phase: 'markdown', parameters: shape({
+    image: shape({ width: number(1, 10000, true), height: number(1, 10000, true), classes: strings, style: mapping(cssValue, property), alt: boundedString(1000) }),
+    link: shape({ classes: strings, rootBase: httpBase, externalTarget: choice('_blank', '_self') }),
+  }) },
   'output.css': { phase: 'output', parameters: shape({ inlineProperties: array(property), dimensionProperties: array(property), preserveAutoDimensions: bool, colorEncoding: choice('rgb', 'preserve') }) },
   'output.html': { phase: 'output', parameters: shape({ wrapperTag: tag, preserveAttributes: array(attribute), removeClasses: bool, stripRootBackground: bool }) },
   'output.text': { phase: 'output', parameters: shape({ maxConsecutiveNewlines: number(1, 100, true), trim: bool }) },

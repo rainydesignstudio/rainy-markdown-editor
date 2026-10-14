@@ -76,6 +76,10 @@ export type ArticleTemplate = {
 };
 
 export type WorkingArticle = {
+  renderCss?: string;
+  renderRecord?: import('./article-format/renderRecords').RenderRecord | null;
+  renderSnapshot?: import('./article-format/runtime').FormatSnapshot;
+  renderIssue?: string;
   source: string;
   folder: string | null;
   month: string | null;
@@ -85,6 +89,8 @@ export type WorkingArticle = {
 };
 
 export type StoredArticle = {
+  renderRecord?: import('./article-format/renderRecords').RenderRecord | null;
+  renderIssue?: string;
   id: string;
   folder: string;
   month: string;

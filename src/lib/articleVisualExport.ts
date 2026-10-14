@@ -1,4 +1,4 @@
-import { getFormatSnapshot, assertCurrentFormat, assertFormatReady } from './article-format/runtime';
+import { getFormatSnapshot, getArticleRenderSnapshot, assertCurrentFormat, assertFormatReady } from './article-format/runtime';
 
 function imageReady(image: HTMLImageElement): Promise<void> {
   if (image.complete && image.naturalWidth > 0) return Promise.resolve();
@@ -8,13 +8,14 @@ function imageReady(image: HTMLImageElement): Promise<void> {
 }
 
 export async function renderArticleExportCanvas(article: HTMLElement): Promise<{ canvas: HTMLCanvasElement; blockEnds: number[] }> {
-  const snapshot = getFormatSnapshot(); assertFormatReady(snapshot);
+  const snapshot = getArticleRenderSnapshot(article); assertFormatReady(snapshot);
   const options = snapshot.bundle.formatter.output.visual;
   const EXPORT_WIDTH = options.width;
   const MAX_CANVAS_SIDE = options.maxCanvasSide;
   const originalRoot = article.getRootNode();
-  if (!(originalRoot instanceof ShadowRoot)) throw new Error('文章预览尚未就绪，无法生成图片。');
-  const sourceStyle = originalRoot.querySelector<HTMLStyleElement>('style[data-article-style]');
+  const native = Boolean(snapshot.bundle.formatter.document || snapshot.bundle.formatter.stylesheets);
+  if (!native && !(originalRoot instanceof ShadowRoot)) throw new Error('文章预览尚未就绪，无法生成图片。');
+  const sourceStyle = native ? article.ownerDocument.querySelector<HTMLStyleElement>('style[data-article-style]') : (originalRoot as ShadowRoot).querySelector<HTMLStyleElement>('style[data-article-style]');
   if (!sourceStyle?.textContent) throw new Error('文章样式尚未就绪，无法生成图片。');
   const host = document.createElement('div');
   host.style.position = 'fixed';
@@ -22,14 +23,26 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
   host.style.top = '0';
   host.style.width = `${EXPORT_WIDTH}px`;
   host.style.pointerEvents = 'none';
-  const shadow = host.attachShadow({ mode: 'open' });
-  const style = document.createElement('style');
-  style.textContent = sourceStyle.textContent;
+  document.body.append(host);
+  const frame = native ? document.createElement('iframe') : null;
+  if (frame) {
+    const viewport = snapshot.bundle.formatter.document?.viewport;
+    frame.setAttribute('sandbox', 'allow-same-origin'); frame.style.border = '0';
+    frame.style.width = (viewport?.width ?? EXPORT_WIDTH) + 'px'; frame.style.height = (viewport?.height ?? 959) + 'px';
+    host.append(frame);
+  }
+  const doc = frame?.contentDocument ?? document;
+  if (frame) { doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close(); }
+  const shadow = frame ? doc.body : host.attachShadow({ mode: 'open' });
+  const style = doc.createElement('style');
+  const preview = snapshot.bundle.formatter.preview;
+  style.textContent = native ? 'body{margin:0;font-family:' + preview.fontFamily + ';color:' + preview.color + ';background:' + preview.light.background + '}' + sourceStyle.textContent : sourceStyle.textContent;
   const copy = article.cloneNode(true) as HTMLElement;
+  copy.querySelectorAll('[data-preview-only]').forEach(node => node.remove());
   copy.style.width = `${EXPORT_WIDTH}px`;
   copy.style.margin = '0';
   shadow.append(style, copy);
-  document.body.append(host);
+  if (native) { copy.getBoundingClientRect(); await doc.fonts.ready; }
   try {
     if (copy.querySelector('span[data-local-asset-src],span[data-local-asset-srcset]')) {
       throw new Error('本地图片尚未载入，图片和 PDF 导出已停止；请等预览显示图片后重试。');
@@ -87,8 +100,8 @@ export function articlePdfPageCuts(height: number, maxPageHeight: number, blockE
   return cuts;
 }
 
-export async function articleCanvasToPdf(canvas: HTMLCanvasElement, blockEnds: readonly number[]): Promise<Blob> {
-  const snapshot = getFormatSnapshot(); assertFormatReady(snapshot);
+export async function articleCanvasToPdf(canvas: HTMLCanvasElement, blockEnds: readonly number[], snapshot = getFormatSnapshot()): Promise<Blob> {
+  assertFormatReady(snapshot);
   const options = snapshot.bundle.formatter.output.visual;
   const PAGE_MARGIN_PT = options.pdfMargin;
   const { jsPDF } = await import('jspdf');

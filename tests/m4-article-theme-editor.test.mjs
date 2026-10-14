@@ -22,6 +22,8 @@ function editor(theme = FORMAT_THEME) {
   let persist = async (_, value) => ({ ...value, version: '1.0.1' });
   const module = { exports: {} };
   vm.runInNewContext(`${code}\nexports.Stylebook = ThemeStylebookDialog;`, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, document: { getElementById: () => ({ focus() {} }) }, require(id) {
+    if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
+    if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
     if (id.endsWith('/article-format/runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/PageHeading')) return { PageHeading: 'page-heading' };

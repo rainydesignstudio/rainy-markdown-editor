@@ -3,11 +3,11 @@ import { validateThemeConfig } from './themeValidation';
 import { BASIC_THEME, THEMES } from '../themes/article-themes/index';
 export { BASIC_THEME, RAINY_THEME, ARTICLE_THEME_PRESETS, THEMES } from '../themes/article-themes/index';
 import type { ThemeNodeKey } from './types';
-import { getFormatSnapshot } from './article-format/runtime';
+import { getFormatSnapshot, type FormatSnapshot } from './article-format/runtime';
 
-function articleCodeHighlightCss(scope = ''): string {
-  const config = getFormatSnapshot().bundle.formatter.codeHighlight;
-  if (!config.enabled) return '';
+function articleCodeHighlightCss(scope = '', snapshot = getFormatSnapshot()): string {
+  const config = snapshot.bundle.formatter.codeHighlight;
+  if (!config.enabled || config.themeDefaults === false) return '';
   const body = `${scope ? `${scope} ` : ''}.article-preview .article-body`;
   return config.styles.map(group => `${group.selectors.map(selector => `${body} ${selector}`).join(', ')} { ${Object.entries(group.declarations).map(([property, value]) => `${property}: ${value};`).join(' ')} }`).join('\n');
 }
@@ -62,9 +62,9 @@ export function themePreviewCss(theme: ThemeConfig, instanceScope: string): stri
   return `${scope} .article-preview {\n${themeTokenDeclarations(theme)}\n}\n${scopedCss}\n${articleCodeHighlightCss(scope)}\n${nodeOverrideCss(theme, scope)}`;
 }
 
-export function themeToCss(theme: ThemeConfig): string {
+export function themeToCss(theme: ThemeConfig, snapshot: FormatSnapshot = getFormatSnapshot()): string {
   assertValidTheme(theme);
   const tokens = themeTokenDeclarations(theme);
   const nodeCss = nodeOverrideCss(theme);
-  return `@theme static {\n${tokens}\n}\n@layer components {\n${theme.css}\n${articleCodeHighlightCss()}\n${nodeCss}\n}`;
+  return `@theme static {\n${tokens}\n}\n@layer components {\n${theme.css}\n${articleCodeHighlightCss('', snapshot)}\n${nodeCss}\n}`;
 }

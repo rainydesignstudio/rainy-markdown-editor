@@ -164,6 +164,7 @@ test('manual save waits for the compiled report and uses it for the save dialog'
   const fixture = compileFixture(); const dialogs = []; let inspections = 0;
   const context = { ...fixture.context,
     mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
+    captureSavedRender: async () => true,
     saveSnapshot: async () => ({ ok: true, current: true, savedSnapshot: fixture.snapshot, result: { article: { parse: { canCopy: true } } } }),
     compileCurrent: async () => { fixture.cache.current = { snapshot: fixture.snapshot, report }; return true; },
     inspectArticleFormatReport: async () => { inspections++; return report; }, hasFormatConcerns: reports.hasFormatConcerns,

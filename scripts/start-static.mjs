@@ -63,9 +63,11 @@ function contentSecurityPolicy(filePath) {
     "default-src 'self'",
     "base-uri 'none'",
     "img-src 'self' data: blob:",
+    "font-src 'self' data: blob:",
+    "worker-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     `script-src ${scriptSource}`,
-    "connect-src 'self'",
+    "connect-src 'self' blob:",
     "object-src 'none'",
     "frame-ancestors 'none'",
   ].join('; ');

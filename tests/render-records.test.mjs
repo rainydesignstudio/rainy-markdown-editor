@@ -1,0 +1,128 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { contentHash, loadStylesheetEnvironment } from '../src/lib/article-format/styles.ts';
+import { DEFAULT_FORMAT_BUNDLE } from '../src/lib/article-format/config.ts';
+import { activateFormatBundle } from '../src/lib/article-format/runtime.ts';
+import { prepareRenderRecord, persistRenderRecord, readRenderRecord, renderRecordMatches, restoreRenderEnvironment, validateRenderRecord } from '../src/lib/article-format/renderRecords.ts';
+import { createArticleSource } from '../src/lib/frontMatter.ts';
+import { BASIC_THEME } from '../src/lib/themes.ts';
+import { createArticleSnapshot, listArticleHistory } from '../src/lib/articleHistory.ts';
+import { saveStoredArticle, getStoredArticleDirectory } from '../src/lib/fileSystem.ts';
+import { compileArticleStyles } from '../src/lib/tailwind.ts';
+
+function memoryLibrary() {
+  const files = new Map(), directories = new Set(['']), writes = [];
+  let fail = '';
+  const dir = (path = '') => ({
+    name: path.split('/').at(-1) || 'render-test', kind: 'directory',
+    async queryPermission() { return 'granted'; }, async requestPermission() { return 'granted'; },
+    async getDirectoryHandle(name, options = {}) {
+      const next = path ? path + '/' + name : name;
+      if (options.create) directories.add(next);
+      if (!directories.has(next)) throw new DOMException('missing ' + next, 'NotFoundError');
+      return dir(next);
+    },
+    async getFileHandle(name, options = {}) {
+      const next = path ? path + '/' + name : name;
+      if (!files.has(next) && !options.create) throw new DOMException('missing ' + next, 'NotFoundError');
+      return { kind: 'file', name,
+        async getFile() { if (!files.has(next)) throw new DOMException('missing ' + next, 'NotFoundError'); return new File([files.get(next)], name); },
+        async createWritable() {
+          let pending;
+          return { async write(value) { pending = value; }, async close() { if (fail && next.endsWith(fail)) { fail = ''; throw new Error('injected write failure'); } files.set(next, pending); writes.push(next); }, async abort() {} };
+        },
+      };
+    },
+    async removeEntry(name) { const next = path ? path + '/' + name : name; if (!files.delete(next) && !directories.delete(next)) throw new DOMException('missing', 'NotFoundError'); },
+    async *entries() {
+      const entries = new Map();
+      for (const name of directories) if (name && name.startsWith(path ? path + '/' : '')) {
+        const rest = path ? name.slice(path.length + 1) : name;
+        if (!rest.includes('/')) entries.set(rest, { kind: 'directory' });
+      }
+      for (const name of files.keys()) if (name.startsWith(path ? path + '/' : '')) {
+        const rest = path ? name.slice(path.length + 1) : name;
+        if (!rest.includes('/')) entries.set(rest, { kind: 'file' });
+      }
+      yield* entries;
+    },
+  });
+  const put = (path, data) => {
+    const parts = path.split('/');
+    for (let i = 1; i < parts.length; i++) directories.add(parts.slice(0, i).join('/'));
+    files.set(path, data);
+  };
+  return { root: dir(), files, writes, put, fail: suffix => { fail = suffix; } };
+}
+const element = { outerHTML: '<article class="article-preview"><div class="article-body"><p class="card">body</p></div></article>', cloneNode() { return { outerHTML: this.outerHTML }; } };
+async function fixture() {
+  const library = memoryLibrary();
+  library.put('styles/globals.css', '@import "tailwindcss"; .card{color:red;background-image:url("/image/mark.svg")}');
+  library.put('assets/image/mark.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
+  const raw = structuredClone(DEFAULT_FORMAT_BUNDLE);
+  raw.formatter.steps.push({ id: 'library-css', operator: 'css.stylesheets', enabled: true, parameters: { entry: 'styles/globals.css', publicRoot: 'assets' } });
+  const environment = await loadStylesheetEnvironment(library.root, { entry: 'styles/globals.css', publicRoot: 'assets' });
+  const snapshot = activateFormatBundle(raw, 'render-test', 'library', environment);
+  const source = createArticleSource('render-test', BASIC_THEME.id) + '\n<p class="card">body</p>\n';
+  const saved = await saveStoredArticle(library.root, source, BASIC_THEME);
+  const directory = await getStoredArticleDirectory(library.root, saved.article.month, saved.article.folder);
+  const compiled = await compileArticleStyles(source, BASIC_THEME);
+  const prepared = await prepareRenderRecord(source, BASIC_THEME, element, compiled.css, { snapshot });
+  return { ...library, snapshot, source, saved, directory, prepared, environment };
+}
+test('renditions keep verified immutable dependencies; opening old source performs no migration writes', async () => {
+  const f = await fixture();
+  try {
+    assert.equal(await readRenderRecord(f.directory), null);
+    const before = f.writes.length;
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const record = await readRenderRecord(f.directory);
+    assert.equal(await renderRecordMatches(record, f.source, BASIC_THEME), true);
+    assert.equal(await renderRecordMatches(record, f.source + '\nchanged', BASIC_THEME), false);
+    assert.ok(record.css.includes('article-asset:'));
+    const immutableWrites = f.writes.filter(path => path.startsWith('assets/.objects/') || path.startsWith('styles/.versions/'));
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    assert.deepEqual(f.writes.filter(path => path.startsWith('assets/.objects/') || path.startsWith('styles/.versions/')), immutableWrites);
+    f.put('styles/globals.css', '.card{color:blue}');
+    const restored = await restoreRenderEnvironment(f.root, record);
+    try {
+      assert.match(restored.css, /color: red/);
+      assert.match(restored.css, /blob:/);
+      assert.match((await compileArticleStyles(f.source, BASIC_THEME, { snapshot: restored.snapshot })).css, /color: red/);
+    } finally { restored.dispose(); }
+    assert.ok(f.writes.length > before);
+  } finally { f.environment.dispose(); }
+});
+test('missing or tampered objects fail and a dependency-write failure never publishes a pointer', async () => {
+  const f = await fixture();
+  try {
+    f.fail('manifest.json');
+    await assert.rejects(persistRenderRecord(f.root, f.directory, f.prepared), /injected/);
+    assert.equal(await readRenderRecord(f.directory), null);
+    assert.equal(await (await f.directory.getFileHandle('article.md')).getFile().then(file => file.text()), f.source);
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const record = await readRenderRecord(f.directory);
+    f.files.set('assets/.objects/' + record.assets[0].hash, 'tampered');
+    await assert.rejects(restoreRenderEnvironment(f.root, record), /校验失败/);
+    assert.throws(() => validateRenderRecord({ ...record, rawFormatter: { ...record.rawFormatter, steps: [{ id: 'bad', operator: 'arbitrary.js', enabled: true, parameters: {} }] } }), /未知/);
+    assert.throws(() => validateRenderRecord({ ...record, css: '.x{background:url(https://example.invalid/tracker)}' }), /未留存资源/);
+    assert.throws(() => validateRenderRecord({ ...record, css: '@import "https://example.invalid/style.css";' }), /额外/);
+  } finally { f.environment.dispose(); }
+});
+test('history carries the same environment; automatic dedup compares its version as well as body and theme', async () => {
+  const f = await fixture();
+  try {
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const first = await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'automatic', id: 'snapshot-first' });
+    assert.equal(first.snapshot.renderRecord.environmentHash, f.prepared.record.environmentHash);
+    assert.equal((await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'automatic', id: 'snapshot-duplicate' })).created, false);
+    const manifest = { ...f.prepared.manifest, candidates: ['card', 'p-4'] };
+    const updated = { ...f.prepared, manifest, record: { ...f.prepared.record } };
+    // Use the engine's canonical representation for the content-addressed manifest.
+    const { canonicalFormatJson } = await import('../src/lib/article-format/config.ts');
+    updated.record.environmentHash = await contentHash(canonicalFormatJson(manifest));
+    await persistRenderRecord(f.root, f.directory, updated);
+    assert.equal((await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'automatic', id: 'snapshot-second' })).created, true);
+    assert.equal((await listArticleHistory(f.root, f.saved.article.month, f.saved.article.folder)).snapshots.length, 2);
+  } finally { f.environment.dispose(); }
+});

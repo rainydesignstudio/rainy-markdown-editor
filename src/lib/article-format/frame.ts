@@ -7,7 +7,9 @@ function scriptJson(value: unknown): string { return JSON.stringify(value).repla
 export function formatPreviewDocument(css: string, html: string, dark: boolean, snapshot = getFormatSnapshot()): string {
   const preview = snapshot.bundle.formatter.preview;
   const payload = scriptJson({ kind: 'preview', bundle: snapshot.bundle, dark });
-  const safeCss = articlePreviewStyle(css).replace(/<\/style/gi, '<\\/style');
+  const safeCss = articlePreviewStyle(css, snapshot).replace(/<\/style/gi, '<\\/style');
+  const viewport = snapshot.bundle.formatter.document?.viewport;
+  if (viewport) html = '<div style="width:' + viewport.contentWidth + 'px;margin-left:' + (viewport.width - viewport.contentWidth) + 'px">' + html + '</div>';
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:${dark ? preview.dark.background : preview.light.background};color:${preview.color};font-family:${preview.fontFamily}}html,body{min-height:100%}${safeCss}</style><script type="application/json" data-article-format-config>${payload}</script><script src="/mp-darkmode.js"></script><script src="/article-format-engine.js"></script><script defer src="/article-format-bootstrap.js"></script></head><body>${html}</body></html>`;
 }
 export async function inspectRenderedFormat(root: HTMLElement, css: string, snapshot: FormatSnapshot = getFormatSnapshot(), signal?: AbortSignal): Promise<RenderedInspection> {
@@ -16,13 +18,14 @@ export async function inspectRenderedFormat(root: HTMLElement, css: string, snap
   const token = crypto.randomUUID(); const frame = document.createElement('iframe');
   const widthRule = snapshot.bundle.validator.rules.find(rule => rule.enabled && rule.operator === 'dom.responsive-width');
   const widths = widthRule?.parameters.widths as number[] | undefined;
-  frame.style.cssText = `position:fixed;left:-100000px;top:0;width:${widths?.[0] ?? snapshot.bundle.formatter.output.visual.width}px;height:2000px;border:0;pointer-events:none`;
+  const viewport = snapshot.bundle.formatter.document?.viewport;
+  frame.style.cssText = `position:fixed;left:-100000px;top:0;width:${viewport?.width ?? widths?.[0] ?? snapshot.bundle.formatter.output.visual.width}px;height:${viewport?.height ?? 2000}px;border:0;pointer-events:none`;
   frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
   frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1;
   const preview = snapshot.bundle.formatter.preview;
   const fullCss = `body{margin:0;font-family:${preview.fontFamily};background:${preview.light.background};color:${preview.color}}${articlePreviewStyle(css)}`;
   const payload = scriptJson({ kind: 'inspection', bundle: snapshot.bundle, token, css: fullCss, origin: location.origin });
-  const html = root.outerHTML;
+  const html = viewport ? '<div style="width:' + viewport.contentWidth + 'px;margin-left:' + (viewport.width - viewport.contentWidth) + 'px">' + root.outerHTML + '</div>' : root.outerHTML;
   return new Promise<RenderedInspection>((resolve, reject) => {
     let done = false;
     let unsubscribe = () => {};

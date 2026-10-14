@@ -1,5 +1,6 @@
-import { DEFAULT_FORMAT_BUNDLE, validateFormatBundle, type RawFormatBundle } from './config';
+import { DEFAULT_FORMAT_BUNDLE, validateFormatBundle, compileFormatBundle, type RawFormatBundle } from './config';
 import { activateFormatBundle, invalidateFormatBundle, type FormatSnapshot } from './runtime';
+import { loadStylesheetEnvironment, type StylesheetEnvironment } from './styles';
 
 export const FORMAT_FILES = ['format-support.json', 'validator.json', 'formatter.json'] as const;
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
@@ -23,7 +24,19 @@ export async function readLibraryFormat(root: FileSystemDirectoryHandle): Promis
 export async function activateLibraryFormat(root: FileSystemDirectoryHandle, isCurrent: () => boolean): Promise<{ snapshot: FormatSnapshot | null; message: string | null }> {
   const result = await readLibraryFormat(root);
   if (!isCurrent()) return { snapshot: null, message: null };
-  const snapshot = result.bundle ? activateFormatBundle(result.bundle, root.name, result.source === 'library' ? 'library' : 'built-in') : invalidateFormatBundle(root.name, result.message!);
+  let environment: StylesheetEnvironment | undefined;
+  if (result.bundle) {
+    try {
+      const policy = compileFormatBundle(result.bundle).formatter.stylesheets;
+      if (policy) environment = await loadStylesheetEnvironment(root, policy);
+    } catch (error) {
+      if (!isCurrent()) return { snapshot: null, message: null };
+      const message = error instanceof Error ? error.message : String(error);
+      return { snapshot: invalidateFormatBundle(root.name, message), message };
+    }
+  }
+  if (!isCurrent()) { environment?.dispose(); return { snapshot: null, message: null }; }
+  const snapshot = result.bundle ? activateFormatBundle(result.bundle, root.name, result.source === 'library' ? 'library' : 'built-in', environment) : invalidateFormatBundle(root.name, result.message!);
   return { snapshot, message: result.message };
 }
 export async function initializeLibraryFormat(root: FileSystemDirectoryHandle): Promise<void> {

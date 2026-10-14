@@ -59,12 +59,12 @@ export function sanitizeStyleValue(value: string): string {
   }
 }
 
-export function sanitizeHtml(html: string): string {
+export function sanitizeHtml(html: string, snapshot = getFormatSnapshot()): string {
   if (typeof window === 'undefined') return '';
   return DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true, svg: true },
     ADD_TAGS: ['animate', 'animateTransform'],
-    ADD_ATTR: ['class', 'style', 'rowspan', 'colspan', 'target', 'rel', 'checked', 'disabled', 'data-theme', ...getFormatSnapshot().bundle.formatter.output.preserveAttributes],
+    ADD_ATTR: ['class', 'style', 'rowspan', 'colspan', 'target', 'rel', 'checked', 'disabled', 'data-theme', ...snapshot.bundle.formatter.output.preserveAttributes],
     FORBID_TAGS,
     FORBID_ATTR,
   });

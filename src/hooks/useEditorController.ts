@@ -1,4 +1,6 @@
 'use client';
+import { prepareRenderRecord, persistRenderRecord, restoreRenderEnvironment, renderRecordMatches, type RenderRecord } from '../lib/article-format/renderRecords';
+import type { FormatSnapshot } from '../lib/article-format/runtime';
 
 import { useFormatSnapshot } from './useFormatSnapshot';
 import { activateLibraryFormat, initializeLibraryFormat } from '../lib/article-format/library';
@@ -27,6 +29,7 @@ import {
   ensureArticleDirectories,
   assertExistingDataDirectory,
   getArticleMediaDirectory,
+  getStoredArticleDirectory,
   loadThemeLibrary,
   listStoredArticles,
   listArticleSummaries,
@@ -57,7 +60,7 @@ import {
   loadArticleTemplates,
   type ContentLibraryIssue,
 } from '../lib/contentLibraries';
-import { buildClipboardPayload } from '../lib/render';
+import { buildClipboardPayload, extractMarkdownClassCandidates } from '../lib/render';
 import { embedClipboardImages } from '../lib/clipboardImages';
 import { ARTICLE_EXAMPLE_IMAGE } from '../lib/articleExamples';
 import { compiledArticleFormatStatus, hasFormatConcerns, inspectArticleFormatReport, type ArticleFormatReport } from '../lib/articleFormatReport';
@@ -133,6 +136,10 @@ function errorDiagnostics(diagnostics: ArticleDiagnostic[]): ArticleDiagnostic[]
 }
 
 type ArticleSnapshot = {
+  renderRecord?: RenderRecord | null;
+  renderCss?: string;
+  renderSnapshot?: FormatSnapshot;
+  renderIssue?: string;
   source: string;
   theme: ThemeConfig;
   themeValid: boolean;
@@ -284,6 +291,8 @@ export function useEditorController() {
   const [mediaRefreshRevision, setMediaRefreshRevision] = useState(0);
   const [isCompiling, setIsCompiling] = useState(false);
   const previewRef = useRef<HTMLElement | null>(null);
+  const renderEnvironmentRef = useRef<{ dispose: () => void } | null>(null);
+  useEffect(() => () => renderEnvironmentRef.current?.dispose(), []);
   const [previewElement, setPreviewElement] = useState<HTMLElement | null>(null);
   const attachPreview = useCallback((element: HTMLElement | null) => {
     previewRef.current = element;
@@ -292,7 +301,7 @@ export function useEditorController() {
   const clipboardReceiverRef = useRef<HTMLDivElement | null>(null);
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const compileRequestRef = useRef(0);
-  const compiledFormatRef = useRef<{ snapshot: ArticleSnapshot; report: ArticleFormatReport; classes: number; preview: HTMLElement | null; requestId: number } | null>(null);
+  const compiledFormatRef = useRef<{ snapshot: ArticleSnapshot; css: string; report: ArticleFormatReport; classes: number; preview: HTMLElement | null; requestId: number } | null>(null);
   const formatInspectionRef = useRef(false);
   const articleRef = useRef(article);
   const directoryRef = useRef(directory);
@@ -459,6 +468,9 @@ export function useEditorController() {
   }, [updateArticle]);
 
   const snapshotFor = useCallback((current = articleRef.current, targetRevision = revisionRef.current): ArticleSnapshot => ({
+    renderSnapshot: current.renderSnapshot,
+    renderRecord: current.renderRecord, renderCss: current.renderCss,
+    renderIssue: current.renderIssue,
     source: current.source,
     theme: current.theme,
     themeValid: current.themeValid,
@@ -495,7 +507,10 @@ export function useEditorController() {
     const requestId = ++compileRequestRef.current;
     setIsCompiling(true);
     try {
-      const result = await compileArticleStyles(snapshot.source, snapshot.theme);
+      if (snapshot.renderIssue) throw new Error(snapshot.renderIssue);
+      const result = snapshot.renderRecord && snapshot.renderCss && await renderRecordMatches(snapshot.renderRecord, snapshot.source, snapshot.theme)
+        ? { css: snapshot.renderCss, candidates: extractMarkdownClassCandidates(snapshot.source) }
+        : await compileArticleStyles(snapshot.source, snapshot.theme, { snapshot: snapshot.renderSnapshot?.id === snapshot.formatId ? snapshot.renderSnapshot : undefined });
       if (requestId !== compileRequestRef.current || !matchesSnapshot(snapshot)) return false;
       // Format rules must be checked against the committed preview, including its new stylesheet.
       flushSync(() => { setCompiledCss(result.css); setCompiledRevision(snapshot.revision); });
@@ -505,7 +520,7 @@ export function useEditorController() {
         body: { passed: [], issues: [] },
       }));
       if (requestId !== compileRequestRef.current || !matchesSnapshot(snapshot)) return false;
-      compiledFormatRef.current = { snapshot, report, classes: result.candidates.length, preview, requestId };
+      compiledFormatRef.current = { snapshot, css: result.css, report, classes: result.candidates.length, preview, requestId };
       setStatus(compiledArticleFormatStatus(report, snapshot.revision, result.candidates.length));
       cacheLoadedArticleReport(snapshot, report, preview);
       return true;
@@ -532,13 +547,21 @@ export function useEditorController() {
     mutationQueueRef.current.run(() => loadStoredArticles(root))
   ), [loadStoredArticles]);
 
-  const applyStoredArticle = useCallback((stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current) => {
+  const applyStoredArticle = useCallback(async (stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current) => {
     const documentToken = openDocument(root, stored.id);
     if (!documentToken) {
       setStatus({ label: '这篇文章正在删除，请稍后刷新文章列表。', tone: 'warning' });
       return false;
     }
-    const nextArticle: WorkingArticle = { source: stored.source, folder: stored.folder, month: stored.month, theme: stored.theme, themeValid: stored.themeValid, dirty: false };
+    let restored: Awaited<ReturnType<typeof restoreRenderEnvironment>> | undefined;
+    let renderIssue = stored.renderIssue;
+    if (stored.renderRecord && root && !renderIssue) {
+      try { restored = await restoreRenderEnvironment(root, stored.renderRecord); }
+      catch (error) { renderIssue = '历史渲染依赖无法载入：' + (error instanceof Error ? error.message : String(error)); }
+    }
+    if (directoryRef.current !== root || documentTokenRef.current !== documentToken) { restored?.dispose(); return false; }
+    renderEnvironmentRef.current?.dispose(); renderEnvironmentRef.current = restored ?? null;
+    const nextArticle: WorkingArticle = { source: stored.source, folder: stored.folder, month: stored.month, theme: stored.theme, themeValid: stored.themeValid, dirty: false, renderRecord: stored.renderRecord, renderSnapshot: restored?.snapshot, renderCss: restored?.css, renderIssue };
     historyBaselineRef.current = root
       ? { root, articleId: stored.id, fingerprint: articleFingerprint(stored.source, stored.theme), initialized: false }
       : null;
@@ -594,7 +617,22 @@ export function useEditorController() {
           ...(preserveThemeSnapshot ? {} : { theme: { id: snapshot.theme.id, version: snapshot.theme.version } }),
         });
     try {
+      let prepared: Awaited<ReturnType<typeof prepareRenderRecord>> | undefined, renderIssue: string | undefined;
+      const compiled = compiledFormatRef.current;
+      const preview = previewRef.current;
+      if (!hasErrors && !preserveThemeSnapshot && matchesSnapshot(snapshot) && preview && compiled?.snapshot.revision === snapshot.revision) {
+        try {
+          prepared = await prepareRenderRecord(nextSource, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: snapshot.folder && snapshot.month ? 'articles/' + snapshot.month + '/' + snapshot.folder : undefined });
+        } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
+      } else renderIssue = '当前渲染尚未就绪，请更新样式后再次保存。';
       const result = await saveStoredArticle(root, nextSource, snapshot.theme, snapshot.folder, snapshot.month, { writeTheme: !preserveThemeSnapshot });
+      if (prepared && result.article.themeValid) {
+        try {
+          await persistRenderRecord(root, await getStoredArticleDirectory(root, result.article.month, result.article.folder), prepared);
+          result.article.renderRecord = prepared.record;
+        } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
+      }
+      if (renderIssue) result.article.renderIssue = renderIssue;
       const currentDocument = matchesSnapshot(snapshot) && mutationQueueRef.current.canSave(snapshot.documentToken);
       const nextDocumentToken = currentDocument
         ? result.article.id === snapshot.documentToken.articleId
@@ -615,7 +653,7 @@ export function useEditorController() {
       if (current) {
         documentTokenRef.current = nextDocumentToken;
         setStoredArticles((items) => upsertStoredArticle(items, result.article));
-        const savedArticle: WorkingArticle = { source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false };
+        const savedArticle: WorkingArticle = { source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false, renderSnapshot: snapshot.renderSnapshot, renderCss: prepared ? compiled?.css : undefined, renderRecord: result.article.renderRecord, renderIssue: snapshot.renderIssue };
         articleRef.current = savedArticle;
         setArticle(savedArticle);
         if (!snapshot.folder || !snapshot.month) {
@@ -630,6 +668,7 @@ export function useEditorController() {
         if (result.indexUpdated && result.indexError) setStatus({ label: `原文已保存；月索引已重建：${result.indexError}`, tone: 'warning' });
         else if (result.indexUpdated) setStatus({ label: `原文已保存 · ${result.article.filePath}`, tone: 'success' });
         else setStatus({ label: `原文已保存；索引未更新：${result.indexError ?? '未知错误'}`, tone: 'warning' });
+        if (renderIssue) setStatus({ label: '原文已保存；渲染记录未更新：' + renderIssue, tone: 'warning' });
       }
       return { ok: result.sourceSaved, current, savedSnapshot, result };
     } catch (error) {
@@ -650,6 +689,27 @@ export function useEditorController() {
     })
   ), [matchesSnapshot, performSaveSnapshot]);
 
+  const captureSavedRender = useCallback(async (snapshot: ArticleSnapshot) => {
+    const root = snapshot.directory, preview = previewRef.current, compiled = compiledFormatRef.current;
+    if (!root || !snapshot.month || !snapshot.folder || !preview || !compiled || !matchesSnapshot(snapshot)) return false;
+    try {
+      const prepared = await prepareRenderRecord(snapshot.source, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: 'articles/' + snapshot.month + '/' + snapshot.folder });
+      if (!matchesSnapshot(snapshot)) return false;
+      await mutationQueueRef.current.run(async () => {
+        if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new Error('文章会话已变化，渲染记录未更新。');
+        await persistRenderRecord(root, await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!), prepared);
+      });
+      if (matchesSnapshot(snapshot)) {
+        const next = { ...articleRef.current, renderRecord: prepared.record, renderCss: compiled.css, renderIssue: undefined };
+        articleRef.current = next; setArticle(next);
+      }
+      return true;
+    } catch (error) {
+      if (matchesSnapshot(snapshot)) setStatus({ label: '原文已保存；渲染记录未更新：' + (error instanceof Error ? error.message : String(error)), tone: 'warning' });
+      return false;
+    }
+  }, [matchesSnapshot]);
+
   const saveCurrent = useCallback(async (): Promise<boolean> => {
     if (mediaOperationRef.current || historyOperationRef.current) return false;
     const snapshot = snapshotFor();
@@ -657,6 +717,7 @@ export function useEditorController() {
     const result = await saveSnapshot(snapshot);
     if (result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy) {
       const compiled = await compileCurrent(result.savedSnapshot);
+      if (compiled) await captureSavedRender(result.savedSnapshot);
       const checked = compiledFormatRef.current;
       try {
       const report = compiled && checked?.report.complete && matchesSnapshot(checked.snapshot)
@@ -669,7 +730,7 @@ export function useEditorController() {
       }
     }
     return result.ok;
-  }, [compileCurrent, matchesSnapshot, saveSnapshot, snapshotFor]);
+  }, [captureSavedRender, compileCurrent, matchesSnapshot, saveSnapshot, snapshotFor]);
 
   const checkCurrentFormat = useCallback(async (): Promise<boolean> => {
     if (formatInspectionRef.current || formatCheckResolveRef.current || mediaOperationRef.current || historyOperationRef.current) return false;
@@ -695,6 +756,18 @@ export function useEditorController() {
       return false;
     } finally { formatInspectionRef.current = false; }
   }, [cacheLoadedArticleReport, compileCurrent, matchesSnapshot, snapshotFor]);
+
+  const updateCurrentStyles = useCallback(async () => {
+    const root = directoryRef.current, token = documentTokenRef.current;
+    if (!root || !token) return false;
+    const loaded = await activateLibraryFormat(root, () => directoryRef.current === root && documentTokenRef.current === token);
+    if (!loaded.snapshot || directoryRef.current !== root || documentTokenRef.current !== token) return false;
+    if (loaded.snapshot.error) { setStatus({ label: '样式未更新：' + loaded.snapshot.error, tone: 'error' }); return false; }
+    renderEnvironmentRef.current?.dispose(); renderEnvironmentRef.current = null;
+    const next: WorkingArticle = { ...articleRef.current, renderSnapshot: undefined, renderCss: undefined, renderIssue: undefined, renderRecord: null, dirty: true };
+    articleRef.current = next; setArticle(next);
+    return compileCurrent(snapshotFor(next));
+  }, [compileCurrent, snapshotFor]);
 
   const saveSettings = useCallback(async (nextSettings: ArticleSettings) => {
     const root = directoryRef.current;
@@ -994,14 +1067,14 @@ export function useEditorController() {
         }
         let restored: Awaited<ReturnType<typeof saveStoredArticle>>;
         try {
-          restored = await saveStoredArticle(root, targetSnapshot.source, targetSnapshot.theme, current.folder, current.month);
+          restored = await saveStoredArticle(root, targetSnapshot.source, targetSnapshot.theme, current.folder, current.month, { renderRecord: targetSnapshot.renderRecord ?? null });
         } catch (error) {
           throw new Error(`article.md 写入失败；原稿未覆盖：${error instanceof Error ? error.message : String(error)}；保护点 ${checkpoint.snapshot.id} 已保留。`);
         }
         if (!restored.article.themeValid) {
           let rollback: Awaited<ReturnType<typeof saveStoredArticle>>;
           try {
-            rollback = await saveStoredArticle(root, current.source, current.theme, current.folder, current.month);
+            rollback = await saveStoredArticle(root, current.source, current.theme, current.folder, current.month, { renderRecord: current.renderRecord ?? null });
           } catch (rollbackError) {
             throw new Error(`theme.json 写入失败，且回滚未完成：${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}；请从保护点 ${checkpoint.snapshot.id} 手动恢复。`);
           }
@@ -1011,7 +1084,7 @@ export function useEditorController() {
         return { restored, checkpointId: checkpoint.snapshot.id };
       });
       if (directoryRef.current !== root || documentTokenRef.current !== current.documentToken || !mutationQueueRef.current.canSave(current.documentToken)) return;
-      applyStoredArticle(result.restored.article, true, root);
+      await applyStoredArticle(result.restored.article, true, root);
       historyBaselineRef.current = { root, articleId: result.restored.article.id, fingerprint: articleFingerprint(targetSnapshot.source, targetSnapshot.theme), initialized: true };
       let refreshError: unknown;
       setHistoryRefreshPending(true);
@@ -1066,7 +1139,7 @@ export function useEditorController() {
           theme: { id: selected.theme.id, version: selected.theme.version },
         });
         try {
-          const saved = await saveStoredArticle(root, source, selected.theme, carrier.article.folder, carrier.article.month);
+          const saved = await saveStoredArticle(root, source, selected.theme, carrier.article.folder, carrier.article.month, { renderRecord: selected.renderRecord ?? null });
           if (!saved.article.themeValid) throw new Error(`theme.json 校验失败：${saved.article.parse.diagnostics.map((item) => item.message).join('；')}`);
           return { article: saved.article, folderCollision: carrier.folderCollision, indexUpdated: saved.indexUpdated, indexError: saved.indexError };
         } catch (error) {
@@ -2067,7 +2140,7 @@ export function useEditorController() {
       return;
     }
     try {
-      const payload = buildClipboardPayload(previewRef.current);
+      const payload = buildClipboardPayload(previewRef.current, target.renderSnapshot);
       const proceed = await confirmFormatCheck(report);
       if (!proceed) { setStatus({ label: '已取消复制；剪贴板没有改动。', tone: 'warning' }); return; }
       if (!current() || !previewRef.current) { setStatus({ label: '校验期间文稿已变化；请再次复制当前稿。', tone: 'warning' }); return; }
@@ -2585,7 +2658,7 @@ export function useEditorController() {
           const snapshot = snapshotFor(current);
           const result = await saveSnapshot(snapshot);
           if (result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy && result.savedSnapshot.documentToken.root === root) {
-            void compileCurrent(result.savedSnapshot);
+            if (await compileCurrent(result.savedSnapshot)) await captureSavedRender(result.savedSnapshot);
           }
         } finally {
           autoSaveBusyRef.current = false;
@@ -2593,7 +2666,7 @@ export function useEditorController() {
       })();
     }, articleSettings.autoSave.intervalSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [articleSettings.autoSave.enabled, articleSettings.autoSave.intervalSeconds, article.dirty, article.folder, article.month, compileCurrent, currentDocumentGeneration, directory, editorWorkspace, saveSnapshot, settingsIssue, snapshotFor]);
+  }, [articleSettings.autoSave.enabled, articleSettings.autoSave.intervalSeconds, article.dirty, article.folder, article.month, captureSavedRender, compileCurrent, currentDocumentGeneration, directory, editorWorkspace, saveSnapshot, settingsIssue, snapshotFor]);
 
   useEffect(() => {
     const root = directory;
@@ -2754,7 +2827,7 @@ export function useEditorController() {
     previewRef, attachPreview, clipboardReceiverRef, sourceTextareaRef, articleRef, directoryRef, contentLibraryRootSessionRef,
     documentTokenRef, historyOpenerRef, mutationQueueRef, mediaOperationRef,
     parsed, parseErrors, currentTitle, currentArticleId, currentProjectName, getCurrentArticleId, articleList, currentArticleIsArchived, isReadyToCopy, articleMediaContext,
-    updateArticle, updateArticleBody, compileCurrent, checkCurrentFormat, prepareVisualExport, loadStoredArticles, refreshArticles, saveCurrent, saveSettings,
+    updateArticle, updateArticleBody, compileCurrent, updateCurrentStyles, checkCurrentFormat, prepareVisualExport, loadStoredArticles, refreshArticles, saveCurrent, saveSettings,
     persistEditorWorkspace, saveEditorAppearance, setEditorColorMode, resetCurrentEditorAppearance,
     setArticleCollection, createProject, renameProject, setProjectCollapsed, setProjectPinned,
     reorderPinnedProjects, confirmDeleteProject, openArticleInfo, archiveStoredArticle, archiveStoredArticles, classifyStoredArticles,

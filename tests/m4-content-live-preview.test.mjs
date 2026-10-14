@@ -10,6 +10,8 @@ import { BASIC_THEME } from '../src/lib/themes.ts';
 
 const code = ts.transpileModule(await readFile(new URL('../src/components/content/ContentRenderPreview.tsx', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 } }).outputText;
 
+const mountCode = ts.transpileModule(await readFile(new URL('../src/hooks/useArticleRenderMount.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+
 function preview() {
   let cursor = 0, tree, timerId = 0, shadows = 0;
   const cells = [], effects = [], timers = new Map(), calls = [];
@@ -23,10 +25,14 @@ function preview() {
     useRef(value) { const i = cursor++; return cells[i] ??= { current: value }; },
     useEffect(effect, dependencies) { const i = cursor++, old = cells[i]; if (old && dependencies.every((value, n) => Object.is(value, old.dependencies[n]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { dependencies, cleanup: effect() }; }); },
   };
+  const mountModule = { exports: {} };
+  vm.runInNewContext(mountCode, { module: mountModule, exports: mountModule.exports, require: id => id === 'react' ? { ...react, useLayoutEffect: react.useEffect } : {} });
   vm.runInNewContext(code, {
     module, exports: module.exports,
     window: { addEventListener() {}, removeEventListener() {}, setTimeout(fn, delay) { assert.equal(delay, 200); timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } },
     require(id) {
+    if (id.endsWith('/useArticleRenderMount')) return mountModule.exports;
+    if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => formatRuntime.getFormatSnapshot() };
     if (id.endsWith('/article-format/preview')) return formatPreview;
       if (id === 'react') return react;

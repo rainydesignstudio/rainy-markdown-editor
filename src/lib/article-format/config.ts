@@ -2,6 +2,7 @@ import supportDefaults from './defaults/format-support.json' with { type: 'json'
 import validatorDefaults from './defaults/validator.json' with { type: 'json' };
 import formatterDefaults from './defaults/formatter.json' with { type: 'json' };
 import { VALIDATOR_CAPABILITIES, FORMATTER_CAPABILITIES, SOURCE_STRUCTURE_SELECTOR, record, shape, text, bool, number, strings, array, mapping, property, selector, choice, fail, type Guard } from './contracts';
+import type { StylesheetsPolicy, RenderDocumentPolicy, RenderNodePolicy, CodeLayoutPolicy, PrismStylePolicy } from './styleTypes';
 
 export type RuleParameters = Record<string, unknown>;
 export type FormatRule = { id: string; operator: string; enabled: boolean; stages: string[]; parameters: RuleParameters };
@@ -34,8 +35,13 @@ export type FormatFormatter = {
     plainText: { maxConsecutiveNewlines: number; trim: boolean };
     visual: { width: number; pngBackground: string; pdfBackground: string; maxCanvasSide: number; pdfMargin: number };
   };
-  css: { utilityPropertyAliases: Record<string, string> }; codeHighlight: { enabled: boolean; styles: { selectors: string[]; declarations: Record<string, string> }[] };
+  css: { utilityPropertyAliases: Record<string, string> }; codeHighlight: { enabled: boolean; styles: { selectors: string[]; declarations: Record<string, string> }[]; engine?: 'highlight' | 'prism'; themeDefaults?: boolean; prismStyles?: PrismStylePolicy };
   codeWhitespace: { enabled: boolean; tabSize: number };
+  stylesheets?: StylesheetsPolicy;
+  document?: RenderDocumentPolicy;
+  nodes?: RenderNodePolicy;
+  codeLayout?: CodeLayoutPolicy;
+  headingIds?: 'auto' | 'explicit';
 };
 export type FormatBundle = { support: FormatSupport; validator: FormatValidator; formatter: FormatFormatter };
 
@@ -112,12 +118,17 @@ export function compileFormatBundle(input: RawFormatBundle): FormatBundle {
     switch (step.operator) {
       case 'markdown.soft-breaks': formatter.markdown.softBreaks = p.mode as 'space' | 'line-break'; break;
       case 'markdown.blank-lines': Object.assign(formatter.markdown, { preserveExtraBlankLines: p.preserve, betweenBlocks: p.betweenBlocks, atEdges: p.atEdges }); break;
-      case 'markdown.code-highlight': Object.assign(formatter.codeHighlight, { enabled: true, styles: p.styles }); break;
+      case 'markdown.code-highlight': Object.assign(formatter.codeHighlight, { enabled: true, ...p }); break;
+      case 'markdown.heading-ids': formatter.headingIds = p.mode as 'auto' | 'explicit'; break;
+      case 'markdown.code-layout': formatter.codeLayout = p as CodeLayoutPolicy; break;
       case 'markdown.code-whitespace': Object.assign(formatter.codeWhitespace, { enabled: true, tabSize: p.tabSize }); break;
       case 'preview.surface': Object.assign(formatter.preview, { light: { background: p.lightBackground }, fontFamily: p.fontFamily, color: p.color, stripThemeBackground: p.stripThemeBackground }); formatter.preview.dark.background = p.darkBackground as string; break;
       case 'preview.dark-mode': Object.assign(formatter.preview.dark, p); break;
       case 'css.drop-properties': formatter.output.dropCssProperties.push(...p.properties as string[]); break;
       case 'css.utility-aliases': formatter.css.utilityPropertyAliases = p.aliases as Record<string, string>; break;
+      case 'css.stylesheets': formatter.stylesheets = p as StylesheetsPolicy; break;
+      case 'render.document': formatter.document = p as RenderDocumentPolicy; break;
+      case 'render.nodes': formatter.nodes = p as RenderNodePolicy; break;
       case 'output.css': case 'output.html': Object.assign(formatter.output, p); break;
       case 'output.text': Object.assign(formatter.output.plainText, p); break;
       case 'output.visual': Object.assign(formatter.output.visual, p); break;

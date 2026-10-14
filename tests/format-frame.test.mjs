@@ -28,7 +28,7 @@ test('static frame bootstrap reports inspection results and failures without eva
     const posted = [], attributes = [];
     const payload = { kind: 'inspection', bundle: getFormatSnapshot().bundle, token: 'nonce', origin: 'http://127.0.0.1:3501', css: 'body{}' };
     const context = {
-      document: { head: { querySelector: () => ({ textContent: JSON.stringify(payload) }) }, querySelector: () => ({}), body: { setAttribute: (...args) => attributes.push(args) } },
+      document: { head: { querySelector: () => ({ textContent: JSON.stringify(payload) }) }, querySelector: () => ({}), body: { dataset: {}, setAttribute: (...args) => attributes.push(args) } },
       window: { ArticleFormatEngine: { async inspect() { if (fail) throw new Error('measurement failed'); return { checked: ['width'], issues: [], manual: [] }; } } },
       parent: { postMessage: (...args) => posted.push(args) },
     };
@@ -38,6 +38,6 @@ test('static frame bootstrap reports inspection results and failures without eva
     assert.equal(posted[0][0].token, 'nonce');
     assert.equal(posted[0][1], payload.origin);
     if (fail) { assert.match(posted[0][0].error, /measurement failed/); assert.equal(attributes[0][0], 'data-preview-error'); }
-    else assert.equal(posted[0][0].result.checked[0], 'width');
+    else { assert.equal(posted[0][0].result.checked[0], 'width'); assert.equal(context.document.body.dataset.previewReady, 'true'); }
   }
 });
