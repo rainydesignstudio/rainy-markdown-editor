@@ -1,7 +1,7 @@
 import { ProductError, productCause } from "./i18n/productMessages";
 import { parseFragment, serialize, type DefaultTreeAdapterMap } from 'parse5';
 import { articleImageFileNameFromSource, articleImageSourceSetCandidates, inspectArticleImage, replaceArticleImageSourceSetUrls } from './articleMedia';
-import { ARTICLE_EXAMPLE_IMAGE } from './articleExamples';
+import { ARTICLE_EXAMPLE_IMAGE, isApplicationExampleImage } from './articleExamples';
 import type { ClipboardPayload } from './render';
 
 type Element = DefaultTreeAdapterMap['element'];
@@ -21,7 +21,7 @@ export async function embedClipboardImages(payload: ClipboardPayload, readImage:
   const assertCurrent = () => { if (!isCurrent()) throw new ProductError("controller.theManuscriptOrLibraryChangedCopyingThePreviousDraftWasCancelled"); };
   const embed = async (source: string): Promise<string> => {
     const fileName = articleImageFileNameFromSource(source);
-    const example = source === ARTICLE_EXAMPLE_IMAGE;
+    const example = isApplicationExampleImage(source);
     if (!fileName && !example) {
       if (/^(?:blob:|\.\.?\/|media\/image\/)/i.test(source)) throw new ProductError("clipboardImages.theLocalImageReferenceCouldNotBeRead", { "source": source });
       return source;

@@ -1,0 +1,8 @@
+{
+  "id": "rainy-opening",
+  "name": "Rainy Design · 开场",
+  "trigger": "//rainy-opening",
+  "description": "我喜欢的开场白。",
+  "content": "<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5 rounded-xl\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">EYEBROW / TEXT</p>\n  <h1 class=\"m-0 border-b border-article-line pb-4 text-[26px]/[1.5] font-bold text-article-accent\">这是第一行<br />用 break 元素换行<br /><span class=\"text-article-accent\">来避免<em class=\"bg-article-accent text-white/67 pr-1\">大空隙</em>的换行</span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">如果你搞不明白 Tailwind CSS 、甚至是 HTML 也不想学的话，为啥不试试神奇的对话式生成呢？LLM 在向你招手。<br />直接让他阅读本项目下的 README，然后告诉它：<br />“我要做的主题是这样式儿的……▌”</p>\n</section>",
+  "categoryId": "rainy-design"
+}

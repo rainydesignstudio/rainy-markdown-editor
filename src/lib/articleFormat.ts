@@ -1,3 +1,4 @@
+import { enabledFormatRules } from './article-format/config';
 import { productCause, productMessage, productText, productReference, productJoin, type ProductMessageInfo, type ProductMessageValue } from "./i18n/productMessages";
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
@@ -18,7 +19,7 @@ type TreeNode = DefaultTreeAdapterMap['node'];
 type MarkdownNode = { type: string; value?: string; tagName?: string; properties?: Record<string, unknown>; children?: MarkdownNode[]; position?: { start?: { line?: number; offset?: number }; end?: { offset?: number } } };
 export type ArticleFormatTier = 'safe' | 'usable' | 'conditional' | 'lowPriority' | 'danger' | 'notAllowed' | 'unknown' | 'warning' | 'error';
 export type ArticleFormatSeverity = 'safe' | 'warning' | 'error';
-export type ArticleFormatIssue = { kind: 'element' | 'attribute' | 'style' | 'value' | 'engine'; name: string; source: string; sourceKind?: 'utility'; tier: ArticleFormatTier; line?: number; lines?: number[]; message: string; ruleId?: string; reference?: string; domain?: 'standard' | 'product' };
+export type ArticleFormatIssue = { kind: 'element' | 'attribute' | 'style' | 'value' | 'engine'; name: string; source: string; sourceKind?: 'utility'; tier: ArticleFormatTier; line?: number; lines?: number[]; message: string; ruleId?: string; reference?: string; domain?: 'standard' | 'product'; resourceSource?: string };
 type Sink = { issues: ArticleFormatIssue[]; passed: Set<string> };
 type StyleDeclaration = { property: string; value: string; important?: boolean };
 export type ArticleStyleContext = { element: string; declarations: ReadonlyMap<string, string> };
@@ -63,7 +64,7 @@ function transparent(value: string): boolean {
 function checkCss(sink: Sink, property: string, value: string, source: string, line?: number): void {
   if (/(?:expression\s*\(|javascript\s*:|vbscript\s*:|behavior\s*:|-moz-binding)/i.test(value)) sink.issues.push({ kind: 'style', name: property, source, tier: 'error', ...productMessage("articleFormat.theStyleContainsExecutableContentProhibitedByTheProductSafetyBoundary"), domain: 'product', ...(line ? { line } : {}) });
   const name = property.trim().toLowerCase(); const text = value.replace(/!\s*important\s*$/i, '').trim().toLowerCase();
-  for (const rule of getFormatSnapshot().bundle.validator.rules.filter(item => item.enabled && item.stages.includes('authoring') && item.operator.startsWith('style.'))) {
+  for (const rule of enabledFormatRules(getFormatSnapshot().bundle).filter(item => item.stages.includes('authoring') && item.operator.startsWith('style.'))) {
     const matchesProperty = rule.parameters.property === name;
     const violation = rule.operator === 'style.present' ? matchesProperty
       : rule.operator === 'style.values' ? matchesProperty && Array.isArray(rule.parameters.values) && rule.parameters.values.includes(text)

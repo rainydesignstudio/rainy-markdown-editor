@@ -92,8 +92,8 @@ for (const { locale, editor, article, snippet, markdown } of examples) {
     assert.doesNotMatch(completed, /▌|\/\/guide-note|\[填写|\[Write the article/);
     const headings = [...completed.matchAll(/^## (.+)$/gm)].map(match => match[0]);
     assert.equal(headings.length, 2);
-    assert.ok(completed.indexOf(headings[0]) < completed.indexOf('/article-sample.png'));
-    assert.ok(completed.indexOf('/article-sample.png') < completed.indexOf(headings[1]));
+    assert.ok(completed.indexOf(headings[0]) < completed.indexOf('/images/article-sample.png'));
+    assert.ok(completed.indexOf('/images/article-sample.png') < completed.indexOf(headings[1]));
     const next = parseArticle(instantiateArticleTemplate(markdown[0].source, { theme: article }));
     assert.equal(next.metadata.theme.id, article.id);
     assert.notEqual(next.metadata.createdAt, parseArticle(markdown[0].source).metadata.createdAt);

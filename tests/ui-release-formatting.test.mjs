@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import changelog from '../docs/changelog.json' with { type: 'json' };
+import changelog from '../resources/changelog.json' with { type: 'json' };
 import { createUII18n, UI_RESOURCES } from '../src/lib/i18n/runtime.ts';
 import { releaseTextKey, chineseReleaseTexts } from '../src/lib/i18n/changelog.ts';
 import * as formats from '../src/lib/i18n/formatters.ts';
@@ -42,7 +42,7 @@ async function component(file, extra = {}) {
 
 test('all release translations cover original summaries, sections and items without duplicating metadata', async () => {
   const en = createUII18n('en-US'), zh = createUII18n('zh-CN');
-  const storedChinese = JSON.parse(await readFile(new URL('../locale/zh-CN/changelog.json', import.meta.url), 'utf8'));
+  const storedChinese = JSON.parse(await readFile(new URL('../resources/locale/zh-CN/changelog.json', import.meta.url), 'utf8'));
   assert.equal(storedChinese.releases, undefined, 'Chinese wording is derived from its original single source');
   const historicalVersions = ['0.1.1', '0.1.2', '0.1.3', '0.1.3.1', '0.1.4', '0.1.5', '0.1.6', '0.1.7', '0.1.8', '0.2.0', '0.2.1'];
   const historical = changelog.filter(release => historicalVersions.includes(release.version));

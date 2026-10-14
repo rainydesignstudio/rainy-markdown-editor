@@ -1,5 +1,5 @@
 import { createInstance, type TFunction } from 'i18next';
-import zhMessages from '../../../locale/zh-CN/messages.json' with { type: 'json' };
+import zhMessages from '../../../resources/locale/zh-CN/messages.json' with { type: 'json' };
 
 export type ProductMessageValue = string | number | boolean | null | undefined | ProductMessageInfo | ProductMessageSequence | readonly ProductMessageValue[];
 export type ProductMessageInfo = { messageKey: string; messageParams?: Record<string, ProductMessageValue> };
@@ -115,6 +115,8 @@ export function formatDiagnosticMessage(value: unknown, t: TFunction): string {
 
 export function formatDiagnosticName(value: { name: string; domain?: string }, t: TFunction): string {
   if (value.domain === 'standard') return value.name;
+  if (value.name === '图片资源') return t('messages:image.resourceName');
+  if (value.name === '资源相关渲染检查') return t('messages:image.deferredRenderName');
   if (/^本地图片 /.test(value.name)) return t('messages:diagnostic.names.localImage', { fileName: value.name.slice(5) });
   const names: Record<string, string> = { '资料库格式配置': 'formatConfiguration', '格式检查': 'formatCheck', '主题预览': 'themePreview', '格式检查引擎': 'formatEngine', '实际布局／转换检查': 'layoutConversion', '人工核对项': 'manualReview' };
   const key = names[value.name];
@@ -122,6 +124,7 @@ export function formatDiagnosticName(value: { name: string; domain?: string }, t
 }
 
 export function formatDiagnosticSource(source: string, t: TFunction): string {
+  if (source === '当前正文资源') return t('messages:image.resourceScope');
   if (source.startsWith('工具类 ')) return t('messages:diagnostic.utilitySource', { candidate: source.slice(4) });
   const names: Record<string, string> = { '正文': 'body', '当前文章': 'currentArticle', '当前文章正文': 'currentBody', '当前文章主题': 'currentTheme', '主题节点样式': 'themeNodes', '主题 CSS': 'themeCss', '文章主题 CSS': 'articleThemeCss', '复制内容': 'copiedContent', '当前文章使用的样式': 'usedStyles', '当前正文实际渲染': 'renderedBody', '当前正文': 'currentBodyRender', '片段正文': 'snippetBody', '起稿模板正文': 'templateBody', '人工核对项': 'manualReview' };
   const key = names[source];

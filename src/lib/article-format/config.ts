@@ -1,7 +1,7 @@
 import { productText } from "../i18n/productMessages";
-import supportDefaults from './defaults/format-support.json' with { type: 'json' };
-import validatorDefaults from './defaults/validator.json' with { type: 'json' };
-import formatterDefaults from './defaults/formatter.json' with { type: 'json' };
+import supportDefaults from '../../../resources/presets/platform/wechat-article/format/format-support.json' with { type: 'json' };
+import validatorDefaults from '../../../resources/presets/platform/wechat-article/format/validator.json' with { type: 'json' };
+import formatterDefaults from '../../../resources/presets/platform/wechat-article/format/formatter.json' with { type: 'json' };
 import { VALIDATOR_CAPABILITIES, FORMATTER_CAPABILITIES, SOURCE_STRUCTURE_SELECTOR, record, shape, text, bool, number, strings, array, mapping, property, selector, choice, fail, type Guard } from './contracts';
 import type { StylesheetsPolicy, RenderDocumentPolicy, RenderNodePolicy, CodeLayoutPolicy, PrismStylePolicy } from './styleTypes';
 
@@ -21,7 +21,7 @@ export type ProductThemeDefinition = {
   limits: { id: number; name: number; value: number; css: number; json: number };
   formatVersion: number; kind: string; idPattern: string; versionPattern: string; valuePattern: string;
 };
-export type FormatValidator = { schemaVersion: number; meta: { id: string }; product: { theme: ProductThemeDefinition }; rules: FormatRule[] };
+export type FormatValidator = { schemaVersion: number; meta: { id: string; enabled?: boolean }; product: { theme: ProductThemeDefinition }; rules: FormatRule[] };
 export type FormatFormatter = {
   schemaVersion: number; meta: { id: string };
   markdown: { softBreaks: 'space' | 'line-break'; preserveExtraBlankLines: boolean; betweenBlocks: number; atEdges: number };
@@ -53,6 +53,11 @@ export type RawFormatBundle = { support: FormatSupport; validator: FormatValidat
 export const DEFAULT_FORMAT_BUNDLE = { support: supportDefaults, validator: validatorDefaults, formatter: formatterDefaults } as unknown as RawFormatBundle;
 export const FORMAT_OPERATORS = new Set(Object.keys(VALIDATOR_CAPABILITIES));
 
+// This only gates platform standards. Product syntax, safety and resources stay active.
+export function enabledFormatRules(bundle: Pick<FormatBundle, 'validator'>): FormatRule[] {
+  return bundle.validator.meta.enabled === false ? [] : bundle.validator.rules.filter(rule => rule.enabled);
+}
+
 const identifier: Guard = (value, path) => { text(value, path); if (!/^[a-z0-9][a-z0-9._-]*$/i.test(String(value))) fail(path, productText("config.invalidId")); };
 const pattern: Guard = (value, path) => { text(value, path); if (String(value).length > 512) fail(path, productText("config.regularExpressionIsTooLong")); try { new RegExp(String(value), 'u'); } catch { fail(path, productText("config.invalidRegularExpression")); } };
 const sourceGuard = shape({ url: text }, { version: text, commit: text });
@@ -66,7 +71,7 @@ export function validateFormatBundle(input: unknown): RawFormatBundle {
   shape({ support: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier, name: text, sources: mapping(sourceGuard, identifier) }),
     rules: array(shape({ id: identifier, section: text, title: text, severity: choice('warning', 'error'), source: identifier, validator: identifier }, { description: text, anchor: text })),
     manualReview: array(shape({ id: identifier, section: text, title: text, selector, source: identifier }, { description: text, anchor: text })),
-  }), validator: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }), product: shape({ theme: themeGuard }),
+  }), validator: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }, { enabled: bool }), product: shape({ theme: themeGuard }),
     rules: array(shape({ id: identifier, operator: text, enabled: bool, stages: array(choice('authoring', 'rendered'), 1), parameters: (value, path) => { record(value, path); } })),
   }), formatter: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }), steps: array(shape({ id: identifier, operator: text, enabled: bool, parameters: (value, path) => { record(value, path); } })) }),
   })(input, productText("config.formatTrio"));

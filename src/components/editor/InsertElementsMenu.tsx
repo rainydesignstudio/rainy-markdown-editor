@@ -4,8 +4,9 @@ import { useUITranslation } from '../global/UILocaleProvider';
 
 import { useEffect, useRef } from 'react';
 import { IconButton } from '../global/IconButton';
+import { INLINE_FORMATS, isInlineFormat, type InlineFormat } from '../../lib/editor/inlineFormatting';
 
-type InsertIconName = 'heading' | 'quote' | 'link' | 'code' | 'list' | 'ordered-list' | 'task-list' | 'bold' | 'italic' | 'strike' | 'inline-code' | 'table' | 'rule' | 'snippets';
+type InsertIconName = 'heading' | 'quote' | 'link' | 'code' | 'list' | 'ordered-list' | 'task-list' | 'bold' | 'italic' | 'underline' | 'strike' | 'inline-code' | 'table' | 'rule' | 'snippets';
 type InsertItem = { id: string; content: string; caret: number; icon: InsertIconName };
 type InsertGroup = { id: string; icon: InsertIconName; items: InsertItem[] };
 
@@ -28,6 +29,7 @@ const STANDARD_GROUPS: InsertGroup[] = [
     items: [
       { id: 'bold', content: '**▌粗体文字**', caret: 2, icon: 'bold' },
       { id: 'italic', content: '*▌斜体文字*', caret: 1, icon: 'italic' },
+      { id: 'underline', content: '<u>▌下划线文字</u>', caret: 3, icon: 'underline' },
       { id: 'strikethrough', content: '~~▌删除线~~', caret: 2, icon: 'strike' },
       { id: 'inline-code', content: '▌`行内代码`', caret: 0, icon: 'inline-code' },
       { id: 'link', content: '[▌链接文字](https://)', caret: 1, icon: 'link' },
@@ -65,6 +67,7 @@ function InsertIcon({ name }: { name: InsertIconName }) {
   if (name === 'task-list') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="m4 6 1.5 1.5L8 5M10 6h10M4 13l1.5 1.5L8 12m2 1h10M4 20h4m2 0h10" /></svg>;
   if (name === 'bold') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M7 5h6a3 3 0 0 1 0 6H7zm0 6h7a3 3 0 0 1 0 6H7z" /></svg>;
   if (name === 'italic') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M10 5h9M5 19h9m3-14-6 14" /></svg>;
+  if (name === 'underline') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M7 4v7a5 5 0 0 0 10 0V4M5 21h14" /></svg>;
   if (name === 'strike') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M5 12h14M8 8c0-2 1.5-3 4-3s4 1 4 3M8 16c0 2 1.5 3 4 3s4-1 4-3" /></svg>;
   if (name === 'table') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="3.5" y="5" width="17" height="14" rx="1.5" /><path d="M3.5 10h17M9 5v14M15 5v14" /></svg>;
   if (name === 'snippets') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg>;
@@ -83,6 +86,7 @@ export function InsertElementsMenu({
   onOpenMediaPicker,
   onOpenSnippetPicker,
   onInsert,
+  onFormat,
 }: {
   disabled: boolean;
   readOnly: boolean;
@@ -90,6 +94,7 @@ export function InsertElementsMenu({
   onOpenMediaPicker: () => void;
   onOpenSnippetPicker: () => void;
   onInsert: (text: string, caretOffset: number) => void;
+  onFormat: (format: InlineFormat) => void;
 }) {
   const { t } = useUITranslation('editor');
   const menuRef = useRef<HTMLDetailsElement | null>(null);
@@ -133,7 +138,7 @@ export function InsertElementsMenu({
           <details key={group.id} className="insert-standard-category">
             <summary><InsertIcon name={group.icon} /><span>{t('editor:insert.groups.' + group.id)}</span><span aria-hidden="true">›</span></summary>
             <div className="insert-standard-options" role="group" aria-label={t('editor:insert.groups.' + group.id)}>
-              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span></button>)}
+              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); if (isInlineFormat(item.id)) onFormat(item.id); else insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span>{isInlineFormat(item.id) ? <kbd className="ml-auto whitespace-nowrap font-mono text-xs text-faint">⌘{INLINE_FORMATS[item.id].key.toUpperCase()} / Ctrl+{INLINE_FORMATS[item.id].key.toUpperCase()}</kbd> : null}</button>)}
             </div>
           </details>
         ))}

@@ -72,7 +72,7 @@ Print the actual installation directory and a copyable restart command from ther
 ## Installation: directory access and initialization
 
 1. Open the printed URL in a desktop browser supporting `showDirectoryPicker`.
-2. New library: **Settings → Local directory → New library**, enter its name, then let the user select a parent and grant read/write access. A disk root may be the parent; the app creates files only in its named child.
+2. New library: **Settings → Local directory → New library**, enter its name and choose a validation and processing template (currently WeChat Official Account), then let the user select a parent and grant read/write access. A disk root may be the parent; the app creates files only in its named child.
 3. Existing library: **Open existing library**, select the library itself and verify its name/files. Cancellation/refused access retains existing data; report the current state.
 4. A new library creates the format trio and an empty `articles/`. Wait for themes, snippets and starters to load. Bundled fonts/licenses are copied to `fonts/`; `settings.json` is created when settings are explicitly saved.
 5. Read the trio and check its source. Complete absence gives an explicit built-in fallback; partial/old configuration requires repair without mixing files. Back up and obtain migration authorization before following FORMAT.md.
@@ -108,7 +108,7 @@ Ask about purpose, readers, material/facts, tone, article theme, starter templat
 2. Organize title, introduction, sections and closing from the supplied material, then write the body.
 3. Use matching snippets for introductions, section headings, quotations, key notes, captions or endings. Check purpose, hierarchy and current format rules first. If none fits, use [Tutorial 3](#doc-tutorial-3) to design and validate a legal snippet before expanding it. Establish rhythm through typography, spacing, theme colors and repeated structures; decoration need not surround every paragraph.
 4. Replace cursor markers, instructions and placeholders. Check adjacent headings, spacing and images; keep comparable content consistent and distinguish genuine emphasis. Deliver expanded content rather than unresolved `//triggers`.
-5. Import/adopt images through the app and use article-relative references. `/article-sample.png` is an application sample; real images use `media/image/<filename>`, never maintainer-machine absolute paths.
+5. Import/adopt images through the app and use article-relative references. When dropping files onto Assets, review the target library, files and unsupported entries before confirming; cancellation writes nothing. `/images/article-sample.png` is an application sample; real images use `media/image/<filename>`, never maintainer-machine absolute paths.
 6. Save through the app with an independent theme snapshot. Metadata must match the theme source; the app supplies dates/directories for new manuscripts.
 
 For website libraries, align CSS entry, asset root, container, parsing steps, fonts and viewport using [library styles and isolated canvases](FORMAT.md#doc-library-styles). Reference only the designated body and styling dependencies, without importing navigation, a CMS or business scripts. Existing render records retain their environment; explicitly **Update styles** and save to adopt a new one, keeping historical objects.
@@ -122,6 +122,10 @@ App saving synchronizes categories and list summaries into the monthly `index.js
 Verify Front Matter, format reports, local images, style revision, save/reopen and rich-text receipt. Unmeasurable rules remain incomplete; failed copy preparation is not success. The user checks WeChat drafts/mobile previews in person; the tutorial does not log in or publish automatically.
 
 **Check current scope** is explicit and aggregates checked, warning, error, unchecked, stale and failed articles. Cached records describe the last check. Open the target article to inspect actual preview/output. Find/replace affects the current input; article editing limits it to the body without scanning the library.
+
+The article preview has [three controls](README.md#doc-preview-controls): one-way scrolling, manual-save reports and save-only refresh. Check their state and retained-preview notice before production or review; a frozen display cannot establish the current draft's result. Inspection and output still use the current draft, and the existing pre-copy save can refresh the display. Record actual saving, checks and receipt results without changing user preferences just to perform a check.
+
+Article source supports Cmd/Ctrl+B bold, I italic and U underline. Menu hints show the keys; chosen text is retained and one action is one undo step. See [inline formatting shortcuts](README.md#doc-source-formatting).
 
 Use Cmd/Ctrl+/ in body source to toggle line numbers; the preference belongs to the browser origin.
 
@@ -211,3 +215,5 @@ Report actual paths, version, artifacts, commands, passes, unverified scope and 
 ## Publication and licensing
 
 The project uses the [MIT License](../../../LICENSE); fonts and third-party resources keep their own licenses. The user participates in choosing GitHub repository/public content and confirming remote pushes. The maintainer arranges publication after source/static packages are ready.
+
+When platform standards are unnecessary, set meta.enabled=false in a complete validator.json. Do not bypass the trio by library name. Keep formatter settings and product.theme; syntax, safety, resources and whole-bundle validation remain. See the [format guide](FORMAT.md).

@@ -1,3 +1,4 @@
+import * as previewScrolling from '../src/lib/editor/previewScrolling.ts';
 import * as uiFormatters from '../src/lib/i18n/formatters.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +22,7 @@ test('collection IDs translate product labels without translating colliding user
     'shell:views.': ['articles', 'themes', 'template', 'assets', 'settings'],
     'articles:collections.': ['all', 'unclassified', 'archived'],
     'editor:insert.groups.': ['headings', 'text-formatting', 'lists', 'blocks'],
-    'editor:insert.items.': ['heading-1', 'heading-2', 'heading-3', 'heading-4', 'heading-5', 'heading-6', 'bold', 'italic', 'strikethrough', 'inline-code', 'link', 'unordered-list', 'ordered-list', 'task-list', 'table', 'quote', 'code-block', 'rule'],
+    'editor:insert.items.': ['heading-1', 'heading-2', 'heading-3', 'heading-4', 'heading-5', 'heading-6', 'bold', 'italic', 'underline', 'strikethrough', 'inline-code', 'link', 'unordered-list', 'ordered-list', 'task-list', 'table', 'quote', 'code-block', 'rule'],
     'editor:diagnostics.': ['error', 'warning', 'mixed'],
     'common:displayMode.': ['light', 'dark', 'system'],
     'common:language.': ['zh-CN', 'en-US'],
@@ -64,12 +65,13 @@ test('changing UI language updates iframe title without remounting, replacing th
   const head = { styles: [], append(node) { this.styles.push(node); }, querySelector() { return this.styles[0]; } };
   const doc = { documentElement: { dataset: {}, style: {}, classList: { toggle() {} } }, body: { style: {}, append() {} }, head, open() {}, write() {}, close() {}, createElement: element, addEventListener() {}, removeEventListener() {} };
   doc.createElement = () => ({ ...element(), ownerDocument: doc });
-  const host = { style: {}, clientWidth: 996, clientHeight: 959, append(frame) { frames.push(frame); }, querySelectorAll() { return frames; } }, hostRef = { current: host };
+  const host = { addEventListener() {}, removeEventListener() {}, style: {}, clientWidth: 996, clientHeight: 959, append(frame) { frames.push(frame); }, querySelectorAll() { return frames; } }, hostRef = { current: host };
   const effect = (fn, deps) => { const i = cursor++, old = cells[i]; if (old && deps.every((x, j) => Object.is(x, old.deps[j]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { deps, cleanup: fn() }; }); };
   const react = { useEffect: effect, useLayoutEffect: effect, useRef(value) { return cells[cursor++] ??= { current: value }; }, useState(value) { const i = cursor++; if (!(i in cells)) cells[i] = value; return [cells[i], value => { cells[i] = value; }]; } };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, document: { createElement() { creations++; return { ...element(), contentDocument: doc, setAttribute() {} }; } }, ResizeObserver: class { observe() {} disconnect() {} }, require(id) {
     if (id === 'react') return react;
+    if (id.endsWith('/editor/previewScrolling')) return previewScrolling;
     if (id.endsWith('/i18n/formatters')) return uiFormatters;
       if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ locale: 'en-US' }), useUITranslation: () => ({ t: titles[language] }) };
     return {};

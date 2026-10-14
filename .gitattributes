@@ -1,0 +1,2 @@
+# Preserve authored Markdown list placeholders and hard breaks in starter sources.
+resources/template/fresh-library/templates/**/*.md whitespace=-blank-at-eol

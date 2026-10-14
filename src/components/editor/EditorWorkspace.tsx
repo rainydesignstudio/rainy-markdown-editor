@@ -20,6 +20,9 @@ export type EditorWorkspaceProps = {
   themeUpdateAvailable: boolean;
   parsed: ReturnType<typeof parseArticle>;
   compiledCss: string;
+  compiledRevision?: number | null;
+  savedPreviewRevision?: number;
+  documentGeneration?: number;
   revision: number;
   mediaRevision?: number;
   status: { label: string; tone: Tone };
@@ -50,6 +53,9 @@ export function EditorWorkspace({
   themeUpdateAvailable,
   parsed,
   compiledCss,
+  compiledRevision = null,
+  savedPreviewRevision = 0,
+  documentGeneration = 0,
   revision,
   mediaRevision = 0,
   status,
@@ -119,8 +125,13 @@ export function EditorWorkspace({
             themeUpdateAvailable={themeUpdateAvailable}
             parsed={parsed}
             compiledCss={compiledCss}
+            compiledRevision={compiledRevision}
+            savedPreviewRevision={savedPreviewRevision}
+            documentGeneration={documentGeneration}
+            directory={directory}
             mobilePane={mobilePane}
             previewRef={previewRef}
+            sourceTextareaRef={sourceTextareaRef}
             attachPreview={attachPreview}
             clipboardReceiverRef={clipboardReceiverRef}
             media={media}

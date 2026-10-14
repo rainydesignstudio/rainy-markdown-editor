@@ -1,3 +1,4 @@
+import { enabledFormatRules } from './config';
 import { Tokenizer, TokenizerMode, type TokenHandler } from 'parse5';
 import { articleHtmlSourceMask } from '../articleMarkupValidation';
 import { standardFormatIssue, type ArticleFormatIssue } from '../articleFormat';
@@ -14,7 +15,7 @@ const matches = (node: RawNode, selector: string) => {
 // Inspect the authored token chain before Markdown's generated paragraphs and the
 // HTML parser can repair prohibited nesting. Tokenization/masking is shared with syntax checks.
 export function inspectSourceStructure(source: string, tree: SourceTree, label: string): ArticleFormatIssue[] {
-  const rules = getFormatSnapshot().bundle.validator.rules.filter(rule => rule.enabled && rule.stages.includes('authoring') && ['dom.leaf-content', 'dom.nodeleaf-content'].includes(rule.operator));
+  const rules = enabledFormatRules(getFormatSnapshot().bundle).filter(rule => rule.stages.includes('authoring') && ['dom.leaf-content', 'dom.nodeleaf-content'].includes(rule.operator));
   if (!rules.length) return [];
   const stack: RawNode[] = [], issues: ArticleFormatIssue[] = [];
   const report = (rule: (typeof rules)[number], node: RawNode, detail?: string, review = false) => {

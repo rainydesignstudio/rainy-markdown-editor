@@ -1,6 +1,5 @@
-export const ARTICLE_EXAMPLE_IMAGE = '/article-sample.png';
+export const ARTICLE_EXAMPLE_IMAGE = '/images/article-sample.png';
 
-// Legacy built-in snippets used these paths outside the article media directory.
-export function isLegacyExampleImage(source: string): boolean {
-  return /^(?:\.\/)?media\/image(?:-[ab])?\.png$/.test(source);
+export function isApplicationExampleImage(source: string): boolean {
+  return source === ARTICLE_EXAMPLE_IMAGE;
 }

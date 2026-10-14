@@ -11,7 +11,19 @@
 └── formatter.json        格式化步骤及参数
 ```
 
-三个文件的顶层 `schemaVersion` 当前都是 `1`，`meta.id` 必须一致。没有方案索引或文章级绑定。完整默认文件在 [内置配置](../../../src/lib/article-format/defaults/)；复制整套作起点，再修改所需项。
+三个文件的顶层 `schemaVersion` 当前都是 `1`，`meta.id` 必须一致。没有方案索引或文章级绑定。完整默认文件在 [内置配置](../../../resources/presets/platform/wechat-article/format/)；复制整套作起点，再修改所需项。
+
+新建资料库时，在“校验与算法模板”中选择“微信公众号”，会复制这套三件套及算法实现和许可。公开目录只包含此模板；创建后的库内配置独立保存，不随模板源自动覆盖。
+
+“设置 → 本地目录”会显示当前实际加载的校验规范和算法版本；内置回退、旧库算法回退或配置异常会明确标识。
+
+<a name="doc-bundled-resources"></a>
+
+## 应用内置资源
+
+维护应用默认内容时，界面文案在 `resources/locale/`，公告在 `resources/changelog.json`。平台源位于 `resources/presets/platform/`；新库内容种子位于 `resources/template/fresh-library/`，按真实资料库的主题、片段和模板目录分类，文章与历史为空。主题制作起点在 `resources/template/`。
+
+浏览器直接加载的脚本仍在 `public/format/`、`public/algorithm/`，字体、图片和许可分别在 `public/fonts/`、`public/images/`、`public/licenses/`。样图只使用 `/images/article-sample.png`；旧根地址或任意相对图片不会被替换成样图，应修改实际片段/模板引用。双语说明正文保留在 `docs/locale/`。
 
 <a name="doc-editable-fields"></a>
 
@@ -27,6 +39,12 @@
 这是一套数据驱动的能力调用接口。新增对象可以复用已注册能力，不会自动产生新的算法，也不接受 JSON 中的脚本。新增平台策略通常只需修改这三份文件；新增算法需在能力层实现和注册，业务组件继续消费同一配置快照。
 
 `schemaVersion` 是文件结构版本，不能为了修改策略随意增加。`product.theme.kind` 与 `formatVersion` 是当前产品文件的身份（`article-theme`／`1`），保持不动；更换平台不需要更换主题文件结构。修改官方默认策略后，结果属于当前资料库的自定义策略，不能据此宣称符合公众号官方默认配置。
+
+### 平台校验总开关
+
+`validator.meta.enabled`为可选布尔值，省略或true继续原平台检查。设为false时跳过平台规则及对应人工核对，不生成平台通过记录；通用语法、安全、图片资源及article-theme结构检查继续。关闭前后都加载完整三件套并校验结构、规则引用、参数和算法文件；损坏或缺失仍报错。formatter的预览、转换和输出步骤独立，不受此开关关闭。
+
+例如，将validator.json中的meta设为`{ "id": "custom-platform", "enabled": false }`，其余两份meta.id也使用custom-platform；保留product.theme、rules数组及formatter.steps。不需要平台判据时rules/manualReview可为空，不把三件套删成仅meta的文件。设置摘要与检查弹窗会显示平台校验关闭。规则修改后重新载入库，旧任务和检查缓存失效。
 
 <a name="doc-validator-example"></a>
 
@@ -132,7 +150,7 @@
 | render.nodes | image（width/height/classes/style/alt）、link（classes/rootBase/externalTarget）；只补缺省属性 |
 | markdown.code-whitespace | `tabSize`，关闭此步骤保留原始代码空白 |
 | preview.surface | `lightBackground`、`darkBackground`、`fontFamily`、`color`、`stripThemeBackground` |
-| preview.dark-mode | `transform`: `preserve`／`mp-darkmode`；`options` |
+| preview.dark-mode | `transform`: `preserve`或库内组件ID；`options`为JSON对象 |
 | css.drop-properties | `properties[]`，可重复追加 |
 | css.utility-aliases | `aliases`，CSS 属性名称映射 |
 | output.css | `inlineProperties[]`、`dimensionProperties[]`、`preserveAutoDimensions`、`colorEncoding`: `rgb`／`preserve` |
@@ -142,7 +160,43 @@
 
 加载时按数组顺序编译配置。执行仍分为 Markdown、CSS、预览和输出阶段；调整数组位置不能把输出操作搬到解析之前。除 `css.drop-properties` 外，同一能力不能同时启用两次，避免参数互相覆盖。关闭能力使用通用引擎的中性行为；关闭输出样式快照会失去对应样式，不等于关闭检查。
 
-`mp-darkmode` 的可配置选项目前为 `mode: dark`、`defaultDarkTextColor`、`needJudgeFirstPage`、`noEmit`、`whitelist.attribute[]` 和 `whitelist.tagName[]`。`noEmit: true` 仅计算转换记录而不生成转换样式，通常不用于可见预览。库内明暗纸面分别来自 `preview.surface`。
+默认 `mp-darkmode` 组件的选项为 `mode: dark`、`defaultDarkTextColor`、`defaultDarkBgColor`、`needJudgeFirstPage`、`noEmit`、`whitelist.attribute[]` 和 `whitelist.tagName[]`。官方默认模板不覆盖 SDK 的默认文字色；显式颜色选项属于该库的自定义配置。未设置 `defaultDarkBgColor` 时使用 `preview.surface` 的深色纸面。`noEmit: true` 仅计算转换记录而不生成转换样式，通常不用于可见预览。参数的业务含义由组件验证；通用层只要求有界的JSON对象，自定义组件增加参数不需要增加工作台prop。
+
+官方 SDK 读取内联样式。接入层先采集文章根节点及后代的计算颜色、背景、边框和装饰样式，统一转换为 RGB 后写入隔离副本，再调用原样保留的 SDK。原稿、主题和浅色复制内容不因深色预览改写。
+
+### 资料库算法组件
+
+每库使用 `format/algorithms/manifest.json`。公共默认源在 [微信公众号组件](../../../resources/presets/platform/wechat-article/format/algorithms/manifest.json)，新建资料库会复制其实现和许可。
+
+| 清单字段 | 含义 |
+|---|---|
+| schemaVersion | 协议版本，目前为1 |
+| components[] | 每个组件包含唯一id、version、scripts[]、license和capabilities |
+| scripts[] | 按顺序加载的实现文件；每项为相对path与原始文件SHA-256 |
+| license | 许可文件的相对path与SHA-256，必须随组件保留 |
+| capabilities | transform布尔值、validators[]；只声明确已实现的校验操作 |
+
+`preview.dark-mode.parameters.transform`引用组件ID，`preserve`不运行组件。组件脚本通过`window.ArticleAlgorithm`提供两个方法：
+
+```js
+window.ArticleAlgorithm = {
+  async transform(root, context) {
+    // context: background、options、inlineProperties；root是隔离副本。
+    root.style.color = context.options.defaultDarkTextColor || 'inherit';
+  },
+  async inspect(root, rules) {
+    // 按收到的规则执行检查，返回发现的问题；无问题返回[]。
+    // 每项：{ ruleId, element, outcome: 'violation'|'review'|'incomplete', detail? }
+    return [];
+  }
+};
+```
+
+这是接口示例，不是公众号校验实现。新增组件可追加清单对象与实现文件，更新对应文件hash，再将formatter指向新ID；新增通用校验操作仍须注册执行能力。脚本只可改变现有节点的颜色、背景、边框和文字装饰；不能添加HTML或引入新资源。预览返回的属性、节点索引、规则ID及大小均会检查，完整结果有效后才写入处理副本。
+
+实现只在不具同源权限的独立沙箱执行，不接收工作台DOM或目录句柄。网络、存储、弹窗和导航受限制；组件改动不获得主页面执行权。已有Blob图片与字体在内存中转交并保留布局上下文，不重新扫描资料目录。沙箱是权限边界，不提供任意脚本的CPU预算。
+
+组件文件、许可、参数和指纹参与快照及缓存；历史依赖清单保留当时的代码，重开历史不读取今天的组件替换它。旧库缺算法目录时明示使用内置默认实现且不写原库；现存但不完整、hash不符或缺能力的目录直接失败。旧渲染记录没有组件时另作回退提示，不冒充原算法完整复现。
 
 ## 加载、失败与迁移
 
@@ -187,6 +241,10 @@ viewport决定CSS排版宽高，contentWidth决定正文宽度；显示缩放不
 
 官网交付用“导出文章 → Markdown正文”，仅提取可靠解析的body，保留Markdown、HTML、class和锚点，发布者处理图片地址。格式报告按当前库规则检查，历史回放不冒充当前平台合规。
 
+### 可见预览与当前检查
+
+文章编辑器的[三个预览开关](README.md#doc-preview-controls)是浏览器界面偏好，不写入格式三件套。仅保存刷新留存可见输入及其资源；当前工作画布仍使用当前正文、主题和配置，供校验、复制、导出与渲染记录使用。独立检查不刷新留存画面；成功保存后的编译才推进显示边界，失败或过期任务不推进。滚动对齐只使用同一输入的位置缓存，不读取资料库或重新编译；画面落后于源码时暂停联动。
+
 <a name="doc-configuration-loading"></a>
 
 ### 格式配置
@@ -201,6 +259,8 @@ viewport决定CSS排版宽高，contentWidth决定正文宽度；显示缩放不
 旧版清单不能直接改版本号当作新文件。先备份整个旧库与旧清单，再复制完整新三件套，逐项迁移明确需要的本地策略。旧版的兼容分级、字体放行或图片三属性组合不自动迁移为公众号规则。文章主题快照也不会因配置更新而被改写；需在组合中重新检查。
 
 界面语言与库级格式策略相互独立：切换简体中文／English 不读取或改写三件套，不改变 formatter 的 language、原文或导出语言。产品层诊断随界面语言显示，库内规范名称、说明和人工核对文案保持原文。
+
+空图片地址、无效地址及已确认读取/解码失败作为产品资源错误。失败图片不会再次等待已经结束的load/error事件；资源仍在加载时明确保留未完成状态。已确认缺失的本地文件先返回诊断，修复后主动重检；规范规则JSON不因此降低要求。
 
 <a name="doc-official-basis"></a>
 

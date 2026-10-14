@@ -74,14 +74,17 @@
   --font-editor-source: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   --font-article-source: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  --shadow-panel: 0 1rem 2.5rem color-mix(in srgb, var(--color-secondary) 6%, transparent);
-  --shadow-toggle: 0 0.15rem 0.45rem color-mix(in srgb, var(--color-secondary) 8%, transparent);
+  --shadow-panel: var(--editor-panel-shadow);
+  --shadow-toggle: var(--editor-toggle-shadow);
   --shadow-popup: 0 0.5rem 1.25rem color-mix(in srgb, var(--color-secondary) 15%, transparent);
   --shadow-dialog: 0 2rem 4rem color-mix(in srgb, var(--color-secondary) 25%, transparent);
 }
 
 :root {
   @apply scheme-light;
+  /* Runtime indirection prevents Tailwind from freezing the fallback shadow. */
+  --editor-panel-shadow: 0 1rem 2.5rem color-mix(in srgb, var(--color-secondary) 6%, transparent);
+  --editor-toggle-shadow: 0 0.15rem 0.45rem color-mix(in srgb, var(--color-secondary) 8%, transparent);
   --editor-field-background: var(--color-panel);
   --editor-quiet-bar-background: var(--color-panel);
   --editor-action-gradient: none;

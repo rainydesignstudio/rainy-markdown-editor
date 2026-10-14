@@ -32,6 +32,9 @@ export function EditorPage() {
       themeUpdateAvailable={Boolean(availableArticleThemeUpdate(controller.article.theme, controller.themeLibrary))}
       parsed={controller.parsed}
       compiledCss={controller.compiledCss}
+      compiledRevision={controller.compiledRevision}
+      savedPreviewRevision={controller.savedPreviewRevision}
+      documentGeneration={controller.currentDocumentGeneration}
       revision={controller.revision}
       mediaRevision={controller.mediaRefreshRevision}
       status={controller.status}

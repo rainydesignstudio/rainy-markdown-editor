@@ -7,6 +7,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { normalizeDataDirectoryName } from '../src/lib/fileSystem.ts';
+import { DEFAULT_PLATFORM_PRESET_ID, PUBLIC_PLATFORM_PRESETS, getPublicPlatformPreset } from '../src/lib/article-format/library.ts';
 
 const source = await readFile(new URL('../src/components/settings/CreateLibraryDialog.tsx', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -14,13 +15,14 @@ const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node?.props ? 
 const text = node => Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : typeof node === 'string' ? node : '';
 
 function dialog(onCreate = async () => ({ status: 'created' })) {
-  const cells = [], requests = [];
+  const cells = [], requests = [], presets = [];
   let cursor = 0, tree, closes = 0;
   const module = { exports: {} };
   vm.runInNewContext(code, {
 ...productMessages, module, exports: module.exports, Error, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/fileSystem')) return { normalizeDataDirectoryName };
+    if (id.endsWith('/article-format/library')) return { DEFAULT_PLATFORM_PRESET_ID, PUBLIC_PLATFORM_PRESETS };
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'frame', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'dialog-button' };
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = initial; return [cells[index], value => { cells[index] = value; }]; },
@@ -28,9 +30,9 @@ function dialog(onCreate = async () => ({ status: 'created' })) {
     };
     throw new Error(id);
   }) });
-  const render = () => { cursor = 0; tree = nodes(module.exports.CreateLibraryDialog({ onCreate: name => { requests.push(name); return onCreate(name); }, onClose: () => closes++ })); };
+  const render = () => { cursor = 0; tree = nodes(module.exports.CreateLibraryDialog({ onCreate: (name, presetId) => { requests.push(name); presets.push(presetId); return onCreate(name, presetId); }, onClose: () => closes++ })); };
   const find = predicate => { const node = tree.find(predicate); assert.ok(node); return node; };
-  const result = { render, find, requests, get closes() { return closes; }, input: () => find(node => node.type === 'input'),
+  const result = { render, find, requests, presets, get closes() { return closes; }, input: () => find(node => node.type === 'input'),
     frame: () => find(node => node.type === 'frame'), submit: () => find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }),
     button: label => find(node => node.type === 'dialog-button' && text(node) === label),
     name(value) { result.input().props.onChange({ target: { value } }); render(); },
@@ -41,6 +43,9 @@ function dialog(onCreate = async () => ({ status: 'created' })) {
 test('library creation reuses the dialog shell, focuses the name, previews the destination and validates before choosing a directory', async () => {
   const view = dialog();
   assert.equal(view.input().props.autoFocus, true);
+  const preset = view.find(node => node.type === 'select');
+  assert.equal(preset.props.value, 'wechat-article');
+  assert.deepEqual(nodes(preset.props.children).filter(node => node.type === 'option').map(node => node.props.value), ['wechat-article']);
   assert.equal(view.button('选择父目录并创建').props.disabled, true);
   for (const value of [' ', '../文稿', '..', '文稿.', 'a:']) {
     view.name(value); assert.equal(view.button('选择父目录并创建').props.disabled, true);
@@ -50,6 +55,7 @@ test('library creation reuses the dialog shell, focuses the name, previews the d
   assert.match(text(view.find(node => node.props['aria-label'] === '资料库保存位置预览')), /所选父目录 \/ my-articles/);
   assert.equal(view.input().props['aria-invalid'], false);
   await view.submit(); assert.deepEqual(view.requests, ['my-articles']); assert.equal(view.closes, 1);
+  assert.deepEqual(view.presets, ['wechat-article']);
 });
 
 test('pending directory creation blocks duplicate submissions, cancellation and dismissal', async () => {
@@ -58,6 +64,7 @@ test('pending directory creation blocks duplicate submissions, cancellation and 
   view.name('测试资料库'); const pending = view.submit(); view.render();
   assert.equal(view.frame().props.dismissible, false);
   assert.equal(view.input().props.disabled, true);
+  assert.equal(view.find(node => node.type === 'select').props.disabled, true);
   assert.equal(view.button('取消').props.disabled, true);
   assert.equal(view.find(node => node.type === 'header').props.closeDisabled, true);
   await view.submit(); view.frame().props.onClose();
@@ -104,12 +111,16 @@ test('draft protection precedes the creation dialog and does not open the native
 
 test('directory creation reports success, cancellation, stale selection and file collisions to the dialog', async () => {
   const statuses = [], opened = [], root = { name: 'new-library' };
-  const context = { useCallback: callback => callback, DOMException, directorySelectionRef: { current: 0 },
+  const context = { useCallback: callback => callback, DOMException, DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, directorySelectionRef: { current: 0 },
     pickDataDirectory: async () => ({}), createNamedDataDirectory: async () => root,
     setStatus: status => statuses.push(status), rememberAuthorizedDirectory: (handle, selection) => opened.push(['remember', handle, selection]),
     openAuthorizedDirectory: async (handle, selection) => opened.push(['open', handle, selection]),
   };
   const create = action('createDataDirectory', 'reopenRememberedDirectory', context);
+  context.pickDataDirectory = async () => { throw new Error('picker must not open for a private preset'); };
+  assert.equal((await create('new-library', 'unlisted-platform')).status, 'error');
+  assert.equal(opened.length, 0);
+  context.pickDataDirectory = async () => ({});
   assert.equal((await create('new-library')).status, 'created'); assert.equal(opened.length, 2);
   context.pickDataDirectory = async () => { throw new DOMException('取消', 'AbortError'); };
   assert.equal((await create('new-library')).status, 'cancelled'); assert.equal(opened.length, 2);

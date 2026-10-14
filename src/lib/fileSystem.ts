@@ -1,5 +1,5 @@
 import { ProductError, productCause, productMessage, productReference, productText } from "./i18n/productMessages";
-import { initializeLibraryFormat } from './article-format/library';
+import { DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, initializeLibraryFormat } from './article-format/library';
 import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { parseArticle, updateFrontMatter } from './frontMatter';
 import { getTheme } from './themes';
@@ -96,7 +96,8 @@ export function normalizeDataDirectoryName(input: string): string {
   return name;
 }
 
-export async function createNamedDataDirectory(parent: DirectoryHandle, input: string): Promise<DirectoryHandle> {
+export async function createNamedDataDirectory(parent: DirectoryHandle, input: string, presetId: string = DEFAULT_PLATFORM_PRESET_ID): Promise<DirectoryHandle> {
+  getPublicPlatformPreset(presetId);
   await ensurePermission(parent);
   const name = normalizeDataDirectoryName(input);
   for await (const [existing] of parent.entries()) {
@@ -110,7 +111,7 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
   }
   try {
     await ensureArticleDirectories(child);
-    await initializeLibraryFormat(child);
+    await initializeLibraryFormat(child, presetId);
   } catch (error) {
     let rollbackSafe = true;
     for await (const [entryName, entry] of child.entries()) {
@@ -404,7 +405,10 @@ export async function readStoredArticleById(root: DirectoryHandle, month: string
   const article = await readStoredArticle(month, folder, directory);
   try {
     article.renderRecord = await readRenderRecord(directory);
-    if (article.renderRecord && !await renderRecordMatches(article.renderRecord, article.source, article.theme)) article.renderIssue = productText("fileSystem.theRenderRecordDoesNotMatchTheBodyOrThemeUpdateStyles");
+    if (article.renderRecord && !await renderRecordMatches(article.renderRecord, article.source, article.theme)) {
+      article.renderRecordStale = true;
+      article.renderIssue = productText("fileSystem.theRenderRecordDoesNotMatchTheBodyOrThemeUpdateStyles");
+    }
   } catch (error) { article.renderIssue = productText("fileSystem.theRenderRecordCouldNotBeRead") + (error instanceof Error ? error.message : String(error)); }
   return article;
 }

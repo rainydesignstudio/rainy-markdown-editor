@@ -1,0 +1,9 @@
+{
+  "id": "zixu-entry",
+  "name": "紫序 · 标签条目",
+  "trigger": "//zixu-entry",
+  "description": "三级标题、加粗正文与单条分隔线；搭配紫序主题复现标签条目。",
+  "content": "<h3 class=\"text-sm text-article-accent tracking-widest\"> 01 / KEY POINT </h3>\n\n**要点标题**　▌这里写说明或案例。\n\n<span class=\"block my-6\"></span>\n\n<hr />",
+  "icon": "tag",
+  "categoryId": "zixu"
+}

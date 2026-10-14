@@ -119,7 +119,7 @@ export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSna
     if (styles) target.setAttribute('style', styles);
     else target.removeAttribute('style');
     [...target.attributes].forEach((attribute) => {
-      if (output.removeClasses && attribute.name === 'class' || attribute.name.startsWith('data-') && !keptAttributes.has(attribute.name) || attribute.name.startsWith('aria-') && !keptAttributes.has(attribute.name)) {
+      if (attribute.name === 'data-source-line' || output.removeClasses && attribute.name === 'class' || attribute.name.startsWith('data-') && !keptAttributes.has(attribute.name) || attribute.name.startsWith('aria-') && !keptAttributes.has(attribute.name)) {
         target.removeAttribute(attribute.name);
       }
     });

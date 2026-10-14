@@ -1,5 +1,5 @@
-import zhCommon from '../../../locale/zh-CN/common.json' with { type: 'json' };
-import enCommon from '../../../locale/en-US/common.json' with { type: 'json' };
+import zhCommon from '../../../resources/locale/zh-CN/common.json' with { type: 'json' };
+import enCommon from '../../../resources/locale/en-US/common.json' with { type: 'json' };
 
 export const UI_LOCALES = ['zh-CN', 'en-US'] as const;
 export type UILocale = typeof UI_LOCALES[number];

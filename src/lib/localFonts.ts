@@ -12,7 +12,7 @@ export async function initializeLocalFonts(root: FileSystemDirectoryHandle, curr
     if (!current()) return;
     try { await directory.getFileHandle(name); continue; }
     catch (error) { if (!missing(error)) throw error; }
-    const response = await fetch(`/${name}`);
+    const response = await fetch(`/fonts/${name}`);
     if (!response.ok) throw new ProductError("localFonts.openFontFileCouldNotBeCopied", { "name": name, "responseStatus": response.status });
     const content = await response.arrayBuffer();
     if (!current()) return;

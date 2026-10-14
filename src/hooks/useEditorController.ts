@@ -5,7 +5,7 @@ import { prepareRenderRecord, persistRenderRecord, restoreRenderEnvironment, ren
 import type { FormatSnapshot } from '../lib/article-format/runtime';
 
 import { useFormatSnapshot } from './useFormatSnapshot';
-import { activateLibraryFormat, initializeLibraryFormat } from '../lib/article-format/library';
+import { activateLibraryFormat, DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, initializeLibraryFormat, type PlatformPresetId } from '../lib/article-format/library';
 import { getFormatSnapshot, invalidateFormatBundle } from '../lib/article-format/runtime';
 
 import { articleFormatPreviewStructure } from '../lib/articleFormat';
@@ -65,7 +65,8 @@ import {
 import { buildClipboardPayload, extractMarkdownClassCandidates } from '../lib/render';
 import { embedClipboardImages } from '../lib/clipboardImages';
 import { ARTICLE_EXAMPLE_IMAGE } from '../lib/articleExamples';
-import { compiledArticleFormatStatus, hasFormatConcerns, inspectArticleFormatReport, type ArticleFormatReport } from '../lib/articleFormatReport';
+import { compiledArticleFormatStatus, inspectArticleFormatReport, type ArticleFormatReport } from '../lib/articleFormatReport';
+import { getPreviewPreferences } from './usePreviewPreferences';
 import { compileArticleStyles } from '../lib/tailwind';
 import { createArticleMutationQueue, type ArticleDocumentToken } from '../lib/articleMutationQueue';
 import { copyArticleImageAs, importArticleImage, insertArticleImageReferences, rewriteArticleImageReferences, type ArticleMediaAsset, type LibraryMediaAsset, type MediaActionOutcome, importSharedImage, inspectArticleImage } from '../lib/articleMedia';
@@ -157,6 +158,7 @@ type ArticleSnapshot = {
 type SaveSnapshotResult = {
   ok: boolean;
   current: boolean;
+  rendered?: boolean;
   savedSnapshot?: ArticleSnapshot;
   result?: Awaited<ReturnType<typeof saveStoredArticle>>;
 };
@@ -262,6 +264,7 @@ export function useEditorController() {
   const [revision, setRevision] = useState(1);
   const [compiledRevision, setCompiledRevision] = useState<number | null>(null);
   const [compiledCss, setCompiledCss] = useState('');
+  const [savedPreviewRevision, setSavedPreviewRevision] = useState(0);
   const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
   const [formatCheck, setFormatCheck] = useState<{ mode: 'copy' | 'save' | 'inspect' | 'export'; report: ArticleFormatReport } | null>(null);
   const [loadInspectionRevision, setLoadInspectionRevision] = useState<number | null>(null);
@@ -304,6 +307,7 @@ export function useEditorController() {
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const compileRequestRef = useRef(0);
   const compiledFormatRef = useRef<{ snapshot: ArticleSnapshot; css: string; report: ArticleFormatReport; classes: number; preview: HTMLElement | null; requestId: number } | null>(null);
+  const savedPreviewPendingRef = useRef<ArticleSnapshot | null>(null);
   const formatInspectionRef = useRef(false);
   const articleRef = useRef(article);
   const directoryRef = useRef(directory);
@@ -525,6 +529,12 @@ export function useEditorController() {
       compiledFormatRef.current = { snapshot, css: result.css, report, classes: result.candidates.length, preview, requestId };
       setStatus(compiledArticleFormatStatus(report, snapshot.revision, result.candidates.length));
       cacheLoadedArticleReport(snapshot, report, preview);
+      const saved = savedPreviewPendingRef.current;
+      if (saved && saved.documentToken === snapshot.documentToken && saved.revision === snapshot.revision &&
+        saved.source === snapshot.source && !articleRef.current.dirty) {
+        savedPreviewPendingRef.current = null;
+        setSavedPreviewRevision(value => value + 1);
+      }
       return true;
     } catch (error) {
       if (requestId === compileRequestRef.current && matchesSnapshot(snapshot)) {
@@ -557,8 +567,13 @@ export function useEditorController() {
     }
     let restored: Awaited<ReturnType<typeof restoreRenderEnvironment>> | undefined;
     let renderIssue = stored.renderIssue;
-    if (stored.renderRecord && root && !renderIssue) {
-      try { restored = await restoreRenderEnvironment(root, stored.renderRecord); }
+    if (stored.renderRecord && root && (!renderIssue || stored.renderRecordStale)) {
+      try {
+        restored = await restoreRenderEnvironment(root, stored.renderRecord);
+        // Expired HTML/CSS can be rebuilt from source with verified retained
+        // dependencies; adopting today's library styles remains explicit.
+        if (stored.renderRecordStale) renderIssue = undefined;
+      }
       catch (error) { renderIssue = productText("controller.historicalRenderDependenciesCouldNotLoad") + (error instanceof Error ? error.message : String(error)); }
     }
     if (directoryRef.current !== root || documentTokenRef.current !== documentToken) { restored?.dispose(); return false; }
@@ -575,7 +590,9 @@ export function useEditorController() {
     setRevision(revisionRef.current);
     setLoadInspectionRevision(revisionRef.current);
     setCompiledRevision(null);
-    setStatus({ ...(stored.parse.diagnostics.length > 0 ? productLabel("controller.loadedResolveDiagnosticsFirst", { "storedFilePath": stored.filePath }) : productLabel("controller.loaded", { "storedFilePath": stored.filePath })), tone: stored.parse.diagnostics.length > 0 ? 'warning' : 'success' });
+    const loadedMessage = productReference(stored.parse.diagnostics.length > 0 ? 'controller.loadedResolveDiagnosticsFirst' : 'controller.loaded', { storedFilePath: stored.filePath });
+    const legacyAlgorithm = restored?.snapshot.algorithmSource === 'legacy' && restored.snapshot.bundle.formatter.preview.dark.transform !== 'preserve';
+    setStatus({ ...productLabel('shared.compose', { parts: productJoin(legacyAlgorithm ? [loadedMessage, productReference('algorithms.legacyHistory')] : [loadedMessage], '；') }), tone: stored.parse.diagnostics.length > 0 || legacyAlgorithm ? 'warning' : 'success' });
     if (navigateToEditor) navigateArticleMode('editor');
     void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
     return true;
@@ -657,6 +674,7 @@ export function useEditorController() {
         setStoredArticles((items) => upsertStoredArticle(items, result.article));
         const savedArticle: WorkingArticle = { source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false, renderSnapshot: snapshot.renderSnapshot, renderCss: prepared ? compiled?.css : undefined, renderRecord: result.article.renderRecord, renderIssue: snapshot.renderIssue };
         articleRef.current = savedArticle;
+        savedPreviewPendingRef.current = savedSnapshot;
         setArticle(savedArticle);
         if (!snapshot.folder || !snapshot.month) {
           historyBaselineRef.current = {
@@ -679,8 +697,8 @@ export function useEditorController() {
     }
   }, [matchesSnapshot, openDocument]);
 
-  const saveSnapshot = useCallback((snapshot: ArticleSnapshot): Promise<SaveSnapshotResult> => (
-    mutationQueueRef.current.run(() => {
+  const saveSnapshot = useCallback(async (snapshot: ArticleSnapshot): Promise<SaveSnapshotResult> => {
+    const result: SaveSnapshotResult = await mutationQueueRef.current.run(() => {
       const current = matchesSnapshot(snapshot);
       const tokenMatchesSnapshot = snapshot.documentToken.root === snapshot.directory && snapshot.documentToken.articleId === snapshot.articleId;
       if (!tokenMatchesSnapshot || !mutationQueueRef.current.canSave(snapshot.documentToken)) {
@@ -688,8 +706,13 @@ export function useEditorController() {
         return { ok: false, current };
       }
       return performSaveSnapshot(snapshot);
-    })
-  ), [matchesSnapshot, performSaveSnapshot]);
+    });
+    if (getPreviewPreferences().saveOnly && result.ok && result.current && result.savedSnapshot &&
+      result.result?.article.parse.canCopy) {
+      result.rendered = await compileCurrent(result.savedSnapshot);
+    }
+    return result;
+  }, [matchesSnapshot, performSaveSnapshot, compileCurrent]);
 
   const captureSavedRender = useCallback(async (snapshot: ArticleSnapshot) => {
     const root = snapshot.directory, preview = previewRef.current, compiled = compiledFormatRef.current;
@@ -714,17 +737,18 @@ export function useEditorController() {
 
   const saveCurrent = useCallback(async (): Promise<boolean> => {
     if (mediaOperationRef.current || historyOperationRef.current) return false;
+    const showReport = getPreviewPreferences().saveReport;
     const snapshot = snapshotFor();
     setLoadInspectionRevision(null);
     const result = await saveSnapshot(snapshot);
     if (result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy) {
-      const compiled = await compileCurrent(result.savedSnapshot);
+      const compiled = result.rendered ?? await compileCurrent(result.savedSnapshot);
       if (compiled) await captureSavedRender(result.savedSnapshot);
       const checked = compiledFormatRef.current;
       try {
       const report = compiled && checked?.report.complete && matchesSnapshot(checked.snapshot)
         ? checked.report : await inspectArticleFormatReport(result.savedSnapshot.source, result.savedSnapshot.theme, previewRef.current, { root: result.savedSnapshot.directory, month: result.savedSnapshot.month, folder: result.savedSnapshot.folder });
-      if (matchesSnapshot(result.savedSnapshot) && hasFormatConcerns(report)) {
+      if (matchesSnapshot(result.savedSnapshot) && showReport) {
         setFormatCheck({ mode: 'save', report });
       }
       } catch (error) {
@@ -2047,13 +2071,14 @@ export function useEditorController() {
     runAfterDraftDecision({ label: productText("controller.createALibrary"), run: () => { setCreateLibraryDialogOpen(true); } });
   }, [runAfterDraftDecision]);
 
-  const createDataDirectory = useCallback(async (name: string): Promise<LibraryCreationResult> => {
+  const createDataDirectory = useCallback(async (name: string, presetId: PlatformPresetId = DEFAULT_PLATFORM_PRESET_ID): Promise<LibraryCreationResult> => {
     const selection = ++directorySelectionRef.current;
     try {
+      getPublicPlatformPreset(presetId);
       setStatus({ ...productLabel("controller.chooseTheParentDirectoryForTheNewLibrary"), tone: 'neutral' });
       const parent = await pickDataDirectory();
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
-      const handle = await createNamedDataDirectory(parent, name);
+      const handle = await createNamedDataDirectory(parent, name, presetId);
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
       rememberAuthorizedDirectory(handle, selection);
       await openAuthorizedDirectory(handle, selection);
@@ -2118,7 +2143,7 @@ export function useEditorController() {
       setStatus({ ...productLabel("controller.thisManuscriptCannotBeCopiedYetRepairYamlOrTheThemeSnapshot"), tone: 'error' });
       return;
     }
-    const saved = initial.directory && articleRef.current.dirty ? await saveSnapshot(initial) : { ok: true, current: matchesSnapshot(initial), savedSnapshot: initial };
+    const saved = initial.directory && articleRef.current.dirty ? await saveSnapshot(initial) : { ok: true, current: matchesSnapshot(initial), savedSnapshot: initial, rendered: undefined };
     if (!saved.ok) return;
     if (!saved.current || !saved.savedSnapshot || !matchesSnapshot(saved.savedSnapshot) || copyRequestRef.current !== requestId) {
       setStatus({ ...productLabel("controller.theManuscriptChangedDuringSavingTheOldRevisionWasDiscardedCopyThe"), tone: 'error' });
@@ -2126,7 +2151,7 @@ export function useEditorController() {
     }
     const target = saved.savedSnapshot;
     const current = () => copyRequestRef.current === requestId && matchesSnapshot(target) && !mediaOperationRef.current;
-    const compiled = compiledRevision === target.revision ? true : await compileCurrent(target);
+    const compiled = saved.rendered ?? (compiledRevision === target.revision ? true : await compileCurrent(target));
     if (!compiled || !current()) return;
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     if (!current() || !previewRef.current) return;
@@ -2660,7 +2685,7 @@ export function useEditorController() {
           const snapshot = snapshotFor(current);
           const result = await saveSnapshot(snapshot);
           if (result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy && result.savedSnapshot.documentToken.root === root) {
-            if (await compileCurrent(result.savedSnapshot)) await captureSavedRender(result.savedSnapshot);
+            if (result.rendered ?? await compileCurrent(result.savedSnapshot)) await captureSavedRender(result.savedSnapshot);
           }
         } finally {
           autoSaveBusyRef.current = false;
@@ -2819,7 +2844,7 @@ export function useEditorController() {
     historyDialogOpen, setHistoryDialogOpen, historySnapshots, setHistorySnapshots, historyIssues,
     setHistoryIssues, historySelectedId, setHistorySelectedId, historyBusy, historyRefreshPending,
     setHistoryRefreshPending, historyNotice, setHistoryNotice,
-    revision, compiledRevision, setCompiledRevision, compiledCss, status, setStatus,
+    revision, compiledRevision, setCompiledRevision, compiledCss, savedPreviewRevision, currentDocumentGeneration, status, setStatus,
     mobilePane, setMobilePane, showThemeDialog, setShowThemeDialog, showTemplateDialog,
     setShowTemplateDialog, showUnsavedDialog, setShowUnsavedDialog, pendingActionLabel,
     setPendingActionLabel,

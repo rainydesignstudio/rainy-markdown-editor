@@ -1,0 +1,9 @@
+{
+  "id": "table-merged",
+  "name": "简易表格",
+  "trigger": "//table-merged",
+  "description": "两列轻量表格，填写表头与内容；保留原触发词。",
+  "content": "<table>\n  <thead><tr><td class=\"p-2 font-bold\">条目</td><td class=\"p-2 font-bold\">内容</td></tr></thead>\n  <tbody>\n    <tr><td class=\"p-2\">左侧单元格内容▌</td><td class=\"p-2\">说明</td></tr>\n    <tr><td class=\"p-2\">后续条目</td><td class=\"p-2\">更多内容</td></tr>\n  </tbody>\n</table>\n",
+  "icon": "table",
+  "categoryId": "default"
+}

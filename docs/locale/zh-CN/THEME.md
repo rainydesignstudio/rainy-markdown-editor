@@ -30,7 +30,7 @@
 | id / name | 安全ID；名称1～80字符 |
 | version | 三段数字，例如1.0.0 |
 | formatVersion | 新主题用4；读取旧格式时由应用规范化 |
-| palette | 1～100个色板值；键为安全名称，值为不含alpha的3或6位十六进制颜色 |
+| palette | 1～128个色板值；键为安全名称，值为不含alpha的3或6位十六进制颜色 |
 | colors | 只含light和dark；每套完整包含下方33个角色，值引用palette中的键 |
 | fonts | 完整包含下方8个字体角色，每个值是非空安全字体栈 |
 | surfaces | 可选；只使用正式字段与固定结构，未使用时整个字段省略 |
@@ -58,7 +58,7 @@ ui serif mono editorSource articleSource heading subHeading eyebrow
 
 fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题、副标题和上标；editorSource用于内容类编辑，articleSource用于文章源码；代码字体采用mono及其回退。先确认用户指定字体可用，再加入系统回退。随应用提供的Sen Local、Noto Sans SC Local、Roboto Mono Local也可采用，原许可文件随字体资源保留。文章主题与微信输出不依赖这些界面字体。
 
-可选surfaces由light／dark两套组成，字段为primaryButton、primaryText、primaryHover、secondaryButton、eyebrow、dangerSurface、field、shadow、canvasWash，以及可选backdrop。颜色全部引用palette键；primaryHover为一个键或四个键；field／shadow／backdrop为`{ color, opacity }`，opacity范围0～100；canvasWash为三色键数组与opacity。以[正式类型和校验器](../../../src/lib/editorThemes.ts)为准，不能用该字段注入任意CSS。
+可选surfaces由light／dark两套组成；各项可省略，省略保留既有角色回退。正式字段为primaryButton、primaryText、primaryHover、primaryLine、secondaryButton、eyebrow、dangerSurface、field、shadow、panelShadow、toggleShadow、backdrop和canvasWash。颜色全部引用palette键；primaryHover为一个键或四个渐变键；field／shadow／panelShadow／toggleShadow／backdrop为`{ color, opacity }`，opacity范围0～100；canvasWash为三色键数组与opacity。以[正式类型和校验器](../../../src/lib/editorThemes.ts)为准，不能用该字段注入任意CSS。
 
 <a name="doc-editor-theme-example"></a>
 
@@ -241,6 +241,8 @@ color-article-code-tint
 
 本示例的图片用 `max-width:100%`、`height:auto`、`display:block` 保持常规自适应；这属于示例排版选择。公众号官方宽度规则检查多屏幕的布局、居中和溢出，图片先取实际宽度，失败时按声明／`data-w`／HTML 宽度及透明占位兜底。没有“只有三属性组合才放行 height:auto”的现行判据。输出是否保留自动尺寸取 formatter 的配置；图片加载、文件存在性和实际布局分别核对。
 
+文章编辑器的[预览操作开关](README.md#doc-preview-controls)不属于主题JSON。开启“仅保存时刷新”后，改稿或选择新主题可能暂时保留旧画面；成功保存后再核对主题版本和布局，或关闭此开关恢复实时。文章主题库、片段和起稿模板的设计预览保持各自原有流程。
+
 <a name="doc-article-theme-example"></a>
 
 ### 完整 article-theme 示例
@@ -354,7 +356,7 @@ templateIcon: book
 
 ## 整篇文章示例
 
-此稿把主题、模板结构和提示片段合在一起，正文无片段触发词或光标占位符。它使用随应用提供的 `/article-sample.png`，真实素材通过应用导入后改用 `media/image/<文件名>`。
+此稿把主题、模板结构和提示片段合在一起，正文无片段触发词或光标占位符。它使用随应用提供的 `/images/article-sample.png`，真实素材通过应用导入后改用 `media/image/<文件名>`。
 
 ```markdown
 ---
@@ -378,7 +380,7 @@ theme:
 
 在设置里新建一个命名清楚的资料库。正文、主题快照和文章图片会一起保存，代码目录则负责启动应用。
 
-![应用随附的示例图片](/article-sample.png)
+![应用随附的示例图片](/images/article-sample.png)
 
 <section class="my-4 rounded-lg bg-article-tint p-4">
   <p class="m-0 text-article-ink"><strong class="text-article-accent">提示：</strong>先在测试资料库里完成一次保存和重开。</p>
@@ -420,3 +422,9 @@ theme:
 - [资料库格式配置、能力和迁移](FORMAT.md)
 
 本文引用仓库内正式实现；更改类型、字段或校验条件时，同时更新对应示例和说明。
+
+### 编辑器表面色与透明度
+
+设置 → 外观 → 编辑器主题中，所有主题提供相同的33个基础角色与13个表面编辑项；数量统计编辑项，不是不同色值。表面包括主按钮常态/悬停/文字/边线、次按钮、危险按钮、装饰上标、表单、浮层与弹窗阴影、卡片/开关阴影、遮罩和三色工作区点缀。两种模式分别编辑；修改表面色会分离该项的调色板引用，不连带修改原基础角色。
+
+未配置的次按钮保持透明，表单和阴影沿用原回退；首次显式设置相应表面后才覆盖。浮层/弹窗共用shadow材质；卡片和开关阴影独立。按钮悬停可选纯色或四段渐变，点缀和半透明材质可调不透明度；不开放任意CSS或布局尺寸。旧主题及缓存继续有效，不自动重写用户文件。

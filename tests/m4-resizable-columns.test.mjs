@@ -9,7 +9,7 @@ const source = await readFile(new URL('../src/hooks/useResizableColumns.ts', imp
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 
 function columns() {
-  let cursor = 0, layout, width = 1200, desktop = true;
+  let cursor = 0, layout, width = 1200, desktop = true, identity = 'first';
   const cells = [], effects = [], observers = [], listeners = new Map();
   const addListener = (name, fn) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(fn); };
   const removeListener = (name, fn) => { listeners.get(name)?.delete(fn); if (!listeners.get(name)?.size) listeners.delete(name); };
@@ -24,14 +24,14 @@ function columns() {
       if (id === 'react') return {
         useRef(value) { const index = cursor++; return cells[index] ??= { current: value }; },
         useState(value) { const index = cursor++; if (!(index in cells)) cells[index] = value; return [cells[index], next => { cells[index] = typeof next === 'function' ? next(cells[index]) : next; }]; },
-        useEffect(effect, deps) { const index = cursor++; if (!cells[index]) { effects.push(() => { cells[index] = { cleanup: effect(), deps }; }); } },
+        useEffect(effect, deps) { const index = cursor++, old = cells[index]; if (!old || deps.some((value, i) => !Object.is(value, old.deps[i]))) { effects.push(() => { old?.cleanup?.(); cells[index] = { cleanup: effect(), deps }; }); } },
       };
       throw new Error(id);
     },
   });
-  const render = () => { cursor = 0; layout = module.exports.useResizableColumns(100 / 3, '(width >= 48rem)'); layout.containerRef.current = element; while (effects.length) effects.shift()(); };
+  const render = () => { cursor = 0; layout = module.exports.useResizableColumns(100 / 3, '(width >= 48rem)', identity); layout.containerRef.current = element; while (effects.length) effects.shift()(); };
   render(); render();
-  return { render, get layout() { return layout; }, resize(nextWidth, nextDesktop = true) { width = nextWidth; desktop = nextDesktop; observers[0].update(); render(); }, dispatch(name) { for (const fn of listeners.get(name) ?? []) fn(); }, hide() { document.visibilityState = 'hidden'; this.dispatch('visibilitychange'); }, unmount() { cells.forEach(cell => cell?.cleanup?.()); }, listeners, observers };
+  return { render, identity(next) { identity = next; render(); render(); }, get layout() { return layout; }, resize(nextWidth, nextDesktop = true) { width = nextWidth; desktop = nextDesktop; observers.at(-1).update(); render(); }, dispatch(name) { for (const fn of listeners.get(name) ?? []) fn(); }, hide() { document.visibilityState = 'hidden'; this.dispatch('visibilitychange'); }, unmount() { cells.forEach(cell => cell?.cleanup?.()); }, listeners, observers };
 }
 
 test('shared splitter captures drag, clamps both panes and supports the same keyboard boundaries', () => {
@@ -82,4 +82,15 @@ test('releasing outside the splitter or leaving the window restores preview inte
   assert.equal(view.layout.dragging, false);
   view.unmount();
   assert.equal(view.listeners.size, 0);
+});
+
+test('changing a split-view identity while dragging clears both the ref and iframe-disabling state', () => {
+  const view = columns();
+  view.layout.startDrag({ button: 0, pointerId: 7, currentTarget: { setPointerCapture() {} } }); view.render();
+  assert.equal(view.layout.dragging, true);
+  view.identity('second');
+  assert.equal(view.layout.dragging, false);
+  view.dispatch('pointerup'); view.render(); assert.equal(view.layout.dragging, false);
+  const ratio = view.layout.ratio; view.layout.moveDrag({ clientX: 5000 }); view.render();
+  assert.equal(view.layout.ratio, ratio); view.unmount();
 });

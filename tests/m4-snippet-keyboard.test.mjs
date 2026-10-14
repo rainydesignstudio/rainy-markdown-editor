@@ -323,3 +323,44 @@ test('grouping follows directory index metadata and search opens only matching g
   assert.equal(walk(snippetRow).find(n => n.type === 'category-icon').props.name, 'quote');
   assert.equal(snippetRow.props.className.includes('ml-6'), false, 'the icon and text use the same left column as the category row');
 });
+
+test('article formatting keys and menu ref use one native undoable source edit; other editors and guarded input are unchanged', () => {
+  for (const [key, expected] of [['b', '**selected**'], ['i', '*selected*'], ['u', '<u>selected</u>']]) {
+    const formatSelectionRef = { current: null }, f = inputFixture('selected', [], true, { formatSelectionRef });
+    f.element.setSelectionRange(0, 8);
+    assert.equal(f.key(key, { metaKey: true }), true);
+    assert.equal(f.props.value, expected);
+    assert.equal(f.element.value.slice(f.element.selectionStart, f.element.selectionEnd), 'selected');
+    f.document.execCommand('undo'); assert.equal(f.props.value, 'selected');
+  }
+  const ref = { current: null }, menu = inputFixture('chosen', [], true, { formatSelectionRef: ref });
+  menu.element.setSelectionRange(0, 6); assert.equal(ref.current('bold'), true);
+  assert.equal(menu.props.value, '**chosen**'); menu.document.execCommand('undo'); assert.equal(menu.props.value, 'chosen');
+  for (const extras of [{}, { readOnly: true, formatSelectionRef: { current: null } }, { disabled: true, formatSelectionRef: { current: null } }]) {
+    const f = inputFixture('kept', [], true, extras); assert.equal(f.key('b', { ctrlKey: true }), false); assert.equal(f.props.value, 'kept');
+  }
+  const f = inputFixture('kept', [], true, { formatSelectionRef: { current: null } });
+  assert.equal(f.key('b', { ctrlKey: true, nativeEvent: { isComposing: true } }), false); assert.equal(f.props.value, 'kept');
+});
+
+test('insert menu labels expose B/I/U and formatting routes through the shared selection action', async () => {
+  const module = { exports: {} }, calls = [];
+  const menuSource = await readFile(new URL('../src/components/editor/InsertElementsMenu.tsx', import.meta.url), 'utf8');
+  vm.runInNewContext(ts.transpileModule(menuSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
+    module, exports: module.exports, require: withTextInputHistory(id => {
+      if (id === 'react') return { useRef: value => ({ current: value }), useEffect() {} };
+      if (id === 'react/jsx-runtime') return { jsx, jsxs };
+      if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
+      throw new Error(id);
+    }),
+  });
+  const tree = module.exports.InsertElementsMenu({ disabled: false, readOnly: false, onFormat: kind => calls.push(kind), onInsert() { throw new Error('format must preserve the chosen text'); } });
+  const nodes = walk(tree), kbd = nodes.filter(node => node.type === 'kbd');
+  const content = node => Array.isArray(node) ? node.map(content).join('') : node?.props ? content(node.props.children) : typeof node === 'string' ? node : '';
+  assert.deepEqual(kbd.map(content), ['⌘B / Ctrl+B', '⌘I / Ctrl+I', '⌘U / Ctrl+U']);
+  for (const label of ['粗体', '斜体', '下划线']) {
+    const button = nodes.find(node => node.type === 'button' && content(node).startsWith(label));
+    assert.ok(button); button.props.onClick({ currentTarget: { closest: () => ({ open: true }) } });
+  }
+  assert.deepEqual(calls, ['bold', 'italic', 'underline']);
+});

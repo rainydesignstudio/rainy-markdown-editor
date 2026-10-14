@@ -1,0 +1,9 @@
+{
+  "id": "zixu-opening",
+  "name": "紫序 · 开场卡",
+  "trigger": "//zixu-opening",
+  "description": "淡紫开场卡：栏目标签、主副标题与导语。",
+  "content": "<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">CHANNEL / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 pb-4 border-b border-article-line text-[26px]/[1.5] font-bold text-article-heading\">▌文章标题<br />副标题<span class=\"text-article-accent\">重点词</span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">这里写导语：说明问题、阅读路径与文章价值。</p>\n</section>",
+  "icon": "document",
+  "categoryId": "zixu"
+}

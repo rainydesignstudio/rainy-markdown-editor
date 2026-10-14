@@ -15,7 +15,7 @@ async function component(file, dependencies) {
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = typeof initial === 'function' ? initial() : initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
-      useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; }, useMemo: callback => callback(),
+      useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; }, useMemo: callback => callback(), useEffect() {},
     };
     if (id in dependencies) return dependencies[id];
     throw new Error(id);
@@ -32,7 +32,7 @@ test('first card checkbox enables bulk selection; collapsed controls retain it a
     '../global/PageHeading': { PageHeading: 'heading' }, './MediaManagementDialog': { MediaManagementDialog: 'management' },
     '../../hooks/useMediaPreferences': { useMediaPreferences: () => [{ columns: 1, sort: 'name', descending: false }, () => {}] },
     '../../hooks/useMediaPagination': { useMediaPagination: items => ({ items, page: 1, pageCount: 1, total: items.length, start: 1, end: items.length, pageSize: 20 }) },
-    '../../lib/mediaBrowsing': { mediaDirectoryImages: values => values }, './MediaPagination': { MediaPagination: 'pagination' }, './MediaPreviewDialog': { MediaPreviewDialog: 'preview' },
+    '../../lib/mediaBrowsing': { mediaDirectoryImages: values => values }, './MediaPagination': { MediaPagination: 'pagination' }, './MediaPreviewDialog': { MediaPreviewDialog: 'preview' }, './MediaImportDialog': { MediaImportDialog: 'import-dialog' },
     '../../hooks/useMediaLibrary': { useMediaLibrary: () => ({ assets, issues: [], refresh() {} }) },
     '../global/DialogFrame': { DialogFrame: 'frame', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'button' },
     './MediaToolbar': { MediaToolbar: 'toolbar' }, './MediaGallery': galleryExports, './ArticleImagePreview': { ArticleImagePreview: 'image' },

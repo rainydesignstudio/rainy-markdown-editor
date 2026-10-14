@@ -1,0 +1,8 @@
+{
+  "id": "zixu-blockquote",
+  "name": "紫序 · 引用",
+  "trigger": "//zixu-blockquote",
+  "description": "一组带作者的引用内容。",
+  "content": "<blockquote>\n  <p class=\"font-bold text-xl text-article-accent\">我是主要内容<p>\n  <span class=\"text-article-muted\">- 我是说明文本▌</span>\n</blockquote>",
+  "categoryId": "zixu"
+}

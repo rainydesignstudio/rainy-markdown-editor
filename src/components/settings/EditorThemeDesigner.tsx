@@ -3,10 +3,9 @@
 import { formatProductMessage, productErrorMessage, productMessage, productText, type ProductMessageFields } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
-import { themeBindingLabel } from '../../lib/i18n/themeLabels';
 
 import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
-import { BASE_EDITOR_THEME, EDITOR_COLOR_ROLES, editorSurfaceTokens, inspectEditorTheme, parseEditorThemeJson, resolveEditorThemeColors, resolveEditorThemeSurfaces, type EditorTheme, type EditorColorRole, type EditorColorScheme, type EditorThemeFontRole } from '../../lib/editorThemes';
+import { BASE_EDITOR_THEME, EDITOR_COLOR_ROLES, EDITOR_SURFACE_FIELDS, editorSurfaceValue, updateEditorSurface, mapEditorSurfaceColors, editorSurfaceTokens, inspectEditorTheme, parseEditorThemeJson, resolveEditorThemeColors, resolveEditorThemeSurfaces, type EditorTheme, type EditorColorRole, type EditorColorScheme, type EditorThemeFontRole, type EditorSurfaceField } from '../../lib/editorThemes';
 import type { NavigationGuard } from '../../hooks/useRouteNavigation';
 import { tokenizeEditorSource } from '../../lib/editorSourceHighlight';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
@@ -55,13 +54,9 @@ export function forkEditorTheme(source: EditorTheme): EditorTheme {
     surfaceReferences.set(identity, key);
     return key;
   };
-  const surfaces = source.surfaces ? Object.fromEntries((['light', 'dark'] as const).map(mode => {
-    const surface = source.surfaces![mode];
-    const reference = (key: string) => paletteKey(mode, key);
-    return [mode, { ...surface, primaryButton: paletteKey(mode, surface.primaryButton, 'accent'), primaryText: paletteKey(mode, surface.primaryText, 'on-accent'), primaryHover: typeof surface.primaryHover === 'string' ? paletteKey(mode, surface.primaryHover, 'accent-strong') : surface.primaryHover.map(reference), secondaryButton: paletteKey(mode, surface.secondaryButton, 'panel'), eyebrow: paletteKey(mode, surface.eyebrow, 'accent-text'), dangerSurface: reference(surface.dangerSurface),
-      ...(surface.backdrop ? { backdrop: { ...surface.backdrop, color: reference(surface.backdrop.color) } } : {}),
-      field: { ...surface.field, color: paletteKey(mode, surface.field.color, 'panel') }, shadow: { ...surface.shadow, color: paletteKey(mode, surface.shadow.color, 'secondary') }, canvasWash: { ...surface.canvasWash, colors: surface.canvasWash.colors.map(reference) } }];
-  })) as EditorTheme['surfaces'] : undefined;
+  const surfaces = source.surfaces ? Object.fromEntries((['light', 'dark'] as const).map(mode =>
+    [mode, mapEditorSurfaceColors(source.surfaces![mode], (key, path) => paletteKey(mode, key, EDITOR_SURFACE_FIELDS.find(field => field.path === path)?.role))],
+  )) as EditorTheme['surfaces'] : undefined;
   return { kind: 'editor-theme', id: `editor-custom-${Date.now().toString(36)}`, name: `${source.name} 新主题`, version: '1.0.0', formatVersion: 4, palette, colors, fonts: { ...source.fonts }, ...(surfaces ? { surfaces } : {}) };
 }
 
@@ -74,15 +69,20 @@ function surfaceBindings(theme: EditorTheme, mode: EditorColorScheme): Record<st
   const refs: Record<string, [string, string[]]> = {
     action: ['按钮底色', [surface?.primaryButton ?? theme.colors[mode].accent]],
     'action-text': ['按钮文字', [surface?.primaryText ?? theme.colors[mode]['on-accent']]],
-    'action-hover': ['按钮悬停底色', surface ? typeof surface.primaryHover === 'string' ? [surface.primaryHover] : [surface.primaryButton] : [theme.colors[mode]['accent-strong']]],
+    'action-hover': ['按钮悬停底色', surface?.primaryHover ? typeof surface.primaryHover === 'string' ? [surface.primaryHover] : [surface.primaryButton ?? theme.colors[mode].accent] : [theme.colors[mode]['accent-strong']]],
     'editor-action-gradient': ['按钮悬停渐变', surface && Array.isArray(surface.primaryHover) ? surface.primaryHover : []],
-    'action-line': ['按钮边线', [theme.colors[mode][surface ? 'accent-line' : 'accent']]],
+    'action-line': ['按钮边线', [surface?.primaryLine ?? theme.colors[mode][surface ? 'accent-line' : 'accent']]],
     eyebrow: ['装饰上标', [surface?.eyebrow ?? theme.colors[mode]['accent-text']]],
     'danger-surface': ['危险操作底色', [surface?.dangerSurface ?? theme.colors[mode].panel]],
-    'editor-field-background': ['表单底色', surface?.field.opacity === 0 ? [] : [surface?.field.color ?? theme.colors[mode].panel]],
-    'editor-canvas-wash': ['工作区点缀', surface?.canvasWash.opacity ? surface.canvasWash.colors : []],
+    'editor-field-background': ['表单底色', surface?.field?.opacity === 0 ? [] : [surface?.field?.color ?? theme.colors[mode].panel]],
+    'editor-canvas-wash': ['工作区点缀', surface?.canvasWash?.opacity ? surface.canvasWash.colors : []],
   };
-  return Object.fromEntries(Object.entries(refs).map(([key, [label, values]]) => [key, values.map(value => binding(key.startsWith('editor-') ? `--${key}` : `--color-${key}`, label, value))]));
+  const paths: Record<string, EditorSurfaceField> = { action: 'primaryButton', 'action-text': 'primaryText', 'action-hover': 'primaryHover', 'editor-action-gradient': 'primaryHover', 'action-line': 'primaryLine', eyebrow: 'eyebrow', 'danger-surface': 'dangerSurface', 'editor-field-background': 'field', 'editor-canvas-wash': 'canvasWash' };
+  return Object.fromEntries(Object.entries(refs).map(([key, [label, values]]) => [key, values.flatMap(value => {
+    const token = key.startsWith('editor-') ? `--${key}` : `--color-${key}`;
+    const alias = binding(token, label, value);
+    return [...(alias.key.startsWith('surface:') ? [] : [alias]), { key: `surface:${mode}:${paths[key]}`, label, token, value }];
+  })]));
 }
 
 function editorElementBindings(element: HTMLElement, root: HTMLElement, theme: EditorTheme, mode: EditorColorScheme): ColorBinding[] {
@@ -111,7 +111,7 @@ function editorElementBindings(element: HTMLElement, root: HTMLElement, theme: E
     const values = background.classList.contains('button-primary') ? derived[background.matches(':hover') ? derived['editor-action-gradient'].length ? 'editor-action-gradient' : 'action-hover' : 'action'] : background.classList.contains('button-danger') ? background.matches(':hover') ? [{ key: 'danger', label: COLOR_LABELS.danger, token: '--color-danger' }] : derived['danger-surface'] : background.classList.contains('field') ? derived['editor-field-background'] : fromClass(background, 'bg');
     output.push(...values);
     if (background === root) output.push(...derived['editor-canvas-wash']);
-    const translucent = background.classList.contains('field') && surface && surface.field.opacity < 100 || Array.from(background.classList).some(value => value.startsWith('bg-') && /\/(?:0|[1-9]\d?)$/.test(value));
+    const translucent = background.classList.contains('field') && surface?.field && surface.field.opacity < 100 || Array.from(background.classList).some(value => value.startsWith('bg-') && /\/(?:0|[1-9]\d?)$/.test(value));
     if (values.length && !translucent) break;
     background = background.parentElement;
   }
@@ -158,7 +158,7 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
   useEffect(() => { inspection.clear(); setMode(appearanceScheme); }, [appearanceScheme]);
   const [colorsOpen, setColorsOpen] = useState(true);
   const [fontsOpen, setFontsOpen] = useState(true);
-  const [colorPicker, setColorPicker] = useState<{ scheme: EditorColorScheme; role?: EditorColorRole; key?: string; label?: string; token?: string } | null>(null);
+  const [colorPicker, setColorPicker] = useState<{ scheme: EditorColorScheme; role?: EditorColorRole; key?: string; label?: string; token?: string; surface?: EditorSurfaceField; index?: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | ProductMessageFields | { message: string }>('');
   const [departure, setDeparture] = useState<(() => void) | null>(null);
@@ -168,7 +168,7 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
   const errors = inspectEditorTheme(draft);
   if (themes.some(theme => theme.id === draft.id && (!editing || theme.id !== source.id))) errors.push(productMessage("editorThemeDesigner.theFileJsonAlreadyExists", { "draftId": draft.id }));
   const availableFonts = [...themes.flatMap(theme => Object.values(theme.fonts)), ...Object.values(draft.fonts)];
-  const extraColors = uniqueBindings((['light', 'dark'] as const).flatMap(scheme => Object.values(surfaceBindings(draft, scheme)).flat())).filter(binding => binding.key.startsWith('surface:'));
+  // The inspector keeps role aliases; every surface also has an independent editable control.
   useEffect(() => { if (inspection.selected) setColorsOpen(true); }, [inspection.selected]);
   const close = () => {
     if (busyRef.current) return;
@@ -202,8 +202,20 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
       <p id="editor-theme-designer-description" className="shrink-0 p-4 text-xs text-muted">{t('dialogs:ui.adjustLightAndDarkColorsSeparatelyPreviewThe')}</p>
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:flex-row lg:overflow-hidden">
         <aside ref={inspection.listRef} {...inspection.listProps} className="flex h-96 min-h-0 shrink-0 flex-col gap-4 lg:h-auto lg:w-96" aria-label={t('dialogs:ui.themeColorsAndFonts')}>
-          <CollapsiblePanel id="editor-theme-colors" title={t('dialogs:ui.colors')} icon={<PanelIcon kind="colors" />} count={EDITOR_COLOR_ROLES.length + extraColors.length} open={colorsOpen} onToggle={() => setColorsOpen(current => !current)} className="data-[open=true]:flex-1 data-[open=false]:shrink-0" contentClassName="flex flex-1 flex-col pb-2">
-            <><div className="flex shrink-0 items-center justify-between gap-3 border-b border-line pb-2 text-2xs text-faint"><span>{t('dialogs:ui.semanticRoles')}</span><div className="flex gap-3"><span className="w-8 text-center">{t('dialogs:ui.light')}</span><span className="w-8 text-center">{t('dialogs:ui.dark')}</span></div></div><div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" aria-label={t('dialogs:ui.colorRoleList')} onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}>{EDITOR_COLOR_ROLES.map(role => <div key={role} {...inspection.rowProps(role)} className={`flex items-center justify-between gap-3 border-b border-line/60 py-3 last:border-0 ${INSPECTION_ROW_CLASSES}`}><div className="min-w-0"><p className="text-xs font-medium text-primary">{t('dialogs:colorRoles.' + role)}</p><p className="mt-1 break-all font-mono text-2xs text-faint">--color-{role}</p></div><div className="flex shrink-0 gap-3">{(['light', 'dark'] as const).map(scheme => <ColorSwatchButton key={scheme} color={draft.palette[draft.colors[scheme][role]]} colorName={draft.colors[scheme][role]} type="button" data-color-swatch="true" className="size-8 shrink-0 rounded-full border border-line-strong hover:ring-2 hover:ring-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed" aria-label={`${scheme}.${role}`} aria-haspopup="dialog" disabled={saving} onClick={() => setColorPicker({ scheme, role })} />)}</div></div>)}{extraColors.map(binding => { const scheme = binding.key.split(':')[1] as EditorColorScheme; return <div key={binding.key} {...inspection.rowProps(binding.key)} className={`flex items-center justify-between gap-3 border-t border-line py-3 ${INSPECTION_ROW_CLASSES}`}><div className="min-w-0"><p className="text-xs font-medium text-primary">{themeBindingLabel(binding, t)} · {scheme === 'light' ? t('dialogs:ui.light') : t('dialogs:ui.dark')}</p><p className="mt-1 break-all font-mono text-2xs text-faint">{binding.token}</p></div><ColorSwatchButton color={draft.palette[binding.value!]} className="size-8 shrink-0 rounded-full border border-line-strong focus-visible:outline-2 focus-visible:outline-accent" disabled={saving} aria-label={t('dialogs:templates.edit', { name: themeBindingLabel(binding, t) })} onClick={() => setColorPicker({ scheme, key: binding.value, label: binding.label, token: binding.token })} /></div>; })}</div></>
+          <CollapsiblePanel id="editor-theme-colors" title={t('dialogs:ui.colors')} icon={<PanelIcon kind="colors" />} count={EDITOR_COLOR_ROLES.length + EDITOR_SURFACE_FIELDS.length} open={colorsOpen} onToggle={() => setColorsOpen(current => !current)} className="data-[open=true]:flex-1 data-[open=false]:shrink-0" contentClassName="flex flex-1 flex-col pb-2">
+            <><div className="flex shrink-0 items-center justify-between gap-3 border-b border-line pb-2 text-2xs text-faint"><span>{t('dialogs:ui.semanticRoles')}</span><div className="flex gap-3"><span className="w-8 text-center">{t('dialogs:ui.light')}</span><span className="w-8 text-center">{t('dialogs:ui.dark')}</span></div></div><div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" aria-label={t('dialogs:ui.colorRoleList')} onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}>{EDITOR_COLOR_ROLES.map(role => <div key={role} {...inspection.rowProps(role)} className={`flex items-center justify-between gap-3 border-b border-line/60 py-3 last:border-0 ${INSPECTION_ROW_CLASSES}`}><div className="min-w-0"><p className="text-xs font-medium text-primary">{t('dialogs:colorRoles.' + role)}</p><p className="mt-1 break-all font-mono text-2xs text-faint">--color-{role}</p></div><div className="flex shrink-0 gap-3">{(['light', 'dark'] as const).map(scheme => <ColorSwatchButton key={scheme} color={draft.palette[draft.colors[scheme][role]]} colorName={draft.colors[scheme][role]} type="button" data-color-swatch="true" className="size-8 shrink-0 rounded-full border border-line-strong hover:ring-2 hover:ring-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed" aria-label={`${scheme}.${role}`} aria-haspopup="dialog" disabled={saving} onClick={() => setColorPicker({ scheme, role })} />)}</div></div>)}{EDITOR_SURFACE_FIELDS.map(field => <section key={field.path} className="border-t border-line py-3">
+              <p className="text-xs font-medium text-primary">{t('dialogs:surfaceRoles.' + field.token.slice(2))}</p>
+              <p className="mt-1 break-all font-mono text-2xs text-faint">{field.token}</p>
+              <div className="mt-2 grid gap-2">{(['light', 'dark'] as const).map(scheme => {
+                const value = editorSurfaceValue(draft, scheme, field.path);
+                return <div key={scheme} {...inspection.rowProps(`surface:${scheme}:${field.path}`)} className={`flex flex-wrap items-center gap-2 ${INSPECTION_ROW_CLASSES}`}>
+                  <span className="w-8 text-2xs text-faint">{t('dialogs:ui.' + scheme)}</span>
+                  {value.colors.map((reference, index) => <ColorSwatchButton key={index} color={draft.palette[reference]} colorName={reference} className="size-7 shrink-0 rounded-full border border-line-strong focus-visible:outline-2 focus-visible:outline-accent" disabled={saving} aria-label={`${t('dialogs:surfaceRoles.' + field.token.slice(2))} · ${t('dialogs:ui.' + scheme)} · ${index + 1}`} aria-haspopup="dialog" onClick={() => setColorPicker({ scheme, surface: field.path, index, label: t('dialogs:surfaceRoles.' + field.token.slice(2)), token: field.token })} />)}
+                  {value.opacity !== undefined ? <label className="ml-auto inline-flex items-center gap-1 text-2xs text-muted"><span>{t('dialogs:ui.opacity')}</span><input className="field w-16 min-h-0 px-2 py-1 text-xs" type="number" min="0" max="100" step="1" value={value.opacity} disabled={saving} aria-label={`${t('dialogs:surfaceRoles.' + field.token.slice(2))} · ${t('dialogs:ui.' + scheme)} · ${t('dialogs:ui.opacity')}`} onChange={event => { if (event.target.value !== '') setDraft(current => updateEditorSurface(current, scheme, field.path, { opacity: Math.max(0, Math.min(100, Number(event.target.value))) })); }} />%</label> : null}
+                  {field.path === 'primaryHover' ? <select className="field ml-auto min-h-0 w-24 px-2 py-1 text-xs" value={value.colors.length === 4 ? 'gradient' : 'solid'} disabled={saving} aria-label={`${t('dialogs:surfaceRoles.' + field.token.slice(2))} · ${t('dialogs:ui.' + scheme)}`} onChange={event => setDraft(current => updateEditorSurface(current, scheme, field.path, { gradient: event.target.value === 'gradient' }))}><option value="solid">{t('dialogs:ui.solidColor')}</option><option value="gradient">{t('dialogs:ui.gradientColor')}</option></select> : null}
+                </div>;
+              })}</div>
+            </section>)}</div></>
           </CollapsiblePanel>
           <CollapsiblePanel id="editor-theme-fonts" title={t('dialogs:ui.fonts')} icon={<PanelIcon kind="fonts" />} count={FONT_ROLES.length} open={fontsOpen} onToggle={() => setFontsOpen(current => !current)} className="data-[open=true]:flex-1 data-[open=false]:shrink-0" contentClassName="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" contentLabel={t('dialogs:ui.fontRoleList')}>
             <div className="grid gap-4">{FONT_ROLES.map(role => <label key={role} className="grid gap-2"><span><span className="block text-xs font-medium text-primary">{t('dialogs:fontRoles.' + role)}</span><span className="mt-1 block font-mono text-2xs text-faint">{FONT_TOKENS[role]}</span></span><select className="field" aria-label={t('dialogs:templates.font', { name: t('dialogs:fontRoles.' + role) })} value={canonicalFontStack(draft.fonts[role])} disabled={saving} onChange={event => setDraft(current => ({ ...current, fonts: { ...current.fonts, [role]: event.target.value } }))}>{fontOptions([draft.fonts[role], ...availableFonts], role === 'editorSource' || role === 'mono').map(font => <option key={font.value} value={font.value}>{t('dialogs:fontOptions.' + fontFamily(font.value), { defaultValue: font.label })}</option>)}</select></label>)}</div>
@@ -213,7 +225,7 @@ export function EditorThemeDesigner({ source, themes, appearanceScheme, navigati
       </div>
       <DialogFooter className="pt-4">{error || errors.length ? <p role="alert" className="mb-3 text-xs text-danger">{error ? formatProductMessage(error, t) : errors.map(issue => formatProductMessage(issue, t)).join('; ')}</p> : null}<DialogActions><DialogButton disabled={saving} onClick={close}><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" disabled={saving || Boolean(errors.length) || (editing && !dirty)} onClick={() => void save().then(saved => { if (saved) onClose(); })}><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6" /></svg>{saving ? t('dialogs:ui.saving') : t('dialogs:ui.saveTheme')}</DialogButton></DialogActions></DialogFooter>
     </DialogFrame>
-    {colorPicker ? <EditorColorPicker label={colorPicker.label ?? t('dialogs:colorRoles.' + colorPicker.role)} token={colorPicker.token ?? `--color-${colorPicker.role}`} modeLabel={colorPicker.scheme === 'light' ? t('dialogs:ui.light') : t('dialogs:ui.dark')} value={draft.palette[colorPicker.key ?? draft.colors[colorPicker.scheme][colorPicker.role!]]} onClose={() => setColorPicker(null)} onSelect={hex => setDraft(current => ({ ...current, palette: { ...current.palette, [colorPicker.key ?? current.colors[colorPicker.scheme][colorPicker.role!]]: hex } }))} /> : null}
+    {colorPicker ? <EditorColorPicker label={colorPicker.label ?? t('dialogs:colorRoles.' + colorPicker.role)} token={colorPicker.token ?? `--color-${colorPicker.role}`} modeLabel={colorPicker.scheme === 'light' ? t('dialogs:ui.light') : t('dialogs:ui.dark')} value={draft.palette[colorPicker.surface ? editorSurfaceValue(draft, colorPicker.scheme, colorPicker.surface).colors[colorPicker.index ?? 0] : colorPicker.key ?? draft.colors[colorPicker.scheme][colorPicker.role!]]} onClose={() => setColorPicker(null)} onSelect={hex => setDraft(current => colorPicker.surface ? updateEditorSurface(current, colorPicker.scheme, colorPicker.surface, { color: hex, index: colorPicker.index }) : ({ ...current, palette: { ...current.palette, [colorPicker.key ?? current.colors[colorPicker.scheme][colorPicker.role!]]: hex } }))} /> : null}
     {departure ? <UnsavedChangesDialog entries={[{ label: draft.name || t('dialogs:ui.newEditorThemeAlternative'), detail: t('dialogs:ui.colorsAndFontsAreUnsaved') }]} description={t('dialogs:ui.thisNewThemeHasUnsavedChanges')} saveLabel={t('dialogs:ui.saveAndContinue')} saveDisabled={Boolean(errors.length)} onCancel={() => setDeparture(null)} onDiscard={departure} onSave={async () => { if (!await save()) return false; departure(); return true; }} /> : null}
   </>;
 }

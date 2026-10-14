@@ -7,6 +7,7 @@ import { useUITranslation } from '../global/UILocaleProvider';
 import { useRef, useState, type FormEvent } from 'react';
 import type { LibraryCreationResult } from '../../hooks/useEditorController';
 import { normalizeDataDirectoryName } from '../../lib/fileSystem';
+import { DEFAULT_PLATFORM_PRESET_ID, PUBLIC_PLATFORM_PRESETS, type PlatformPresetId } from '../../lib/article-format/library';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 
 function LibraryIcon({ cancel = false }: { cancel?: boolean }) {
@@ -15,9 +16,10 @@ function LibraryIcon({ cancel = false }: { cancel?: boolean }) {
   </svg>;
 }
 
-export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: string) => Promise<LibraryCreationResult>; onClose: () => void }) {
+export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: string, presetId: PlatformPresetId) => Promise<LibraryCreationResult>; onClose: () => void }) {
   const { t } = useUITranslation('dialogs');
   const [name, setName] = useState('');
+  const [presetId, setPresetId] = useState<PlatformPresetId>(DEFAULT_PLATFORM_PRESET_ID);
   const [creating, setCreating] = useState(false);
   const [feedback, setFeedback] = useState<{ label: string; error: boolean } | null>(null);
   const creatingRef = useRef(false);
@@ -34,7 +36,7 @@ export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: st
     setCreating(true);
     setFeedback(null);
     try {
-      const result = await onCreate(normalizedName);
+      const result = await onCreate(normalizedName, presetId);
       if (result.status === 'created') onClose();
       else setFeedback({ label: result.status === 'error' ? result.message : productText("uiFeedback.directoryCancelled"), error: result.status === 'error' });
     } catch (error) {
@@ -52,6 +54,13 @@ export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: st
           <input id="new-library-name" name="library-name" className="field" value={name} maxLength={80} onChange={event => { setName(event.target.value); setFeedback(null); }} placeholder={t('dialogs:ui.exampleMyManuscripts')} autoFocus autoComplete="off" spellCheck={false} required disabled={creating} aria-invalid={Boolean(nameIssue)} aria-describedby={nameIssue ? 'create-library-name-error' : 'create-library-name-help'} />
           <span id="create-library-name-help" className="text-xs text-faint">{t('dialogs:ui.usedAsTheNewFolderNameUpTo')}</span>
           {nameIssue ? <span id="create-library-name-error" className="text-xs text-danger" role="alert">{formatProductMessage(nameIssue, t)}</span> : null}
+        </label>
+        <label className="field-stack" htmlFor="new-library-preset">
+          <span className="field-label">{t('dialogs:ui.validationAndAlgorithmTemplate')}</span>
+          <select id="new-library-preset" name="library-preset" className="field" value={presetId} disabled={creating} aria-describedby="new-library-preset-help" onChange={event => { setPresetId(event.target.value as PlatformPresetId); setFeedback(null); }}>
+            {PUBLIC_PLATFORM_PRESETS.map(preset => <option key={preset.id} value={preset.id}>{t('dialogs:platformPresets.' + preset.id)}</option>)}
+          </select>
+          <span id="new-library-preset-help" className="text-xs text-faint">{t('dialogs:ui.newLibraryPresetHelp')}</span>
         </label>
         <div className="grid min-w-0 gap-3 rounded-lg border border-line bg-list/50 p-4" aria-label={t('dialogs:ui.libraryLocationPreview')}>
           <p className="text-xs text-muted">{t('dialogs:ui.creationLocation')}</p>

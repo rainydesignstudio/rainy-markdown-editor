@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceOffsetRect, revealSourceRect } from '../src/lib/sourceViewport.ts';
+import { sourceOffsetRect, createSourceRectReader, revealSourceRect } from '../src/lib/sourceViewport.ts';
 
 function layer(parts) {
   const nodes = parts.map(([text, line, padding = false]) => ({
@@ -32,4 +32,14 @@ test('reveal changes only the common viewport and preserves the scroll position 
   assert.equal(viewport.scrollTop, 483);
   revealSourceRect(viewport, { top: 150, bottom: 178, height: 28 });
   assert.equal(viewport.scrollTop, 539);
+});
+
+test('batched geometry reuses one text walk and preserves boundary/padding offsets', () => {
+  const source = layer([['甲', 0], ['\n', 0], ['\u200b', 1, true], ['\n', 1], ['乙😀', 2]]);
+  let walks = 0; const original = source.ownerDocument.createTreeWalker;
+  source.ownerDocument.createTreeWalker = (...args) => { walks++; return original(...args); };
+  const read = createSourceRectReader(source);
+  assert.equal(read(2).top, 28); assert.equal(read(3).top, 56);
+  assert.equal(read(5).left, 2); assert.equal(read(999).left, 3);
+  assert.equal(walks, 1);
 });

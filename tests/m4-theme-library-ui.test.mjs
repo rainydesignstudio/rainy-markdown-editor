@@ -25,7 +25,7 @@ function page(fileSystem = {}) {
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/article-format/preview')) return { articlePreviewStyle: value => value, previewSurfaceStyle: () => ({}) };
     if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input' };
-    if (id.endsWith('/articleExamples')) return { ARTICLE_EXAMPLE_IMAGE: '/article-sample.png' };
+    if (id.endsWith('/articleExamples')) return { ARTICLE_EXAMPLE_IMAGE: '/images/article-sample.png' };
       if (id.endsWith('/ThemeInspection')) return { useThemeInspection: () => ({ listRef: { current: null }, hovered: null, selected: null, rowProps: () => ({}), clear() {}, locate() {} }), ThemeInspectionPreview: 'inspection-preview', INSPECTION_ROW_CLASSES: '' };
     if (id.endsWith('/themeInspection')) return { uniqueBindings: items => items.filter((item, index) => items.findIndex(other => other.key === item.key) === index) };
     if (id.endsWith('/tailwind')) return {};

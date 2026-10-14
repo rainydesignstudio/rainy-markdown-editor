@@ -1,0 +1,9 @@
+{
+  "id": "horizontal-scroll",
+  "name": "三图横排",
+  "trigger": "//horizontal-scroll",
+  "description": "三张示例图片横向排列，使用时替换图片与图注；保留原触发词。",
+  "content": "<section class=\"my-6\">\n  <table class=\"w-full\"><tbody><tr>\n    <td class=\"w-1/3 p-1 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">▌示例图一</p></td>\n    <td class=\"w-1/3 p-1 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">示例图二</p></td>\n    <td class=\"w-1/3 p-1 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">示例图三</p></td>\n  </tr></tbody></table>\n</section>\n",
+  "icon": "image",
+  "categoryId": "default"
+}

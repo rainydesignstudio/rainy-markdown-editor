@@ -1,3 +1,30 @@
+import snippetsIndex from '../../resources/template/fresh-library/snippets/index.json' with { type: 'json' };
+import templatesIndex from '../../resources/template/fresh-library/templates/index.json' with { type: 'json' };
+import seedSnippet0 from '../../resources/template/fresh-library/snippets/default/callout.json' with { type: 'json' };
+import seedSnippet1 from '../../resources/template/fresh-library/snippets/default/captioned-image.json' with { type: 'json' };
+import seedSnippet2 from '../../resources/template/fresh-library/snippets/default/half-break.json' with { type: 'json' };
+import seedSnippet3 from '../../resources/template/fresh-library/snippets/default/horizontal-scroll.json' with { type: 'json' };
+import seedSnippet4 from '../../resources/template/fresh-library/snippets/default/image-pair.json' with { type: 'json' };
+import seedSnippet5 from '../../resources/template/fresh-library/snippets/default/rich-blockquote.json' with { type: 'json' };
+import seedSnippet6 from '../../resources/template/fresh-library/snippets/default/signature.json' with { type: 'json' };
+import seedSnippet7 from '../../resources/template/fresh-library/snippets/default/table-merged.json' with { type: 'json' };
+import seedSnippet8 from '../../resources/template/fresh-library/snippets/zixu/zixu-blockquote.json' with { type: 'json' };
+import seedSnippet9 from '../../resources/template/fresh-library/snippets/zixu/zixu-chapter.json' with { type: 'json' };
+import seedSnippet10 from '../../resources/template/fresh-library/snippets/zixu/zixu-entry.json' with { type: 'json' };
+import seedSnippet11 from '../../resources/template/fresh-library/snippets/zixu/zixu-index.json' with { type: 'json' };
+import seedSnippet12 from '../../resources/template/fresh-library/snippets/zixu/zixu-note.json' with { type: 'json' };
+import seedSnippet13 from '../../resources/template/fresh-library/snippets/zixu/zixu-opening.json' with { type: 'json' };
+import seedSnippet14 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-chapter.json' with { type: 'json' };
+import seedSnippet15 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-closing.json' with { type: 'json' };
+import seedSnippet16 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-opening-ii.json' with { type: 'json' };
+import seedSnippet17 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-opening.json' with { type: 'json' };
+import seedSnippet18 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-quote.json' with { type: 'json' };
+import seedSnippet19 from '../../resources/template/fresh-library/snippets/rainy-design/rainy-section.json' with { type: 'json' };
+import seedTemplate0 from '../../resources/template/fresh-library/templates/default/markdown-guide.md';
+import seedTemplate1 from '../../resources/template/fresh-library/templates/default/project-review.md';
+import seedTemplate2 from '../../resources/template/fresh-library/templates/default/tutorial.md';
+import seedTemplate3 from '../../resources/template/fresh-library/templates/theme-samples/rainy-design-sample-ii.md';
+import seedTemplate4 from '../../resources/template/fresh-library/templates/theme-samples/rainy-design-sample.md';
 import { ProductError, productCause, productDiagnosticReference, productErrorMessage, productJoin, productMessage, productReference, type ProductMessageInfo } from "./i18n/productMessages";
 import { parseArticle } from './frontMatter';
 import { articleFormatMessage, articleFormatMessageReference, type ArticleFormatIssue } from './articleFormat';
@@ -18,256 +45,22 @@ const SAFE_ID = /^[a-z0-9][a-z0-9-]{0,47}$/;
 export function isContentFileId(id: string): boolean {
   return SAFE_ID.test(id);
 }
-export const DEFAULT_TEMPLATE_CATEGORIES: SnippetCategory[] = [
-  {
-    "id": "default",
-    "name": "默认",
-    "description": "常用的文章起稿结构，可选择后补充正文。",
-    "order": 0,
-    "icon": "folder"
-  },
-  {
-    "id": "theme-samples",
-    "name": "主题样稿",
-    "description": "展示文章主题与配套片段的完整起稿示例。",
-    "order": 1,
-    "icon": "book"
-  }
-];
+export const DEFAULT_TEMPLATE_CATEGORIES: SnippetCategory[] = templatesIndex.categories as SnippetCategory[];
 
 const CURSOR_MARKER = '▌';
 const MAX_SNIPPET_LENGTH = 64_000;
 const MAX_TEMPLATE_LENGTH = 250_000;
 
-export const DEFAULT_SNIPPET_CATEGORIES: SnippetCategory[] = [
-  {
-    "id": "default",
-    "name": "默认",
-    "description": "基础片段与 Rainy Design 文章组合，可直接用于正文。",
-    "order": 0,
-    "icon": "document"
-  },
-  {
-    "id": "zixu",
-    "name": "紫序",
-    "description": "紫色标签与单线分隔的文章组合；优先用 Markdown，开场卡、编号章节和提示卡保留独立 HTML。",
-    "order": 1,
-    "icon": "quote"
-  },
-  {
-    "id": "rainy-design",
-    "name": "Rainy Design",
-    "description": "Rainy Design 微信公众号爱用的主题。",
-    "order": 2,
-    "icon": "sparkles"
-  }
-];
+export const DEFAULT_SNIPPET_CATEGORIES: SnippetCategory[] = snippetsIndex.categories as SnippetCategory[];
 
-export const DEFAULT_ARTICLE_SNIPPETS: ArticleSnippet[] = [
-  {
-    "id": "callout",
-    "name": "提示框",
-    "trigger": "//callout",
-    "description": "随文章主题着色的提示段落，包含正文与强调文字。",
-    "content": "<section class=\"block rounded-xl border border-article-line bg-article-tint p-4 mb-6\">\n  <p class=\"m-0\"><span>💡 </span><strong class=\"text-article-accent\">提示：</strong>▌这是一条提示信息。</p>\n</section>",
-    "icon": "sparkles",
-    "categoryId": "default"
-  },
-  {
-    "id": "captioned-image",
-    "name": "带图注图片",
-    "trigger": "//captioned-image",
-    "description": "示例图片与可见图注；使用时替换为文章图片和说明。",
-    "content": "<section>\n  <img class=\"h-auto max-w-full\" src=\"/article-sample.png\" />\n  <p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">图注信息▌</p>\n</section>\n",
-    "categoryId": "default"
-  },
-  {
-    "id": "half-break",
-    "name": "半行空白",
-    "trigger": "//half-break",
-    "description": "就折半行空白。当你需要不太大的行间距时，你会想念它的。",
-    "content": "<span class=\"block my-6\"></span>",
-    "categoryId": "default"
-  },
-  {
-    "id": "horizontal-scroll",
-    "name": "三图横排",
-    "trigger": "//horizontal-scroll",
-    "description": "三张示例图片横向排列，使用时替换图片与图注；保留原触发词。",
-    "content": "<section class=\"my-6\">\n  <table class=\"w-full\"><tbody><tr>\n    <td class=\"w-1/3 p-1 align-top border-transparent\"><img class=\"max-w-full\" src=\"/article-sample.png\" /><p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">▌示例图一</p></td>\n    <td class=\"w-1/3 p-1 align-top border-transparent\"><img class=\"max-w-full\" src=\"/article-sample.png\" /><p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">示例图二</p></td>\n    <td class=\"w-1/3 p-1 align-top border-transparent\"><img class=\"max-w-full\" src=\"/article-sample.png\" /><p class=\"mt-2 mb-0 text-center text-xs text-article-muted\">示例图三</p></td>\n  </tr></tbody></table>\n</section>\n",
-    "icon": "image",
-    "categoryId": "default"
-  },
-  {
-    "id": "image-pair",
-    "name": "并排图片",
-    "trigger": "//image-pair",
-    "description": "并排的示例图片；使用时替换为文章图片与图注。",
-    "content": "<table class=\"w-full\"><tbody><tr>\n  <td class=\"w-1/2 p-2 align-top border-transparent\"><img class=\"max-w-full\" src=\"/article-sample.png\" /><p class=\"mt-2 mb-0 text-center\">图一</p></td>\n  <td class=\"w-1/2 p-2 align-top border-transparent\"><img class=\"max-w-full\" src=\"/article-sample.png\" /><p class=\"mt-2 mb-0 text-center\">图二▌</p></td>\n</tr></tbody></table>\n",
-    "icon": "image",
-    "categoryId": "default"
-  },
-  {
-    "id": "rich-blockquote",
-    "name": "富引用",
-    "trigger": "//rich-blockquote",
-    "description": "分上下两层的引用栏，方便填写引用内容与作者。",
-    "content": "<blockquote>\n  <p class=\"font-bold text-xl\">我是主要内容<p>\n  <span class=\"text-article-muted\">- 我是说明文本 ▌</span>\n</blockquote>",
-    "categoryId": "default"
-  },
-  {
-    "id": "signature",
-    "name": "署名 / 结尾",
-    "trigger": "//signature",
-    "description": "文末收尾与作者署名；文字与分隔线使用文章主题的语义颜色。",
-    "content": "<section class=\"mt-10 pt-6 text-center\">\n  <p class=\"m-0 mb-6 border-b-2 text-article-line\"></p>\n  <p class=\"m-0 text-xl font-semibold text-article-accent\">感谢阅读</p>\n  <p class=\"mt-2 mb-6 text-sm text-article-muted\">[在这里写一句收尾的话]</p>\n  <p class=\"m-0 text-sm text-article-heading\"><strong class=\"font-semibold\">▌[作者 / 团队名称]</strong></p>\n  <p class=\"mt-1 mb-0 text-xs text-article-muted\">[作者介绍 / 联系方式]</p>\n</section>",
-    "icon": "bookmark",
-    "categoryId": "default"
-  },
-  {
-    "id": "table-merged",
-    "name": "简易表格",
-    "trigger": "//table-merged",
-    "description": "两列轻量表格，填写表头与内容；保留原触发词。",
-    "content": "<table>\n  <thead><tr><td class=\"p-2 font-bold\">条目</td><td class=\"p-2 font-bold\">内容</td></tr></thead>\n  <tbody>\n    <tr><td class=\"p-2\">左侧单元格内容▌</td><td class=\"p-2\">说明</td></tr>\n    <tr><td class=\"p-2\">后续条目</td><td class=\"p-2\">更多内容</td></tr>\n  </tbody>\n</table>\n",
-    "icon": "table",
-    "categoryId": "default"
-  },
-  {
-    "id": "zixu-blockquote",
-    "name": "紫序 · 引用",
-    "trigger": "//zixu-blockquote",
-    "description": "一组带作者的引用内容。",
-    "content": "<blockquote>\n  <p class=\"font-bold text-xl text-article-accent\">我是主要内容<p>\n  <span class=\"text-article-muted\">- 我是说明文本▌</span>\n</blockquote>",
-    "categoryId": "zixu"
-  },
-  {
-    "id": "zixu-chapter",
-    "name": "紫序 · 编号章节",
-    "trigger": "//zixu-chapter",
-    "description": "章节序号、英文栏目标签与标题，搭配分隔线组织阅读层级。",
-    "content": "<section class=\"mt-8 mb-6 border-b-2 border-article-line pb-6\">\n  <p class=\"my-0 font-bold tracking-[0.12em] text-article-accent border-none\"><span class=\"inline-block border-none text-[24px]/[1.3]\">01</span><span class=\"inline-block border-none text-[11px]/[1.7] pl-2.5 pb-1 align-middle\">PREMISE</span></p>\n  <h2 class=\"m-0 mt-0.5 pl-10 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">这里第一行标题<br />\n▌这里写第二行章节标题</h2>\n</section>",
-    "icon": "bookmark",
-    "categoryId": "zixu"
-  },
-  {
-    "id": "zixu-entry",
-    "name": "紫序 · 标签条目",
-    "trigger": "//zixu-entry",
-    "description": "三级标题、加粗正文与单条分隔线；搭配紫序主题复现标签条目。",
-    "content": "<h3 class=\"text-sm text-article-accent tracking-widest\"> 01 / KEY POINT </h3>\n\n**要点标题**　▌这里写说明或案例。\n\n<span class=\"block my-6\"></span>\n\n<hr />",
-    "icon": "tag",
-    "categoryId": "zixu"
-  },
-  {
-    "id": "zixu-index",
-    "name": "紫序 · 阅读目录",
-    "trigger": "//zixu-index",
-    "description": "三级标题、显式编号与分隔线；编号和标签需自行填写。",
-    "content": "### READING INDEX\n\n**章节目录**\n\n### 01\n\n**第一项标题▌**　这里写阅读说明。\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n\n### 02\n\n**第二项标题**　这里写阅读说明。\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n\n### 03\n\n**第三项标题**　这里写阅读说明。\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n",
-    "icon": "book",
-    "categoryId": "zixu"
-  },
-  {
-    "id": "zixu-note",
-    "name": "紫序 · 提示卡",
-    "trigger": "//zixu-note",
-    "description": "淡紫提示卡与底部强调线，适合补充上下文。",
-    "content": "<section class=\"my-6 border-b-2 border-article-accent bg-article-tint p-4\">\n  <p class=\"mt-0 mb-2 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">NOTE / CONTEXT</p>\n  <p class=\"m-0 text-[15px]/[1.85] text-article-ink\">▌这里写补充说明、提醒或背景信息。</p>\n</section>\n",
-    "categoryId": "zixu"
-  },
-  {
-    "id": "zixu-opening",
-    "name": "紫序 · 开场卡",
-    "trigger": "//zixu-opening",
-    "description": "淡紫开场卡：栏目标签、主副标题与导语。",
-    "content": "<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">CHANNEL / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 pb-4 border-b border-article-line text-[26px]/[1.5] font-bold text-article-heading\">▌文章标题<br />副标题<span class=\"text-article-accent\">重点词</span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">这里写导语：说明问题、阅读路径与文章价值。</p>\n</section>",
-    "icon": "document",
-    "categoryId": "zixu"
-  },
-  {
-    "id": "rainy-chapter",
-    "name": "Rainy Design · 编号章节",
-    "trigger": "//rainy-chapter",
-    "description": "较正后的编号章节，能实现确切的对齐效果。",
-    "content": "<section class=\"mt-8 mb-6 border-b border-article-line pb-4.5\">\n  <span class=\"my-0 text-[24px]/[1.3] font-bold tracking-[0.12em] text-article-accent\">01</span>\n  <p class=\"my-0 text-[11px]/[1.7] font-bold tracking-[0.12em] text-article-accent indent-6\">PREMISE</p>\n  <h2 class=\"m-0 pl-11 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">▌这里写章节标题</h2>\n</section>\n",
-    "categoryId": "rainy-design"
-  },
-  {
-    "id": "rainy-closing",
-    "name": "Rainy Design · 收束",
-    "trigger": "//rainy-closing",
-    "description": "细线收束与简短署名，适合作为文章末尾。",
-    "content": "<section class=\"mt-10 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-sm text-article-ink\">▌对，文章应该由赛博员工写，你负责审和修修改改。</p>\n  <p class=\"m-0 text-xs font-semibold tracking-widest text-article-muted\">RAINY DESIGN · NOTES</p>\n</section>",
-    "icon": "bookmark",
-    "categoryId": "rainy-design"
-  },
-  {
-    "id": "rainy-opening-ii",
-    "name": "Rainy Design · 开场 · 贰",
-    "trigger": "//rainy-opening-ii",
-    "description": "克制的英文眉题、标题与导语，使用 Rainy Design 的文字与分隔色。",
-    "content": "<section class=\"mt-0 mb-8 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest\">RAINY DESIGN / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 p-0 text-3xl font-bold\">▌我不装了我真摊牌了</h1>\n  <p class=\"mt-4 mb-0 text-base\">其实写文章都不该你自己写的。你可以试试好用的 ghost-writter，如果不太懂的话有 eli5 和 teach skill 可以用。</p>\n</section>\n",
-    "categoryId": "rainy-design"
-  },
-  {
-    "id": "rainy-opening",
-    "name": "Rainy Design · 开场",
-    "trigger": "//rainy-opening",
-    "description": "我喜欢的开场白。",
-    "content": "<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5 rounded-xl\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">EYEBROW / TEXT</p>\n  <h1 class=\"m-0 border-b border-article-line pb-4 text-[26px]/[1.5] font-bold text-article-accent\">这是第一行<br />用 break 元素换行<br /><span class=\"text-article-accent\">来避免<em class=\"bg-article-accent text-white/67 pr-1\">大空隙</em>的换行</span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">如果你搞不明白 Tailwind CSS 、甚至是 HTML 也不想学的话，为啥不试试神奇的对话式生成呢？LLM 在向你招手。<br />直接让他阅读本项目下的 README，然后告诉它：<br />“我要做的主题是这样式儿的……▌”</p>\n</section>",
-    "categoryId": "rainy-design"
-  },
-  {
-    "id": "rainy-quote",
-    "name": "Rainy Design · 摘记",
-    "trigger": "//rainy-quote",
-    "description": "浅 Slate 底色的摘记，强调一句值得停留的话。",
-    "content": "<blockquote class=\"my-7 border-b-6 border-l-4 bg-article-line/33 border-article-ink/33 p-4\">\n  <p class=\"m-0 font-medium text-article-heading\">▌忘说了，样式你也别亲自设计，让 Agent 代行。</p>\n</blockquote>",
-    "icon": "quote",
-    "categoryId": "rainy-design"
-  },
-  {
-    "id": "rainy-section",
-    "name": "Rainy Design · 小节",
-    "trigger": "//rainy-section",
-    "description": "小节标题与引言，以细线和文字层级组织内容。",
-    "content": "<section class=\"my-8\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-muted\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">▌你说：我就喜欢 “古法写作”</h2>\n  <p class=\"m-0 text-base text-article-ink\">那还说啥呢？Markdown 语法和 HTML 你总得懂一个。</p>\n</section>\n",
-    "categoryId": "rainy-design"
-  }
-].map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+export const DEFAULT_ARTICLE_SNIPPETS: ArticleSnippet[] = ([seedSnippet0, seedSnippet1, seedSnippet2, seedSnippet3, seedSnippet4, seedSnippet5, seedSnippet6, seedSnippet7, seedSnippet8, seedSnippet9, seedSnippet10, seedSnippet11, seedSnippet12, seedSnippet13, seedSnippet14, seedSnippet15, seedSnippet16, seedSnippet17, seedSnippet18, seedSnippet19] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
 
 export const DEFAULT_ARTICLE_TEMPLATES: ArticleTemplate[] = [
-  {
-    "id": "markdown-guide",
-    "categoryId": "default",
-    "name": "Markdown 常用格式",
-    "source": "---\ntitle: \"Markdown 常用格式\"\ndescription: \"Markdown 常用格式类型汇总。\"\nauthor: \"\"\ncategories: []\ncreatedAt: \"2026-09-27T10:13:02.381Z\"\nupdatedAt: \"2026-09-27T10:13:02.381Z\"\ntheme:\n  id: \"zixu\"\n  version: \"1.0.0\"\n---\n# 大标题\n## 副标题\n### 三级标题\n#### 四级标题\n##### 标题\n###### 标题\n\n---\n\n**粗体文字**\n\n*斜体文字*\n\n~~删除线~~\n\n`行内代码`\n\n[链接文字](https://)\n\n- 列表项\n- 列表项\n\n1. 有序列表\n2. 有序列表\n3. 有序列表\n\n- [x] 待办事项\n- [ ] 待办项\n\n| 表头 1 | 表头 2 | 表头 3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n\n> 引用内容\n\n```text\nconsole.log(\"Hello world!\");\n```\n//"
-  },
-  {
-    "id": "project-review",
-    "categoryId": "default",
-    "name": "项目复盘标题",
-    "source": "---\ntitle: \"项目复盘标题\"\ndescription: \"\"\nauthor: \"\"\ncategories: []\ncreatedAt: \"2026-09-23T07:33:08.343Z\"\nupdatedAt: \"2026-09-23T07:33:08.343Z\"\ntheme:\n  id: \"basic\"\n  version: \"1.0.0\"\n---\n\n\n# 项目复盘标题\n\n## 背景与目标\n\n请写明项目起因与预期目标。\n\n## 关键决策\n\n## 执行过程\n\n## 结果与证据\n\n## 遗留问题\n\n## 下一步\n"
-  },
-  {
-    "id": "tutorial",
-    "categoryId": "default",
-    "name": "技术教程标题",
-    "source": "---\ntitle: \"技术教程标题\"\ndescription: \"\"\nauthor: \"\"\ncategories: []\ncreatedAt: \"2026-09-23T07:33:08.343Z\"\nupdatedAt: \"2026-09-23T07:33:08.343Z\"\ntheme:\n  id: \"basic\"\n  version: \"1.0.0\"\n---\n\n\n# 技术教程标题\n\n## 要解决的问题\n\n请说明遇到的问题与目标结果。\n\n## 准备与环境\n\n## 操作步骤\n\n1. \n2. \n3. \n\n## 验证结果\n\n## 注意事项\n"
-  },
-  {
-    "id": "rainy-design-sample-ii",
-    "categoryId": "theme-samples",
-    "name": "雨停之后，窗还亮着",
-    "source": "---\ntitle: \"雨停之后，窗还亮着\"\ndescription: \"Rainy Design 主题与四个配套片段的散文样稿。\"\nauthor: \"\"\ncategories: []\ncreatedAt: \"2026-09-29T00:00:00.000Z\"\nupdatedAt: \"2026-09-29T00:00:00.000Z\"\ntheme:\n  id: \"rainy\"\n  version: \"1.0.2\"\n---\n<section class=\"mt-0 mb-8 border-b border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-muted\">RAINY DESIGN / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 p-0 text-3xl font-bold text-article-heading\">雨停之后，窗还亮着</h1>\n  <p class=\"mt-4 mb-0 text-base text-article-ink\">一篇关于回家、雨声与慢下来的短文。</p>\n</section>\n\n傍晚的雨落得很轻。走过街角时，我看见路边的水把招牌映成两行：一行留在墙上，一行随着脚步晃动。白天赶着做完的事，这时才有了可以回想的空隙。\n\n<section class=\"my-8\">\n  <p class=\"mt-0 mb-2 text-xs font-semibold tracking-widest text-article-muted\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">街角的停顿</h2>\n  <p class=\"m-0 text-base text-article-ink\">便利店门前有人收起伞，先抖掉伞沿的水，再推门进去。我也站了一会儿，听车轮从湿路面缓缓驶过。</p>\n</section>\n\n过去我总觉得停下是耽误。后来才发现，许多细节只有在不赶路的时候才会出现：玻璃上的水痕、被雨洗亮的树叶，还有一扇还亮着灯的窗。\n\n<blockquote class=\"my-7 border-b-2 border-article-line bg-article-tint px-6 py-5\">\n  <p class=\"m-0 text-lg font-medium text-article-heading\">城市没有变慢。只是我终于留出时间，看见它原来的速度。</p>\n</blockquote>\n\n<section class=\"my-8\">\n  <p class=\"mt-0 mb-2 text-xs font-semibold tracking-widest text-article-muted\">02 / RETURN</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">把灯留给自己</h2>\n  <p class=\"m-0 text-base text-article-ink\">回到家，我把伞放在门边，给桌上的纸挪出一小块地方。窗外的雨已经停了，屋里仍有适合写字的声音。</p>\n</section>\n\n<section class=\"mt-10 border-b border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-sm text-article-ink\">愿你今晚也能留住一段不必着急的时间。</p>\n  <p class=\"m-0 text-xs font-semibold tracking-widest text-article-muted\">RAINY DESIGN · NOTES</p>\n</section>\n"
-  },
-  {
-    "id": "rainy-design-sample",
-    "categoryId": "theme-samples",
-    "name": "Untitled ",
-    "source": "---\ntitle: \"Untitled \"\ndescription: \"我的偶像除了 F91 和色总以外，还有人称特师的大咕咕咕鸡。可惜了初代网红焦双喜，生不逢时了解下。\"\nauthor: \"Rainy\"\ncategories:\n  - Unsorted\ncreatedAt: \"2026-09-29T00:00:00.000Z\"\nupdatedAt: \"2026-09-29T00:00:00.000Z\"\ntheme:\n  id: \"zixu\"\n  version: \"1.0.2\"\n---\n<section class=\"mt-0 mb-7 bg-article-tint px-6 py-5 rounded-xl\">\n  <p class=\"mt-0 mb-3 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">DEEP / DARK / FANTACY</p>\n  <h1 class=\"m-0 border-b border-article-line pb-4 text-[26px]/[1.5] font-bold text-article-accent\">算了不装了<br />塞点非商业私货<br /><span class=\"text-article-accent\">来体现作者比较<em class=\"bg-article-accent text-white/67 pr-1\">通人性</em></span></h1>\n  <p class=\"mt-4 mb-0 text-base/[1.9] text-article-ink\">你不觉得这很神圣吗，还是你偏爱 AI 味拉满？你看下隔壁另一篇 ChatGPT 长公主写的稿子，你懂的。</p>\n</section>\n\n你为啥直接写提示词生文呀，有温度的散文不是这样的呀！你应该多让我用 _find-skills_，然后命令我安装加载 _ghost-writer_ 之类的，偶尔让我做做会话 AB Test，然后确保让我测试用的会话没有元提示词和记忆库之类的上下文污染，最后在一番 _humanizer_ 洗礼之后输出样稿！我接受你的裁定，然后我给你输出我的完整稿件！你怎么直接上来就让我写文章？**_Harness Engineering_ 根本不是这样的，我不接受！**\n\n<section class=\"mt-8 mb-6 border-b-2 border-article-line pb-6\">\n  <p class=\"my-0 font-bold tracking-[0.12em] text-article-accent border-none\"><span class=\"inline-block border-none text-[24px]/[1.3]\">01</span><span class=\"inline-block border-none text-[11px]/[1.7] pl-2.5 pb-0.5 align-middle\">GACHIMUCHI</span></p>\n  <h2 class=\"m-0 mt-1 pl-10 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">用量耗尽的日子<br />\n满地捡 Token 吸</h2>\n</section>\n\n- 你……你在干什么，快起来、快起来啊！\n  - 我活不了了。我活不了了！（打滚）Astra，Astra...就一口，一口就够！（猛嘬一大口 Qwen3.8-27b-Q6_K_XL-Unslot, 16fp kv cache, Pi Harness / DSH）不对，这个不行，这个差远了！我的重置卡呢，重置卡呢？！我刚那么满的 Pro 5x 用量呢？？！！没了！！全没了！！谁来救救我！！！\n- 啧啧，又一个被 OpenAI 嚯嚯了的孩子。愿中转接纳你，愿天堂没有用量焦虑。\n\n<section class=\"my-6 border-b-2 border-article-accent bg-article-tint p-4 rounded-lg\">\n  <p class=\"mt-0 mb-2 text-[11px]/[1.7] font-bold tracking-[0.16em] text-article-accent\">NOTE / CONTEXT</p>\n  <p class=\"m-0 text-[15px]/[1.85] text-article-ink\">你不会真跑本地大模型了吧？悄悄说一句，fp16 在 400GB/S 的统一混合内存里头也就平均跑个 17 tps。是的，我是说，这又是何苦呢——你消耗的电费和你的 Apple Silicon 的寿命折损，都够你玩很久小鲸娘 4.1 F了。那位虽然智商不是顶尖的，但是真的快啊，240起步的tps了解下?</p>\n</section>\n\n<h3 class=\"text-sm text-article-accent tracking-widest\"> 01 / KEY POINT </h3>\n\n**噢漏，** 到这里还有人看我碎碎念？那好吧，我把我讲课用的教案拿点出来。这一口下去会很疯狂。\n\n<span class=\"block my-6\"></span>\n\n<hr />\n\n<section class=\"mt-8 mb-6 border-b-2 border-article-line pb-6\">\n  <p class=\"my-0 font-bold tracking-[0.12em] text-article-accent border-none\"><span class=\"inline-block border-none text-[24px]/[1.3]\">02</span><span class=\"inline-block border-none text-[11px]/[1.7] pl-2.5 pb-0.5 align-middle\">THANK YOU, SIR</span></p>\n  <h2 class=\"m-0 mt-1 pl-11 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">挥斥方裘一令间</h2>\n</section>\n\n**TL;DR**\n\n<section class=\"rounded-xl border border-solid border-article-line p-4 mb-6\">\n  <p class=\"m-0\"><span>💡 </span><strong class=\"text-article-accent\">提示：</strong>把自己想象成将军，如何去指挥自己的士兵；赛博疆土任你驰骋。</p>\n</section>\n\n赛博将军你当过吗？\n\n说实话，我开始怀念起自己在公司带团队孵化项目的日子了。但那不是当“将军”，更没有满满的自豪感，就是你作为一个小 Leader，十数人的小团队由你指挥，你就会变得很累，思维很碎，尤其是要照顾每个独特的灵魂的时候。\n\n每周向上报告，每天开会汇报。手捧 iPad 把 Scrum 文档翻来覆去读了百八十遍，才从字眼里看出点端倪：满屏的“敏捷开发、Sprint 驱动”，背后满满的“目标优先、里程至上”。\n\n现在好了，面对一群不会主动开口，等着我发号施令的赛博员工，少了人情味、多了点落寞，但事儿却几下干成了——发很少的工资干巨量的活，ROI 起飞。这不正是 BOSS 们梦寐以求的吗？\n\n`找图、改名、填表、对尺寸、做翻译、查漏项` 等等，想到都是文职小男生在做杂活。要再晚两年他肯定会被优化，然后对话记录和工作方式会被蒸馏成 `同事.skill` ，被他那台工位的电脑静默加载。没有迟到早退，因为 7x24 无需断电；加点 token 费用，再算上设备损耗费和电费，估计够发 0.333 个小男生的工资了；ChatGPT credits 哪有五险一金贵，你说对不？\n\n---\n好值啊。我心想。\n\n前前前 BOSS 会不会也这么想啊，然后大手一挥，咔，把大动脉裁了？\n\n可估计这辈子也没人给他科普什么是 `同事.skill` ，这下坏事了。\n\n停止做梦。\n\n---\n哦对……`找图、改名、填表、对尺寸、做翻译、查漏项`。我现在能调度的，只有赛博员工们了；不用给它们开会，但是要用直截了当的命令语句让 Agent 收到了就充分理解，然后立马执行：\n```\n访问 `xxxx/.csv` 表格，这里头有几百个包含缩略图的产品数据行，对应 `xxxx/` 目录下的几百张产品图片。\n\n你需按顺序完成以下任务：\n\n1. 匹配和表格中每一行产品中缩略图一样的产品图片，将产品图片命名为匹配缩略图所在行的sku；\n2. 如有疑问或识别不清的，其产品图片无需重命名，在表格中将该行背景色标黄方便区分，然后将未重命名的产品图片一并移入 `xxxx/not_renamed/` 目录；\n3. 已命名好的产品图片，需获取其尺寸，在表格中填写新的“尺寸”列并填写；\n4. 接着根据对应表格行中的分类在 `xxxx/` 目录下新建不同类型的目录，然后将图片分类到不同的目录下；\n5. 然后，将 csv 中的第一个 sheet 复制一份，命名为中文，翻译里头的所有文本，同样存疑的单元格请用黄色背景标出；\n6. 最后检查表格中所有遗漏的部分。将他们单独排列出来做成一个新 sheet，然后保存表格。\n```\n然后，泡杯茶或者咖啡，又或者去干点别的什么事儿。我靠在水吧前，茶汤静静摇曳、倒映着，茶叶缓慢且慵懒地舒展开来，那或许是被他磨蹭掉的一个下午；我在他那个年纪的时候，嫌弃公司里的老程序员打字慢。\n\n洗茶、烫杯、冲泡、抿两口。\n\n人的精力总是有限的，我想像他学习，却发现我做不到，即便我不是项目的 Owner；工作狂是这样的，其区别只在于给谁干。\n\n我慢慢踱回岗位。\n\n我望向电脑屏幕，那里没有什么工作狂、不热爱也不讨厌工作，也不隶属于权利或义务。对话和结果报告就呈在那里；Codex 回应着——应是回应了，与缓存一起沉入过去时了，不悲不喜、精细，却了无生气。\n\n**它并不懂我，但是它真的管用啊；它听指挥，能打仗啊！**\n\n那天我一宿没睡，端起 GPT-5.6-Sol Extra-High 一通猛造，减少构思、全是需求，连续迭代了两个版本；标注版本号 v0.2，告诉它这才是起点，再咔咔一顿命令，连续两大段内容加进 Queue，马上从 0.2.1 到 0.2.2 再到 0.3.0，连续迭代，每次都只有一串指令。\n然后我看着早晨九点于床边窗外河面驶过的船舶，全身往右撇去、抱住被子倒头就睡。\n\n就在前十分钟，我要它立马能用，现在就做，今天就要！一个全新的、完整的、待市场考验的产品，本周完成测试，赶紧上线。\n\n<section class=\"mt-10 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-sm text-article-ink\">▌<del>嘎</del> 戛然而止了解一下</p>\n  <p class=\"m-0 text-xs font-semibold tracking-widest text-article-muted\">RAINY DESIGN STUDIO</p>\n</section>"
-  }
+  { id: "markdown-guide", categoryId: "default", name: parseArticle(seedTemplate0).metadata.title, source: seedTemplate0 },
+  { id: "project-review", categoryId: "default", name: parseArticle(seedTemplate1).metadata.title, source: seedTemplate1 },
+  { id: "tutorial", categoryId: "default", name: parseArticle(seedTemplate2).metadata.title, source: seedTemplate2 },
+  { id: "rainy-design-sample-ii", categoryId: "theme-samples", name: parseArticle(seedTemplate3).metadata.title, source: seedTemplate3 },
+  { id: "rainy-design-sample", categoryId: "theme-samples", name: parseArticle(seedTemplate4).metadata.title, source: seedTemplate4 }
 ];
 
 function isNotFound(error: unknown): boolean {

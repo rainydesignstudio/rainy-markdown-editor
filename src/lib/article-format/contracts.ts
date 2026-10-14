@@ -53,10 +53,24 @@ const highlightStyleKey: Guard = (value, path) => {
   text(value, path);
   if (String(value).length > 512 || /[{};@\u0000-\u001f]/.test(String(value)) || ['__proto__', 'constructor', 'prototype'].includes(String(value))) fail(path, productText("contracts.codeHighlightingStyleKeyIsInvalid"));
 };
-export const darkOptions = shape({}, {
-  mode: choice('dark'), defaultDarkTextColor: cssValue, needJudgeFirstPage: bool, noEmit: bool,
-  whitelist: shape({}, { attribute: array(attribute), tagName: strings }),
-});
+const algorithmOptions: Guard = (value, path) => {
+  record(value, path);
+  const check = (item: unknown, depth: number): void => {
+    if (depth > 16) fail(path, productText('algorithms.invalidOptions'));
+    if (item === null || typeof item === 'string' || typeof item === 'boolean' || typeof item === 'number' && Number.isFinite(item)) return;
+    if (Array.isArray(item)) { item.forEach(value => check(value, depth + 1)); return; }
+    if (item && typeof item === 'object') {
+      for (const [key, value] of Object.entries(item)) {
+        if (['__proto__', 'constructor', 'prototype'].includes(key)) fail(path, productText('algorithms.invalidOptions'));
+        check(value, depth + 1);
+      }
+      return;
+    }
+    fail(path, productText('algorithms.invalidOptions'));
+  };
+  check(value, 0);
+  if (JSON.stringify(value).length > 65536) fail(path, productText('algorithms.invalidOptions'));
+};
 
 export const VALIDATOR_CAPABILITIES: Record<string, { stages: string[]; parameters: Guard }> = {
   'style.present': { stages: ['authoring', 'rendered'], parameters: shape({ property }, { selector }) },
@@ -84,7 +98,7 @@ export const FORMATTER_CAPABILITIES: Record<string, { phase: string; multiple?: 
   'markdown.code-layout': { phase: 'markdown', parameters: shape({ wrapperClasses: strings, preTag: choice('div', 'pre'), contentClasses: strings, copyClasses: strings, copyHtml: boundedString(65536), copyLabel: text }) },
   'markdown.code-whitespace': { phase: 'markdown', parameters: shape({ tabSize: number(1, 16, true) }) },
   'preview.surface': { phase: 'preview', parameters: shape({ lightBackground: cssValue, darkBackground: cssValue, fontFamily: cssValue, color: cssValue, stripThemeBackground: bool }) },
-  'preview.dark-mode': { phase: 'preview', parameters: shape({ transform: choice('preserve', 'mp-darkmode'), options: darkOptions }) },
+  'preview.dark-mode': { phase: 'preview', parameters: shape({ transform: (value, path) => { text(value, path); if (!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(String(value))) fail(path, productText('algorithms.invalidComponentId')); }, options: algorithmOptions }) },
   'css.drop-properties': { phase: 'css', multiple: true, parameters: shape({ properties: array(property) }) },
   'css.utility-aliases': { phase: 'css', parameters: shape({ aliases: mapping(property, property) }) },
   'css.stylesheets': { phase: 'css', parameters: shape({ entry: libraryPath, publicRoot: libraryPath }, { allowUnknownClasses: bool }) },

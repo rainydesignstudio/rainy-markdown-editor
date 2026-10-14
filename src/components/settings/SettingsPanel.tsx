@@ -3,6 +3,7 @@
 import { formatProductMessage, productText } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
+import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 
 import { PageHeading } from '../global/PageHeading';
 
@@ -182,6 +183,9 @@ export function SettingsPanel({
   registerNavigationGuard,
 }: Props) {
   const { t } = useUITranslation('settings');
+  const format = useFormatSnapshot();
+  const transform = format.bundle.formatter.preview.dark.transform;
+  const algorithm = format.algorithms.manifest.components.find(component => component.id === transform);
   const [tab, setTab] = useState<SettingsTab>('library');
   const [directoryActionRequested, setDirectoryActionRequested] = useState(false);
   const [draft, setDraft] = useState(settings);
@@ -365,9 +369,22 @@ export function SettingsPanel({
             {!fileSystemReady ? <p className="text-xs text-warning-strong" role="status">{t('settings:ui.thisBrowserDoesNotSupportLocalDirectoryAccess')}</p> : null}
             {directoryBookmarkIssue ? <p className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="alert">{formatProductMessage(directoryBookmarkIssue, t)}</p> : null}
             {workspaceIssue ? <p className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="alert">{formatProductMessage(workspaceIssue, t)} {t('settings:ui.projectOrganizationAndAppearanceAreReadOnlyTo')}</p> : null}
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               <div className="flex items-start gap-3"><span className="mt-0.5 text-faint"><SettingsIcon name="document" /></span><div><h4 className="text-sm font-medium text-primary">{t('settings:ui.manuscriptsAndAssets')}</h4><p className="mt-2 text-xs text-muted">{t('settings:ui.bodyTextImagesAndArticleThemeSnapshotsAre')}</p></div></div>
               <div className="flex items-start gap-3"><span className="mt-0.5 text-faint"><SettingsIcon name="theme" /></span><div><h4 className="text-sm font-medium text-primary">{t('settings:ui.templatesAndPreferences')}</h4><p className="mt-2 text-xs text-muted">{t('settings:ui.snippetsStarterTemplatesProjectsAndEditorAppearanceAre')}</p></div></div>
+              <div className="flex min-w-0 items-start gap-3" aria-label={t('settings:ui.validationAndAlgorithms')}>
+                <span className="mt-0.5 text-faint"><SettingsIcon name="check" /></span>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-medium text-primary">{t('settings:ui.validationAndAlgorithms')}</h4>
+                  {!root ? <p className="mt-2 text-xs text-muted">{t('settings:ui.notConnected')}</p>
+                    : format.loading ? <p className="mt-2 text-xs text-muted" role="status">{t('settings:ui.loadingFormatConfiguration')}</p>
+                    : format.error ? <p className="mt-2 break-words text-xs text-danger" role="alert">{t('settings:ui.formatUnavailable')} · {formatProductMessage(format.error, t)}</p>
+                    : <dl className="mt-2 grid gap-1 text-xs text-muted">
+                      <div><dt className="inline">{t('settings:ui.validationPolicy')} </dt><dd className="inline break-words">{format.bundle.support.meta.name}{format.bundle.validator.meta.enabled === false ? t('dialogs:ui.platformValidationDisabled') : ''}{t(format.source === 'built-in' ? 'settings:ui.builtInPolicyFallback' : format.officialDefault ? 'dialogs:ui.officialDefaults' : 'dialogs:ui.customLibraryConfiguration')}</dd></div>
+                      <div><dt className="inline">{t('settings:ui.algorithm')} </dt><dd className="inline break-words">{transform === 'preserve' ? t('settings:ui.noColorConversion') : <>{algorithm ? `${algorithm.id} · v${algorithm.version}` : transform} · {t('settings:algorithmSources.' + format.algorithmSource)}</>}</dd></div>
+                    </dl>}
+                </div>
+              </div>
             </div>
             <div className="grid gap-2 border-t border-line pt-5 text-xs text-muted"><p className="flex items-start gap-2"><SettingsIcon name="history" />{root ? t('settings:ui.thisDirectoryIsRememberedContinueAfterRefreshingWhile') : rememberedDirectoryName ? t('settings:ui.thePreviousDirectoryIsRememberedAuthorizeItTo') : t('settings:ui.theAppRemembersYourSelectionAndReopensIt')}</p><p className="text-faint">{t('settings:ui.changingDirectoriesOpensAnotherLibraryAndRetainsFiles')}</p></div>
           </div>

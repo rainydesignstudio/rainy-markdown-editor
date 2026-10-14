@@ -21,7 +21,7 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/d4fdc16f-8245-4626-beae-32bc3cb9d0cc" alt="Rainy 文稿台 / Rainy Manuscript Workspace" width="960" /></p>
 
-`v0.2.2` · 开发中 / In development
+`v0.2.2.1` · 开发中 / In development
 
 ## ✨ 功能与特性 / Features
 
@@ -58,6 +58,9 @@
 截图可点击查看原图。 / Click a screenshot to view the original.
 
 ## 📚 文档 / Documentation
+
+预览标题栏提供滚动对齐、手动保存报告和仅保存刷新开关，详见[中文说明](docs/locale/zh-CN/README.md#doc-preview-controls)。<br />
+The preview header offers scroll alignment, manual-save reports and save-only refresh. See the [English guide](docs/locale/en-US/README.md#doc-preview-controls).
 
 | 指南 / Guide | 简体中文 | English |
 |---|---|---|

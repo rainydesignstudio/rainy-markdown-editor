@@ -65,7 +65,7 @@ export function ContentRenderPreview({ source, theme, blocked = false, media = n
     {dark && darkFailed && !blocked ? <p className="shrink-0 border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t("messages:uiFeedback.darkFailed")}</p> : null}
     <div className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
       <div ref={hostRef} hidden={dark && !native || blocked} className="min-h-full min-w-0" style={previewSurfaceStyle()} aria-busy={pending} />
-      {blocked ? <p className="p-4 text-sm text-muted">{t("messages:uiFeedback.metadataBlocksPreview")}</p> : target ? createPortal(<>{!native ? <style>{css ? articlePreviewStyle(css) : ''}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }} media={media}><MarkdownPreview source={body} media={media} placeholderRelativeImages={!media} snapshot={formatSnapshot} /></ArticleDocument></>, target) : null}
+      {blocked ? <p className="p-4 text-sm text-muted">{t("messages:uiFeedback.metadataBlocksPreview")}</p> : target ? createPortal(<>{!native ? <style>{css ? articlePreviewStyle(css) : ''}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }} media={media}><MarkdownPreview source={body} media={media} snapshot={formatSnapshot} /></ArticleDocument></>, target) : null}
       {dark && !native && !blocked ? <iframe ref={frameRef} className="block h-full min-w-0 w-full border-0" title={t("messages:uiFeedback.darkPreview")} sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} /> : null}
     </div>
   </section>;

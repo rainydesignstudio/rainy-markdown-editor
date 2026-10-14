@@ -46,7 +46,7 @@ export function HistorySnapshotPreview({ snapshot, root, article, articleTitle }
   const media: ArticleMediaContext = { root, article, articleTitle, sessionKey: 'history-' + snapshot.id,
     isCurrent: () => identity.current.id === snapshot.id && identity.current.root === root && identity.current.articleId === article.id };
   return <div className="history-render-scroll" aria-label={t('dialogs:history.previewLabel')}>
-    {!snapshot.renderRecord && !issue ? <p className="content-library-note" data-tone="warning">{t('dialogs:history.legacyEnvironment')}</p> : null}
+    {(!snapshot.renderRecord || format.algorithmSource === 'legacy' && format.bundle.formatter.preview.dark.transform !== 'preserve') && !issue ? <p className="content-library-note" data-tone="warning">{t(!snapshot.renderRecord ? 'dialogs:history.legacyEnvironment' : 'messages:algorithms.legacyHistory')}</p> : null}
     {issue ? <p className="content-library-note" data-tone="error" role="alert">{t('dialogs:history.restoreIssue', { issue })}</p> : null}
     {!rendition && !issue ? <p className="status-copy" role="status">{t('dialogs:history.loading')}</p> : null}
     <div ref={hostRef} className="history-render-host" aria-busy={!rendition && !issue} />

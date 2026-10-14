@@ -60,6 +60,10 @@ function inlineScriptHashes(filePath) {
 }
 
 function contentSecurityPolicy(filePath) {
+  if (path.basename(filePath) === 'article-algorithm-sandbox.html') return [
+    "default-src 'none'", "script-src 'self' blob:", "style-src 'unsafe-inline'", "img-src data: blob:", "font-src data: blob:",
+    "connect-src 'none'", "worker-src 'none'", "frame-src 'none'", "object-src 'none'", "base-uri 'none'", "form-action 'none'", "frame-ancestors 'self'", "sandbox allow-scripts",
+  ].join('; ');
   const scriptHashes = inlineScriptHashes(filePath);
   const scriptSource = ["'self'", ...scriptHashes].join(' ');
   return [

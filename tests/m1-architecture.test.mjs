@@ -53,9 +53,9 @@ test('M1 keeps the static, local-only application boundary', async () => {
   assert.match(controller, /loadLastDirectoryHandle\(\)/);
   assert.match(controller, /queryDirectoryReadWritePermission\(handle\)/);
   assert.match(topbar, /aria-label=\{t\('editor:toolbar.createTemplate'\)\}/);
-  assert.equal(JSON.parse(await read('locale/zh-CN/editor.json')).toolbar.createTemplate, '从当前文章创建起稿模板');
+  assert.equal(JSON.parse(await read('resources/locale/zh-CN/editor.json')).toolbar.createTemplate, '从当前文章创建起稿模板');
   assert.match(topbar, /aria-label=\{t\('editor:toolbar.export'\)\}/);
-  assert.equal(JSON.parse(await read('locale/zh-CN/editor.json')).toolbar.export, '导出文章');
+  assert.equal(JSON.parse(await read('resources/locale/zh-CN/editor.json')).toolbar.export, '导出文章');
   assert.match(controller, /beforeunload/);
   assert.match(editorPage, /<EditorWorkspace/);
   assert.match(articlesPage, /collection === 'archived'/);
@@ -80,7 +80,7 @@ test('M1 keeps the static, local-only application boundary', async () => {
   assert.match(startScript, /contentSecurityPolicy\(filePath\)/);
   assert.match(startScript, /\.txt': 'text\/x-component; charset=utf-8'/);
   assert.match(fileSystem, /productText\("fileSystem\.frontMatterValidationDidNotPassSourceWasSavedButTheIndex"\)/);
-  assert.match(JSON.parse(await read('locale/zh-CN/messages.json')).fileSystem.frontMatterValidationDidNotPassSourceWasSavedButTheIndex, /Front Matter 未通过校验/);
+  assert.match(JSON.parse(await read('resources/locale/zh-CN/messages.json')).fileSystem.frontMatterValidationDidNotPassSourceWasSavedButTheIndex, /Front Matter 未通过校验/);
   assert.deepEqual(parseStaticServerOptions([]), { port: 3500, help: false });
   assert.match(startScript, /const host = '127\.0\.0\.1'/);
   assert.match(startScript, /parseStaticServerOptions\(process\.argv\.slice\(2\)\)/);

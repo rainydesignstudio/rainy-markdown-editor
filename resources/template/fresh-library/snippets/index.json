@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "default",
+      "name": "默认",
+      "description": "基础片段与 Rainy Design 文章组合，可直接用于正文。",
+      "order": 0,
+      "icon": "document"
+    },
+    {
+      "id": "zixu",
+      "name": "紫序",
+      "description": "紫色标签与单线分隔的文章组合；优先用 Markdown，开场卡、编号章节和提示卡保留独立 HTML。",
+      "order": 1,
+      "icon": "quote"
+    },
+    {
+      "id": "rainy-design",
+      "name": "Rainy Design",
+      "description": "Rainy Design 微信公众号爱用的主题。",
+      "order": 2,
+      "icon": "sparkles"
+    }
+  ]
+}

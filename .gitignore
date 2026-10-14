@@ -11,4 +11,6 @@ test-results/
 .env.*
 !.env.example
 /data/
+/resources/presets/platform/*
+!/resources/presets/platform/wechat-article/
 /*.zip

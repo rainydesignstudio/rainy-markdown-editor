@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import { getInitialFormatSnapshot } from '../src/lib/article-format/runtime.ts';
 
 const editorThemes = await import('../src/lib/editorThemes.ts');
 const workspace = await import('../src/lib/editorWorkspace.ts');
@@ -12,7 +13,7 @@ const { DEFAULT_ARTICLE_SETTINGS } = await import('../src/lib/articleSettings.ts
 const source = await readFile(new URL('../src/components/settings/SettingsPanel.tsx', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 
-function settingsPage(systemDark = false) {
+function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
   let cursor = 0;
   let tree;
   const cells = [];
@@ -51,6 +52,7 @@ function settingsPage(systemDark = false) {
       if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-changes-dialog' };
       if (id.endsWith('/editorThemes')) return editorThemes;
       if (id.endsWith('/editorWorkspace')) return workspace;
+      if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => format };
       if (id === 'react') return {
         useState(value) { const index = cursor++; if (!(index in cells)) cells[index] = typeof value === 'function' ? value() : value; return [cells[index], (next) => { cells[index] = typeof next === 'function' ? next(cells[index]) : next; }]; },
         useRef(value) { const index = cursor++; return cells[index] ??= { current: value }; },
@@ -65,7 +67,8 @@ function settingsPage(systemDark = false) {
   function label(node) { if (typeof node === 'string') return node; if (Array.isArray(node)) return node.map(label).join(''); return node?.props ? label(node.props.children) : ''; }
   render(); render();
   return {
-    props, focus, saved, previews, appearanceWrites, render, find,
+    props, focus, saved, previews, appearanceWrites, render, find, text: label,
+    format(value) { format = value; render(); },
     systemMode(dark) { media.matches = dark; for (const callback of mediaListeners) callback(); render(); },
     get guard() { return navigationGuard; }, listeners,
     modal() { return find(node => node.type === 'unsaved-changes-dialog'); },
@@ -76,6 +79,32 @@ function settingsPage(systemDark = false) {
     switch(id) { this.tab(id).props.onClick(); render(); },
   };
 }
+
+test('local-library policy summary follows the active snapshot and never labels invalid or disconnected data as usable', () => {
+  const initial = getInitialFormatSnapshot();
+  const page = settingsPage(false, { ...initial, source: 'library', algorithmSource: 'library' });
+  const summary = () => page.text(page.find(node => node.props['aria-label'] === '校验与算法'));
+  assert.match(summary(), /微信公众号官方规范/);
+  assert.match(summary(), /mp-darkmode/);
+  assert.match(summary(), /资料库组件/);
+  page.format(initial);
+  assert.match(summary(), /内置默认回退/);
+  page.format({ ...initial, source: 'library', algorithmSource: 'legacy' });
+  assert.match(summary(), /旧库回退/);
+  page.format({ ...initial, source: 'library', officialDefault: false, bundle: { ...initial.bundle, support: { ...initial.bundle.support, meta: { ...initial.bundle.support.meta, name: '自建官网规则' } }, formatter: { ...initial.bundle.formatter, preview: { ...initial.bundle.formatter.preview, dark: { ...initial.bundle.formatter.preview.dark, transform: 'preserve' } } } } });
+  assert.match(summary(), /自建官网规则/);
+  assert.match(summary(), /资料库自定义配置/);
+  assert.match(summary(), /保留原色/);
+  assert.doesNotMatch(summary(), /mp-darkmode|微信公众号/);
+  page.format({ ...initial, source: 'invalid', error: '测试配置损坏' });
+  assert.match(summary(), /配置不可用.*测试配置损坏/);
+  assert.doesNotMatch(summary(), /mp-darkmode|微信公众号/);
+  page.format({ ...initial, loading: true });
+  assert.match(summary(), /正在载入/);
+  page.props.root = null; page.render();
+  assert.match(summary(), /尚未连接/);
+  page.unmount();
+});
 
 test('designer receives the current appearance draft including system mode and explicit overrides', () => {
   const page = settingsPage(true); page.switch('appearance');
@@ -171,7 +200,7 @@ test('theme selection previews without writing; cancel and unmount clear the pre
   for (const label of ['重置外观', '取消变更', '保存外观']) assert.equal(page.button(label).props.disabled, true);
   page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'sunshine').name}`).props.onClick(); page.render();
   assert.equal(page.previews.at(-1).themeId, 'sunshine');
-  assert.equal(page.props.workspace.appearance.themeId, 'rainy-studio-slate');
+  assert.equal(page.props.workspace.appearance.themeId, 'rainy-design-slate');
   assert.equal(page.appearanceWrites.length, 0);
   assert.equal(page.button('保存外观').props.disabled, false);
   page.button('取消变更').props.onClick(); page.render();
@@ -202,7 +231,7 @@ test('failed appearance save keeps preview and changes available for retry', asy
   await new Promise((resolve) => setImmediate(resolve)); page.render();
   assert.equal(page.previews.at(-1).themeId, 'mist');
   assert.equal(page.button('保存外观').props.disabled, false);
-  assert.equal(page.props.workspace.appearance.themeId, 'rainy-studio-slate');
+  assert.equal(page.props.workspace.appearance.themeId, 'rainy-design-slate');
 });
 
 test('custom combination is staged in the dialog and applied as a preview only', () => {

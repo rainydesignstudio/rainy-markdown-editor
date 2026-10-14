@@ -31,7 +31,7 @@ test('directory initialization copies only bundled open fonts with licenses, and
   await initializeLocalFonts(root);
   const directory = await root.getDirectoryHandle('fonts');
   assert.deepEqual([...directory.files.keys()], OPEN_FONT_ASSETS.flatMap(asset => [asset.license, asset.file]));
-  assert.ok(urls.every(url => /^\/[a-z-]+(?:\.ttf|\.txt)$/i.test(url)));
+  assert.ok(urls.every(url => /^\/fonts\/[a-z-]+(?:\.ttf|\.txt)$/i.test(url)));
   const custom = new Uint8Array([1, 2, 3]).buffer;
   directory.files.set('sen-variable.ttf', custom);
   await initializeLocalFonts(root);

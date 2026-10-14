@@ -48,7 +48,7 @@ test('new themes retain readable interface, button and source text in both schem
 
 test('bundled editor theme catalog contains the current library selection', () => {
   assert.deepEqual(BUILTIN_EDITOR_THEMES.map((theme) => theme.id), [
-    'sea-glass', 'linen', 'mist', 'rainy-studio-slate', 'flowing-violet', 'evening-snow',
+    'sea-glass', 'linen', 'mist', 'rainy-design-slate', 'flowing-violet', 'evening-snow',
     'sunshine', 'ink-white', 'flowing-violet-ii', 'evening-snow-ii', 'dreaming',
   ]);
   assert.equal(BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'dreaming')?.name, '梦华');
@@ -85,7 +85,7 @@ test('editor theme parser rejects incomplete, unsafe, and article-theme inputs',
 test('legacy appearance composition preserves selected base palette, accent, and font', () => {
   const migrated = composeLegacyEditorTheme('linen', 'berry', 'serif');
   const linen = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'linen');
-  const legacyMist = parseEditorThemeJson(readFileSync(new URL('../src/themes/editor-themes/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
+  const legacyMist = parseEditorThemeJson(readFileSync(new URL('../resources/template/compatibility/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
   assert.deepEqual(validateEditorTheme(migrated), []);
   assert.equal(resolveEditorThemeColors(migrated, 'light').canvas, resolveEditorThemeColors(linen, 'light').canvas);
   assert.equal(resolveEditorThemeColors(migrated, 'dark').accent, resolveEditorThemeColors(legacyMist, 'dark').accent);
@@ -94,7 +94,7 @@ test('legacy appearance composition preserves selected base palette, accent, and
 });
 
 test('v1 theme reads upgrade only in memory, while v2 heading is required and independently validated', () => {
-  const legacy = JSON.parse(readFileSync(new URL('../src/themes/editor-themes/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
+  const legacy = JSON.parse(readFileSync(new URL('../resources/template/compatibility/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
   legacy.formatVersion = 1; delete legacy.fonts.heading; delete legacy.fonts.eyebrow; delete legacy.fonts.subHeading; delete legacy.fonts.articleSource;
   const before = JSON.stringify(legacy);
   const normalized = parseEditorThemeJson(before);
@@ -140,7 +140,7 @@ test('three retained themes match current color/font baselines exactly', () => {
   const baselines = {
     'sea-glass': 'da24061a113cda26b9ed403a70f91b4997c9abb7107378baf096ae5edbbd35f8',
     linen: '394cff3f032915e2f7c05442aee679b91f4264afdb03b5be4bf936261e74a7b0',
-    'rainy-studio-slate': '97f67e3192117f547db7a4366cd86155d19000b92538250316771d77d5881f16',
+    'rainy-design-slate': '97f67e3192117f547db7a4366cd86155d19000b92538250316771d77d5881f16',
   };
   for (const [id, baseline] of Object.entries(baselines)) {
     const theme = BUILTIN_EDITOR_THEMES.find((item) => item.id === id);
@@ -155,7 +155,7 @@ test('three retained themes match current color/font baselines exactly', () => {
 
 test('Mist uses neutral grays and serif headings while feedback and other fonts stay intact', () => {
   const mist = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'mist');
-  const legacy = parseEditorThemeJson(readFileSync(new URL('../src/themes/editor-themes/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
+  const legacy = parseEditorThemeJson(readFileSync(new URL('../resources/template/compatibility/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
   assert.equal(mist.fonts.heading, legacy.fonts.serif);
   assert.notEqual(mist.fonts.heading, mist.fonts.ui);
   for (const role of ['ui', 'serif', 'mono', 'editorSource']) assert.equal(mist.fonts[role], legacy.fonts[role]);
@@ -177,7 +177,7 @@ test('Mist uses neutral grays and serif headings while feedback and other fonts 
 });
 
 test('published editor template includes an independent heading font and all fallback colors', () => {
-  const template = parseEditorThemeJson(readFileSync(new URL('../public/presets/editor-theme-template.json', import.meta.url), 'utf8'));
+  const template = parseEditorThemeJson(readFileSync(new URL('../resources/template/editor-theme-template.json', import.meta.url), 'utf8'));
   assert.deepEqual(template, BASE_EDITOR_THEME);
   const composed = { ...template, id: 'mixed-heading-test', fonts: { ...BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'mist').fonts } };
   const restored = parseEditorThemeJson(JSON.stringify(composed));
@@ -195,7 +195,7 @@ test('existing article theme snapshots remain readable with or without the new k
 });
 
 test('Rainy Studio uses complete slate colors and locally bundled Google fonts', () => {
-  const studio = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'rainy-studio-slate');
+  const studio = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'rainy-design-slate');
   assert.ok(studio);
   assert.equal(resolveEditorThemeColors(studio, 'light').accent, '#62748e');
   assert.equal(resolveEditorThemeColors(studio, 'dark').accent, '#90a1b9');
@@ -205,8 +205,8 @@ test('Rainy Studio uses complete slate colors and locally bundled Google fonts',
     ['Roboto Mono Local', 'roboto-mono-variable.ttf', 'roboto-mono-OFL.txt'],
   ]) {
     assert.ok(Object.values(studio.fonts).some((stack) => stack.includes(family)));
-    assert.ok(existsSync(new URL(`../public/${asset}`, import.meta.url)));
-    assert.match(readFileSync(new URL(`../public/${license}`, import.meta.url), 'utf8'), /SIL OPEN FONT LICENSE/);
+    assert.ok(existsSync(new URL(`../public/fonts/${asset}`, import.meta.url)));
+    assert.match(readFileSync(new URL(`../public/fonts/${license}`, import.meta.url), 'utf8'), /SIL OPEN FONT LICENSE/);
   }
   const css = readFileSync(new URL('../src/styles/editor-theme.css', import.meta.url), 'utf8');
   assert.doesNotMatch(css, /fonts\.googleapis\.com|fonts\.gstatic\.com/);

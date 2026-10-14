@@ -17,7 +17,7 @@ import { getArticleMediaDirectory } from '../../lib/fileSystem';
 import type { StoredArticle } from '../../lib/types';
 import { ArticleImagePreview } from '../media/ArticleImagePreview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
-import { ARTICLE_EXAMPLE_IMAGE, isLegacyExampleImage } from '../../lib/articleExamples';
+import { ARTICLE_EXAMPLE_IMAGE } from '../../lib/articleExamples';
 import type { FormatSnapshot } from '../../lib/article-format/runtime';
 import { ArticleCodeBlock } from './ArticleCodeBlock';
 import { LibraryArticleImage } from './LibraryArticleImage';
@@ -86,6 +86,7 @@ function LocalArticleImage(props: LocalImageProps) {
         role="img"
         aria-label={label}
         aria-busy={!issue}
+        data-asset-state={issue ? 'error' : 'loading'}
         data-local-asset-src={props.sourcePath}
         data-local-asset-srcset={props.sourceSetPath}
         data-clipboard-src={props.clipboardSource}
@@ -211,13 +212,11 @@ function LocalArticleSourceSet(props: LocalSourceSetProps) {
 export function MarkdownPreview({
   source,
   media,
-  placeholderRelativeImages = false,
   snapshot,
   previewOnly = false,
 }: {
   source: string;
   media?: ArticleMediaContext | null;
-  placeholderRelativeImages?: boolean;
   snapshot?: FormatSnapshot;
   previewOnly?: boolean;
 }) {
@@ -231,8 +230,6 @@ export function MarkdownPreview({
   const [hydrated, setHydrated] = useState(false);
   const mediaRef = useRef(media);
   mediaRef.current = media;
-  const relativeImagePolicyRef = useRef(placeholderRelativeImages);
-  relativeImagePolicyRef.current = placeholderRelativeImages;
   const componentsRef = useRef<Components | null>(null);
 
   if (!componentsRef.current) {
@@ -246,15 +243,16 @@ export function MarkdownPreview({
       img: ({ node: _node, src, srcSet, alt, ...imageProps }) => {
         const originalSrc = typeof src === 'string' ? src : '';
         const format = snapshotRef.current, currentLibrary = mediaRef.current;
+        // Application sample assets keep their own namespace in stylesheet libraries.
+        if (originalSrc === ARTICLE_EXAMPLE_IMAGE) {
+          return <img {...imageProps} src={ARTICLE_EXAMPLE_IMAGE} alt={alt || '示例图片'} data-example-image="true" />;
+        }
         if (format.bundle.formatter.stylesheets && originalSrc && !/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(originalSrc)) {
           const base = currentLibrary?.article ? 'articles/' + currentLibrary.article.month + '/' + currentLibrary.article.folder : '';
           try {
             const path = originalSrc.startsWith('/') ? stylesheetAssetPath(originalSrc, '', format.bundle.formatter.stylesheets.publicRoot)?.path : normalizeLibraryPath(originalSrc, base);
             if (path) return <LibraryArticleImage root={currentLibrary?.root ?? null} path={path} cachedUrl={format.environment?.assets.find(asset => asset.path === path)?.url} source={originalSrc} imageProps={{ ...imageProps, alt }} />;
           } catch { return <span role="img" aria-label={translationRef.current('messages:image.invalidPathLabel', { path: originalSrc })}>{translationRef.current('messages:image.invalidPath', { path: originalSrc })}</span>; }
-        }
-        if (isLegacyExampleImage(originalSrc) || (relativeImagePolicyRef.current && originalSrc && !/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(originalSrc))) {
-          return <img {...imageProps} src={ARTICLE_EXAMPLE_IMAGE} alt={alt || '示例图片'} data-example-image="true" />;
         }
         const originalSourceSet = typeof srcSet === 'string' ? srcSet : '';
         const localSourceSet = articleImageSourceSetCandidates(originalSourceSet).filter((candidate) => candidate.fileName);
@@ -310,6 +308,9 @@ export function MarkdownPreview({
             onOpen={currentMedia.onOpen}
           />
         );
+      },
+      image: ({ node: _node, href, xlinkHref, ...props }) => {
+        return <image {...props} href={href} xlinkHref={xlinkHref} />;
       },
       source: ({ node: _node, srcSet, ...sourceProps }) => {
         const originalSourceSet = typeof srcSet === 'string' ? srcSet : '';

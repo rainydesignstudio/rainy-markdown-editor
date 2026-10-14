@@ -1,0 +1,9 @@
+{
+  "id": "zixu-index",
+  "name": "紫序 · 阅读目录",
+  "trigger": "//zixu-index",
+  "description": "三级标题、显式编号与分隔线；编号和标签需自行填写。",
+  "content": "### READING INDEX\n\n**章节目录**\n\n### 01\n\n**第一项标题▌**　这里写阅读说明。\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n\n### 02\n\n**第二项标题**　这里写阅读说明。\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n\n### 03\n\n**第三项标题**　这里写阅读说明。\n\n<p class=\"my-4 border-b text-article-line\">　</p>\n",
+  "icon": "book",
+  "categoryId": "zixu"
+}

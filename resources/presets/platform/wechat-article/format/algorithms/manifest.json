@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "components": [
+    {
+      "id": "mp-darkmode",
+      "version": "1.2.3-alpha.1",
+      "scripts": [
+        {
+          "path": "mp-darkmode.js",
+          "sha256": "dcf51e01b75f8da487785fa22da52f20211cc22f54b051beca43be6e33a98b1e"
+        },
+        {
+          "path": "mp-darkmode.adapter.js",
+          "sha256": "d763e0647f875af3a2bf64fb157028fec16db9c34115937a9686aca79b929140"
+        }
+      ],
+      "license": {
+        "path": "mp-darkmode.LICENSE",
+        "sha256": "17133398bde4729dbcac07459d31b21e9979afa91daf2e4574f9fa16676a50c7"
+      },
+      "capabilities": {
+        "transform": true,
+        "validators": [
+          "official.dark-contrast",
+          "official.dark-gradient"
+        ]
+      }
+    }
+  ]
+}

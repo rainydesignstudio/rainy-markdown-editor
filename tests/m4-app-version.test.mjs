@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import packageMetadata from '../package.json' with { type: 'json' };
-import changelog from '../docs/changelog.json' with { type: 'json' };
+import changelog from '../resources/changelog.json' with { type: 'json' };
 const { APP_VERSION, APP_VERSION_COMPACT, formatAppVersion } = await import('../src/lib/appVersion.ts');
 
 test('current app version derives from package metadata and supports four-part patch display', () => {

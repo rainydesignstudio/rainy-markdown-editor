@@ -9,6 +9,7 @@ import { SourceFindBar, FindIcon, type ReplaceAllDecision } from './SourceFindBa
 import { IconButton } from '../global/IconButton';
 import { insertUndoableText } from '../../lib/nativeTextareaEdit';
 import { sourceOffsetRect, revealSourceRect } from '../../lib/sourceViewport';
+import { formatInlineSelection, inlineFormatShortcut, type InlineFormat } from '../../lib/editor/inlineFormatting';
 import { useTextInputHistory } from '../../hooks/useTextInputHistory';
 
 import { forwardRef, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type CompositionEvent, type DragEvent, type ForwardedRef, type KeyboardEvent, type MutableRefObject, type ReactNode, type UIEvent } from 'react';
@@ -26,6 +27,7 @@ type Props = {
   openFindRef?: MutableRefObject<(() => void) | null>;
   openPickerRef?: MutableRefObject<(() => void) | null>;
   insertTextRef?: MutableRefObject<((text: string, caretOffset: number) => boolean) | null>;
+  formatSelectionRef?: MutableRefObject<((format: InlineFormat) => boolean) | null>;
   onChange: (value: string) => void;
   onSnippetInserted?: () => void;
   disabled?: boolean;
@@ -63,7 +65,7 @@ export function highlightMarkdownSource(value: string): ReactNode[] {
 }
 
 export const SnippetTextarea = forwardRef(function SnippetTextarea(
-  { value, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
+  { value, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
   forwardedRef: ForwardedRef<HTMLTextAreaElement>,
 ) {
   const { t } = useUITranslation('editor');
@@ -253,7 +255,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     sourceHistory.events.onChange(event);
   };
 
-  const commitInsertion = (insertion: { text: string; caretOffset: number }, start: number, end: number): boolean => {
+  const commitInsertion = (insertion: { text: string; caretOffset: number; selectionEndOffset?: number }, start: number, end: number): boolean => {
     const textarea = textareaRef.current;
     if (!textarea || disabled || readOnly || composingRef.current) return false;
     const previous = textarea.value;
@@ -262,7 +264,8 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     textarea.setSelectionRange(start, end);
     reportedValueRef.current = previous;
     const nextCaret = start + insertion.caretOffset;
-    pendingSelectionRef.current = { value: expected, start: nextCaret, end: nextCaret };
+    const nextEnd = start + (insertion.selectionEndOffset ?? insertion.caretOffset);
+    pendingSelectionRef.current = { value: expected, start: nextCaret, end: nextEnd };
 
     if (!insertUndoableText(textarea, insertion.text, start, end, () => reportedValueRef.current, previous => {
       reportedValueRef.current = previous;
@@ -275,12 +278,24 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     }
 
     setInsertionIssue(null);
-    restoreSelection(textarea, { start: nextCaret, end: nextCaret });
+    restoreSelection(textarea, { start: nextCaret, end: nextEnd });
     sourceHistory.finishInsertion();
     setDismissedMatch(null);
     setActiveState({ key: null, index: 0 });
     return true;
   };
+
+  const formatSelection = (format: InlineFormat) => {
+    const textarea = textareaRef.current;
+    if (!textarea || disabled || readOnly || composingRef.current) return false;
+    const plan = formatInlineSelection(textarea.value, textarea.selectionStart, textarea.selectionEnd, format);
+    return commitInsertion(plan, plan.start, plan.end);
+  };
+  useLayoutEffect(() => {
+    if (!formatSelectionRef) return;
+    formatSelectionRef.current = formatSelection;
+    return () => { formatSelectionRef.current = null; };
+  }, [formatSelectionRef, disabled, readOnly, value]);
 
   const commitSnippet = (snippet: ArticleSnippet, start: number, end: number, compile = true) => {
     const inserted = commitInsertion(prepareSnippetInsertion(snippet.content.replace(/\r\n?/g, '\n'), textareaRef.current?.value ?? value, start), start, end);
@@ -367,6 +382,8 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     pendingSelectionRef.current = null;
     const composing = composingRef.current || event.nativeEvent.isComposing || event.keyCode === 229;
     if (composing || disabled || readOnly) return;
+    const format = formatSelectionRef ? inlineFormatShortcut(event) : null;
+    if (format) { event.preventDefault(); event.stopPropagation(); formatSelection(format); return; }
 
     if (visibleMatch && event.key === 'ArrowDown') {
       event.preventDefault();

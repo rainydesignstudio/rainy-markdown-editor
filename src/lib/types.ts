@@ -91,6 +91,7 @@ export type WorkingArticle = {
 export type StoredArticle = {
   renderRecord?: import('./article-format/renderRecords').RenderRecord | null;
   renderIssue?: string;
+  renderRecordStale?: boolean;
   id: string;
   folder: string;
   month: string;

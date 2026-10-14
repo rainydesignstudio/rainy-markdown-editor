@@ -1,0 +1,9 @@
+{
+  "id": "zixu-chapter",
+  "name": "紫序 · 编号章节",
+  "trigger": "//zixu-chapter",
+  "description": "章节序号、英文栏目标签与标题，搭配分隔线组织阅读层级。",
+  "content": "<section class=\"mt-8 mb-6 border-b-2 border-article-line pb-6\">\n  <p class=\"my-0 font-bold tracking-[0.12em] text-article-accent border-none\"><span class=\"inline-block border-none text-[24px]/[1.3]\">01</span><span class=\"inline-block border-none text-[11px]/[1.7] pl-2.5 pb-1 align-middle\">PREMISE</span></p>\n  <h2 class=\"m-0 mt-0.5 pl-10 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">这里第一行标题<br />\n▌这里写第二行章节标题</h2>\n</section>",
+  "icon": "bookmark",
+  "categoryId": "zixu"
+}

@@ -39,7 +39,7 @@ const find=(tree,predicate)=>{const result=tree.find(predicate);assert.ok(result
 test('library mounts only the current page, preserves cross-page selections and resets page when filters, sort or page size change',async()=>{
   const root={},cells=[];let cursor=0,pageSize=20,preferences={columns:1,sort:'name',descending:false};
   let assets=Array.from({length:31},(_,index)=>({kind:'shared',root,fileName:`${index+1}.png`,size:1,mimeType:'image/png',handle:{}}));
-  const react={useState(initial){const index=cursor++;if(!(index in cells))cells[index]=typeof initial==='function'?initial():initial;return [cells[index],value=>{cells[index]=typeof value==='function'?value(cells[index]):value}]},useRef(initial){const index=cursor++;return cells[index]??={current:initial}},useMemo:callback=>callback()};
+  const react={useState(initial){const index=cursor++;if(!(index in cells))cells[index]=typeof initial==='function'?initial():initial;return [cells[index],value=>{cells[index]=typeof value==='function'?value(cells[index]):value}]},useRef(initial){const index=cursor++;return cells[index]??={current:initial}},useMemo:callback=>callback(),useEffect(){}};
   const {useMediaPagination}=await load('../src/hooks/useMediaPagination.ts',{'react':react,'../lib/mediaBrowsing':{paginateMedia},'./useMediaPreferences':{useMediaPageSize:()=>[pageSize,value=>pageSize=value]}});
   const module=await load('../src/components/media/MediaLibrary.tsx',{
     'react':react,'../../lib/editorWorkspace':{getArticleOrganization:()=>({})},
@@ -47,7 +47,7 @@ test('library mounts only the current page, preserves cross-page selections and 
     '../../hooks/useMediaLibrary':{useMediaLibrary:()=>({assets,issues:[],loading:false,refresh(){}})},'../../lib/mediaBrowsing':{mediaDirectoryImages},
     '../global/PageHeading':{PageHeading:'heading'},'../global/DialogFrame':{DialogFrame:'frame',DialogHeader:'header',DialogFooter:'footer',DialogActions:'actions',DialogButton:'button'},
     './MediaGallery':{MediaDetails:'details',MediaGallery:'gallery',MediaIcon:'icon',MediaImportButton:'import',sortMediaAssets:values=>values,formatMediaBytes:()=>'',mediaAssetKey:image=>image.fileName},
-    './MediaToolbar':{MediaToolbar:'toolbar'},'./MediaPagination':{MediaPagination:'pagination'},'./MediaPreviewDialog':{MediaPreviewDialog:'preview'},'./ArticleImagePreview':{ArticleImagePreview:'image'},'./MediaManagementDialog':{MediaManagementDialog:'management'},
+    './MediaToolbar':{MediaToolbar:'toolbar'},'./MediaPagination':{MediaPagination:'pagination'},'./MediaPreviewDialog':{MediaPreviewDialog:'preview'},'./MediaImportDialog':{MediaImportDialog:'import-dialog'},'./ArticleImagePreview':{ArticleImagePreview:'image'},'./MediaManagementDialog':{MediaManagementDialog:'management'},
   },{window:{matchMedia:()=>({matches:false})}});
   const props={root,sessionKey:1,articles:[],workspace:{projects:[]},isRootCurrent:()=>true,currentArticleId:'',canAdopt:false,busy:false};
   const view=()=>{cursor=0;return nodes(module.MediaLibrary(props))};

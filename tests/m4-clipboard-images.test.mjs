@@ -6,8 +6,17 @@ import { parseFragment } from 'parse5';
 import ts from 'typescript';
 import vm from 'node:vm';
 import { embedClipboardImages } from '../src/lib/clipboardImages.ts';
+import { isApplicationExampleImage } from '../src/lib/articleExamples.ts';
 
-const png = await readFile(new URL('../public/article-sample.png', import.meta.url));
+const png = await readFile(new URL('../public/images/article-sample.png', import.meta.url));
+
+test('old sample URLs are not rewritten or read through the bundled example reader', async () => {
+  let reads = 0;
+  assert.equal(isApplicationExampleImage('/article-sample.png'), false);
+  const result = await embedClipboardImages({ html: '<img src="/article-sample.png"><code>/article-sample.png</code>', text: '', localImageCount: 0 },
+    async () => { throw new Error('must not read an article file'); }, () => true, async () => { reads++; return file(); });
+  assert.equal(reads, 0); assert.match(result.html, /src="\/article-sample\.png"/);
+});
 const file = () => new Blob([png], { type: 'application/octet-stream' });
 const payload = html => ({ html, text: 'before\nmiddle\nafter', localImageCount: 2 });
 const elements = root => (root.childNodes ?? []).flatMap(node => node.tagName ? [node, ...elements(node)] : []);
@@ -46,7 +55,7 @@ test('missing, inaccessible or unsupported image bytes fail the whole preparatio
 });
 
 test('bundled example images embed through their dedicated reader and documents without local images perform no reads', async () => {
-  const result=await embedClipboardImages(payload('<img src="/article-sample.png">'), async()=>{throw new Error('not an article file')}, ()=>true, async()=>file());
+  const result=await embedClipboardImages(payload('<img src="/images/article-sample.png">'), async()=>{throw new Error('not an article file')}, ()=>true, async()=>file());
   assert.equal(result.embeddedImageCount,1); assert.match(result.html,/data:image\/png;base64,/);
   const remote=await embedClipboardImages(payload('<p>plain</p><img src="https://example.test/remote.png">'), async()=>{throw new Error('must not read')}, ()=>true);
   assert.equal(remote.embeddedImageCount,0); assert.match(remote.html,/https:\/\/example.test\/remote.png/);

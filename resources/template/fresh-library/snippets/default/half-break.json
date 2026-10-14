@@ -1,0 +1,8 @@
+{
+  "id": "half-break",
+  "name": "半行空白",
+  "trigger": "//half-break",
+  "description": "就折半行空白。当你需要不太大的行间距时，你会想念它的。",
+  "content": "<span class=\"block my-6\"></span>",
+  "categoryId": "default"
+}

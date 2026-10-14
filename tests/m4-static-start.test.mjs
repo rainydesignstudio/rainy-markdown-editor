@@ -45,9 +45,9 @@ test('missing static output exits with an explicit build instruction', (t) => {
   copyFileSync(new URL('../scripts/static-server-options.mjs', import.meta.url), path.join(scripts, 'static-server-options.mjs'));
   copyFileSync(new URL('../scripts/cli-locale.mjs', import.meta.url), path.join(scripts, 'cli-locale.mjs'));
   for (const locale of ['zh-CN', 'en-US']) {
-    const target = path.join(directory, 'locale', locale);
+    const target = path.join(directory, 'resources', 'locale', locale);
     mkdirSync(target, { recursive: true });
-    copyFileSync(new URL(`../locale/${locale}/messages.json`, import.meta.url), path.join(target, 'messages.json'));
+    copyFileSync(new URL(`../resources/locale/${locale}/messages.json`, import.meta.url), path.join(target, 'messages.json'));
   }
   symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(directory, 'node_modules'), 'dir');
   const result = spawnSync(process.execPath, [path.join(scripts, 'start-static.mjs')], { encoding: 'utf8', timeout: 5000 });

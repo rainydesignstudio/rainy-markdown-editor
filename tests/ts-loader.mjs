@@ -1,4 +1,4 @@
-import { access } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 
 export async function resolve(specifier, context, nextResolve) {
   try {
@@ -15,4 +15,11 @@ export async function resolve(specifier, context, nextResolve) {
     }
     throw error;
   }
+}
+
+export async function load(url, context, nextLoad) {
+  if (url.startsWith('file:') && url.endsWith('.md') && new URL(url).pathname.includes('/resources/template/fresh-library/templates/')) {
+    return { format: 'module', shortCircuit: true, source: 'export default ' + JSON.stringify(await readFile(new URL(url), 'utf8')) + ';' };
+  }
+  return nextLoad(url, context);
 }

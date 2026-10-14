@@ -8,7 +8,7 @@ export function cliLocale(environment = process.env) {
 
 export function createCliTranslation(locale = cliLocale()) {
   const instance = createInstance();
-  const resource = language => JSON.parse(fs.readFileSync(new URL(`../locale/${language}/messages.json`, import.meta.url), 'utf8'));
+  const resource = language => JSON.parse(fs.readFileSync(new URL(`../resources/locale/${language}/messages.json`, import.meta.url), 'utf8'));
   void instance.init({ lng: locale, fallbackLng: 'zh-CN', resources: { 'zh-CN': { messages: resource('zh-CN') }, 'en-US': { messages: resource('en-US') } }, defaultNS: 'messages', initAsync: false, interpolation: { escapeValue: false }, returnNull: false });
   return instance.getFixedT(locale, 'messages');
 }

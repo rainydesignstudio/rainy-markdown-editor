@@ -6,7 +6,7 @@ import { releaseTextKey } from '../../lib/i18n/changelog';
 import { formatUINumber } from '../../lib/i18n/formatters';
 import { APP_VERSION } from '../../lib/appVersion';
 import { useAnimatedMaxHeight } from '../../hooks/useAnimatedMaxHeight';
-import changelog from '../../../docs/changelog.json' with { type: 'json' };
+import changelog from '../../../resources/changelog.json' with { type: 'json' };
 import { DialogButton, DialogFrame, DialogHeader } from './DialogFrame';
 
 type Release = (typeof changelog)[number];

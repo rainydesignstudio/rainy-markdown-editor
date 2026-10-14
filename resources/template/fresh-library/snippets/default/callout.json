@@ -1,0 +1,9 @@
+{
+  "id": "callout",
+  "name": "提示框",
+  "trigger": "//callout",
+  "description": "随文章主题着色的提示段落，包含正文与强调文字。",
+  "content": "<section class=\"block rounded-xl border border-article-line bg-article-tint p-4 mb-6\">\n  <p class=\"m-0\"><span>💡 </span><strong class=\"text-article-accent\">提示：</strong>▌这是一条提示信息。</p>\n</section>",
+  "icon": "sparkles",
+  "categoryId": "default"
+}

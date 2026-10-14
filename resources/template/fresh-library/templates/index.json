@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "default",
+      "name": "默认",
+      "description": "常用的文章起稿结构，可选择后补充正文。",
+      "order": 0,
+      "icon": "folder"
+    },
+    {
+      "id": "theme-samples",
+      "name": "主题样稿",
+      "description": "展示文章主题与配套片段的完整起稿示例。",
+      "order": 1,
+      "icon": "book"
+    }
+  ]
+}

@@ -2,6 +2,7 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import * as history from '../src/lib/textInputHistory.ts';
+import * as inlineFormatting from '../src/lib/editor/inlineFormatting.ts';
 import * as nativeEdit from '../src/lib/nativeTextareaEdit.ts';
 import { withUILocaleImports } from './ui-locale-fixture.mjs';
 
@@ -11,6 +12,7 @@ const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKi
 export function withTextInputHistory(resolve) {
   let react, hook;
   return withUILocaleImports(function require(id) {
+    if (id.endsWith('/editor/inlineFormatting')) return inlineFormatting;
     if (id.endsWith('/useTextInputHistory')) {
       if (!hook) {
         const module = { exports: {} };

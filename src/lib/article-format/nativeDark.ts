@@ -2,7 +2,7 @@ import { ProductError } from "../i18n/productMessages";
 import { formatPreviewDocument } from './frame';
 import { assertCurrentFormat, type FormatSnapshot } from './runtime';
 
-export async function nativeDarkRendition(root: HTMLElement, css: string, snapshot: FormatSnapshot, signal: AbortSignal): Promise<{ html: string; css: string }> {
+export async function nativeDarkRendition(root: HTMLElement, css: string, snapshot: FormatSnapshot, signal: AbortSignal, options: { retained?: boolean } = {}): Promise<{ html: string; css: string }> {
   signal.throwIfAborted();
   const frame = document.createElement('iframe');
   const viewport = snapshot.bundle.formatter.document?.viewport;
@@ -21,7 +21,8 @@ export async function nativeDarkRendition(root: HTMLElement, css: string, snapsh
       clearTimeout(timeout); signal.removeEventListener('abort', abort); observer?.disconnect();
       try {
         if (error) throw error;
-        assertCurrentFormat(snapshot);
+        // Retained display canvases have their own immutable input and are never used for output.
+        if (!options.retained) assertCurrentFormat(snapshot);
         const doc = frame.contentDocument!, element = doc.querySelector<HTMLElement>('[data-article-content-root],.article-preview');
         if (!element) throw new ProductError("runtime.darkRootMissing");
         resolve({ html: element.outerHTML, css: [...doc.head.querySelectorAll('style')].map(style => style.textContent ?? '').join('\n') });

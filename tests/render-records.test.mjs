@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { contentHash, loadStylesheetEnvironment } from '../src/lib/article-format/styles.ts';
-import { DEFAULT_FORMAT_BUNDLE } from '../src/lib/article-format/config.ts';
+import { DEFAULT_FORMAT_BUNDLE, canonicalFormatJson } from '../src/lib/article-format/config.ts';
+import { DEFAULT_ALGORITHMS, algorithmHash, validateAlgorithmPackage } from '../src/lib/article-format/algorithms.ts';
 import { activateFormatBundle } from '../src/lib/article-format/runtime.ts';
 import { prepareRenderRecord, persistRenderRecord, readRenderRecord, renderRecordMatches, restoreRenderEnvironment, validateRenderRecord } from '../src/lib/article-format/renderRecords.ts';
 import { createArticleSource } from '../src/lib/frontMatter.ts';
 import { BASIC_THEME } from '../src/lib/themes.ts';
 import { createArticleSnapshot, listArticleHistory } from '../src/lib/articleHistory.ts';
-import { saveStoredArticle, getStoredArticleDirectory } from '../src/lib/fileSystem.ts';
+import { saveStoredArticle, getStoredArticleDirectory, readStoredArticleById } from '../src/lib/fileSystem.ts';
 import { compileArticleStyles } from '../src/lib/tailwind.ts';
+import DOMPurify from 'dompurify';
 
 function memoryLibrary() {
   const files = new Map(), directories = new Set(['']), writes = [];
@@ -124,5 +126,74 @@ test('history carries the same environment; automatic dedup compares its version
     await persistRenderRecord(f.root, f.directory, updated);
     assert.equal((await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'automatic', id: 'snapshot-second' })).created, true);
     assert.equal((await listArticleHistory(f.root, f.saved.article.month, f.saved.article.folder)).snapshots.length, 2);
+  } finally { f.environment.dispose(); }
+});
+
+test('historical algorithm code is retained and verified independently of today\'s library component', async () => {
+  const f = await fixture();
+  try {
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const record = await readRenderRecord(f.directory);
+    assert.equal(record.algorithmHash, DEFAULT_ALGORITHMS.fingerprint);
+    const modified = structuredClone(DEFAULT_ALGORITHMS);
+    modified.files['mp-darkmode.adapter.js'] += '\n// changed current component\n';
+    modified.manifest.components[0].scripts[1].sha256 = await algorithmHash(modified.files['mp-darkmode.adapter.js']);
+    modified.fingerprint = await algorithmHash(canonicalFormatJson({ manifest: modified.manifest, files: modified.files }));
+    const current = await validateAlgorithmPackage(modified);
+    const live = activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), 'changed', 'library', undefined, current, 'library');
+    const before = f.writes.length;
+    const restored = await restoreRenderEnvironment(f.root, record, live);
+    try {
+      assert.equal(restored.snapshot.algorithms.fingerprint, record.algorithmHash);
+      assert.notEqual(restored.snapshot.algorithms.fingerprint, live.algorithms.fingerprint);
+      assert.equal(restored.snapshot.algorithms.files['mp-darkmode.adapter.js'], DEFAULT_ALGORITHMS.files['mp-darkmode.adapter.js']);
+      assert.equal(f.writes.length, before);
+    } finally { restored.dispose(); }
+    const broken = structuredClone(f.prepared); broken.manifest.algorithms.files['mp-darkmode.adapter.js'] += 'tamper';
+    const pointer = f.files.get('articles/' + f.saved.article.month + '/' + f.saved.article.folder + '/render.json');
+    await assert.rejects(persistRenderRecord(f.root, f.directory, broken), /校验失败/);
+    assert.equal(f.files.get('articles/' + f.saved.article.month + '/' + f.saved.article.folder + '/render.json'), pointer);
+  } finally { f.environment.dispose(); }
+});
+
+test('older render manifests use a marked legacy algorithm fallback without migration writes', async () => {
+  const f = await fixture();
+  try {
+    const legacy = { ...f.prepared, manifest: { ...f.prepared.manifest }, record: { ...f.prepared.record } };
+    delete legacy.manifest.algorithms; delete legacy.record.algorithmHash;
+    legacy.record.environmentHash = await contentHash(canonicalFormatJson(legacy.manifest));
+    await persistRenderRecord(f.root, f.directory, legacy);
+    const before = f.writes.length;
+    const restored = await restoreRenderEnvironment(f.root, legacy.record);
+    try { assert.equal(restored.snapshot.algorithmSource, 'legacy'); assert.equal(f.writes.length, before); }
+    finally { restored.dispose(); }
+  } finally { f.environment.dispose(); }
+});
+
+test('an expired rendition is distinguished from broken dependencies and rebuilds without adopting live styles or writing on open', async t => {
+  // Node has no DOM. Supply only this trusted fixture's sanitizer bridge so
+  // browser-only candidate extraction runs; actual sanitization is tested separately.
+  const previousWindow = globalThis.window, previousSanitize = DOMPurify.sanitize;
+  globalThis.window = {};
+  DOMPurify.sanitize = source => source;
+  t.after(() => { if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow; if (previousSanitize === undefined) delete DOMPurify.sanitize; else DOMPurify.sanitize = previousSanitize; });
+  const f = await fixture();
+  try {
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const changed = f.source + '\n<p class="card p-6">changed body</p>\n';
+    await saveStoredArticle(f.root, changed, BASIC_THEME, f.saved.article.folder, f.saved.article.month);
+    f.put('styles/globals.css', '.card{color:blue}');
+    const before = f.writes.length;
+    const stored = await readStoredArticleById(f.root, f.saved.article.month, f.saved.article.folder);
+    assert.equal(stored.renderRecordStale, true);
+    assert.ok(stored.renderIssue);
+    const restored = await restoreRenderEnvironment(f.root, stored.renderRecord);
+    try {
+      const compiled = await compileArticleStyles(changed, BASIC_THEME, { snapshot: restored.snapshot });
+      assert.match(compiled.css, /color: red/);
+      assert.ok(compiled.css.includes('.p-6'), JSON.stringify({ candidates: compiled.candidates, end: compiled.css.slice(-1600) }));
+      assert.equal(await renderRecordMatches(stored.renderRecord, changed, BASIC_THEME), false);
+      assert.equal(f.writes.length, before, 'opening and rebuilding preview must not migrate user files');
+    } finally { restored.dispose(); }
   } finally { f.environment.dispose(); }
 });

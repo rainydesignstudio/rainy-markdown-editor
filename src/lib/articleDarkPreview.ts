@@ -1,5 +1,5 @@
 import { ProductError } from "./i18n/productMessages";
-import { getFormatSnapshot } from './article-format/runtime';
+import { getFormatSnapshot, type FormatSnapshot } from './article-format/runtime';
 import { formatPreviewDocument } from './article-format/frame';
 // Configured conversion runs only in a fresh document. The light DOM remains untouched.
 export function observeArticlePreview(root: HTMLElement, refresh: () => void): () => void {
@@ -23,19 +23,19 @@ export function observeArticlePreview(root: HTMLElement, refresh: () => void): (
 
 export { createArticleColorNormalizer } from './article-format/colors';
 
-export function cloneArticleForDarkPreview(root: HTMLElement): HTMLElement {
+export function cloneArticleForDarkPreview(root: HTMLElement, snapshot = getFormatSnapshot()): HTMLElement {
   const clone = root.cloneNode(true) as HTMLElement;
   clone.removeAttribute('hidden');
   const view = root.ownerDocument.defaultView;
   if (!view) throw new ProductError("articleDarkPreview.theArticlePreviewIsNotMountedYet");
   const originals = [root, ...root.querySelectorAll<HTMLElement>('*')];
   const copies = [clone, ...clone.querySelectorAll<HTMLElement>('*')];
-  const options = getFormatSnapshot().bundle.formatter.output;
+  const options = snapshot.bundle.formatter.output;
   originals.forEach((source, index) => {
     const computed = view.getComputedStyle(source);
     for (const property of options.inlineProperties) copies[index].style.setProperty(property, computed.getPropertyValue(property));
   });
-  if (getFormatSnapshot().bundle.formatter.preview.stripThemeBackground) {
+  if (snapshot.bundle.formatter.preview.stripThemeBackground) {
     for (const node of [clone, clone.querySelector<HTMLElement>(':scope > .article-body')]) {
       node?.style.removeProperty('background-color'); node?.style.removeProperty('background-image');
     }
@@ -43,6 +43,6 @@ export function cloneArticleForDarkPreview(root: HTMLElement): HTMLElement {
   return clone;
 }
 
-export function articleDarkPreviewDocument(css: string, html: string): string {
-  return formatPreviewDocument(css, html, true);
+export function articleDarkPreviewDocument(css: string, html: string, snapshot: FormatSnapshot = getFormatSnapshot()): string {
+  return formatPreviewDocument(css, html, true, snapshot);
 }

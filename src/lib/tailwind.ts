@@ -85,7 +85,7 @@ export async function compileArticleStyles(markdown: string, theme: ThemeConfig,
   const snapshot = options?.snapshot ?? getFormatSnapshot(); assertFormatReady(snapshot);
   const environment = options?.environment ?? snapshot.environment;
   const candidates = [...new Set([...extractMarkdownClassCandidates(markdown), ...generatedClasses(snapshot)])].sort();
-  const key = TAILWIND_COMPILER_VERSION + ':' + snapshot.id + ':' + (environment?.fingerprint ?? 'legacy') + ':' + canonicalFormatJson(theme) + ':' + JSON.stringify(candidates);
+  const key = TAILWIND_COMPILER_VERSION + ':' + snapshot.id + ':' + snapshot.algorithms.fingerprint + ':' + (environment?.fingerprint ?? 'legacy') + ':' + canonicalFormatJson(theme) + ':' + JSON.stringify(candidates);
   let pending = cache.get(key);
   if (pending) stats.hits++;
   else {

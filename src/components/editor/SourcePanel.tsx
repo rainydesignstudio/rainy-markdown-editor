@@ -15,6 +15,7 @@ import { useAuthoringChecks } from '../../hooks/useMediaPreferences';
 import { useSourceLineNumbers } from '../../hooks/useSourceLineNumbers';
 import { SnippetTextarea } from '../content/SnippetTextarea';
 import { InsertElementsMenu } from './InsertElementsMenu';
+import type { InlineFormat } from '../../lib/editor/inlineFormatting';
 import { IconButton } from '../global/IconButton';
 import { FindIcon } from '../content/SourceFindBar';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
@@ -67,6 +68,7 @@ export function SourcePanel({
   const openFindRef = useRef<(() => void) | null>(null);
   const openPickerRef = useRef<(() => void) | null>(null);
   const insertTextRef = useRef<((text: string, caretOffset: number) => boolean) | null>(null);
+  const formatSelectionRef = useRef<((format: InlineFormat) => boolean) | null>(null);
   const imagePickerRef = useRef<HTMLInputElement | null>(null);
   const { showLineNumbers, toggle: toggleLineNumbers } = useSourceLineNumbers();
   const [checksEnabled, setChecksEnabled] = useAuthoringChecks();
@@ -121,12 +123,13 @@ export function SourcePanel({
           <IconButton tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
           <IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
           <InsertElementsMenu
-            disabled={readOnly || mediaBusy}
+            disabled={readOnly || mediaBusy || parsed.diagnostics.some(item => item.level === 'error')}
             readOnly={readOnly}
             onOpenSnippetPicker={() => openPickerRef.current?.()}
             onChooseImage={() => imagePickerRef.current?.click()}
             onOpenMediaPicker={onOpenMediaPicker}
             onInsert={(text, caretOffset) => insertTextRef.current?.(text, caretOffset)}
+            onFormat={format => formatSelectionRef.current?.(format)}
           />
         </div>
       </div>
@@ -139,6 +142,7 @@ export function SourcePanel({
         openFindRef={openFindRef}
         openPickerRef={openPickerRef}
         insertTextRef={insertTextRef}
+        formatSelectionRef={formatSelectionRef}
         onChange={onChangeBody}
         onSnippetInserted={onSnippetInserted}
         disabled={mediaBusy || readOnly || parsed.diagnostics.some((item) => item.level === 'error')}

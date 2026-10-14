@@ -22,6 +22,7 @@ export function LibraryArticleImage({ root, path, cachedUrl, source, imageProps 
     }).catch(error => { if (active) setResult({ path, url: '', issue: error instanceof Error ? error.message : String(error) }); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [root, path, cachedUrl]);
-  if (!result?.url || result.path !== path) return <span role="img" aria-label={t('messages:image.missingLabel', { path })} data-local-asset-src={source} title={result?.issue ? formatProductMessage(result.issue, t) : undefined}>{t('messages:image.missing', { path })}</span>;
+  const issue = result?.path === path ? result.issue : undefined;
+  if (!result?.url || result.path !== path) return <span role="img" aria-label={t('messages:image.missingLabel', { path })} data-local-asset-src={source} data-asset-state={issue || !root ? 'error' : 'loading'} aria-busy={!issue && Boolean(root)} title={issue ? formatProductMessage(issue, t) : undefined}>{t('messages:image.missing', { path })}</span>;
   return <img {...imageProps} src={result.url} data-local-asset-src={source} data-library-asset-path={path} onError={() => setResult({ path, url: '', issue: productText('image.decodeResourceFailed', { path }) })} />;
 }

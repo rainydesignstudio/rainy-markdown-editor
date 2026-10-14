@@ -4,7 +4,7 @@ import { formatProductMessage, productCause, productLabel, productMessage } from
 
 import { useUITranslation, useUILocale } from '../global/UILocaleProvider';
 
-import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type MouseEvent } from 'react';
 import { getArticleOrganization, type EditorWorkspace } from '../../lib/editorWorkspace';
 import type { ArticleSummary } from '../../lib/types';
 import type { ArticleMediaAsset, LibraryMediaAsset, MediaActionOutcome } from '../../lib/articleMedia';
@@ -21,6 +21,7 @@ import { MediaToolbar, type MediaControl } from './MediaToolbar';
 import { ArticleImagePreview } from './ArticleImagePreview';
 import { MediaPagination } from './MediaPagination';
 import { MediaPreviewDialog } from './MediaPreviewDialog';
+import { MediaImportDialog } from './MediaImportDialog';
 
 type Props = {
   root: FileSystemDirectoryHandle | null; sessionKey: number; refreshSignal: number;
@@ -50,8 +51,23 @@ export function MediaLibrary({ root, sessionKey, refreshSignal, articles, worksp
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [management, setManagement] = useState<MediaEditRequest | null>(null);
   const [notice, setNotice] = useState<MediaActionOutcome | null>(null);
+  const [dropRequest, setDropRequest] = useState<{ files: File[]; root: FileSystemDirectoryHandle; sessionKey: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
+  useEffect(() => { setDropRequest(null); setDragging(false); dragDepth.current = 0; }, [root, sessionKey]);
   const [preferences, setPreferences] = useMediaPreferences();
   const isCurrent = () => Boolean(root && isRootCurrent(root, sessionKey));
+  const dropIsCurrent = () => Boolean(dropRequest && dropRequest.root === root && dropRequest.sessionKey === sessionKey && isRootCurrent(dropRequest.root, dropRequest.sessionKey));
+  const canDrop = Boolean(root && !busy && !management && !previewKey && !expandedKey && !dropRequest && isCurrent());
+  const isFileDrag = (event: DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files');
+  const dropFiles = (event: DragEvent<HTMLElement>) => {
+    if (!isFileDrag(event)) return;
+    event.preventDefault(); event.stopPropagation(); dragDepth.current = 0; setDragging(false);
+    if (!canDrop || !root) return;
+    const files = Array.from(event.dataTransfer.files);
+    if (!files.length) { setNotice({ ok: false, tone: 'warning', ...productMessage('mediaLibrary.dropContainsNoFiles') }); return; }
+    setActiveControl(null); setDropRequest({ files, root, sessionKey });
+  };
   const articleOptions = articles.filter(article => groupFilter === 'all' || (getArticleOrganization(workspace, article.id).projectId ?? 'unclassified') === groupFilter);
   const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
   const visible = sortMediaAssets(library.assets.filter(asset => asset.kind === tab && (asset.kind === 'shared' || (articleFilter === 'all' || asset.articleId === articleFilter) && articleOptions.some(article => article.id === asset.articleId)) && `${asset.fileName} ${asset.kind === 'article' ? asset.articleTitle : ''}`.toLocaleLowerCase('zh-CN').includes(normalizedQuery)), preferences);
@@ -82,8 +98,13 @@ export function MediaLibrary({ root, sessionKey, refreshSignal, articles, worksp
     catch (error) { const result: MediaActionOutcome = { ok: false, ...productMessage("mediaLibrary.sharedImageImportFailed", { "cause": productCause(error) }), tone: 'error' }; if (isCurrent()) setNotice(result); return result; }
   };
   const details = (asset: LibraryMediaAsset) => <div className="grid gap-4"><MediaDetails key={mediaAssetKey(asset)} asset={asset} sessionKey={sessionKey} isCurrent={isCurrent} disabled={busy} onPreview={() => setPreviewKey(mediaAssetKey(asset))} onRename={() => edit('rename', [asset])} onDescribe={() => edit('describe', [asset])} onReplace={() => edit('replace', [asset])} onDelete={() => edit('delete', [asset])} /><p className="break-words text-xs text-muted">{canAdopt ? t('media:templates.currentArticle', { name: currentArticleTitle }) : t('media:ui.openAnEditableArticleBeforeAdoptingAnImage')}</p><button className="button button-primary" disabled={busy || !canUse(asset)} onClick={() => { setExpandedKey(null); onAdopt(asset); }}><MediaIcon name="use" />{t('media:ui.useInArticle')}</button></div>;
-  return <section className="page-card gap-4 overflow-hidden" aria-labelledby="media-library-title">
+  return <section className="page-card gap-4 overflow-hidden data-[dragging=true]:ring-2 data-[dragging=true]:ring-accent" data-dragging={dragging} aria-labelledby="media-library-title"
+    onDragEnter={event => { if (isFileDrag(event)) { event.preventDefault(); if (canDrop) { dragDepth.current++; setDragging(true); } } }}
+    onDragOver={event => { if (isFileDrag(event)) { event.preventDefault(); event.dataTransfer.dropEffect = canDrop ? 'copy' : 'none'; } }}
+    onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }}
+    onDrop={dropFiles}>
     <PageHeading><div className="min-w-0"><p className="eyebrow">{t('media:ui.imageLibrary')}</p><h2 id="media-library-title" className="page-title font-heading">{t('media:ui.assets')}</h2><p className="mt-3 text-sm text-muted">{t('media:ui.organizeArticleImagesAndKeepReusableImagesIn')}</p></div><div className="toolbar-actions"><button className="button button-quiet" disabled={!root || busy || library.loading} onClick={library.refresh}><MediaIcon name="refresh" />{t('media:ui.refreshAssets')}</button><MediaImportButton disabled={!root} busy={busy} onImport={importFiles} /></div></PageHeading>
+    {dragging ? <p className="text-sm text-accent-text" role="status">{t('media:upload.dropHint')}</p> : null}
     {!root ? <div className="empty-state"><div><strong>{t('media:ui.chooseALibraryToViewImages')}</strong><p>{t('media:ui.openOrCreateALibraryInSettings')}</p></div></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip overflow-y-auto lg:overflow-hidden">
       <div className="grid shrink-0 gap-3 border-b border-line p-4">
@@ -102,6 +123,7 @@ export function MediaLibrary({ root, sessionKey, refreshSignal, articles, worksp
     {expanded && isCurrent() ? <DialogFrame titleId="media-detail-title" onClose={() => setExpandedKey(null)} dismissible={!busy && !management && !preview} focusActive={!management && !preview} large wide><DialogHeader titleId="media-detail-title" eyebrow={t('media:ui.imageDetailsAlternative')} title={t('media:ui.imageDetails')} onClose={() => setExpandedKey(null)} closeDisabled={busy || Boolean(management) || Boolean(preview)} /><div className="min-h-0 flex-1 overflow-x-clip overflow-y-auto p-4">{details(expanded)}</div><DialogFooter><DialogActions><DialogButton disabled={busy || Boolean(management) || Boolean(preview)} onClick={() => setExpandedKey(null)}><MediaIcon name="close" />{t('common:actions.close')}</DialogButton></DialogActions></DialogFooter></DialogFrame> : null}
     {management && isCurrent() ? <MediaManagementDialog request={management} articles={articles.filter(article => !getArticleOrganization(workspace, article.id).archived)} busy={busy} isCurrent={isCurrent} currentReferences={currentReferenceCount(management.assets)} scanReferences={scanReferences} onSubmit={manage} onClose={() => setManagement(null)} /> : null}
     {preview && isCurrent() ? <MediaPreviewDialog key={`${sessionKey}:${mediaAssetKey(preview)}`} initial={preview} images={sortMediaAssets(mediaDirectoryImages(library.assets, preview), preferences)} sessionKey={sessionKey} isCurrent={isCurrent} onClose={() => setPreviewKey(null)} /> : null}
+    {dropRequest && dropIsCurrent() ? <MediaImportDialog files={dropRequest.files} libraryName={dropRequest.root.name} busy={busy} isCurrent={dropIsCurrent} onImport={files => dropIsCurrent() ? importFiles(files) : Promise.resolve({ ok: false, tone: 'warning', ...productMessage('mediaLibrary.dropTargetChanged') })} onClose={() => setDropRequest(null)} /> : null}
   </section>;
 }
 

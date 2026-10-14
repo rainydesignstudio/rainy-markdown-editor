@@ -84,11 +84,11 @@ test('an unconfigured library defaults to Slate and follows the system scheme', 
   let listener;
   const media = { matches: false, addEventListener(_event, callback) { listener = callback; }, removeEventListener() {} };
   const page = provider(undefined, media);
-  assert.equal(page.controller.editorWorkspace.appearance.themeId, 'rainy-studio-slate');
+  assert.equal(page.controller.editorWorkspace.appearance.themeId, 'rainy-design-slate');
   assert.equal(page.controller.editorWorkspace.appearance.colorMode, 'system');
   page.controller.editorAppearanceReady = true;
   page.render();
-  assert.equal(page.root.dataset.editorTheme, 'rainy-studio-slate');
+  assert.equal(page.root.dataset.editorTheme, 'rainy-design-slate');
   assert.equal(page.root.dataset.colorMode, 'system');
   assert.equal(page.values.get('--font-sans'), themes.DEFAULT_EDITOR_THEME.fonts.ui);
   assert.equal(page.root.dataset.editorColorScheme, 'light');

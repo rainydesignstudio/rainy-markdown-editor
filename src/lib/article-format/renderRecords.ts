@@ -6,6 +6,8 @@ import { contentHash, normalizeLibraryPath, readLibraryFile, loadStylesheetEnvir
 import { parseArticle } from '../frontMatter';
 import type { ThemeConfig } from '../types';
 import { TAILWIND_COMPILER_VERSION } from '../tailwind-assets';
+import { ALGORITHM_LIMITS, DEFAULT_ALGORITHMS, validateAlgorithmPackage } from './algorithms';
+import type { AlgorithmPackage } from './algorithmTypes';
 
 const OWNER = 'wechat-article-editor-render';
 const HASH = /^[a-f0-9]{64}$/;
@@ -16,12 +18,14 @@ export type RenderRecord = {
   rawFormatter: RawFormatter; formatter: FormatFormatter;
   html: string; css: string;
   assets: RenderAssetReference[];
+  algorithmHash?: string;
 };
 type RenderManifest = {
   owner: typeof OWNER; schemaVersion: 1; rawFormatter: RawFormatter;
   rawFiles: Record<string, string>; policy: FormatFormatter['stylesheets'] | null;
   candidates: string[]; assets: RenderAssetReference[];
   compilerVersion: string;
+  algorithms?: AlgorithmPackage;
 };
 export type PreparedRenderRecord = { record: RenderRecord; assets: readonly CssAsset[]; manifest: RenderManifest };
 async function directory(root: FileSystemDirectoryHandle, path: string, create = false) {
@@ -48,6 +52,7 @@ export function validateRenderRecord(value: unknown): RenderRecord {
   if (record.owner !== OWNER || record.schemaVersion !== 1 || !HASH.test(record.bodyHash) || !HASH.test(record.themeHash) || !HASH.test(record.environmentHash) ||
       typeof record.html !== 'string' || typeof record.css !== 'string' || !Array.isArray(record.assets) || record.assets.length > STYLE_LIMITS.assets) throw new ProductError("renderRecords.theRenderRecordProtocolIsInvalid");
   if (record.html.length + record.css.length > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderRecordExceedsTheSizeLimit");
+  if (record.algorithmHash !== undefined && !HASH.test(record.algorithmHash)) throw new ProductError('algorithms.invalidPackage');
   if (canonicalFormatJson(checkedFormatter(record.rawFormatter)) !== canonicalFormatJson(record.formatter)) throw new ProductError("renderRecords.theRenderConfigurationDoesNotMatchTheValidatedSteps");
   assertPortableStyles(record.css);
   for (const asset of record.assets) {
@@ -102,12 +107,17 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
   const rawFormatter = snapshot.rawFormatter ?? DEFAULT_FORMAT_BUNDLE.formatter;
   const formatter = checkedFormatter(rawFormatter);
   const refs = assets.map(({ path, hash, mime }) => ({ path, hash, mime }));
-  const manifest: RenderManifest = { owner: OWNER, schemaVersion: 1, rawFormatter, rawFiles: { ...(environment?.rawFiles ?? {}) }, policy: environment?.policy ?? null, candidates: [...(environment?.candidates ?? [])], assets: refs, compilerVersion: TAILWIND_COMPILER_VERSION };
+  const algorithms = await validateAlgorithmPackage(snapshot.algorithms);
+  const manifest: RenderManifest = { owner: OWNER, schemaVersion: 1, rawFormatter, rawFiles: { ...(environment?.rawFiles ?? {}) }, policy: environment?.policy ?? null, candidates: [...(environment?.candidates ?? [])], assets: refs, compilerVersion: TAILWIND_COMPILER_VERSION, algorithms };
   const environmentHash = await contentHash(canonicalFormatJson(manifest));
-  return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, html, css: storedCss, assets: refs }, assets, manifest };
+  return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, algorithmHash: algorithms.fingerprint, html, css: storedCss, assets: refs }, assets, manifest };
 }
 export async function persistRenderRecord(root: FileSystemDirectoryHandle, target: FileSystemDirectoryHandle, prepared: PreparedRenderRecord) {
   const record = validateRenderRecord(prepared.record);
+  if (prepared.manifest.algorithms) {
+    const algorithms = await validateAlgorithmPackage(prepared.manifest.algorithms);
+    if (record.algorithmHash !== algorithms.fingerprint) throw new ProductError('algorithms.hashMismatch', { path: 'render.json' });
+  } else if (record.algorithmHash !== undefined) throw new ProductError('algorithms.invalidPackage');
   const objects = await directory(root, 'assets/.objects', true);
   for (const asset of prepared.assets) {
     let file: File | null = null;
@@ -136,7 +146,7 @@ export async function copyRenderRecord(source: FileSystemDirectoryHandle, destin
 }
 async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecord): Promise<RenderManifest> {
   const file = await readLibraryFile(root, 'styles/.versions/' + record.environmentHash + '/manifest.json');
-  if (file.size > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderManifestIsTooLarge");
+  if (file.size > STYLE_LIMITS.cssBytes + ALGORITHM_LIMITS.totalBytes * 2) throw new ProductError("renderRecords.theRenderManifestIsTooLarge");
   const text = await file.text();
   if (await contentHash(text) !== record.environmentHash) throw new ProductError("renderRecords.theHistoricalRenderVersionIsMissingOrFailedVerification");
   const manifest = JSON.parse(text) as RenderManifest;
@@ -146,6 +156,8 @@ async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecor
 }
 export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, value: RenderRecord, live = getFormatSnapshot()): Promise<{ snapshot: FormatSnapshot; html: string; css: string; dispose: () => void }> {
   const record = validateRenderRecord(value), manifest = await readManifest(root, record);
+  const algorithms = manifest.algorithms ? await validateAlgorithmPackage(manifest.algorithms) : DEFAULT_ALGORITHMS;
+  if (record.algorithmHash !== undefined && record.algorithmHash !== algorithms.fingerprint || manifest.algorithms && record.algorithmHash === undefined) throw new ProductError('algorithms.hashMismatch', { path: 'render.json' });
   const files = new Map<string, Blob>();
   let bytes = 0;
   for (const asset of record.assets) {
@@ -183,7 +195,7 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
     css = css.replaceAll('article-asset:' + asset.hash, url);
   }
   const dispose = () => { environment?.dispose(); urls.forEach(url => URL.revokeObjectURL(url)); };
-  const snapshot: FormatSnapshot = { ...live, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter },
+  const snapshot: FormatSnapshot = { ...live, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter }, algorithms, algorithmSource: manifest.algorithms ? 'library' : 'legacy', officialDefault: live.officialDefault && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint && canonicalFormatJson(record.rawFormatter) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE.formatter),
     ...(environment ? { environment: { ...environment, get assets() { return [...environment.assets, ...extraAssets]; }, rawFiles: manifest.rawFiles, candidates: manifest.candidates, fingerprint: record.environmentHash } } : { environment: undefined }) };
   return { snapshot, html, css, dispose };
 }

@@ -99,7 +99,7 @@ export function FormatCheckDialog({ mode, report, onDecision }: { mode: 'save' |
     <p id="format-check-description" className="p-4 text-sm text-muted">{mode === 'save'
       ? t('dialogs:ui.sourceSavedChecksUseTheCurrentLibraryConfiguration')
       : mode === 'inspect' ? t('dialogs:ui.resultsUseTheCurrentDraftAndLibraryConfiguration')
-      : mode === 'export' ? t('dialogs:ui.reviewThemeAndBodyBeforeExportingIncompleteChecks') : concerns ? t('dialogs:ui.reviewThemeAndBodyBeforeCopyingIncompleteChecks') : t('dialogs:ui.noActionableConcernsFoundInTheThemeOr')}<span className="mt-1 block text-xs text-faint">{format.bundle.support.meta.name}{format.officialDefault ? t('dialogs:ui.officialDefaults') : t('dialogs:ui.customLibraryConfiguration')}{report.complete === false ? t('dialogs:ui.layoutConversionChecksIncomplete') : ''}</span></p>
+      : mode === 'export' ? t('dialogs:ui.reviewThemeAndBodyBeforeExportingIncompleteChecks') : concerns ? t('dialogs:ui.reviewThemeAndBodyBeforeCopyingIncompleteChecks') : t('dialogs:ui.noActionableConcernsFoundInTheThemeOr')}<span className="mt-1 block text-xs text-faint">{format.bundle.support.meta.name}{format.bundle.validator.meta.enabled === false ? t('dialogs:ui.platformValidationDisabled') : ''}{format.officialDefault ? t('dialogs:ui.officialDefaults') : t('dialogs:ui.customLibraryConfiguration')}{report.complete === false ? t('dialogs:ui.layoutConversionChecksIncomplete') : ''}</span></p>
     <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line p-4" role="tablist" aria-label={t('dialogs:ui.checkTarget')}>
       {TABS.map((item, index) => {
         const errorCount = report[item.id].issues.filter(issue => articleFormatSeverity(issue.tier) === 'error').length;

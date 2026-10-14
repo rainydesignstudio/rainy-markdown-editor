@@ -157,6 +157,14 @@ test('clipboard keeps authored backgrounds and layout but omits generated page p
   assert.ok(payload.html.includes('width:80%'));
   assert.ok(payload.html.includes('width:100%'));
   assert.equal(root.outerHTML, before, 'export cannot modify the original article');
+  image.setAttribute('data-source-line', '7');
+  const active = formatRuntime.getFormatSnapshot();
+  const custom = { ...active, bundle: { ...active.bundle, formatter: { ...active.bundle.formatter,
+    output: { ...active.bundle.formatter.output, preserveAttributes: [...active.bundle.formatter.output.preserveAttributes, 'data-source-line'] },
+  } } };
+  const customPayload = module.exports.buildClipboardPayload(root, custom);
+  assert.doesNotMatch(customPayload.html, /data-source-line/, 'internal source mapping is never output, even when explicitly listed');
+  assert.equal(image.getAttribute('data-source-line'), '7', 'the live mapping remains available for scrolling');
 });
 
 test('clipboard and dark preview share RGB normalization for modern colors, alpha and gradients', () => {

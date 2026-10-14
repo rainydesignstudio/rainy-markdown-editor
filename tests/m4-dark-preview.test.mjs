@@ -92,7 +92,8 @@ test('the isolated document loads the registered conversion and escapes styleshe
   const css = '.article-preview{color:var(--color-article-ink)}';
   const html = '<article class="article-preview"><p>原稿</p></article>';
   const result = articleDarkPreviewDocument(css, html);
-  assert.ok(result.includes('src="/mp-darkmode.js"') && result.includes('src="/article-format-engine.js"'));
+  assert.ok(result.includes('src="/algorithm/article-algorithm-host.js"') && result.includes('src="/format/article-format-engine.js"'));
+  assert.equal(result.includes('src="/mp-darkmode.js"'), false);
   assert.ok(result.includes('background:#191919'));
   assert.ok(result.includes(css) && result.includes(html));
   assert.equal(articleDarkPreviewDocument('</style><script>bad()</script>', html).includes('</style><script>bad()'), false);

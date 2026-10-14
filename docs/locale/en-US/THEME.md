@@ -30,7 +30,7 @@ Save under `themes/editor-themes/<id>.json`. Import through **Settings → Appea
 | id / name | Safe ID; name 1–80 characters |
 | version | Three numeric components, such as 1.0.0 |
 | formatVersion | Use 4 for new themes; the app normalizes supported older formats |
-| palette | 1–100 entries with safe names and 3/6-digit HEX values without alpha |
+| palette | 1–128 entries with safe names and 3/6-digit HEX values without alpha |
 | colors | Only light/dark; each includes all 33 roles below, referencing palette keys |
 | fonts | All 8 roles below, each a nonempty safe font stack |
 | surfaces | Optional; use defined fields/structure, or omit it entirely |
@@ -58,7 +58,7 @@ Design the palette first, then map semantic roles. Do not put literal colors int
 
 `ui` serves interface text; `heading`, `subHeading` and `eyebrow` serve their respective hierarchy. `editorSource` is for content editors, `articleSource` for article source, and `mono` for code/fallbacks. Confirm chosen fonts are available and provide system fallbacks. Bundled Sen Local, Noto Sans SC Local and Roboto Mono Local are also available, retaining original licenses. Article themes/WeChat output do not depend on these interface fonts.
 
-Optional `surfaces` contains light/dark schemes with `primaryButton`, `primaryText`, `primaryHover`, `secondaryButton`, `eyebrow`, `dangerSurface`, `field`, `shadow`, `canvasWash` and optional `backdrop`. Colors reference palette keys. `primaryHover` is one key or four keys; field/shadow/backdrop use `{ color, opacity }` with opacity 0–100; canvasWash uses three palette keys and opacity. Follow the [production type and validator](../../../src/lib/editorThemes.ts); this field cannot inject arbitrary CSS.
+Optional `surfaces` contains light/dark schemes. Its fields may be omitted to retain existing role fallbacks; the full field list and editor controls are described below. Colors reference palette keys and bounded opacity values. Follow the [production type and validator](../../../src/lib/editorThemes.ts); this field cannot inject arbitrary CSS.
 
 <a name="doc-editor-theme-example"></a>
 
@@ -241,6 +241,8 @@ Semantic body utilities such as `text-article-accent`, `bg-article-tint` and `bo
 
 The sample image uses max-width:100%, height:auto and display:block for ordinary responsive layout; this is a sample choice. Official WeChat width checks inspect multi-screen layout, centering and overflow, using measured widths first and declared/data-w/HTML widths or transparent placeholders as fallbacks. There is no current rule allowing height:auto only in a three-property combination. Formatter configuration determines automatic-dimension output; loading, existence and actual layout are separate checks.
 
+The article editor's [preview controls](README.md#doc-preview-controls) are separate from theme JSON. With save-only refresh enabled, editing or choosing a theme can temporarily retain the earlier display. Verify the theme version and layout after saving successfully, or turn the switch off to resume live display. Theme-library, snippet and starter design previews keep their existing workflows.
+
 <a name="doc-article-theme-example"></a>
 
 ### Complete article-theme example
@@ -354,7 +356,7 @@ Create information, edit the body and save under **Templates → Starter templat
 
 ## Complete article example
 
-This combines theme, starter structure and a note snippet, without unresolved triggers/cursor placeholders. `/article-sample.png` is bundled with the app; real imported assets use `media/image/<filename>`.
+This combines theme, starter structure and a note snippet, without unresolved triggers/cursor placeholders. `/images/article-sample.png` is bundled with the app; real imported assets use `media/image/<filename>`.
 
 ```markdown
 ---
@@ -378,7 +380,7 @@ Keep materials where you can find them. Start with a clear directory, then write
 
 Create a clearly named library in Settings. Body text, theme snapshots and article images are saved together; the code directory starts the app.
 
-![Bundled sample image](/article-sample.png)
+![Bundled sample image](/images/article-sample.png)
 
 <section class="my-4 rounded-lg bg-article-tint p-4">
   <p class="m-0 text-article-ink"><strong class="text-article-accent">Note:</strong>First save and reopen once in a test library.</p>
@@ -420,3 +422,9 @@ UI language does not translate examples or saved library names, bodies and rule 
 - [Library format configuration, capabilities and migration](FORMAT.md)
 
 These references point to production code. Update examples and guidance when types, fields or validation conditions change.
+
+### Editor surface colors and opacity
+
+Settings → Appearance → Editor theme offers the same 33 base roles and 13 surface controls for every theme. Counts describe editable roles, not distinct colors. Controls include primary button fill/hover/text/border, secondary and danger fills, eyebrow, field, popup/dialog shadows, card/toggle shadows, backdrop and a three-color canvas wash. Light and dark are independent. Editing a surface detaches that palette reference without changing the original base role.
+
+Each field in surfaces.light and surfaces.dark is optional: missing fields retain existing fallbacks. Valid fields are primaryButton, primaryText, primaryHover, primaryLine, secondaryButton, eyebrow, dangerSurface, field, shadow, panelShadow, toggleShadow, backdrop and canvasWash. Tint fields use { color, opacity }; opacity is 0–100. The canvas wash has three palette references and opacity. Hover accepts one reference or four gradient stops. Missing secondary fill stays transparent until explicitly configured. Popup/dialog shadows share their material; card/toggle shadows are independent. Arbitrary CSS and layout dimensions are not accepted. Old themes and startup caches remain readable without rewriting user files.

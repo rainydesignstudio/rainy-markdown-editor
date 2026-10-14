@@ -122,6 +122,53 @@ test('switching to a legacy theme explicitly clears gradients and restores its o
   assert.equal(reset['--color-button-surface'], 'transparent');
 });
 
+test('every shipped theme exposes matching surface overrides while partial legacy fallbacks retain their paint', () => {
+  for (const theme of themes.BUILTIN_EDITOR_THEMES) {
+    assert.deepEqual(themes.validateEditorTheme(theme), []);
+    for (const mode of ['light', 'dark']) {
+      for (const key of ['primaryButton', 'primaryHover', 'primaryLine', 'dangerSurface']) assert.ok(theme.surfaces[mode][key]);
+      if (theme.id === 'rainy-design-slate') continue;
+      const colors = themes.resolveEditorThemeColors(theme, mode);
+      assert.deepEqual(themes.editorSurfaceTokens(colors, themes.resolveEditorThemeSurfaces(theme)[mode]), themes.editorSurfaceTokens(colors));
+    }
+  }
+  const partial = structuredClone(themes.BASE_EDITOR_THEME);
+  partial.surfaces = { light: {}, dark: {} };
+  assert.deepEqual(themes.validateEditorTheme(partial), []);
+  const invalid = structuredClone(partial); invalid.surfaces.light.field = { color: 'missing', opacity: 30 };
+  assert.ok(themes.validateEditorTheme(invalid).length);
+});
+
+test('independent surface changes detach only that slot, preserve both modes, and roundtrip all registered material controls', () => {
+  const source = structuredClone(themes.DEFAULT_EDITOR_THEME), before = JSON.stringify(source);
+  let next = source;
+  for (const mode of ['light', 'dark']) {
+    for (const field of themes.EDITOR_SURFACE_FIELDS) {
+      const initial = themes.editorSurfaceValue(next, mode, field.path);
+      for (let i = 0; i < initial.colors.length; i++) next = themes.updateEditorSurface(next, mode, field.path, { color: '#123456', index: i });
+      if (initial.opacity !== undefined) next = themes.updateEditorSurface(next, mode, field.path, { opacity: 35 });
+    }
+    next = themes.updateEditorSurface(next, mode, 'primaryHover', { gradient: true });
+    for (let i = 0; i < 4; i++) next = themes.updateEditorSurface(next, mode, 'primaryHover', { color: '#654321', index: i });
+    assert.equal(themes.editorSurfaceValue(next, mode, 'primaryHover').colors.length, 4);
+  }
+  assert.equal(JSON.stringify(source), before);
+  assert.deepEqual(next.colors, source.colors); assert.deepEqual(next.fonts, source.fonts);
+  assert.deepEqual(themes.parseEditorThemeJson(JSON.stringify(next)), next);
+  assert.ok(Object.keys(next.palette).length <= 128);
+  const resolved = themes.resolveEditorThemeSurfaces(next);
+  const tokens = themes.editorSurfaceTokens(themes.resolveEditorThemeColors(next, 'light'), resolved.light);
+  assert.equal(tokens['--color-action'], '#123456');
+  assert.match(tokens['--editor-action-gradient'], /#654321/);
+  for (const key of ['--editor-field-background', '--editor-popup-shadow', '--editor-dialog-shadow', '--editor-panel-shadow', '--editor-toggle-shadow', '--editor-dialog-backdrop', '--editor-canvas-wash']) assert.match(tokens[key], /#123456 35%/);
+  const store = storage(); cache.cacheSavedEditorTheme('material-test', { themeId: next.id, colorMode: 'system', custom: null }, [next], store);
+  const restored = boot(store, false).values;
+  for (const [key, value] of Object.entries(tokens)) assert.equal(restored.get(key), value);
+  for (const mutate of [bad => { bad.surfaces.light.panelShadow.opacity = 101; }, bad => { bad.surfaces.dark.toggleShadow.color = 'red);url(x)'; }, bad => { bad.surfaces.light.primaryLine = 'missing'; }]) {
+    const bad = structuredClone(next); mutate(bad); assert.ok(themes.validateEditorTheme(bad).length);
+  }
+});
+
 test('compiled shared controls retain runtime shadow variables instead of inlining a fallback theme', async () => {
   const base = fileURLToPath(new URL('../src/styles/', import.meta.url));
   const source = await readFile(new URL('../src/styles/globals.css', import.meta.url), 'utf8');
@@ -133,6 +180,7 @@ test('compiled shared controls retain runtime shadow variables instead of inlini
   assert.match(css, /--tw-shadow: var\(--editor-popup-shadow\)/);
   assert.match(css, /background-color: var\(--editor-field-background\)/);
   assert.match(css, /background-image: var\(--editor-action-gradient\)/);
+  assert.match(css, /--tw-shadow: var\(--editor-toggle-shadow\)/);
 });
 
 test('editing and forking a soft theme preserve surfaces and keep preview tokens independent of the enclosing theme', async () => {

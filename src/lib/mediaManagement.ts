@@ -171,7 +171,7 @@ export async function inspectLocalArticleImages(source: string, root: FileSystem
     let error: unknown = directoryError;
     if (directory) { try { await (await directory.getFileHandle(fileName)).getFile(); continue; } catch (cause) { error = cause; } }
     const absent = Boolean(root && month && folder && missing(error));
-    issues.push({ kind: 'element', name: `本地图片 ${fileName}`, source: '当前文章正文', tier: absent ? 'danger' : 'conditional', line: lines[0], lines: [...new Set(lines)], ...productMessage(absent ? 'diagnostic.imageMissing' : 'diagnostic.imageUnconfirmed', { fileName, cause: error ? productCause(error) : productReference('diagnostic.articleNotSaved') }), domain: 'product' });
+    issues.push({ kind: 'element', name: `本地图片 ${fileName}`, source: '当前文章正文', tier: absent ? 'danger' : 'conditional', line: lines[0], lines: [...new Set(lines)], ...productMessage(absent ? 'diagnostic.imageMissing' : 'diagnostic.imageUnconfirmed', { fileName, cause: error ? productCause(error) : productReference('diagnostic.articleNotSaved') }), domain: 'product', resourceSource: 'media/image/' + fileName });
   }
   return issues;
 }

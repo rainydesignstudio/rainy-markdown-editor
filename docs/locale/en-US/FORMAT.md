@@ -11,7 +11,19 @@ library/format/
 └── formatter.json        Processing steps and parameters
 ```
 
-All three top-level `schemaVersion` values are currently `1`, and `meta.id` must match. There is no strategy index or per-article binding. Start by copying the complete [built-in configuration](../../../src/lib/article-format/defaults/), then edit the needed parts.
+All three top-level `schemaVersion` values are currently `1`, and `meta.id` must match. There is no strategy index or per-article binding. Start by copying the complete [built-in configuration](../../../resources/presets/platform/wechat-article/format/), then edit the needed parts.
+
+When creating a library, choose “WeChat Official Account” under “Validation and processing template” to copy the trio, algorithm implementation and license. This is the only public preset. Library files remain independent and are not overwritten when the preset source changes.
+
+Settings → Local directory shows the currently loaded validation policy and algorithm version. Built-in defaults, legacy algorithm fallbacks and unavailable configurations are identified explicitly.
+
+<a name="doc-bundled-resources"></a>
+
+## Bundled application resources
+
+Default UI catalogs live in `resources/locale/`, and release data in `resources/changelog.json`. Platform sources are in `resources/presets/platform/`. New-library seeds live in `resources/template/fresh-library/` using actual theme, snippet and starter directories, with no articles or history. Theme authoring starting points are in `resources/template/`.
+
+Browser-loaded scripts remain in `public/format/` and `public/algorithm/`; fonts, images and licenses are in `public/fonts/`, `public/images/` and `public/licenses/`. The sample uses only `/images/article-sample.png`. Old root URLs and arbitrary relative images are not replaced with the sample; correct the actual snippet/template references. Bilingual prose remains in `docs/locale/`.
 
 <a name="doc-editable-fields"></a>
 
@@ -27,6 +39,12 @@ All three top-level `schemaVersion` values are currently `1`, and `meta.id` must
 This is a data-driven capability interface. New objects can reuse registered capabilities; they do not create algorithms or execute JSON scripts. A new platform policy can often be configured with the trio, while new algorithms need implementation/registration in the capability layer. Business components keep consuming one immutable snapshot.
 
 `schemaVersion` describes file structure, so do not increment it merely to edit policy. `product.theme.kind` and `formatVersion` identify current article-theme files (`article-theme`/`1`); keep them unchanged. Switching platforms does not require a new theme-file structure. Modified official defaults become a custom library policy and cannot be claimed as unchanged official WeChat defaults.
+
+### Platform validation switch
+
+`validator.meta.enabled` is an optional boolean. Omitted or true retains platform checks. False skips platform rules and their manual reviews without creating platform pass records. Product syntax, safety, image resources and article-theme structure checks remain. Both modes load the entire trio and validate its structure, references, parameters and algorithm files; missing or invalid files still fail. Formatter preview, transformation and output steps are independent.
+
+For example, set validator.json → meta to `{ "id": "custom-platform", "enabled": false }` and use custom-platform as the other two meta.id values. Keep product.theme, rules arrays and formatter.steps. Rules/manualReview may be empty when no platform standards are needed; a trio reduced to metadata alone is invalid. Settings and format reports show when platform validation is off. Reload after changing rules; stale tasks and check caches expire.
 
 <a name="doc-validator-example"></a>
 
@@ -145,7 +163,7 @@ The following capability is additive: repeated steps merge property lists.
 | render.nodes | image (width/height/classes/style/alt), link (classes/rootBase/externalTarget); supplies missing defaults only |
 | markdown.code-whitespace | `tabSize`; disabling retains original code whitespace |
 | preview.surface | lightBackground, darkBackground, fontFamily, color, stripThemeBackground |
-| preview.dark-mode | `transform`: `preserve` / `mp-darkmode`; `options` |
+| preview.dark-mode | `transform`: `preserve` or a library component ID; `options` is a JSON object |
 | css.drop-properties | properties[]; repeatable |
 | css.utility-aliases | aliases mapping CSS property names |
 | output.css | inlineProperties[], dimensionProperties[], preserveAutoDimensions, colorEncoding: rgb/preserve |
@@ -155,7 +173,43 @@ The following capability is additive: repeated steps merge property lists.
 
 Configuration compiles in array order, but execution still has Markdown, CSS, preview and output stages. Reordering cannot move an output operation ahead of parsing. Except for `css.drop-properties`, each capability can be enabled only once to avoid conflicting parameters. Disabled capabilities use neutral engine behavior; disabling output style capture loses those styles and does not disable checking.
 
-Current `mp-darkmode` options are `mode: dark`, `defaultDarkTextColor`, `needJudgeFirstPage`, `noEmit`, `whitelist.attribute[]` and `whitelist.tagName[]`. `noEmit: true` computes conversion records without emitting styles and is usually unsuitable for visible previews. Library light/dark surfaces come from `preview.surface`.
+The default `mp-darkmode` component accepts `mode: dark`, `defaultDarkTextColor`, `defaultDarkBgColor`, `needJudgeFirstPage`, `noEmit`, `whitelist.attribute[]` and `whitelist.tagName[]`. The official default template leaves the SDK's default text color unchanged; explicit color options customize that library. Without `defaultDarkBgColor`, the dark surface from `preview.surface` is used. `noEmit: true` computes conversion records without emitting styles and is usually unsuitable for visible previews. The component validates parameter meaning; the shared layer requires only a bounded JSON object. Custom components can add parameters without new workbench props.
+
+The official SDK reads inline styles. The integration first captures computed colors, backgrounds, borders and decorative paint for the article root and descendants, writes RGB values to an isolated copy, then calls the unchanged SDK. Dark preview does not rewrite source, themes or light-mode clipboard content.
+
+### Library algorithm components
+
+Each library uses `format/algorithms/manifest.json`. The [public WeChat component](../../../resources/presets/platform/wechat-article/format/algorithms/manifest.json) is the default source; new libraries copy its implementation and license.
+
+| Manifest field | Meaning |
+|---|---|
+| schemaVersion | Protocol version; currently 1 |
+| components[] | Each component has a unique id, version, scripts[], license and capabilities |
+| scripts[] | Implementations loaded in order; each entry has a relative path and the raw file's SHA-256 |
+| license | Relative path and SHA-256 of the required license file |
+| capabilities | A transform boolean and validators[]; declare only implemented validation operators |
+
+`preview.dark-mode.parameters.transform` references the component ID. `preserve` runs no component. Scripts expose two methods through `window.ArticleAlgorithm`:
+
+```js
+window.ArticleAlgorithm = {
+  async transform(root, context) {
+    // context: background, options, inlineProperties; root is an isolated copy.
+    root.style.color = context.options.defaultDarkTextColor || 'inherit';
+  },
+  async inspect(root, rules) {
+    // Check the supplied rules and return findings, or [] when none are found.
+    // Each entry: { ruleId, element, outcome: 'violation'|'review'|'incomplete', detail? }
+    return [];
+  }
+};
+```
+
+This illustrates the interface, not WeChat validation. Add a manifest component and implementation files, update their hashes, then point the formatter to its ID. New shared validation operators still require a registered execution capability. Scripts can change paint on existing nodes: colors, backgrounds, borders and text decoration. They cannot add HTML or introduce resources. Returned properties, node indexes, rule IDs and size are checked before any result is applied to the processing copy.
+
+Implementation runs only in a separate sandbox without same-origin permission. No workbench DOM or directory handle is passed in. Network, storage, popups and navigation are restricted; editing a component does not grant execution in the main page. Existing Blob images and fonts are transferred in memory with their layout context, without rescanning the library. The sandbox isolates permissions; it is not a CPU budget for arbitrary scripts.
+
+Component files, license, parameters and fingerprints participate in snapshots and caches. Historical dependency manifests retain the original code rather than substituting today's component. Older libraries without an algorithm directory receive an explicit built-in fallback without writes; present but incomplete directories, hash failures and missing capabilities fail. Older render records without components get a separate fallback notice and are not claimed to reproduce their original algorithm exactly.
 
 ## Loading, failures and migration
 
@@ -226,6 +280,10 @@ Source, index and render retention have separate feedback. Dependency failure do
 
 For website delivery, **Export article → Markdown body** extracts the reliably parsed body, retaining Markdown, HTML, classes and anchors. The publisher handles image addresses. Reports use current library rules; replaying history is not proof of present platform compliance.
 
+### Visible preview and current inspection
+
+The article editor's [three preview controls](README.md#doc-preview-controls) are browser UI preferences, separate from the format trio. Save-only refresh retains visible inputs and their resources. The current working canvas still uses the current body, theme and configuration for validation, copying, export and render records. Inspection alone does not advance the display boundary; successful saving followed by compilation does, while failed or stale tasks do not. Scroll alignment uses cached positions for the same input without reading the library or recompiling. It pauses while display and source differ.
+
 <a name="doc-configuration-loading"></a>
 
 ### Format configuration
@@ -240,6 +298,8 @@ Configuration is read when opening a library. Input, find and list navigation do
 Do not relabel old lists by changing version numbers. Back up the entire old library/list, copy a complete new trio and deliberately migrate needed local policy. Older compatibility tiers, font exemptions and image three-property combinations are not automatically WeChat rules. Configuration changes do not rewrite article-theme snapshots; recheck the combination.
 
 UI language is independent of library policy. Switching Simplified Chinese/English neither rereads nor rewrites the trio, changes formatter language, nor translates source/export content. Product diagnostics follow UI language; library rule names, descriptions and manual-review wording remain original.
+
+Empty/invalid image addresses and confirmed loading/decoding failures are product resource errors. Failed images do not wait again for events that have already finished; unsettled resources remain explicitly incomplete. Known missing local files return diagnostics first. Repair them and check again; standards JSON is not relaxed.
 
 <a name="doc-official-basis"></a>
 

@@ -20,8 +20,9 @@ const report = {
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node?.props ? [node, ...nodes(node.props.children)] : [];
 const text = node => Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : typeof node === 'string' ? node : '';
 function action(name, next, context) {
+  context.getPreviewPreferences ??= () => ({ saveReport: true });
   const start = controllerSource.indexOf(`  const ${name} = useCallback(`);
-  const end = controllerSource.indexOf(`\n\n  const ${next}`, start);
+  const end = controllerSource.indexOf(next === 'useEffect' ? '\n\n  useEffect' : `\n\n  const ${next}`, start);
   assert.ok(start >= 0 && end > start);
   const source = controllerSource.slice(start, end) + `\nglobalThis.action = ${name};`;
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
@@ -101,6 +102,7 @@ function compileFixture() {
     inspectArticleFormatReport: async () => { assert.equal(events.at(-1)[0], 'commit-end'); events.push(['inspect']); return report; },
     compiledArticleFormatStatus: reports.compiledArticleFormatStatus, setStatus: status => statuses.push(status),
     cacheLoadedArticleReport() {},
+    savedPreviewPendingRef: { current: null }, articleRef: { current: { dirty: false } }, setSavedPreviewRevision() {},
   };
   return { context, snapshot, statuses, events, cache, compile: action('compileCurrent', 'loadStoredArticles', context) };
 }
@@ -176,4 +178,90 @@ test('manual save waits for the compiled report and uses it for the save dialog'
   };
   const save = action('saveCurrent', 'checkCurrentFormat', context);
   assert.equal(await save(), true); assert.equal(inspections, 1); assert.equal(dialogs[0].mode, 'save'); assert.equal(dialogs[0].report, report);
+});
+
+
+test('manual save report preference only changes presentation, including an all-pass report', async () => {
+  for (const enabled of [false, true]) for (const ok of [false, true]) {
+    const fixture = compileFixture(), dialogs = [], events = [];
+    const clean = { complete: true, theme: { passed: ['theme'], issues: [] }, body: { passed: ['body'], issues: [] } };
+    const context = { ...fixture.context, getPreviewPreferences: () => ({ saveReport: enabled }),
+      mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
+      saveSnapshot: async () => ({ ok, current: true, savedSnapshot: fixture.snapshot, result: { article: { parse: { canCopy: true } } } }),
+      compileCurrent: async () => { events.push('compile'); fixture.cache.current = { snapshot: fixture.snapshot, report: clean }; return true; },
+      captureSavedRender: async () => events.push('capture'),
+      inspectArticleFormatReport: async () => { events.push('inspect'); return clean; },
+      setFormatCheck: dialog => dialogs.push(dialog),
+    };
+    assert.equal(await action('saveCurrent', 'checkCurrentFormat', context)(), ok);
+    assert.equal(dialogs.length, ok && enabled ? 1 : 0);
+    assert.deepEqual(events, ok ? ['compile', 'capture'] : []);
+    if (dialogs.length) { assert.equal(dialogs[0].mode, 'save'); assert.equal(dialogs[0].report, clean); }
+  }
+});
+
+
+
+test('save-only mode compiles each successful current save once, including implicit pre-copy and draft saves', async () => {
+  for (const enabled of [false, true]) for (const ok of [false, true]) for (const current of [false, true]) {
+    let writes = 0, renders = 0;
+    const root = {}, token = { root, articleId: 'draft' };
+    const snapshot = { directory: root, articleId: 'draft', documentToken: token };
+    const result = { ok, current, savedSnapshot: snapshot, result: { article: { parse: { canCopy: true } } } };
+    const context = { useCallback: fn => fn, getPreviewPreferences: () => ({ saveOnly: enabled }),
+      mutationQueueRef: { current: { run: fn => fn(), canSave: () => true } }, matchesSnapshot: () => current,
+      performSaveSnapshot: async () => { writes++; return result; }, setStatus() {},
+      compileCurrent: async () => { renders++; return true; } };
+    const actual = await action('saveSnapshot', 'captureSavedRender', context)(snapshot);
+    assert.equal(writes, 1); assert.equal(renders, enabled && ok && current ? 1 : 0);
+    assert.equal(actual.rendered, renders ? true : undefined);
+  }
+});
+
+test('only a current successful-save receipt advances the visible boundary after compilation', async () => {
+  for (const dirty of [false, true]) for (const matching of [false, true]) {
+    const fixture = compileFixture(); let refresh = 0;
+    fixture.context.articleRef.current.dirty = dirty;
+    fixture.context.savedPreviewPendingRef.current = { ...fixture.snapshot, source: matching ? fixture.snapshot.source : 'different saved revision' };
+    fixture.context.setSavedPreviewRevision = fn => { refresh = fn(refresh); };
+    assert.equal(await fixture.compile(), true);
+    assert.equal(refresh, !dirty && matching ? 1 : 0);
+    await fixture.compile(); assert.equal(refresh, !dirty && matching ? 1 : 0);
+  }
+});
+
+function loadedRenderFixture(fail = false) {
+  const root = { name: 'test-library' }, token = { root, articleId: '2026-10/draft' };
+  const retained = { id: 'retained-environment' }, restores = [], compiled = [], states = [];
+  const context = {
+    useCallback: fn => fn, directoryRef: { current: root }, documentTokenRef: { current: token },
+    openDocument: () => token, restoreRenderEnvironment: async (_root, record) => {
+      restores.push(record); if (fail) throw new Error('damaged retained manifest');
+      return { snapshot: retained, css: '.retained {}', dispose() {} };
+    },
+    renderEnvironmentRef: { current: null }, historyBaselineRef: { current: null }, articleRef: { current: null },
+    revisionRef: { current: 0 }, compileRequestRef: { current: 0 }, articleFingerprint: () => 'body-and-theme',
+    setIsCompiling() {}, setArticle: article => states.push(article), setRevision() {}, setLoadInspectionRevision() {}, setCompiledRevision() {}, setStatus() {}, navigateArticleMode() {},
+    snapshotFor: article => article, compileCurrent: snapshot => { compiled.push(snapshot); return Promise.resolve(!snapshot.renderIssue); },
+  };
+  const stored = { id: token.articleId, month: '2026-10', folder: 'draft', source: 'changed source', theme: BASIC_THEME, themeValid: true, parse: { diagnostics: [] }, renderRecord: { bodyHash: 'old' }, renderRecordStale: true, renderIssue: 'expired rendition' };
+  return { root, retained, restores, compiled, states, stored, apply: action('applyStoredArticle', 'useEffect', context) };
+}
+
+test('loading an expired rendition recompiles current source with its retained environment instead of blocking', async () => {
+  const f = loadedRenderFixture();
+  assert.equal(await f.apply(f.stored, false, f.root), true);
+  assert.equal(f.restores.length, 1);
+  assert.equal(f.states[0].renderIssue, undefined);
+  assert.equal(f.compiled[0].source, f.stored.source);
+  assert.equal(f.compiled[0].renderSnapshot, f.retained);
+});
+
+test('a broken retained environment remains a blocking issue and never falls back to current library styles', async () => {
+  const f = loadedRenderFixture(true);
+  assert.equal(await f.apply(f.stored, false, f.root), true);
+  assert.equal(f.restores.length, 1);
+  assert.match(f.states[0].renderIssue, /damaged retained manifest/);
+  assert.equal(f.compiled[0].renderSnapshot, undefined);
+  assert.equal(Boolean(f.compiled[0].renderIssue), true);
 });

@@ -1,11 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_FORMAT_BUNDLE, validateFormatBundle, compileFormatBundle } from '../src/lib/article-format/config.ts';
+import { DEFAULT_FORMAT_BUNDLE, enabledFormatRules, validateFormatBundle, compileFormatBundle } from '../src/lib/article-format/config.ts';
 import { activateFormatBundle, assertCurrentFormat, assertFormatReady, getFormatSnapshot, invalidateFormatBundle } from '../src/lib/article-format/runtime.ts';
-import { initializeLibraryFormat, readLibraryFormat } from '../src/lib/article-format/library.ts';
+import { initializeLibraryFormat, readLibraryFormat, PUBLIC_PLATFORM_PRESETS } from '../src/lib/article-format/library.ts';
 import { findSourceMatches, replaceAllSourceMatches } from '../src/lib/sourceSearch.ts';
+import { validateArticleFormatMarkdown, validateArticleFormatCss } from '../src/lib/articleFormat.ts';
 
 const copy = () => structuredClone(DEFAULT_FORMAT_BUNDLE);
+test('only public presets can initialize a library and invalid selection writes nothing', async () => {
+  assert.deepEqual(PUBLIC_PLATFORM_PRESETS.map(preset => preset.id), ['wechat-article']);
+  const root = directory();
+  await assert.rejects(initializeLibraryFormat(root, 'unlisted-platform'), /未知/);
+  assert.equal(root.children.size, 0);
+  await initializeLibraryFormat(root, 'wechat-article');
+  assert.deepEqual((await readLibraryFormat(root)).bundle, copy());
+  assert.ok(root.children.get('format').children.get('algorithms').children.has('manifest.json'));
+});
 test('configuration can add registered rules and additive formatter steps without consumer props', () => {
   const raw = copy();
   raw.support.rules.push({ id: 'alignment', section: 'custom', title: '自定义对齐', severity: 'warning', source: 'wechat-editor', validator: 'alignment' });
@@ -41,6 +51,34 @@ test('snapshots are immutable and stale tasks cannot commit after switching conf
   assert.throws(() => assertCurrentFormat(first));
   invalidateFormatBundle('test', '坏配置'); assert.throws(() => assertFormatReady());
   assert.equal(getFormatSnapshot().officialDefault, false);
+  activateFormatBundle(copy(), null, 'built-in');
+});
+
+test('validator meta.enabled is a platform-only boolean gate; absent and true retain official defaults', async () => {
+  const original = activateFormatBundle(copy(), 'test');
+  assert.ok(enabledFormatRules(original.bundle).length);
+  const explicit = copy(); explicit.validator.meta.enabled = true;
+  assert.equal(activateFormatBundle(explicit, 'test').officialDefault, true);
+  const disabled = copy(); disabled.validator.meta.enabled = false;
+  const snapshot = activateFormatBundle(disabled, 'test');
+  assert.equal(snapshot.officialDefault, false);
+  assert.equal(enabledFormatRules(snapshot.bundle).length, 0);
+  assert.notEqual(snapshot.id, original.id); assert.throws(() => assertCurrentFormat(original));
+  assert.deepEqual(snapshot.bundle.formatter, compileFormatBundle(copy()).formatter);
+  assert.deepEqual(snapshot.bundle.validator.product, copy().validator.product);
+  assert.equal(validateArticleFormatCss('.example { font-family: Georgia; }').some(issue => issue.domain === 'standard'), false);
+  assert.ok(validateArticleFormatCss('.example { width: expression(x); }').some(issue => issue.domain === 'product' && issue.tier === 'error'));
+  assert.ok(validateArticleFormatMarkdown('<script>alert(1)</script>').some(issue => issue.domain === 'product' && issue.tier === 'error'));
+  for (const mutate of [raw => { raw.validator.meta.enabled = 'false'; }, raw => { raw.validator.rules[0].operator = 'unregistered'; }, raw => { delete raw.validator.product; }, raw => { raw.formatter.meta.id = 'other'; }]) {
+    const bad = structuredClone(disabled); mutate(bad); assert.throws(() => validateFormatBundle(bad));
+  }
+  const root = directory(); await initializeLibraryFormat(root);
+  const format = root.children.get('format');
+  format.children.set('validator.json', JSON.stringify(disabled.validator));
+  const before = format.counts.reads;
+  assert.equal((await readLibraryFormat(root)).bundle.validator.meta.enabled, false);
+  assert.equal(format.counts.reads - before, 3, 'disabled policies still read every member of the trio');
+  format.children.delete('formatter.json'); assert.equal((await readLibraryFormat(root)).source, 'invalid');
   activateFormatBundle(copy(), null, 'built-in');
 });
 

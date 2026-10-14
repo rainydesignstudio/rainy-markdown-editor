@@ -16,7 +16,7 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/d4fdc16f-8245-4626-beae-32bc3cb9d0cc" alt="Your library. Your writing rules." width="960" /></p>
 
-`v0.2.2` · In development
+`v0.2.2.1` · In development
 
 Manuscripts, theme snapshots, images and history stay in your authorized local library. The first default format configuration targets WeChat Official Accounts; each library can adapt its own policies for other platforms.
 
@@ -140,15 +140,39 @@ After building, subsequent starts from the same directory need only `npm start`.
 
 ## 🌱 First use
 
-1. Open **Settings → Local directory → New library**. Enter a folder name, select its parent and grant read/write access. The app creates a named child directory. If that name exists, choose another or use **Open existing library**.
+1. Open **Settings → Local directory → New library**. Enter a folder name, choose a validation and processing template (currently “WeChat Official Account”), select its parent and grant read/write access. The app creates a named child directory. If that name exists, choose another or use **Open existing library**.
 2. For an existing library, select the library itself using **Open existing library**. Only the latest directory bookmark is remembered; authorize it again if permission expires.
 3. Create an article, enter body content and save with `⌘S` on macOS or `Ctrl+S` elsewhere. Saving creates the article directory and theme snapshot.
 4. Preview article themes under **Themes**. For saved articles, **Copy and apply** creates an independent copy and retains the original/theme snapshot; an unsaved new draft uses **Apply to current draft**.
 5. Manage snippets and starter templates under **Templates**. Insert them through **Insert element** or a snippet trigger.
-6. Import shared or article images under **Assets**. Adopting a shared image copies it into the article's own `media/image/`; shared originals and article copies are independent.
+6. Import shared or article images under **Assets**. You can also drop local images onto the Assets page, review the target library, file list and formats, then confirm; cancellation writes nothing. Adopting a shared image copies it into the article's own `media/image/`; shared originals and article copies are independent.
 7. Copy rich text and inspect it in the clipboard receiver. The user then pastes into WeChat and checks the draft and mobile preview.
 
 Narrow windows can switch between source and preview. Directory authorization, asset operations and WeChat editing are primarily desktop-browser workflows.
+
+<a name="doc-preview-controls"></a>
+
+### 👁️ Article preview controls
+
+The three icons in the preview header are ordered left to right. Hover or focus them for descriptions. Preferences are remembered per browser origin.
+
+| Control | Default | Behavior |
+|---|---|---|
+| Align preview scrolling | Off | Align the rendered element corresponding to the source top. Only source scrolling drives the preview. |
+| Show format check after manual save | On | Show the report after manual saving. Turning it off only hides the dialog; auto-save never opens it. |
+| Refresh preview only after saving | Off | Retain the visible body, theme and styles until a successful save. Turning it off resumes live display. |
+
+A retained display does not replace current-draft checks, copying or export. When source and display differ, alignment pauses with a notice. Copying also refreshes the display if the existing workflow first saves an unsaved draft. Source, checking and render-record failures are reported separately; a retained display or incomplete check is not a pass.
+
+<a name="doc-source-formatting"></a>
+
+### ⌨️ Inline formatting shortcuts
+
+In article source, use `Cmd/Ctrl+B`, `Cmd/Ctrl+I` and `Cmd/Ctrl+U` for bold, italic and underline. The same keys appear beside **Insert element → Text formatting**. Chosen text is retained; an empty selection inserts only paired markers. Repeating the action removes markers directly around the selection. Ordinary Markdown uses Markdown markers, while HTML paragraph text uses HTML inline tags.
+
+Menu and keyboard actions share one undoable edit. Undo/redo still follows the focused input. Composition, read-only and unavailable inputs do not format text, and find/replace fields remain independent.
+
+Empty image addresses and failed links/decoding report errors without repeated timeout waits. Loading resources are not treated as verified; repair the source and run Format check again.
 
 <a name="doc-interface-language"></a>
 

@@ -28,6 +28,7 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
+    draggingRef.current = false; setDragging(false);
     const update = () => {
       const measured = element.getBoundingClientRect().width;
       const enough = window.matchMedia(breakpoint).matches && getEditorSplitLimits(measured) !== null;

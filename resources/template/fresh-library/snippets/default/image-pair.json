@@ -1,0 +1,9 @@
+{
+  "id": "image-pair",
+  "name": "并排图片",
+  "trigger": "//image-pair",
+  "description": "并排的示例图片；使用时替换为文章图片与图注。",
+  "content": "<table class=\"w-full\"><tbody><tr>\n  <td class=\"w-1/2 p-2 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><p class=\"mt-2 mb-0 text-center\">图一</p></td>\n  <td class=\"w-1/2 p-2 align-top border-transparent\"><img class=\"max-w-full\" src=\"/images/article-sample.png\" /><p class=\"mt-2 mb-0 text-center\">图二▌</p></td>\n</tr></tbody></table>\n",
+  "icon": "image",
+  "categoryId": "default"
+}

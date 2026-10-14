@@ -5,7 +5,8 @@ import { parseArticle } from './frontMatter';
 import { themeAuthoredCss } from './themes';
 import { articleFormatSeverity, standardFormatIssue, validateRenderedArticleCss, type ArticleFormatIssue } from './articleFormat';
 import { assertCurrentFormat, getFormatSnapshot } from './article-format/runtime';
-import { inspectRenderedFormat } from './article-format/frame';
+import { inspectRenderedFormat, type RenderedResourceFinding } from './article-format/frame';
+import { articleImageFileNameFromSource } from './articleMedia';
 import { prepareInspectionAssets } from './article-format/inspectionAssets';
 import { compileArticleStyles } from './tailwind';
 import { validateArticleAuthoringMarkdown } from './articleAuthoringFormat';
@@ -16,10 +17,18 @@ export type ArticleFormatReport = { theme: FormatCheckSection; body: FormatCheck
 export function finalizeFormatSection(section: FormatCheckSection, failedRules = new Set(section.issues.flatMap(issue => issue.ruleId ? [issue.ruleId] : []))): FormatCheckSection {
   const seen = new Set<string>();
   const issues = section.issues.filter(issue => {
-    const key = issue.ruleId ? JSON.stringify([issue.ruleId, issue.line, issue.tier]) : JSON.stringify([issue.kind, issue.name, issue.source, issue.line, issue.tier]);
+    const key = issue.ruleId ? JSON.stringify([issue.ruleId, issue.line, issue.tier]) : JSON.stringify([issue.kind, issue.name, issue.source, issue.line, issue.tier, issue.resourceSource]);
     if (seen.has(key)) return false; seen.add(key); return true;
   });
   return { passed: section.passed.filter(name => ![...failedRules].some(id => name === productText("articleFormatReport.rule", { "id": id }))), issues };
+}
+
+export function renderedResourceIssue(resource: RenderedResourceFinding): ArticleFormatIssue {
+  const source = resource.source.startsWith('data:') ? productText('image.embeddedResource') : resource.source.slice(0, 200);
+  return { kind: 'element', name: productText('image.resourceName'), source: productText('image.resourceScope'),
+    tier: resource.reason === 'loading' ? 'conditional' : 'danger', line: resource.line,
+    ...productMessage('image.resource.' + resource.reason, resource.reason === 'empty' ? undefined : { source }),
+    domain: 'product', resourceSource: resource.source };
 }
 
 export function articleFormatReportCounts(report: ArticleFormatReport): { pass: number; warning: number; error: number } {
@@ -62,7 +71,11 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
       : { ...issue, source: issue.kind === 'engine' ? issue.source : '主题 CSS' });
   }
   let complete = !body.trim() && !snapshot.error;
-  if (body.trim() && options.deep !== false && preview) {
+  const knownResourceFailure = bodyIssues.some(issue => issue.resourceSource && articleFormatSeverity(issue.tier) === 'error');
+  if (body.trim() && options.deep !== false && knownResourceFailure) {
+    bodyIssues.push({ kind: 'engine', name: productText('image.deferredRenderName'), source: productText('image.resourceScope'),
+      tier: 'unknown', ...productMessage('image.resourcesBlockRender'), domain: 'product' });
+  } else if (body.trim() && options.deep !== false && preview) {
     try {
       const shadow = preview.getRootNode();
       const css = shadow instanceof ShadowRoot ? shadow.querySelector('style')?.textContent ?? '' : preview.ownerDocument.querySelector('style[data-article-style]')?.textContent ?? (await compileArticleStyles(body, theme)).css;
@@ -70,6 +83,12 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
       let checked;
       try { checked = await inspectRenderedFormat(assets.root, css, snapshot, options.signal); }
       finally { assets.dispose(); }
+      for (const resource of checked.resources ?? []) {
+        const name = articleImageFileNameFromSource(resource.source);
+        const alreadyReported = bodyIssues.some(issue => issue.resourceSource &&
+          (issue.resourceSource === resource.source || name && articleImageFileNameFromSource(issue.resourceSource) === name));
+        if (!alreadyReported) bodyIssues.push(renderedResourceIssue(resource));
+      }
       for (const id of checked.checked) bodyPassed.add(productText("articleFormatReport.rule", { "id": id }));
       for (const finding of checked.issues) {
         const rule = snapshot.bundle.validator.rules.find(item => item.id === finding.ruleId);
@@ -77,13 +96,17 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
         const issue = standardFormatIssue(rule, '当前正文实际渲染', finding.line, finding.detail);
         if (finding.outcome === 'incomplete') { issue.kind = 'engine'; issue.tier = 'unknown'; }
         if (finding.outcome === 'review') issue.tier = 'warning';
+        if (finding.resourceDependency) {
+          issue.domain = 'product'; issue.name = productText('image.deferredRenderName');
+          Object.assign(issue, productMessage(checked.resources?.some(resource => resource.reason === 'loading') ? 'image.resourcesPendingRender' : 'image.resourcesBlockRender'));
+        }
         bodyIssues.push(issue);
       }
       for (const id of checked.manual) {
         const review = snapshot.bundle.support.manualReview.find(item => item.id === id);
         if (review) bodyIssues.push({ kind: 'value', name: review.title, source: '人工核对项', tier: 'warning', message: review.title, ruleId: review.id, reference: `${snapshot.bundle.support.meta.sources[review.source]?.url ?? ''}${review.anchor ? `#${encodeURIComponent(review.anchor)}` : ''}`, domain: 'standard' });
       }
-      complete = !checked.issues.some(item => item.outcome === 'incomplete');
+      complete = !checked.issues.some(item => item.outcome === 'incomplete') && !checked.resources?.some(item => item.reason === 'loading');
     } catch (error) {
       bodyIssues.push({ kind: 'engine', name: '实际布局／转换检查', source: '当前正文', tier: 'unknown', ...productErrorMessage(error), domain: 'product' });
     }

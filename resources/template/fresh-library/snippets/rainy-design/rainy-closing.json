@@ -1,0 +1,9 @@
+{
+  "id": "rainy-closing",
+  "name": "Rainy Design · 收束",
+  "trigger": "//rainy-closing",
+  "description": "细线收束与简短署名，适合作为文章末尾。",
+  "content": "<section class=\"mt-10 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-sm text-article-ink\">▌对，文章应该由赛博员工写，你负责审和修修改改。</p>\n  <p class=\"m-0 text-xs font-semibold tracking-widest text-article-muted\">RAINY DESIGN · NOTES</p>\n</section>",
+  "icon": "bookmark",
+  "categoryId": "rainy-design"
+}

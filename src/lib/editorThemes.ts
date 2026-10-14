@@ -15,18 +15,21 @@ export type EditorColorRole = (typeof EDITOR_COLOR_ROLES)[number];
 export type EditorColorScheme = 'light' | 'dark';
 export type EditorThemeFontRole = 'ui' | 'serif' | 'mono' | 'editorSource' | 'articleSource' | 'heading' | 'subHeading' | 'eyebrow';
 
-export type EditorThemeSurfaces = Record<EditorColorScheme, {
+export type EditorThemeSurfaces = Record<EditorColorScheme, Partial<{
   primaryButton: string;
   primaryText: string;
   primaryHover: string | [string, string, string, string];
+  primaryLine: string;
   secondaryButton: string;
   eyebrow: string;
   dangerSurface: string;
   field: { color: string; opacity: number };
   shadow: { color: string; opacity: number };
+  panelShadow: { color: string; opacity: number };
+  toggleShadow: { color: string; opacity: number };
   backdrop?: { color: string; opacity: number };
   canvasWash: { colors: [string, string, string]; opacity: number };
-}>;
+}>>;
 
 export type EditorTheme = {
   kind: 'editor-theme';
@@ -40,6 +43,62 @@ export type EditorTheme = {
   surfaces?: EditorThemeSurfaces;
 };
 
+// Surface overrides are optional; absence preserves the existing theme's paint.
+// One registry drives the designer and its preview bindings.
+export const EDITOR_SURFACE_FIELDS = [
+  { path: 'primaryButton', token: '--color-action', role: 'accent' },
+  { path: 'primaryText', token: '--color-action-text', role: 'on-accent' },
+  { path: 'primaryHover', token: '--color-action-hover', role: 'accent-strong' },
+  { path: 'primaryLine', token: '--color-action-line', role: 'accent' },
+  { path: 'secondaryButton', token: '--color-button-surface', role: 'panel' },
+  { path: 'eyebrow', token: '--color-eyebrow', role: 'accent-text' },
+  { path: 'dangerSurface', token: '--color-danger-surface', role: 'panel' },
+  { path: 'field', token: '--editor-field-background', role: 'panel', opacity: 100 },
+  { path: 'shadow', token: '--editor-popup-shadow', role: 'secondary', opacity: 15 },
+  { path: 'panelShadow', token: '--editor-panel-shadow', role: 'secondary', opacity: 6 },
+  { path: 'toggleShadow', token: '--editor-toggle-shadow', role: 'secondary', opacity: 8 },
+  { path: 'backdrop', token: '--editor-dialog-backdrop', role: 'secondary', opacity: 45 },
+  { path: 'canvasWash', token: '--editor-canvas-wash', role: 'canvas', opacity: 0 },
+] as const;
+export type EditorSurfaceField = typeof EDITOR_SURFACE_FIELDS[number]['path'];
+
+export function mapEditorSurfaceColors(surface: EditorThemeSurfaces['light'], map: (key: string, path: string) => string): EditorThemeSurfaces['light'] {
+  return Object.fromEntries(Object.entries(surface).map(([key, value]) => [key,
+    typeof value === 'string' ? map(value, key) : Array.isArray(value) ? value.map(color => map(color, key)) :
+      'colors' in value ? { ...value, colors: value.colors.map(color => map(color, key)) } : { ...value, color: map(value.color, key) },
+  ])) as EditorThemeSurfaces['light'];
+}
+
+export function editorSurfaceValue(theme: EditorTheme, mode: EditorColorScheme, path: EditorSurfaceField) {
+  const field = EDITOR_SURFACE_FIELDS.find(item => item.path === path)!;
+  const value = theme.surfaces?.[mode][path];
+  const fallback = theme.colors[mode][path === 'primaryLine' && theme.surfaces ? 'accent-line' : field.role];
+  return {
+    colors: value === undefined ? path === 'canvasWash' ? [fallback, fallback, fallback] : [fallback] :
+      typeof value === 'string' ? [value] : Array.isArray(value) ? value : 'colors' in value ? value.colors : [value.color],
+    opacity: value && typeof value === 'object' && !Array.isArray(value) ? value.opacity : 'opacity' in field ? field.opacity : undefined,
+    inherited: value === undefined,
+  };
+}
+
+export function updateEditorSurface(theme: EditorTheme, mode: EditorColorScheme, path: EditorSurfaceField, change: { color?: string; index?: number; opacity?: number; gradient?: boolean }): EditorTheme {
+  const value = editorSurfaceValue(theme, mode, path), palette = { ...theme.palette };
+  let colors = [...value.colors];
+  if (change.gradient !== undefined) colors = change.gradient ? Array.from({ length: 4 }, (_, i) => colors[i] ?? colors[0]) : [colors[0]];
+  if (change.color !== undefined) {
+    const index = change.index ?? 0, key = `${mode}-surface-${path.toLowerCase()}-${index}`;
+    palette[key] = change.color; colors[index] = key;
+  }
+  const opacity = change.opacity ?? value.opacity;
+  const next = path === 'canvasWash' ? { colors: colors as [string, string, string], opacity: opacity! } :
+    opacity !== undefined ? { color: colors[0], opacity } : path === 'primaryHover' && colors.length === 4 ? colors : colors[0];
+  const surfaces: EditorThemeSurfaces = { light: { ...theme.surfaces?.light }, dark: { ...theme.surfaces?.dark }, [mode]: { ...theme.surfaces?.[mode], [path]: next } };
+  const used = new Set(Object.values(theme.colors).flatMap(roles => Object.values(roles)));
+  for (const surface of Object.values(surfaces)) mapEditorSurfaceColors(surface, key => { used.add(key); return key; });
+  for (const key of value.colors) if (!used.has(key)) delete palette[key];
+  return { ...theme, palette, surfaces };
+}
+
 // Self-contained so cached, resolved colors can be checked before hydration too.
 export function validEditorThemeSurfaces(value: unknown, palette?: Record<string, unknown>): value is EditorThemeSurfaces {
   const record = (item: unknown): item is Record<string, unknown> => typeof item === 'object' && item !== null && !Array.isArray(item);
@@ -50,12 +109,15 @@ export function validEditorThemeSurfaces(value: unknown, palette?: Record<string
   if (!record(value) || !keys(value, ['light', 'dark'])) return false;
   for (const mode of ['light', 'dark']) {
     const surface = value[mode];
-    if (!record(surface) || !keys(surface, ['primaryButton', 'primaryText', 'primaryHover', 'secondaryButton', 'eyebrow', 'dangerSurface', 'field', 'shadow', 'canvasWash', ...('backdrop' in surface ? ['backdrop'] : [])])) return false;
-    if (!color(surface.primaryHover) && (!Array.isArray(surface.primaryHover) || surface.primaryHover.length !== 4 || !surface.primaryHover.every(color))) return false;
-    if (![surface.primaryButton, surface.primaryText, surface.secondaryButton, surface.eyebrow, surface.dangerSurface].every(color) || !tint(surface.field) || !tint(surface.shadow)) return false;
-    if ('backdrop' in surface && !tint(surface.backdrop)) return false;
-    const wash = surface.canvasWash;
-    if (!record(wash) || !keys(wash, ['colors', 'opacity']) || !opacity(wash.opacity) || !Array.isArray(wash.colors) || wash.colors.length !== 3 || !wash.colors.every(color)) return false;
+    const plain = ['primaryButton', 'primaryText', 'primaryLine', 'secondaryButton', 'eyebrow', 'dangerSurface'];
+    const tints = ['field', 'shadow', 'panelShadow', 'toggleShadow', 'backdrop'];
+    if (!record(surface) || Object.keys(surface).some(key => ![...plain, ...tints, 'primaryHover', 'canvasWash'].includes(key))) return false;
+    if (plain.some(key => key in surface && !color(surface[key])) || tints.some(key => key in surface && !tint(surface[key]))) return false;
+    if ('primaryHover' in surface && !color(surface.primaryHover) && (!Array.isArray(surface.primaryHover) || surface.primaryHover.length !== 4 || !surface.primaryHover.every(color))) return false;
+    if ('canvasWash' in surface) {
+      const wash = surface.canvasWash;
+      if (!record(wash) || !keys(wash, ['colors', 'opacity']) || !opacity(wash.opacity) || !Array.isArray(wash.colors) || wash.colors.length !== 3 || !wash.colors.every(color)) return false;
+    }
   }
   return true;
 }
@@ -63,32 +125,31 @@ export function validEditorThemeSurfaces(value: unknown, palette?: Record<string
 export function resolveEditorThemeSurfaces(theme: EditorTheme): EditorThemeSurfaces | undefined {
   if (!theme.surfaces) return undefined;
   return Object.fromEntries((['light', 'dark'] as const).map(mode => {
-    const surface = theme.surfaces![mode], color = (key: string) => theme.palette[key];
-    return [mode, { ...surface, primaryButton: color(surface.primaryButton), primaryText: color(surface.primaryText), primaryHover: typeof surface.primaryHover === 'string' ? color(surface.primaryHover) : surface.primaryHover.map(color), secondaryButton: color(surface.secondaryButton), eyebrow: color(surface.eyebrow), dangerSurface: color(surface.dangerSurface),
-      ...(surface.backdrop ? { backdrop: { ...surface.backdrop, color: color(surface.backdrop.color) } } : {}),
-      field: { ...surface.field, color: color(surface.field.color) }, shadow: { ...surface.shadow, color: color(surface.shadow.color) }, canvasWash: { ...surface.canvasWash, colors: surface.canvasWash.colors.map(color) } }];
+    return [mode, mapEditorSurfaceColors(theme.surfaces![mode], key => theme.palette[key])];
   })) as EditorThemeSurfaces;
 }
 
 // Only fixed shapes plus validated color data enter CSS; JSON never supplies CSS.
 export function editorSurfaceTokens(colors: Record<EditorColorRole, string>, surface?: EditorThemeSurfaces['light']): Record<string, string> {
   const tint = (color: string, opacity: number) => opacity === 100 ? color : `color-mix(in srgb, ${color} ${opacity}%, transparent)`;
-  const shadow = surface ? tint(surface.shadow.color, surface.shadow.opacity) : '';
+  const shadow = surface?.shadow ? tint(surface.shadow.color, surface.shadow.opacity) : '';
   return {
     '--color-action': surface?.primaryButton ?? colors.accent,
-    '--color-action-hover': surface ? (typeof surface.primaryHover === 'string' ? surface.primaryHover : surface.primaryButton) : colors['accent-strong'],
+    '--color-action-hover': surface?.primaryHover ? (typeof surface.primaryHover === 'string' ? surface.primaryHover : surface.primaryButton ?? colors.accent) : colors['accent-strong'],
     '--color-action-text': surface?.primaryText ?? colors['on-accent'],
-    '--color-action-line': surface ? colors['accent-line'] : colors.accent,
+    '--color-action-line': surface?.primaryLine ?? (surface ? colors['accent-line'] : colors.accent),
     '--color-button-surface': surface?.secondaryButton ?? 'transparent',
     '--editor-quiet-bar-background': surface?.secondaryButton ?? colors.panel,
-    '--editor-field-background': surface ? tint(surface.field.color, surface.field.opacity) : colors.panel,
+    '--editor-field-background': surface?.field ? tint(surface.field.color, surface.field.opacity) : colors.panel,
     '--color-eyebrow': surface?.eyebrow ?? colors['accent-text'],
     '--color-danger-surface': surface?.dangerSurface ?? colors.panel,
     '--editor-action-gradient': surface && Array.isArray(surface.primaryHover) ? `linear-gradient(90deg, ${surface.primaryHover.join(', ')})` : 'none',
-    '--editor-canvas-wash': surface && surface.canvasWash.opacity > 0 ? surface.canvasWash.colors.map((color, index) => `radial-gradient(ellipse at ${[0, 50, 100][index]}% 0%, ${tint(color, surface.canvasWash.opacity)}, transparent 65%)`).join(', ') : 'none',
+    '--editor-canvas-wash': surface?.canvasWash && surface.canvasWash.opacity > 0 ? surface.canvasWash.colors.map((color, index) => `radial-gradient(ellipse at ${[0, 50, 100][index]}% 0%, ${tint(color, surface.canvasWash!.opacity)}, transparent 65%)`).join(', ') : 'none',
     '--editor-dialog-backdrop': surface?.backdrop ? tint(surface.backdrop.color, surface.backdrop.opacity) : tint(colors.secondary, 45),
-    '--editor-popup-shadow': surface ? `0 4px 6px -1px ${shadow}, 0 2px 4px -2px ${shadow}` : `0 0.5rem 1.25rem ${tint(colors.secondary, 15)}`,
-    '--editor-dialog-shadow': surface ? `0 4px 6px -1px ${shadow}, 0 2px 4px -2px ${shadow}` : `0 2rem 4rem ${tint(colors.secondary, 25)}`,
+    '--editor-popup-shadow': surface?.shadow ? `0 4px 6px -1px ${shadow}, 0 2px 4px -2px ${shadow}` : `0 0.5rem 1.25rem ${tint(colors.secondary, 15)}`,
+    '--editor-dialog-shadow': surface?.shadow ? `0 4px 6px -1px ${shadow}, 0 2px 4px -2px ${shadow}` : `0 2rem 4rem ${tint(colors.secondary, 25)}`,
+    '--editor-panel-shadow': `0 1rem 2.5rem ${tint(surface?.panelShadow?.color ?? colors.secondary, surface?.panelShadow?.opacity ?? 6)}`,
+    '--editor-toggle-shadow': `0 0.15rem 0.45rem ${tint(surface?.toggleShadow?.color ?? colors.secondary, surface?.toggleShadow?.opacity ?? 8)}`,
   };
 }
 
@@ -121,7 +182,7 @@ export function inspectEditorTheme(value: unknown): ProductMessageFields[] {
   if (![1, 2, 3, 4].includes(value.formatVersion as number)) errors.push(productMessage("editorThemes.editorThemeFormatversionSupportsOnly123Or4"));
 
   const palette = value.palette;
-  if (!isRecord(palette) || !Object.keys(palette).length || Object.keys(palette).length > 100) {
+  if (!isRecord(palette) || !Object.keys(palette).length || Object.keys(palette).length > 128) {
     errors.push(productMessage("editorThemes.theThemePaletteMustContain1100Colors"));
   } else {
     for (const [key, color] of Object.entries(palette)) {
@@ -189,7 +250,7 @@ export const BUILTIN_EDITOR_THEMES: readonly EditorTheme[] = EDITOR_THEME_TEMPLA
 });
 
 export const BASE_EDITOR_THEME = BUILTIN_EDITOR_THEMES[0];
-export const DEFAULT_EDITOR_THEME = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'rainy-studio-slate')!;
+export const DEFAULT_EDITOR_THEME = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'rainy-design-slate')!;
 
 export function resolveEditorThemeColors(theme: EditorTheme, mode: EditorColorScheme): Record<EditorColorRole, string> {
   return Object.fromEntries(EDITOR_COLOR_ROLES.map((role) => [role, theme.palette[theme.colors[mode][role]]])) as Record<EditorColorRole, string>;
