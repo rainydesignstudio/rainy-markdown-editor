@@ -1,4 +1,8 @@
 import { articleFormatSeverity, type ArticleFormatIssue } from './articleFormat';
+import { formatDiagnosticMessage, formatDiagnosticName, formatDiagnosticSource, formatProductMessage } from './i18n/productMessages';
+import type { TFunction } from 'i18next';
+
+const concernIssues = new WeakMap<SourceLineConcern, ArticleFormatIssue[]>();
 
 export type SourceLineConcern = {
   severity: 'warning' | 'error';
@@ -23,6 +27,9 @@ export function groupSourceLineIssues(issues: readonly ArticleFormatIssue[], lin
     for (const line of new Set(lines)) {
       if (!Number.isInteger(line) || line < 1 || line > lineCount) continue;
       const current: SourceLineConcern = byLine.get(line) ?? { severity, messages: [] };
+      const retained = concernIssues.get(current) ?? [];
+      if (!retained.includes(issue)) retained.push(issue);
+      concernIssues.set(current, retained);
       if (current.severity !== severity || current.severities) {
         current.severities = [...new Set([...(current.severities ?? [current.severity]), severity])];
         current.messageLevels ??= current.messages.map(message => ({ message, severity: current.severity }));
@@ -34,4 +41,24 @@ export function groupSourceLineIssues(issues: readonly ArticleFormatIssue[], lin
     }
   }
   return byLine;
+}
+
+export function sourceLineMessageLevels(concern: SourceLineConcern, t: TFunction) {
+  const issues = concernIssues.get(concern);
+  if (!issues) return (concern.messageLevels ?? concern.messages.map(message => ({ message, severity: concern.severity }))).map(entry => ({ ...entry, message: formatProductMessage(entry.message, t) }));
+  const result: Array<{ message: string; severity: 'warning' | 'error' }> = [];
+  for (const issue of issues) {
+    const severity = articleFormatSeverity(issue.tier);
+    if (severity === 'safe') continue;
+    const name = formatDiagnosticName(issue, t);
+    const subject = issue.source.startsWith('工具类 ') ? `${formatDiagnosticSource(issue.source, t)} · ${name}` : name;
+    const description = formatDiagnosticMessage(issue, t);
+    const message = subject === issue.message ? description : `${subject}：${description}`;
+    if (!result.some(entry => entry.message === message && entry.severity === severity)) result.push({ message, severity });
+  }
+  return result;
+}
+
+export function sourceLineMessages(concern: SourceLineConcern, t: TFunction): string[] {
+  return [...new Set(sourceLineMessageLevels(concern, t).map(entry => entry.message))];
 }

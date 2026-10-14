@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -135,7 +136,7 @@ test('shared linkage separates temporary preview hovering from pinned list selec
   const source = await readFile(new URL('../src/components/global/ThemeInspection.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} }, cells = [], effects = [], frames = []; let cursor = 0, linkage;
-  vm.runInNewContext(code, { module, exports: module.exports, requestAnimationFrame: fn => (frames.push(fn), frames.length), cancelAnimationFrame() {}, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, requestAnimationFrame: fn => (frames.push(fn), frames.length), cancelAnimationFrame() {}, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react-dom') return {};
     if (id.endsWith('/themeInspection')) return { animateInspectionScroll, uniqueBindings };
@@ -145,7 +146,7 @@ test('shared linkage separates temporary preview hovering from pinned list selec
       useEffect(effect, deps) { const index = cursor++; if (!cells[index] || deps.some((value, i) => value !== cells[index][i])) { cells[index] = deps; effects.push(effect); } },
     };
     throw Error(id);
-  } });
+  }) });
   const render = () => { cursor = 0; linkage = module.exports.useThemeInspection(); while (effects.length) effects.shift()(); };
   render(); linkage.rowProps('heading').onPointerEnter(); render(); assert.equal(linkage.hovered, 'heading');
   linkage.locate({ key: 'ink', label: '正文', token: '--color-article-ink' }); render();
@@ -162,13 +163,13 @@ test('editor preview identifies component colors and aliases from palette refere
   const source = await readFile(new URL('../src/components/settings/EditorThemeDesigner.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(code + '\nexports.read = editorElementBindings; exports.Preview = Preview;', { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code + '\nexports.read = editorElementBindings; exports.Preview = Preview;', { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/editorThemes')) return editorThemes;
     if (id.endsWith('/editorSourceHighlight')) return { tokenizeEditorSource };
     if (id.endsWith('/themeInspection')) return { uniqueBindings };
     return {};
-  } });
+  }) });
   const node = (classes, parent, own = true, states = []) => ({ classList: Object.assign(new Set(classes.split(' ')), { contains(value) { return this.has(value); } }), parentElement: parent,
     childNodes: own ? [{ nodeType: 3, textContent: 'sample' }] : [], matches: selector => selector.split(',').some(selector => states.includes(selector)),
     contains(other) { for (let item = other; item; item = item.parentElement) if (item === this) return true; return false; } });
@@ -250,7 +251,7 @@ test('article node swatches use measured CSS defaults and preserve explicit node
   const source = await readFile(new URL('../src/components/themes/ArticleThemeFields.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return { useEffect() {}, useState: value => [value, () => {}] };
     if (id.endsWith('/ColorSwatchButton')) return { ColorSwatchButton: 'swatch' };
@@ -258,7 +259,7 @@ test('article node swatches use measured CSS defaults and preserve explicit node
     if (id.endsWith('/ButtonBar')) return { ButtonBar: 'bar' };
     if (id.endsWith('/themeInspection')) return { ARTICLE_COLOR_LABELS: {} };
     return {};
-  } });
+  }) });
   const find = value => {
     if (Array.isArray(value)) return value.map(find).find(Boolean);
     if (!value?.props) return;
@@ -296,13 +297,13 @@ test('popup remains actionable while crossing preview siblings and cancels its 2
   vm.runInNewContext(code, { module, exports: module.exports, window: win, document: doc,
     MutationObserver: class { observe() {} disconnect() {} },
     setTimeout(fn, delay) { timers.set(++id, { fn, at: now + delay }); return id; }, clearTimeout(id) { timers.delete(id); },
-    require(name) {
+    require: withUILocaleImports(function(name){
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return { jsx, jsxs };
       if (name === 'react-dom') return { createPortal: child => child };
       if (name.endsWith('/themeInspection')) return { uniqueBindings, inspectionDimmedElements, INSPECTION_CLASSES: [] };
       throw Error(name);
-    },
+    }),
   });
   const props = { inspection: { hovered: null, locate(binding) { located = binding.key; }, clear() {} },
     resolve: element => [{ key: element.name, token: `--${element.name}`, label: element.name }] };

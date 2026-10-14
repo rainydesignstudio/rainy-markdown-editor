@@ -1,3 +1,4 @@
+import { ProductError } from "./i18n/productMessages";
 const DATABASE_NAME = 'rainy-editor-directory-bookmark';
 const STORE_NAME = 'handles';
 const LAST_DIRECTORY_KEY = 'last-directory';
@@ -15,7 +16,7 @@ type PermissionHandle = FileSystemDirectoryHandle & {
 
 function openBookmarkDatabase(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') {
-    return Promise.reject(new Error('当前浏览器无法保存上次使用的资料目录。'));
+    return Promise.reject(new ProductError("directoryBookmark.thisBrowserCannotRememberTheLastLibraryDirectory"));
   }
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME, 1);
@@ -27,8 +28,8 @@ function openBookmarkDatabase(): Promise<IDBDatabase> {
       if (blocked) request.result.close();
       else resolve(request.result);
     };
-    request.onerror = () => reject(request.error ?? new Error('无法打开本地目录记录。'));
-    request.onblocked = () => { blocked = true; reject(new Error('本地目录记录正在被其他页面占用。')); };
+    request.onerror = () => reject(request.error ?? new ProductError("directoryBookmark.theLocalDirectoryRecordCouldNotBeOpened"));
+    request.onblocked = () => { blocked = true; reject(new ProductError("directoryBookmark.theLocalDirectoryRecordIsInUseByAnotherPage")); };
   });
 }
 
@@ -65,8 +66,8 @@ export async function loadLastDirectoryHandle(): Promise<FileSystemDirectoryHand
       if (handle && directoryId) directoryIds.set(handle, directoryId);
       resolve(handle);
     };
-    transaction.onerror = () => { database.close(); reject(transaction.error ?? new Error('无法读取上次使用的资料目录。')); };
-    transaction.onabort = () => { database.close(); reject(transaction.error ?? new Error('读取资料目录记录已中止。')); };
+    transaction.onerror = () => { database.close(); reject(transaction.error ?? new ProductError("directoryBookmark.thePreviousLibraryDirectoryCouldNotBeRead")); };
+    transaction.onabort = () => { database.close(); reject(transaction.error ?? new ProductError("directoryBookmark.readingTheLibraryDirectoryRecordWasAborted")); };
   });
 }
 
@@ -85,8 +86,8 @@ export async function saveLastDirectoryHandle(handle: FileSystemDirectoryHandle)
       return;
     }
     transaction.oncomplete = () => { database.close(); directoryIds.set(handle, directoryId); resolve(); };
-    transaction.onerror = () => { database.close(); reject(transaction.error ?? new Error('无法保存上次使用的资料目录。')); };
-    transaction.onabort = () => { database.close(); reject(transaction.error ?? new Error('保存资料目录记录已中止。')); };
+    transaction.onerror = () => { database.close(); reject(transaction.error ?? new ProductError("directoryBookmark.thePreviousLibraryDirectoryCouldNotBeSaved")); };
+    transaction.onabort = () => { database.close(); reject(transaction.error ?? new ProductError("directoryBookmark.savingTheLibraryDirectoryRecordWasAborted")); };
   });
 }
 

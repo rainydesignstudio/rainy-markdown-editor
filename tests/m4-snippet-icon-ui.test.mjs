@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -9,11 +10,11 @@ import { SNIPPET_CATEGORY_ICONS, isSnippetCategoryIcon } from '../src/lib/snippe
 function loadComponent(path, imports) {
   const module = { exports: {} };
   const code = ts.transpileModule(path, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     for (const [suffix, value] of Object.entries(imports)) if (id.endsWith(suffix)) return value;
     throw new Error(`Unexpected import ${id}`);
-  } });
+  }) });
   return module.exports;
 }
 
@@ -50,7 +51,7 @@ test('the shared icon fieldset keeps the current selection and preview inside on
   const nodes = all(tree);
   assert.equal(nodes.find(node => node.type === 'legend').props.children, '分类图标');
   assert.equal(nodes.find(node => node.type === category.IconChoiceGrid).props.value, 'sparkles');
-  assert.deepEqual(Array.from(nodes.find(node => node.type === 'p' && node.props.className === 'mt-3 text-xs text-faint').props.children), ['当前：', '灵感', '，', '分类预览', '：']);
+  assert.equal([nodes.find(node => node.type === 'p' && node.props.className === 'mt-3 text-xs text-faint').props.children].flat(Infinity).join(''), '当前：灵感，分类预览：');
   assert.equal(nodes.find(node => node.type === 'preview-card').props.title, 'Rainy Design');
 });
 

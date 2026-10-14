@@ -1,3 +1,4 @@
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -40,7 +41,7 @@ function settingsPage(systemDark = false) {
     exports: module.exports, module,
     document: { body: {}, getElementById: (id) => ({ focus: () => focus.push(id) }) },
     window: { matchMedia: () => media, addEventListener: (name, callback) => listeners.set(name, callback), removeEventListener: (name) => listeners.delete(name) },
-    require(id) {
+    require: withUILocaleImports(function(id){
       if (id.endsWith('/PageHeading')) return { PageHeading: 'header' };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/ButtonBar')) return { ButtonBar: 'button-bar' };
@@ -56,7 +57,7 @@ function settingsPage(systemDark = false) {
         useEffect(effect, dependencies) { const index = cursor++; const previous = cells[index]; if (previous && dependencies.every((value, i) => Object.is(value, previous.dependencies[i]))) return; effects.push(() => { previous?.cleanup?.(); cells[index] = { dependencies, cleanup: effect() }; }); },
       };
       throw new Error(`Unexpected settings import: ${id}`);
-    },
+    }),
   });
   function render() { cursor = 0; tree = module.exports.SettingsPanel(props); while (effects.length) effects.shift()(); }
   function all(node) { if (Array.isArray(node)) return node.flatMap(all); if (!node || typeof node !== 'object' || !node.props) return []; return [node, ...all(node.props.children)]; }

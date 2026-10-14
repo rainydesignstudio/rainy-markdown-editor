@@ -1,3 +1,4 @@
+import { ProductError } from "./i18n/productMessages";
 import { OPEN_FONT_ASSETS } from './fontCatalog';
 
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
@@ -12,7 +13,7 @@ export async function initializeLocalFonts(root: FileSystemDirectoryHandle, curr
     try { await directory.getFileHandle(name); continue; }
     catch (error) { if (!missing(error)) throw error; }
     const response = await fetch(`/${name}`);
-    if (!response.ok) throw new Error(`无法复制开源字体文件 ${name}（${response.status}）。`);
+    if (!response.ok) throw new ProductError("localFonts.openFontFileCouldNotBeCopied", { "name": name, "responseStatus": response.status });
     const content = await response.arrayBuffer();
     if (!current()) return;
     const file = await directory.getFileHandle(name, { create: true });

@@ -1,3 +1,4 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -68,7 +69,7 @@ function copyFixture({ decision=true, getFile=async()=>file(), placeholder=false
     confirmFormatCheck:async()=>decision,embedClipboardImages,getArticleMediaDirectory:async()=>({getFileHandle:async()=>({getFile:async()=>{reads++;const result=getFile();began();return result}})}),
     setStatus:value=>statuses.push(value),ClipboardItem:class{constructor(types){this.types=types}},navigator:{clipboard:{write:async items=>writes.push(items)}},
   };
-  vm.runInNewContext(ts.transpileModule(`globalThis.copy=${initializer.getText(ast)};`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);
+  vm.runInNewContext(ts.transpileModule(`globalThis.copy=${initializer.getText(ast)};`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,Object.assign(context, productMessages));
   return {copy:context.copy,writes,statuses,context,readStarted,stop(){current=false},get reads(){return reads}};
 }
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import { articlePreviewStyle, previewSurfaceStyle } from '../../lib/article-format/preview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 
@@ -48,6 +50,7 @@ export function PreviewPanel({
   readOnly,
   onOpenTheme,
 }: Props) {
+  const { t } = useUITranslation('editor');
   const liveFormatSnapshot = useFormatSnapshot();
   const formatSnapshot = article.renderSnapshot?.id === liveFormatSnapshot.id ? article.renderSnapshot : liveFormatSnapshot;
   const { dark, toggle } = useArticlePreviewMode();
@@ -115,34 +118,34 @@ export function PreviewPanel({
     <section ref={panelRef} className="panel preview-panel" data-mobile-hidden={mobilePane === 'source'}>
       <div className="panel-header h-18 min-h-18 bg-list px-3 md:px-7.5">
         <div className="flex min-w-0 items-center gap-2 md:gap-6">
-          <InformationButton icon={<InformationIcon book />} title={article.theme.name} subtitle={<span className="flex items-center gap-1.5">v{article.theme.version}{themeUpdateAvailable ? <ThemeUpdateTag /> : null}</span>} onClick={onOpenTheme} disabled={mediaBusy} aria-label={`选择文章主题：${article.theme.name}，版本 ${article.theme.version}${themeUpdateAvailable ? '，可更新' : ''}`} />
+          <InformationButton icon={<InformationIcon book />} title={article.theme.name} subtitle={<span className="flex items-center gap-1.5">v{article.theme.version}{themeUpdateAvailable ? <ThemeUpdateTag /> : null}</span>} onClick={onOpenTheme} disabled={mediaBusy} aria-label={t('editor:preview.themeLabel', { name: article.theme.name, version: article.theme.version, update: themeUpdateAvailable ? t('editor:preview.updateSuffix') : '' })} />
           <PreviewModeSwitch dark={dark} onToggle={toggle} />
         </div>
-        <span className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-faint" role="status"><svg className="size-3.5 text-accent-text" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{article.dirty ? <circle cx="12" cy="12" r="7" /> : <path d="m4 12 5 5L20 6" />}</svg>{article.dirty ? '未保存' : '已保存'}</span>
+        <span className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-faint" role="status"><svg className="size-3.5 text-accent-text" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{article.dirty ? <circle cx="12" cy="12" r="7" /> : <path d="m4 12 5 5L20 6" />}</svg>{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}</span>
       </div>
       <div className="preview-shell" data-preview-mode={dark ? 'dark' : 'light'}>
-        {darkIssue ? <p className="content-library-note" data-tone="error" role="alert">深色转换未完成：{darkIssue}</p> : null}
+        {darkIssue ? <p className="content-library-note" data-tone="error" role="alert">{t('editor:preview.darkIssue', { message: darkIssue })}</p> : null}
         <div ref={lightHostRef} className="min-h-full min-w-0 " style={previewSurfaceStyle()} hidden={dark && !native} />
         {lightTarget ? createPortal(<>{!native ? <style data-article-style="true">{articlePreviewStyle(compiledCss)}</style> : null}
           <ArticleDocument snapshot={formatSnapshot} themeId={article.theme.id} attach={attachPreview} media={media}>
-            {parsed.canCopy && article.themeValid ? <MarkdownPreview source={parsed.body} media={media} snapshot={formatSnapshot} /> : <div className="empty-state"><strong>预览已阻止</strong><p>请先处理 Front Matter 或主题快照诊断。</p></div>}
+            {parsed.canCopy && article.themeValid ? <MarkdownPreview source={parsed.body} media={media} snapshot={formatSnapshot} /> : <div className="empty-state"><strong>{t('editor:preview.blocked')}</strong><p>{t('editor:preview.repair')}</p></div>}
           </ArticleDocument></>, lightTarget) : null}
-        {dark && !native && darkError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">深色预览加载失败，可切回浅色后重试。原稿与复制内容不受影响。</p> : null}
-        {dark && !native ? <iframe ref={darkFrameRef} className="block h-full w-full border-0" title="深色文章预览" sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} /> : null}
+        {dark && !native && darkError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t('editor:preview.darkFailed')}</p> : null}
+        {dark && !native ? <iframe ref={darkFrameRef} className="block h-full w-full border-0" title={t('editor:preview.darkFrame')} sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} /> : null}
       </div>
       <div className="panel-body">
         <section className="clipboard-dock">
           <button className="clipboard-dock-toggle group/dock" type="button" aria-expanded={dockOpen} aria-controls="clipboard-receiver" onClick={() => setDockOpen((current) => !current)}>
-            <span>剪贴板接收区</span>
+            <span>{t('editor:clipboard.title')}</span>
             <svg className="size-4 shrink-0 text-faint transition-transform duration-500 ease-out motion-reduce:transition-none group-aria-expanded/dock:rotate-90" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
           </button>
           <div id="clipboard-receiver" ref={dockBodyRef} className="clipboard-dock-body" inert={!dockOpen}>
             <div className="clipboard-dock-content">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="m-0 min-w-0 text-xs text-muted">复制富文本后在此粘贴，与复制结果逐项比对。</p>
-                <button className="button button-quiet shrink-0" type="button" onClick={() => void onPaste()} disabled={mediaBusy || readOnly || !parsed.canCopy || !article.themeValid}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4h6v3H9zM7 5H5v15h14V5h-2" /><path d="M9 12h6M9 16h4" /></svg>复制后在此粘贴</button>
+                <p className="m-0 min-w-0 text-xs text-muted">{t('editor:clipboard.description')}</p>
+                <button className="button button-quiet shrink-0" type="button" onClick={() => void onPaste()} disabled={mediaBusy || readOnly || !parsed.canCopy || !article.themeValid}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4h6v3H9zM7 5H5v15h14V5h-2" /><path d="M9 12h6M9 16h4" /></svg>{t('editor:clipboard.paste')}</button>
               </div>
-              <div ref={clipboardReceiverRef} className="clipboard-receiver before:pointer-events-none before:text-muted data-[empty=true]:before:content-[attr(aria-placeholder)]" data-preview-mode={dark ? 'dark' : 'light'} contentEditable={!readOnly} suppressContentEditableWarning style={previewSurfaceStyle(dark)} role="textbox" aria-multiline="true" aria-label="富文本剪贴板接收区" aria-placeholder="点击“复制富文本”，再在此处按 ⌘V / Ctrl+V 验证 text/html。" />
+              <div ref={clipboardReceiverRef} className="clipboard-receiver before:pointer-events-none before:text-muted data-[empty=true]:before:content-[attr(aria-placeholder)]" data-preview-mode={dark ? 'dark' : 'light'} contentEditable={!readOnly} suppressContentEditableWarning style={previewSurfaceStyle(dark)} role="textbox" aria-multiline="true" aria-label={t('editor:clipboard.aria')} aria-placeholder={t('editor:clipboard.placeholder')} />
             </div>
           </div>
         </section>

@@ -1,57 +1,55 @@
 'use client';
 
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import { useEffect, useRef } from 'react';
 import { IconButton } from '../global/IconButton';
 
 type InsertIconName = 'heading' | 'quote' | 'link' | 'code' | 'list' | 'ordered-list' | 'task-list' | 'bold' | 'italic' | 'strike' | 'inline-code' | 'table' | 'rule' | 'snippets';
-type InsertItem = { id: string; label: string; content: string; caret: number; icon: InsertIconName };
-type InsertGroup = { id: string; label: string; icon: InsertIconName; items: InsertItem[] };
+type InsertItem = { id: string; content: string; caret: number; icon: InsertIconName };
+type InsertGroup = { id: string; icon: InsertIconName; items: InsertItem[] };
 
 const STANDARD_GROUPS: InsertGroup[] = [
   {
     id: 'headings',
-    label: '标题',
     icon: 'heading',
     items: [
-      { id: 'heading-1', label: '一级标题', content: '# ▌标题', caret: 2, icon: 'heading' },
-      { id: 'heading-2', label: '二级标题', content: '## ▌标题', caret: 3, icon: 'heading' },
-      { id: 'heading-3', label: '三级标题', content: '### ▌标题', caret: 4, icon: 'heading' },
-      { id: 'heading-4', label: '四级标题', content: '#### ▌标题', caret: 5, icon: 'heading' },
-      { id: 'heading-5', label: '五级标题', content: '##### ▌标题', caret: 6, icon: 'heading' },
-      { id: 'heading-6', label: '六级标题', content: '###### ▌标题', caret: 7, icon: 'heading' },
+      { id: 'heading-1', content: '# ▌标题', caret: 2, icon: 'heading' },
+      { id: 'heading-2', content: '## ▌标题', caret: 3, icon: 'heading' },
+      { id: 'heading-3', content: '### ▌标题', caret: 4, icon: 'heading' },
+      { id: 'heading-4', content: '#### ▌标题', caret: 5, icon: 'heading' },
+      { id: 'heading-5', content: '##### ▌标题', caret: 6, icon: 'heading' },
+      { id: 'heading-6', content: '###### ▌标题', caret: 7, icon: 'heading' },
     ],
   },
   {
     id: 'text-formatting',
-    label: '文字格式',
     icon: 'bold',
     items: [
-      { id: 'bold', label: '粗体', content: '**▌粗体文字**', caret: 2, icon: 'bold' },
-      { id: 'italic', label: '斜体', content: '*▌斜体文字*', caret: 1, icon: 'italic' },
-      { id: 'strikethrough', label: '删除线', content: '~~▌删除线~~', caret: 2, icon: 'strike' },
-      { id: 'inline-code', label: '行内代码', content: '▌`行内代码`', caret: 0, icon: 'inline-code' },
-      { id: 'link', label: '链接', content: '[▌链接文字](https://)', caret: 1, icon: 'link' },
+      { id: 'bold', content: '**▌粗体文字**', caret: 2, icon: 'bold' },
+      { id: 'italic', content: '*▌斜体文字*', caret: 1, icon: 'italic' },
+      { id: 'strikethrough', content: '~~▌删除线~~', caret: 2, icon: 'strike' },
+      { id: 'inline-code', content: '▌`行内代码`', caret: 0, icon: 'inline-code' },
+      { id: 'link', content: '[▌链接文字](https://)', caret: 1, icon: 'link' },
     ],
   },
   {
     id: 'lists',
-    label: '列表与表格',
     icon: 'list',
     items: [
-      { id: 'unordered-list', label: '无序列表', content: '- ▌列表项', caret: 2, icon: 'list' },
-      { id: 'ordered-list', label: '有序列表', content: '1. ▌列表项', caret: 3, icon: 'ordered-list' },
-      { id: 'task-list', label: '任务列表', content: '- [ ] ▌待办事项', caret: 6, icon: 'task-list' },
-      { id: 'table', label: '表格', content: '\n| 表头 1 | 表头 2 |\n| --- | --- |\n| ▌内容 | 内容 |\n', caret: 33, icon: 'table' },
+      { id: 'unordered-list', content: '- ▌列表项', caret: 2, icon: 'list' },
+      { id: 'ordered-list', content: '1. ▌列表项', caret: 3, icon: 'ordered-list' },
+      { id: 'task-list', content: '- [ ] ▌待办事项', caret: 6, icon: 'task-list' },
+      { id: 'table', content: '\n| 表头 1 | 表头 2 |\n| --- | --- |\n| ▌内容 | 内容 |\n', caret: 33, icon: 'table' },
     ],
   },
   {
     id: 'blocks',
-    label: '区块',
     icon: 'quote',
     items: [
-      { id: 'quote', label: '引用', content: '> ▌引用内容', caret: 2, icon: 'quote' },
-      { id: 'code-block', label: '代码块', content: "```text\n▌\n```", caret: 8, icon: 'code' },
-      { id: 'rule', label: '分割线', content: '\n---\n', caret: 5, icon: 'rule' },
+      { id: 'quote', content: '> ▌引用内容', caret: 2, icon: 'quote' },
+      { id: 'code-block', content: "```text\n▌\n```", caret: 8, icon: 'code' },
+      { id: 'rule', content: '\n---\n', caret: 5, icon: 'rule' },
     ],
   },
 ];
@@ -93,6 +91,7 @@ export function InsertElementsMenu({
   onOpenSnippetPicker: () => void;
   onInsert: (text: string, caretOffset: number) => void;
 }) {
+  const { t } = useUITranslation('editor');
   const menuRef = useRef<HTMLDetailsElement | null>(null);
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -121,28 +120,28 @@ export function InsertElementsMenu({
   const triggerIcon = <svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 7v10M7 12h10" /></svg>;
 
   if (disabled) {
-    const reason = readOnly ? '归档文档只读' : '当前无法插入元素';
-    return <IconButton disabled tooltip={`插入元素：${reason}`} icon={triggerIcon} />;
+    const reason = readOnly ? t('editor:insert.readOnly') : t('editor:insert.unavailable');
+    return <IconButton disabled tooltip={t('editor:insert.disabled', { reason: reason })} icon={triggerIcon} />;
   }
 
   return (
     <details ref={menuRef} className="insert-elements-menu">
-      <IconButton as="summary" tooltip="插入元素" icon={triggerIcon} />
-      <div className="insert-elements-panel" role="group" aria-label="插入元素">
-        <p className="insert-menu-label">Markdown</p>
+      <IconButton as="summary" tooltip={t('editor:insert.label')} icon={triggerIcon} />
+      <div className="insert-elements-panel" role="group" aria-label={t('editor:insert.label')}>
+        <p className="insert-menu-label">{t('editor:insert.markdown')}</p>
         {STANDARD_GROUPS.map((group) => (
           <details key={group.id} className="insert-standard-category">
-            <summary><InsertIcon name={group.icon} /><span>{group.label}</span><span aria-hidden="true">›</span></summary>
-            <div className="insert-standard-options" role="group" aria-label={group.label}>
-              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{item.label}</span></button>)}
+            <summary><InsertIcon name={group.icon} /><span>{t('editor:insert.groups.' + group.id)}</span><span aria-hidden="true">›</span></summary>
+            <div className="insert-standard-options" role="group" aria-label={t('editor:insert.groups.' + group.id)}>
+              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span></button>)}
             </div>
           </details>
         ))}
-        <p className="insert-menu-label insert-menu-label--divider">图片</p>
-        <button type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); onOpenMediaPicker(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>从素材库选择</span></button>
-        <button type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); onChooseImage(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>选择图片</span></button>
-        <p className="insert-menu-label insert-menu-label--divider">片段库</p>
-        <button type="button" onClick={(event) => { closeInsertMenu(event.currentTarget); onOpenSnippetPicker(); }}><InsertIcon name="snippets" /><span>打开片段库</span></button>
+        <p className="insert-menu-label insert-menu-label--divider">{t('editor:insert.images')}</p>
+        <button type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); onOpenMediaPicker(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>{t('editor:insert.fromLibrary')}</span></button>
+        <button type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); onChooseImage(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>{t('editor:insert.chooseImage')}</span></button>
+        <p className="insert-menu-label insert-menu-label--divider">{t('editor:insert.snippets')}</p>
+        <button type="button" onClick={(event) => { closeInsertMenu(event.currentTarget); onOpenSnippetPicker(); }}><InsertIcon name="snippets" /><span>{t('editor:insert.openSnippets')}</span></button>
       </div>
     </details>
   );

@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { APP_VERSION, APP_VERSION_COMPACT } from '../../lib/appVersion';
 import type { EditorColorMode } from '../../lib/editorWorkspace';
 import type { ViewKey } from '../../hooks/useEditorController';
+import { IconPopover } from './IconPopover';
+import { useUILocale, useUITranslation } from './UILocaleProvider';
+import { UI_LOCALES } from '../../lib/i18n/preferences';
 
-type IconName = 'brand' | 'collapse' | 'articles' | 'assets' | 'themes' | 'templates' | 'settings' | 'sun' | 'moon' | 'system' | 'chevron';
+type IconName = 'brand' | 'collapse' | 'articles' | 'assets' | 'themes' | 'templates' | 'settings' | 'sun' | 'moon' | 'system' | 'language' | 'chevron';
 
 function Icon({ name }: { name: IconName }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -20,15 +23,16 @@ function Icon({ name }: { name: IconName }) {
   if (name === 'sun') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2.5 12h2m15 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>;
   if (name === 'moon') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M19.5 15.7A8.4 8.4 0 0 1 8.3 4.5 8.6 8.6 0 1 0 19.5 15.7Z" /></svg>;
   if (name === 'system') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="3.5" y="4" width="17" height="12" rx="2" /><path d="M9 20h6m-3-4v4" /></svg>;
+  if (name === 'language') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18Z" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="m7 10 5 5 5-5" /></svg>;
 }
 
-const NAV_ITEMS: Array<{ id: ViewKey; label: string; icon: IconName }> = [
-  { id: 'articles', label: '文章', icon: 'articles' },
-  { id: 'themes', label: '主题', icon: 'themes' },
-  { id: 'template', label: '模板', icon: 'templates' },
-  { id: 'assets', label: '素材', icon: 'assets' },
-  { id: 'settings', label: '设置', icon: 'settings' },
+const NAV_ITEMS: Array<{ id: ViewKey; icon: IconName }> = [
+  { id: 'articles', icon: 'articles' },
+  { id: 'themes', icon: 'themes' },
+  { id: 'template', icon: 'templates' },
+  { id: 'assets', icon: 'assets' },
+  { id: 'settings', icon: 'settings' },
 ];
 
 type Props = {
@@ -42,35 +46,36 @@ type Props = {
   onOpenChangelog: () => void;
 };
 
-const COLOR_MODES: Array<{ id: EditorColorMode; label: string; icon: IconName }> = [
-  { id: 'light', label: '浅色模式', icon: 'sun' },
-  { id: 'dark', label: '深色模式', icon: 'moon' },
-  { id: 'system', label: '跟随系统', icon: 'system' },
+const COLOR_MODES: Array<{ id: EditorColorMode; icon: IconName }> = [
+  { id: 'light', icon: 'sun' },
+  { id: 'dark', icon: 'moon' },
+  { id: 'system', icon: 'system' },
 ];
 
-export function MainSidebar({ view, mediaOperation, collapsed, colorMode, onNavigate, onToggleCollapsed, onSetColorMode, onOpenChangelog }: Props) {
-  const modePickerRef = useRef<HTMLDetailsElement | null>(null);
-  const selectedMode = COLOR_MODES.find((mode) => mode.id === colorMode) ?? COLOR_MODES[0];
+const preferenceOption = 'flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-xs text-popup-text hover:bg-hover hover:text-accent-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent aria-checked:bg-accent-soft aria-checked:text-accent-text';
 
-  useEffect(() => {
-    const closeOnOutsideClick = (event: PointerEvent) => {
-      if (modePickerRef.current && !modePickerRef.current.contains(event.target as Node)) modePickerRef.current.open = false;
-    };
-    document.addEventListener('pointerdown', closeOnOutsideClick);
-    return () => document.removeEventListener('pointerdown', closeOnOutsideClick);
-  }, []);
+export function MainSidebar({ view, mediaOperation, collapsed, colorMode, onNavigate, onToggleCollapsed, onSetColorMode, onOpenChangelog }: Props) {
+  const { locale, setLocale, preferenceSaved } = useUILocale();
+  const { t } = useUITranslation();
+  const [openPreference, setOpenPreference] = useState<'mode' | 'language' | null>(null);
+  const selectedMode = COLOR_MODES.find((mode) => mode.id === colorMode) ?? COLOR_MODES[0];
+  useEffect(() => { setOpenPreference(null); }, [collapsed]);
+  const closePreference = () => setOpenPreference(null);
+  const togglePreference = (id: 'mode' | 'language') => setOpenPreference(current => current === id ? null : id);
+  const languageName = t('language.' + locale);
+  const languageTooltip = preferenceSaved === false ? t('language.preferenceUnsaved') : t('language.current', { language: languageName });
 
   return (
-    <aside className="sidebar" data-collapsed={collapsed} aria-label="主导航">
+    <aside className="sidebar" data-collapsed={collapsed} aria-label={t('shell:navigation.label')}>
       <div className="sidebar-brand">
         <div className="flex min-w-0 items-center gap-2.5">
-          {collapsed ? <button className="brand-mark group rounded-lg border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" type="button" onClick={onToggleCollapsed} aria-label="展开主侧栏" data-tooltip="展开主侧栏"><Icon name="brand" /></button> : <span className="brand-mark"><Icon name="brand" /></span>}
-          <div className="brand-copy"><p className="eyebrow whitespace-nowrap text-3xs font-normal">RAINY DESIGN</p><strong>文稿工作台</strong></div>
+          {collapsed ? <button className="brand-mark group rounded-lg border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" type="button" onClick={onToggleCollapsed} aria-label={t('shell:sidebar.expand')} data-tooltip={t('shell:sidebar.expand')}><Icon name="brand" /></button> : <span className="brand-mark"><Icon name="brand" /></span>}
+          <div className="brand-copy"><p className="eyebrow whitespace-nowrap text-3xs font-normal">{t('shell:brand.name')}</p><strong>{t('shell:brand.workspace')}</strong></div>
         </div>
       </div>
-      {collapsed ? null : <button className="sidebar-collapse md:right-2.5 md:w-8 md:opacity-50 hover:opacity-100" type="button" onClick={onToggleCollapsed} aria-label="折叠主侧栏" data-tooltip="折叠主侧栏"><Icon name="collapse" /></button>}
+      {collapsed ? null : <button className="sidebar-collapse md:right-2.5 md:w-8 md:opacity-50 hover:opacity-100" type="button" onClick={onToggleCollapsed} aria-label={t('shell:sidebar.collapse')} data-tooltip={t('shell:sidebar.collapse')}><Icon name="collapse" /></button>}
 
-      <nav className="sidebar-nav" aria-label="工作区">
+      <nav className="sidebar-nav" aria-label={t('shell:navigation.workspace')}>
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -78,27 +83,32 @@ export function MainSidebar({ view, mediaOperation, collapsed, colorMode, onNavi
             type="button"
             data-active={view === item.id}
             aria-current={view === item.id ? 'page' : undefined}
-            aria-label={item.label}
-            data-tooltip={item.label}
+            aria-label={t('shell:navigation.' + item.id)}
+            data-tooltip={t('shell:navigation.' + item.id)}
             onClick={() => onNavigate(item.id)}
             disabled={mediaOperation !== null}
           >
             <span className="absolute bottom-3 left-0 top-3 w-0.5 rounded-full bg-accent-text opacity-0 group-aria-[current=page]:opacity-100" aria-hidden="true" /><span className="nav-icon text-faint transition-colors group-hover:text-primary group-aria-[current=page]:text-accent-text"><Icon name={item.icon} /></span>
-            <span className="nav-copy">{item.label}</span>
+            <span className="nav-copy">{t('shell:navigation.' + item.id)}</span>
           </button>
         ))}
       </nav>
 
       <footer className="sidebar-footer">
-        <details ref={modePickerRef} className="mode-picker" onKeyDown={(event) => { if (event.key === 'Escape') { modePickerRef.current!.open = false; modePickerRef.current?.querySelector('summary')?.focus(); } }}>
-          <summary className="mode-picker-trigger" aria-label={`显示模式：${selectedMode.label}`}><Icon name={selectedMode.icon} /><span className="mode-copy">{selectedMode.label}</span><Icon name="chevron" /></summary>
-          <div className="mode-picker-menu" role="group" aria-label="选择显示模式">
-            {COLOR_MODES.map((mode) => <button key={mode.id} type="button" aria-label={mode.label} aria-pressed={colorMode === mode.id} onClick={() => { onSetColorMode(mode.id); modePickerRef.current!.open = false; modePickerRef.current?.querySelector('summary')?.focus(); }}><Icon name={mode.icon} /><span>{mode.label}</span></button>)}
-          </div>
-        </details>
-        <button className="version-button" type="button" aria-label={`Rainy 文稿台 v${APP_VERSION}，查看更新记录`} onClick={onOpenChangelog} data-tooltip="查看更新记录">
-          <span className="version-copy">Rainy 文稿台 v{APP_VERSION}</span><span className="version-compact" aria-hidden="true">v{APP_VERSION_COMPACT}</span>
+        <div className="mode-picker">
+          <IconPopover label={t('displayMode.current', { mode: t('displayMode.' + selectedMode.id) })} icon={<Icon name={selectedMode.icon} />} open={openPreference === 'mode'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{t('displayMode.' + selectedMode.id)}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('mode')} onClose={closePreference}>
+            {COLOR_MODES.map(mode => <button key={mode.id} type="button" role="menuitemradio" aria-checked={colorMode === mode.id} className={preferenceOption} onClick={() => { onSetColorMode(mode.id); closePreference(); }}><span className="grid size-4 shrink-0 place-items-center [&_svg]:size-4"><Icon name={mode.icon} /></span><span>{t('displayMode.' + mode.id)}</span></button>)}
+          </IconPopover>
+        </div>
+        <button className="version-button" type="button" aria-label={t('shell:updates.aria', { title: t('common:app.title'), version: APP_VERSION })} onClick={onOpenChangelog} data-tooltip={t('shell:updates.open')}>
+          <span className="version-copy">{t('common:app.title')} v{APP_VERSION}</span><span className="version-compact" aria-hidden="true">v{APP_VERSION_COMPACT}</span>
         </button>
+        <div className="mode-picker">
+          <IconPopover label={t('language.title')} tooltip={languageTooltip} icon={<Icon name="language" />} open={openPreference === 'language'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{languageName}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('language')} onClose={closePreference}>
+            {UI_LOCALES.map(option => <button key={option} type="button" role="menuitemradio" aria-checked={locale === option} lang={option} className={preferenceOption} onClick={() => { closePreference(); void setLocale(option); }}><span className="grid size-4 shrink-0 place-items-center" aria-hidden="true">{locale === option ? '✓' : ''}</span><span>{t('language.' + option)}</span></button>)}
+          </IconPopover>
+        </div>
+        <span className="sr-only" role="status">{preferenceSaved === false ? t('language.preferenceUnsaved') : ''}</span>
       </footer>
     </aside>
   );

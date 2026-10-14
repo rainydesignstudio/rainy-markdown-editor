@@ -135,7 +135,7 @@
   }
 
   .mode-picker-trigger {
-    @apply flex min-h-10 min-w-max cursor-pointer list-none items-center justify-center gap-2.5 rounded-lg border border-line-strong bg-list px-2.5 text-xs text-muted transition;
+    @apply flex min-h-10 min-w-max cursor-pointer items-center justify-center gap-2.5 rounded-lg border border-line-strong bg-list px-2.5 text-xs text-muted transition;
 
     @variant md {
       @apply w-full min-w-0 p-0;
@@ -155,10 +155,6 @@
 
   }
 
-  .mode-picker-trigger::-webkit-details-marker {
-    @apply hidden;
-  }
-
   .mode-picker-trigger svg {
     @apply size-4;
   }
@@ -169,34 +165,6 @@
     @variant lg {
       @apply ml-auto block;
     }
-  }
-
-  .mode-picker-menu {
-    @apply absolute top-full right-0 z-50 mt-2 grid min-w-36 gap-1 rounded-lg border border-line-strong bg-popup-bg p-1.5 text-popup-text shadow-(--editor-popup-shadow);
-
-    @variant md {
-      @apply top-auto right-auto bottom-full left-0 mt-0 mb-2;
-    }
-  }
-
-  .mode-picker-menu button {
-    @apply flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-xs text-popup-text;
-
-    @variant hover {
-      @apply bg-hover text-accent-text;
-    }
-
-    @variant focus-visible {
-      @apply outline-2 outline-offset-1 outline-accent;
-    }
-
-    @variant aria-pressed {
-      @apply bg-accent-soft text-accent-text;
-    }
-  }
-
-  .mode-picker-menu svg {
-    @apply size-4;
   }
 
   .mode-copy {

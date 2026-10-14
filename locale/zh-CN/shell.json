@@ -1,0 +1,34 @@
+{
+  "brand": {
+    "workspace": "文稿工作台",
+    "name": "RAINY DESIGN"
+  },
+  "navigation": {
+    "label": "主导航",
+    "workspace": "工作区",
+    "articles": "文章",
+    "themes": "主题",
+    "template": "模板",
+    "assets": "素材",
+    "settings": "设置"
+  },
+  "views": {
+    "articles": "文章",
+    "themes": "文章主题",
+    "template": "模板",
+    "assets": "素材",
+    "settings": "设置"
+  },
+  "sidebar": {
+    "expand": "展开主侧栏",
+    "collapse": "折叠主侧栏"
+  },
+  "updates": {
+    "open": "查看更新记录",
+    "aria": "{{title}} v{{version}}，查看更新记录"
+  },
+  "eyebrow": {
+    "workspace": "WORKSPACE",
+    "articles": "RAINY WORKSPACE"
+  }
+}

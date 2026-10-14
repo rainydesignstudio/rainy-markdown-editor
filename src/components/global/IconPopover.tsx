@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom';
 import { IconButton } from './IconButton';
 
 /** Controlled by the toolbar so opening one control closes its sibling. */
-export function IconPopover({ label, tooltip = label, icon, open, disabled = false, kind = 'menu', onToggle, onClose, children }: {
+export function IconPopover({ label, tooltip = label, icon, open, disabled = false, kind = 'menu', triggerVariant = 'surface', triggerChildren, onToggle, onClose, children }: {
   label: string; tooltip?: ReactNode; icon: ReactNode; open: boolean; disabled?: boolean;
   kind?: 'menu' | 'dialog'; onToggle: () => void; onClose: () => void; children: ReactNode;
+  triggerVariant?: 'surface' | 'inline' | 'preference'; triggerChildren?: ReactNode;
 }) {
   const id = useId();
   const triggerRef = useRef<HTMLSpanElement>(null);
@@ -26,7 +27,7 @@ export function IconPopover({ label, tooltip = label, icon, open, disabled = fal
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
-    (panel?.querySelector<HTMLElement>('[aria-checked="true"], button:not(:disabled), input:not(:disabled)') ?? panel)?.focus();
+    (panel?.querySelector<HTMLElement>('[aria-checked="true"]') ?? panel?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)') ?? panel)?.focus();
     const outside = (event: PointerEvent) => {
       if (event.target instanceof Node && !panelRef.current?.contains(event.target) && !triggerRef.current?.contains(event.target)) closeRef.current();
     };
@@ -44,8 +45,8 @@ export function IconPopover({ label, tooltip = label, icon, open, disabled = fal
   }, [open]);
 
   return <>
-    <span ref={triggerRef} className="inline-flex shrink-0"><IconButton icon={icon} tooltip={tooltip} aria-label={label} aria-haspopup={kind} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={onToggle} /></span>
-    {open && typeof document !== 'undefined' ? createPortal(<div ref={panelRef} id={id} role={kind} aria-label={label} tabIndex={-1} className="fixed z-60 grid max-h-80 w-56 gap-0.5 overflow-x-clip overflow-y-auto rounded-lg border border-line-strong bg-popup-bg p-1.5 text-xs text-popup-text shadow-(--editor-popup-shadow) scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" style={position} onKeyDown={event => {
+    <span ref={triggerRef} className={triggerVariant === 'preference' ? 'flex w-full shrink-0' : 'inline-flex shrink-0'}><IconButton variant={triggerVariant} icon={icon} tooltip={tooltip} aria-label={label} aria-haspopup={kind} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={onToggle}>{triggerChildren}</IconButton></span>
+    {open && typeof document !== 'undefined' ? createPortal(<div ref={panelRef} id={id} data-variant={triggerVariant} role={kind} aria-label={label} tabIndex={-1} className="fixed z-60 grid max-h-80 w-56 gap-0.5 data-[variant=preference]:w-max data-[variant=preference]:min-w-36 data-[variant=preference]:gap-1 overflow-x-clip overflow-y-auto rounded-lg border border-line-strong bg-popup-bg p-1.5 text-xs text-popup-text shadow-(--editor-popup-shadow) scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" style={position} onKeyDown={event => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeRef.current(); return; }
       const focusable = Array.from(panelRef.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]') ?? []);
       if (event.key === 'Tab' && focusable.length) {

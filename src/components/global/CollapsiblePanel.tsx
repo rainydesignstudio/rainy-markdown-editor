@@ -1,11 +1,15 @@
 'use client';
 
+import { useUILocale } from './UILocaleProvider';
+import { formatUINumber } from '../../lib/i18n/formatters';
+
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 export function PanelHeading({ title, icon, count, expanded, reserveAction = false, details, className = '', children, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'title'> & {
   title: ReactNode; icon?: ReactNode; count?: number; expanded?: boolean; reserveAction?: boolean; details?: ReactNode;
 }) {
-  const heading = <>{icon}<span className="min-w-0 flex-1 truncate">{title}</span>{reserveAction ? <span className="size-8 shrink-0" aria-hidden="true" /> : null}{count !== undefined ? <span className="w-6 shrink-0 text-center font-mono text-xs font-normal text-faint">{count}</span> : null}
+  const { locale } = useUILocale();
+  const heading = <>{icon}<span className="min-w-0 flex-1 truncate">{title}</span>{reserveAction ? <span className="size-8 shrink-0" aria-hidden="true" /> : null}{count !== undefined ? <span className="w-6 shrink-0 text-center font-mono text-xs font-normal text-faint">{formatUINumber(count, locale)}</span> : null}
     {expanded !== undefined ? <svg className="size-4 shrink-0 text-faint group-aria-expanded/panel:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg> : children}</>;
   return <button {...props} type="button" className={`panel-heading group/panel ${className}`} aria-expanded={expanded}>
     {details ? <><span className="flex w-full min-w-0 items-center gap-2">{heading}</span>{details}</> : heading}

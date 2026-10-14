@@ -1,4 +1,6 @@
 'use client';
+import { useUITranslation } from '../global/UILocaleProvider';
+import { productText, formatProductMessage } from '../../lib/i18n/productMessages';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { readLibraryFile } from '../../lib/article-format/styles';
 
@@ -6,6 +8,7 @@ export function LibraryArticleImage({ root, path, cachedUrl, source, imageProps 
   root: FileSystemDirectoryHandle | null; path: string; cachedUrl?: string;
   source: string; imageProps: Omit<ComponentProps<'img'>, 'src'>;
 }) {
+  const { t } = useUITranslation('messages');
   const [result, setResult] = useState<{ path: string; url: string; issue?: string } | null>(null);
   useEffect(() => {
     let active = true, url: string | undefined;
@@ -19,6 +22,6 @@ export function LibraryArticleImage({ root, path, cachedUrl, source, imageProps 
     }).catch(error => { if (active) setResult({ path, url: '', issue: error instanceof Error ? error.message : String(error) }); });
     return () => { active = false; if (url) URL.revokeObjectURL(url); };
   }, [root, path, cachedUrl]);
-  if (!result?.url || result.path !== path) return <span role="img" aria-label={'本地图片待补：' + path} data-local-asset-src={source} title={result?.issue}>本地图片待补 · {path}</span>;
-  return <img {...imageProps} src={result.url} data-local-asset-src={source} data-library-asset-path={path} onError={() => setResult({ path, url: '', issue: '浏览器无法解码资源：' + path })} />;
+  if (!result?.url || result.path !== path) return <span role="img" aria-label={t('messages:image.missingLabel', { path })} data-local-asset-src={source} title={result?.issue ? formatProductMessage(result.issue, t) : undefined}>{t('messages:image.missing', { path })}</span>;
+  return <img {...imageProps} src={result.url} data-local-asset-src={source} data-library-asset-path={path} onError={() => setResult({ path, url: '', issue: productText('image.decodeResourceFailed', { path }) })} />;
 }

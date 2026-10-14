@@ -1,3 +1,5 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -15,7 +17,8 @@ function dialog(onCreate = async () => ({ status: 'created' })) {
   const cells = [], requests = [];
   let cursor = 0, tree, closes = 0;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, Error, require(id) {
+  vm.runInNewContext(code, {
+...productMessages, module, exports: module.exports, Error, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/fileSystem')) return { normalizeDataDirectoryName };
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'frame', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'dialog-button' };
@@ -24,7 +27,7 @@ function dialog(onCreate = async () => ({ status: 'created' })) {
       useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; },
     };
     throw new Error(id);
-  } });
+  }) });
   const render = () => { cursor = 0; tree = nodes(module.exports.CreateLibraryDialog({ onCreate: name => { requests.push(name); return onCreate(name); }, onClose: () => closes++ })); };
   const find = predicate => { const node = tree.find(predicate); assert.ok(node); return node; };
   const result = { render, find, requests, get closes() { return closes; }, input: () => find(node => node.type === 'input'),
@@ -87,7 +90,7 @@ function action(name, next, context) {
   const start = controllerSource.indexOf(`  const ${name} = useCallback(`);
   const end = controllerSource.indexOf(`\n\n  const ${next}`, start);
   assert.ok(start >= 0 && end > start);
-  vm.runInNewContext(ts.transpileModule(controllerSource.slice(start, end) + `\nglobalThis.action = ${name};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+  vm.runInNewContext(ts.transpileModule(controllerSource.slice(start, end) + `\nglobalThis.action = ${name};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
   return context.action;
 }
 

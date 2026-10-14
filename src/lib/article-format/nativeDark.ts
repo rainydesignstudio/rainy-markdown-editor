@@ -1,3 +1,4 @@
+import { ProductError } from "../i18n/productMessages";
 import { formatPreviewDocument } from './frame';
 import { assertCurrentFormat, type FormatSnapshot } from './runtime';
 
@@ -13,8 +14,8 @@ export async function nativeDarkRendition(root: HTMLElement, css: string, snapsh
   // Its input is a clone of the sanitized React document.
   return new Promise((resolve, reject) => {
     let done = false, observer: MutationObserver | undefined;
-    const timeout = window.setTimeout(() => finish(new Error('深色转换超时。')), 20000);
-    const abort = () => finish(new Error('深色转换已取消。'));
+    const timeout = window.setTimeout(() => finish(new ProductError("runtime.darkTimeout")), 20000);
+    const abort = () => finish(new ProductError("runtime.darkCancelled"));
     const finish = (error?: Error) => {
       if (done) return; done = true;
       clearTimeout(timeout); signal.removeEventListener('abort', abort); observer?.disconnect();
@@ -22,14 +23,14 @@ export async function nativeDarkRendition(root: HTMLElement, css: string, snapsh
         if (error) throw error;
         assertCurrentFormat(snapshot);
         const doc = frame.contentDocument!, element = doc.querySelector<HTMLElement>('[data-article-content-root],.article-preview');
-        if (!element) throw new Error('转换后的文章根节点缺失。');
+        if (!element) throw new ProductError("runtime.darkRootMissing");
         resolve({ html: element.outerHTML, css: [...doc.head.querySelectorAll('style')].map(style => style.textContent ?? '').join('\n') });
       } catch (cause) { reject(cause); }
       finally { frame.remove(); }
     };
     frame.onload = () => {
       const doc = frame.contentDocument;
-      if (!doc) { finish(new Error('深色转换文档无法访问。')); return; }
+      if (!doc) { finish(new ProductError("runtime.darkDocumentUnavailable")); return; }
       const inspect = () => {
         if (doc.body.dataset.previewError) finish(new Error(doc.body.dataset.previewError));
         else if (doc.body.dataset.previewReady === 'true') finish();

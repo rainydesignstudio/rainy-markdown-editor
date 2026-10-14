@@ -1,3 +1,4 @@
+import { ProductError, productCause, productJoin, productMessage, productReference, productText, type ProductMessageFields, type ProductMessageValue } from "./i18n/productMessages";
 import { EDITOR_THEME_TEMPLATE_JSON, LEGACY_MIST_THEME_JSON } from '../themes/editor-themes/index';
 import { codeFontStack } from './fontCatalog';
 
@@ -103,72 +104,76 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function exactKeys(record: Record<string, unknown>, expected: readonly string[], label: string, errors: string[]): void {
+function exactKeys(record: Record<string, unknown>, expected: readonly string[], label: ProductMessageValue, errors: ProductMessageFields[]): void {
   const required = new Set(expected);
-  for (const key of expected) if (!(key in record)) errors.push(`${label}缺少 ${key}。`);
-  for (const key of Object.keys(record)) if (!required.has(key)) errors.push(`${label}含未知字段 ${key}。`);
+  for (const key of expected) if (!(key in record)) errors.push(productMessage("editorThemes.isMissing", { "label": label, "key": key }));
+  for (const key of Object.keys(record)) if (!required.has(key)) errors.push(productMessage("editorThemes.containsUnknownField", { "label": label, "key": key }));
 }
 
-export function validateEditorTheme(value: unknown): string[] {
-  const errors: string[] = [];
-  if (!isRecord(value)) return ['Editor theme 顶层必须是对象。'];
+export function inspectEditorTheme(value: unknown): ProductMessageFields[] {
+  const errors: ProductMessageFields[] = [];
+  if (!isRecord(value)) return [productMessage("editorThemes.theTopLevelOfAnEditorThemeMustBeAnObject")];
   exactKeys(value, ['kind', 'id', 'name', 'version', 'formatVersion', 'palette', 'colors', 'fonts', ...('surfaces' in value ? ['surfaces'] : [])], 'Editor theme', errors);
-  if (value.kind !== 'editor-theme') errors.push('主题 kind 必须是 editor-theme。');
-  if (typeof value.id !== 'string' || !ID_PATTERN.test(value.id)) errors.push('主题 ID 仅支持小写字母、数字和连字符，长度不超过48。');
-  if (typeof value.name !== 'string' || !value.name.trim() || value.name.length > 80) errors.push('主题名称须为1–80字符。');
-  if (typeof value.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.version)) errors.push('主题版本须为三段数字。');
-  if (![1, 2, 3, 4].includes(value.formatVersion as number)) errors.push('Editor theme formatVersion 仅支持1、2、3或4。');
+  if (value.kind !== 'editor-theme') errors.push(productMessage("editorThemes.themeKindMustBeEditorTheme"));
+  if (typeof value.id !== 'string' || !ID_PATTERN.test(value.id)) errors.push(productMessage("editorThemes.theThemeIdAcceptsLowercaseLettersNumbersAndHyphensOnlyWithAt"));
+  if (typeof value.name !== 'string' || !value.name.trim() || value.name.length > 80) errors.push(productMessage("editorThemes.theThemeNameMustContain180Characters"));
+  if (typeof value.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.version)) errors.push(productMessage("editorThemes.theThemeVersionMustContainThreeNumericSegments"));
+  if (![1, 2, 3, 4].includes(value.formatVersion as number)) errors.push(productMessage("editorThemes.editorThemeFormatversionSupportsOnly123Or4"));
 
   const palette = value.palette;
   if (!isRecord(palette) || !Object.keys(palette).length || Object.keys(palette).length > 100) {
-    errors.push('主题 palette 须含1–100个颜色。');
+    errors.push(productMessage("editorThemes.theThemePaletteMustContain1100Colors"));
   } else {
     for (const [key, color] of Object.entries(palette)) {
       if (!PALETTE_KEY_PATTERN.test(key) || typeof color !== 'string' || !COLOR_PATTERN.test(color)) {
-        errors.push(`色板 ${key} 只允许不含透明度的十六进制颜色。`);
+        errors.push(productMessage("editorThemes.paletteEntryAcceptsHexColorsWithoutTransparencyOnly", { "key": key }));
       }
     }
   }
-  if ('surfaces' in value && (!isRecord(palette) || !validEditorThemeSurfaces(value.surfaces, palette))) errors.push('主题 surfaces 须为明暗两套色板引用、有限透明度及固定数量的渐变色。');
+  if ('surfaces' in value && (!isRecord(palette) || !validEditorThemeSurfaces(value.surfaces, palette))) errors.push(productMessage("editorThemes.themeSurfacesRequireLightAndDarkPaletteReferencesBoundedOpacityAndA"));
 
-  if (!isRecord(value.colors)) errors.push('主题 colors 必须包含 light 和 dark。');
+  if (!isRecord(value.colors)) errors.push(productMessage("editorThemes.themeColorsMustContainLightAndDark"));
   else {
-    exactKeys(value.colors, ['light', 'dark'], '主题 colors', errors);
+    exactKeys(value.colors, ['light', 'dark'], productReference("editorThemes.themeColors"), errors);
     for (const mode of ['light', 'dark'] as const) {
       const roles = value.colors[mode];
       if (!isRecord(roles)) {
-        errors.push(`${mode}颜色角色必须是对象。`);
+        errors.push(productMessage("editorThemes.theColorRolesMustBeAnObject", { "mode": mode }));
         continue;
       }
-      exactKeys(roles, EDITOR_COLOR_ROLES, `${mode}颜色角色`, errors);
+      exactKeys(roles, EDITOR_COLOR_ROLES, productReference("editorThemes.colorRoles", { "mode": mode }), errors);
       for (const [role, key] of Object.entries(roles)) {
-        if (typeof key !== 'string' || !isRecord(palette) || !(key in palette)) errors.push(`${mode}.${role}未引用有效色板颜色。`);
+        if (typeof key !== 'string' || !isRecord(palette) || !(key in palette)) errors.push(productMessage("editorThemes.doesNotReferenceAValidPaletteColor", { "mode": mode, "role": role }));
       }
     }
   }
 
-  if (!isRecord(value.fonts)) errors.push('主题 fonts 必须是对象。');
+  if (!isRecord(value.fonts)) errors.push(productMessage("editorThemes.themeFontsMustBeAnObject"));
   else {
     // Older v2 files inherit the UI font for eyebrows without rewriting the file.
     const expectedFonts = value.formatVersion === 1 ? LEGACY_FONT_ROLES : value.formatVersion === 2
       ? [...LEGACY_FONT_ROLES, 'heading', ...('eyebrow' in value.fonts ? ['eyebrow'] : [])] : value.formatVersion === 3 ? V3_FONT_ROLES : FONT_ROLES;
-    exactKeys(value.fonts, expectedFonts, '主题 fonts', errors);
+    exactKeys(value.fonts, expectedFonts, productReference("editorThemes.themeFonts"), errors);
     for (const [role, stack] of Object.entries(value.fonts)) {
       if (typeof stack !== 'string' || !stack.trim() || stack.length > 180 || !FONT_PATTERN.test(stack)) {
-        errors.push(`字体 ${role} 不受支持或不安全。`);
+        errors.push(productMessage("editorThemes.fontIsUnsupportedOrUnsafe", { "role": role }));
       }
     }
   }
   return errors;
 }
 
+export function validateEditorTheme(value: unknown): string[] {
+  return inspectEditorTheme(value).map(issue => issue.message);
+}
+
 export function parseEditorThemeJson(source: string): EditorTheme {
-  if (source.length > 60_000) throw new Error('Editor theme JSON 超过60,000字符。');
+  if (source.length > 60_000) throw new ProductError("editorThemes.editorThemeJsonExceeds60000Characters");
   let parsed: unknown;
   try { parsed = JSON.parse(source); }
-  catch (error) { throw new Error(`Editor theme JSON 无效：${error instanceof Error ? error.message : String(error)}`); }
-  const errors = validateEditorTheme(parsed);
-  if (errors.length) throw new Error(errors.join('；'));
+  catch (error) { throw new ProductError("editorThemes.editorThemeJsonIsInvalid", { "cause": productCause(error) }); }
+  const errors = inspectEditorTheme(parsed);
+  if (errors.length) throw new ProductError('shared.compose', { parts: productJoin(errors, '；') });
   const theme = parsed as EditorTheme;
   const legacy = (parsed as { formatVersion: number }).formatVersion < 4;
   return { ...theme, formatVersion: 4, fonts: { ...theme.fonts,
@@ -199,7 +204,7 @@ export function composeLegacyEditorTheme(preset: string, accent: string, font: s
   const legacyThemes = BUILTIN_EDITOR_THEMES.map((theme) => theme.id === 'mist' ? parseEditorThemeJson(JSON.stringify(LEGACY_MIST_THEME_JSON)) : theme);
   const neutral = findEditorTheme(legacyThemes, preset);
   const accentTheme = findEditorTheme(legacyThemes, { teal: 'sea-glass', moss: 'linen', berry: 'mist' }[accent] ?? '');
-  if (!neutral || !accentTheme || !['sans', 'serif'].includes(font)) throw new Error('旧外观选项无法迁移。');
+  if (!neutral || !accentTheme || !['sans', 'serif'].includes(font)) throw new ProductError("editorThemes.legacyAppearanceOptionsCannotBeMigrated");
   const accentRoles = new Set<EditorColorRole>(['accent', 'accent-strong', 'accent-text', 'accent-soft', 'accent-line', 'selection']);
   const colors = Object.fromEntries((['light', 'dark'] as const).map((mode) => [mode,
     Object.fromEntries(EDITOR_COLOR_ROLES.map((role) => [role,
@@ -207,11 +212,11 @@ export function composeLegacyEditorTheme(preset: string, accent: string, font: s
     ])),
   ])) as EditorTheme['colors'];
   const theme: EditorTheme = {
-    kind: 'editor-theme', id: `legacy-${preset}-${accent}-${font}`, name: '旧外观迁移', version: '1.0.0', formatVersion: 4,
+    kind: 'editor-theme', id: `legacy-${preset}-${accent}-${font}`, name: productText("editorThemes.legacyAppearanceMigration"), version: '1.0.0', formatVersion: 4,
     palette: { ...neutral.palette, ...accentTheme.palette }, colors,
     fonts: { ...neutral.fonts, ui: font === 'serif' ? neutral.fonts.serif : BASE_EDITOR_THEME.fonts.ui, heading: font === 'serif' ? neutral.fonts.serif : BASE_EDITOR_THEME.fonts.ui, subHeading: font === 'serif' ? neutral.fonts.serif : BASE_EDITOR_THEME.fonts.ui, eyebrow: font === 'serif' ? neutral.fonts.serif : BASE_EDITOR_THEME.fonts.ui },
   };
-  const errors = validateEditorTheme(theme);
-  if (errors.length) throw new Error(`旧外观迁移失败：${errors.join('；')}`);
+  const errors = inspectEditorTheme(theme);
+  if (errors.length) throw new ProductError("editorThemes.legacyAppearanceMigrationFailed", { "details": productJoin(errors, '；') });
   return theme;
 }

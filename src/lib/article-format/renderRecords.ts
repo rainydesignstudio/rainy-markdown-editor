@@ -1,3 +1,4 @@
+import { ProductError, productJoin, productReference, productText } from "../i18n/productMessages";
 import postcss from 'postcss';
 import { canonicalFormatJson, compileFormatBundle, DEFAULT_FORMAT_BUNDLE, type FormatFormatter, type RawFormatter } from './config';
 import { getFormatSnapshot, type FormatSnapshot } from './runtime';
@@ -42,22 +43,22 @@ function checkedFormatter(raw: RawFormatter): FormatFormatter {
   return compileFormatBundle(seed).formatter;
 }
 export function validateRenderRecord(value: unknown): RenderRecord {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('render.json必须是对象。');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("renderRecords.renderJsonMustBeAnObject");
   const record = value as RenderRecord;
   if (record.owner !== OWNER || record.schemaVersion !== 1 || !HASH.test(record.bodyHash) || !HASH.test(record.themeHash) || !HASH.test(record.environmentHash) ||
-      typeof record.html !== 'string' || typeof record.css !== 'string' || !Array.isArray(record.assets) || record.assets.length > STYLE_LIMITS.assets) throw new Error('渲染记录协议无效。');
-  if (record.html.length + record.css.length > STYLE_LIMITS.cssBytes) throw new Error('渲染记录超过大小上限。');
-  if (canonicalFormatJson(checkedFormatter(record.rawFormatter)) !== canonicalFormatJson(record.formatter)) throw new Error('渲染配置与已校验步骤不一致。');
+      typeof record.html !== 'string' || typeof record.css !== 'string' || !Array.isArray(record.assets) || record.assets.length > STYLE_LIMITS.assets) throw new ProductError("renderRecords.theRenderRecordProtocolIsInvalid");
+  if (record.html.length + record.css.length > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderRecordExceedsTheSizeLimit");
+  if (canonicalFormatJson(checkedFormatter(record.rawFormatter)) !== canonicalFormatJson(record.formatter)) throw new ProductError("renderRecords.theRenderConfigurationDoesNotMatchTheValidatedSteps");
   assertPortableStyles(record.css);
   for (const asset of record.assets) {
-    if (!HASH.test(asset.hash) || typeof asset.path !== 'string' || !/^(image|font)\//.test(asset.mime) || normalizeLibraryPath(asset.path) !== asset.path) throw new Error('渲染资源引用无效。');
+    if (!HASH.test(asset.hash) || typeof asset.path !== 'string' || !/^(image|font)\//.test(asset.mime) || normalizeLibraryPath(asset.path) !== asset.path) throw new ProductError("renderRecords.theRenderResourceReferenceIsInvalid");
   }
   return record;
 }
 export async function readRenderRecord(target: FileSystemDirectoryHandle): Promise<RenderRecord | null> {
   try {
     const file = await (await target.getFileHandle('render.json')).getFile();
-    if (file.size > STYLE_LIMITS.cssBytes) throw new Error('渲染记录过大。');
+    if (file.size > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderRecordIsTooLarge");
     return validateRenderRecord(JSON.parse(await file.text()));
   } catch (error) { if (missing(error)) return null; throw error; }
 }
@@ -70,7 +71,7 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
   const assets: CssAsset[] = [...(environment?.assets ?? [])];
   const clone = element.cloneNode(true) as HTMLElement;
   if (options.root) {
-    if (element.querySelector('span[data-local-asset-src],span[data-local-asset-srcset]')) throw new Error('本地图片未载入，渲染记录未生成。');
+    if (element.querySelector('span[data-local-asset-src],span[data-local-asset-srcset]')) throw new ProductError("renderRecords.localImagesAreNotLoadedNoRenderRecordWasGenerated");
     const images = Array.from(clone.querySelectorAll<HTMLImageElement>('img[data-local-asset-src]'));
     const liveImages = Array.from(element.querySelectorAll<HTMLImageElement>('img[data-local-asset-src]'));
     for (let index = 0; index < images.length; index++) {
@@ -82,14 +83,14 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
         const blob = await readLibraryFile(options.root, path);
         const extension = path.split('.').at(-1)?.toLowerCase();
         const mime = blob.type || ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', webp: 'image/webp', avif: 'image/avif', gif: 'image/gif' } as Record<string, string>)[extension ?? ''];
-        if (!mime?.startsWith('image/')) throw new Error('渲染图片类型无效：' + path);
+        if (!mime?.startsWith('image/')) throw new ProductError('shared.compose', { parts: productJoin([productReference("renderRecords.invalidRenderImageType"), path]) });
         asset = { path, hash: await contentHash(blob), mime, blob, url: live.getAttribute('src') ?? '' };
         assets.push(asset);
       }
       image.src = 'article-asset:' + asset.hash;
     }
   }
-  if (assets.length > STYLE_LIMITS.assets || assets.reduce((sum, item) => sum + item.blob.size, 0) > STYLE_LIMITS.assetBytes) throw new Error('渲染资源超过上限。');
+  if (assets.length > STYLE_LIMITS.assets || assets.reduce((sum, item) => sum + item.blob.size, 0) > STYLE_LIMITS.assetBytes) throw new ProductError("renderRecords.renderResourcesExceedTheLimit");
   let html = clone.outerHTML, storedCss = css;
   for (const asset of assets) {
     if (asset.url) {
@@ -97,7 +98,7 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
       storedCss = storedCss.replaceAll(asset.url, 'article-asset:' + asset.hash);
     }
   }
-  if (/blob:/i.test(html + storedCss)) throw new Error('仍有未留存的临时资源，渲染记录未生成。');
+  if (/blob:/i.test(html + storedCss)) throw new ProductError("renderRecords.temporaryResourcesRemainUnsavedNoRenderRecordWasGenerated");
   const rawFormatter = snapshot.rawFormatter ?? DEFAULT_FORMAT_BUNDLE.formatter;
   const formatter = checkedFormatter(rawFormatter);
   const refs = assets.map(({ path, hash, mime }) => ({ path, hash, mime }));
@@ -111,17 +112,17 @@ export async function persistRenderRecord(root: FileSystemDirectoryHandle, targe
   for (const asset of prepared.assets) {
     let file: File | null = null;
     try { file = await (await objects.getFileHandle(asset.hash)).getFile(); } catch (error) { if (!missing(error)) throw error; }
-    if (file && await contentHash(file) !== asset.hash) throw new Error('已有渲染对象校验失败：' + asset.hash);
-    if (!file) { await write(objects, asset.hash, asset.blob); if (await contentHash(await (await objects.getFileHandle(asset.hash)).getFile()) !== asset.hash) throw new Error('渲染对象写入校验失败。'); }
+    if (file && await contentHash(file) !== asset.hash) throw new ProductError('shared.compose', { parts: productJoin([productReference("renderRecords.existingRenderObjectVerificationFailed"), asset.hash]) });
+    if (!file) { await write(objects, asset.hash, asset.blob); if (await contentHash(await (await objects.getFileHandle(asset.hash)).getFile()) !== asset.hash) throw new ProductError("renderRecords.renderObjectWriteVerificationFailed"); }
   }
   const version = await directory(root, 'styles/.versions/' + record.environmentHash, true);
   const manifest = canonicalFormatJson(prepared.manifest);
-  if (await contentHash(manifest) !== record.environmentHash) throw new Error('渲染依赖版本校验失败。');
+  if (await contentHash(manifest) !== record.environmentHash) throw new ProductError("renderRecords.renderDependencyVersionVerificationFailed");
   let existing: string | null = null;
   try { existing = await (await version.getFileHandle('manifest.json')).getFile().then(file => file.text()); } catch (error) { if (!missing(error)) throw error; }
-  if (existing !== null && existing !== manifest) throw new Error('不可变渲染版本已损坏，未覆盖。');
+  if (existing !== null && existing !== manifest) throw new ProductError("renderRecords.theImmutableRenderVersionIsDamagedAndWasNotOverwritten");
   if (existing === null) await write(version, 'manifest.json', manifest);
-  if (await contentHash(await (await version.getFileHandle('manifest.json')).getFile().then(file => file.text())) !== record.environmentHash) throw new Error('渲染清单写入校验失败。');
+  if (await contentHash(await (await version.getFileHandle('manifest.json')).getFile().then(file => file.text())) !== record.environmentHash) throw new ProductError("renderRecords.renderManifestWriteVerificationFailed");
   await writeRenderRecord(target, record);
 }
 export async function writeRenderRecord(target: FileSystemDirectoryHandle, record: RenderRecord | null) {
@@ -135,12 +136,12 @@ export async function copyRenderRecord(source: FileSystemDirectoryHandle, destin
 }
 async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecord): Promise<RenderManifest> {
   const file = await readLibraryFile(root, 'styles/.versions/' + record.environmentHash + '/manifest.json');
-  if (file.size > STYLE_LIMITS.cssBytes) throw new Error('渲染清单过大。');
+  if (file.size > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderManifestIsTooLarge");
   const text = await file.text();
-  if (await contentHash(text) !== record.environmentHash) throw new Error('历史渲染版本缺失或校验失败。');
+  if (await contentHash(text) !== record.environmentHash) throw new ProductError("renderRecords.theHistoricalRenderVersionIsMissingOrFailedVerification");
   const manifest = JSON.parse(text) as RenderManifest;
   if (manifest.owner !== OWNER || manifest.schemaVersion !== 1 || canonicalFormatJson(manifest.rawFormatter) !== canonicalFormatJson(record.rawFormatter) ||
-      canonicalFormatJson(manifest.assets) !== canonicalFormatJson(record.assets) || !manifest.rawFiles || !Array.isArray(manifest.candidates) || manifest.candidates.some(value => typeof value !== 'string' || value.length > 256)) throw new Error('历史依赖清单无效。');
+      canonicalFormatJson(manifest.assets) !== canonicalFormatJson(record.assets) || !manifest.rawFiles || !Array.isArray(manifest.candidates) || manifest.candidates.some(value => typeof value !== 'string' || value.length > 256)) throw new ProductError("renderRecords.theHistoricalDependencyManifestIsInvalid");
   return manifest;
 }
 export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, value: RenderRecord, live = getFormatSnapshot()): Promise<{ snapshot: FormatSnapshot; html: string; css: string; dispose: () => void }> {
@@ -150,11 +151,11 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
   for (const asset of record.assets) {
     const file = await readLibraryFile(root, 'assets/.objects/' + asset.hash);
     bytes += file.size;
-    if (bytes > STYLE_LIMITS.assetBytes || await contentHash(file) !== asset.hash) throw new Error('历史渲染资源缺失或校验失败：' + asset.path);
+    if (bytes > STYLE_LIMITS.assetBytes || await contentHash(file) !== asset.hash) throw new ProductError('shared.compose', { parts: productJoin([productReference("renderRecords.historicalRenderResourceIsMissingOrFailedVerification"), asset.path]) });
     files.set(asset.path, new Blob([await file.arrayBuffer()], { type: asset.mime }));
   }
   for (const [path, css] of Object.entries(manifest.rawFiles)) {
-    if (typeof css !== 'string' || normalizeLibraryPath(path) !== path) throw new Error('历史CSS路径无效。');
+    if (typeof css !== 'string' || normalizeLibraryPath(path) !== path) throw new ProductError("renderRecords.theHistoricalCssPathIsInvalid");
     const sheet = postcss.parse(css);
     // Explicit source candidates are captured in the immutable manifest, not reread from today's library.
     sheet.walkAtRules('source', rule => { if (!/\binline\s*\(/.test(rule.params)) rule.remove(); });
@@ -165,7 +166,7 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
     async getDirectoryHandle(name: string) { return virtual(prefix ? prefix + '/' + name : name); },
     async getFileHandle(name: string) {
       const path = prefix ? prefix + '/' + name : name, blob = files.get(path);
-      if (!blob) throw new DOMException('历史资源缺失：' + path, 'NotFoundError');
+      if (!blob) throw new DOMException(productText("renderRecords.historicalResourceIsMissing") + path, 'NotFoundError');
       return { async getFile() { return new File([blob], name, { type: blob.type }); } } as FileSystemFileHandle;
     },
     async *entries() { /* no host enumeration */ },

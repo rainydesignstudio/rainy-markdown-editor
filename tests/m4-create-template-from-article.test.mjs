@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -17,7 +18,7 @@ test('creating a template takes the current draft body once and leaves the artic
   const writes = [], created = [];
   const state = []; let cursor = 0;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react') return { useState(initial) { const index = cursor++; if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial; return [state[index], next => { state[index] = typeof next === 'function' ? next(state[index]) : next; }]; }, useRef(initial) { const index = cursor++; return state[index] ??= { current: initial }; } };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/contentLibraries')) return { isContentFileId: id => /^[a-z0-9-]+$/.test(id), async saveArticleTemplate(...args) { writes.push(args); return { id: args[1], name: frontMatter.parseArticle(args[2]).metadata.title, source: args[2], categoryId: args[4] }; } };
@@ -27,7 +28,7 @@ test('creating a template takes the current draft body once and leaves the artic
     if (id.endsWith('/ContentMetadataDialog')) return { ContentMetadataDialog: 'metadata-dialog' };
     if (id.endsWith('/ContentMetadataEditor')) return { ContentMetadataEditor: 'metadata-editor' };
     throw new Error(id);
-  } });
+  }) });
   const props = { source: original, dirty: true, root, categories: [{ id: 'default', name: '默认' }], templates: [], isCurrent: () => true, onCreated: (...args) => created.push(args), onClose() {} };
   const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node?.props ? [node, ...nodes(node.props.children)] : [];
   const render = () => { cursor = 0; return nodes(module.exports.CreateTemplateFromArticleDialog(props)); };

@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -52,14 +53,14 @@ async function harness(file, dependencies, initialProps) {
   const listeners = new Map();
   const fixture = colorDocument();
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
-  vm.runInNewContext(code, { module, exports: module.exports, document: fixture.document, window: { innerWidth: 300, innerHeight: 200, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) }, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, document: fixture.document, window: { innerWidth: 300, innerHeight: 200, addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) }, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return hooks;
     if (id === 'react-dom') return { createPortal: children => jsx('portal', { children }) };
     if (id.endsWith('/tailwindPalette')) return palette;
     if (id in dependencies) return dependencies[id];
     throw new Error(id);
-  } });
+  }) });
   return { module, listeners, setProps(value) { props = value; }, render(name) { cursor = 0; return module.exports[name](props); }, flush() { while (effects.length) effects.shift()(); } };
 }
 

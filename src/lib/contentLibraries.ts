@@ -1,5 +1,6 @@
+import { ProductError, productCause, productDiagnosticReference, productErrorMessage, productJoin, productMessage, productReference, type ProductMessageInfo } from "./i18n/productMessages";
 import { parseArticle } from './frontMatter';
-import { articleFormatMessage, type ArticleFormatIssue } from './articleFormat';
+import { articleFormatMessage, articleFormatMessageReference, type ArticleFormatIssue } from './articleFormat';
 import { validateArticleAuthoringMarkdown } from './articleAuthoringFormat';
 import { contentFormatBlockingIssues } from './contentValidation';
 import type { ArticleSnippet, ArticleTemplate, SnippetCategory, SnippetCategoryIcon } from './types';
@@ -273,24 +274,24 @@ function isNotFound(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'NotFoundError';
 }
 
-function assertId(id: string, kind: string): string {
-  if (!SAFE_ID.test(id)) throw new Error(`${kind} ID 不安全；只接受小写字母、数字和连字符。`);
+function assertId(id: string, kind: ProductMessageInfo): string {
+  if (!SAFE_ID.test(id)) throw new ProductError("contentLibraries.theIdIsUnsafeOnlyLowercaseLettersNumbersAndHyphensAreAccepted", { "kind": kind });
   return id;
 }
 
 function validateSnippet(value: unknown): ArticleSnippet {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('片段 JSON 顶层必须是对象。');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("contentLibraries.theTopLevelOfSnippetJsonMustBeAnObject");
   const candidate = value as Record<string, unknown>;
   const { id, name, trigger, description, content, categoryId, icon } = candidate;
-  if (typeof id !== 'string') throw new Error('片段 ID 必须是字符串。');
-  assertId(id, '片段');
-  if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new Error('片段名称不能为空且不得超过 80 字符。');
-  if (typeof trigger !== 'string' || !/^\/\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trigger)) throw new Error('片段触发词格式无效；使用 // 加小写字母、数字和连字符。');
-  if (typeof description !== 'string' || description.length > 240) throw new Error('片段说明必须是字符串且不得超过 240 字符。');
-  if (typeof content !== 'string' || !content.trim() || content.length > MAX_SNIPPET_LENGTH) throw new Error('片段内容不能为空且不得超过 64 KB。');
-  if (content.split(CURSOR_MARKER).length > 2) throw new Error('每个片段最多包含一个光标占位符。');
-  if (categoryId !== undefined && (typeof categoryId !== 'string' || !SAFE_ID.test(categoryId))) throw new Error('片段分类 ID 不安全。');
-  if (icon !== undefined && (typeof icon !== 'string' || !SNIPPET_CATEGORY_ICONS.some(item => item.id === icon))) throw new Error('请选择有效的片段图标。');
+  if (typeof id !== 'string') throw new ProductError("contentLibraries.theSnippetIdMustBeAString");
+  assertId(id, productReference('contentFileLabels.snippet'));
+  if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new ProductError("contentLibraries.theSnippetNameMustBeNonemptyAndContainAtMost80Characters");
+  if (typeof trigger !== 'string' || !/^\/\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(trigger)) throw new ProductError("contentLibraries.theSnippetTriggerIsInvalidUseFollowedByLowercaseLettersNumbersAnd");
+  if (typeof description !== 'string' || description.length > 240) throw new ProductError("contentLibraries.theSnippetDescriptionMustBeAStringOfAtMost240Characters");
+  if (typeof content !== 'string' || !content.trim() || content.length > MAX_SNIPPET_LENGTH) throw new ProductError("contentLibraries.snippetContentMustBeNonemptyAndNoLargerThan64Kb");
+  if (content.split(CURSOR_MARKER).length > 2) throw new ProductError("contentLibraries.eachSnippetMayContainAtMostOneCursorPlaceholder");
+  if (categoryId !== undefined && (typeof categoryId !== 'string' || !SAFE_ID.test(categoryId))) throw new ProductError("contentLibraries.theSnippetCategoryIdIsUnsafe");
+  if (icon !== undefined && (typeof icon !== 'string' || !SNIPPET_CATEGORY_ICONS.some(item => item.id === icon))) throw new ProductError("contentLibraries.chooseAValidSnippetIcon");
   const resolvedIcon = (icon ?? (Object.hasOwn(DEFAULT_SNIPPET_ICONS, id) ? DEFAULT_SNIPPET_ICONS[id] : undefined)) as SnippetCategoryIcon | undefined;
   return { id, name: name.trim(), trigger, description: description.trim(), content, ...(categoryId ? { categoryId } : {}), ...(resolvedIcon ? { icon: resolvedIcon } : {}) };
 }
@@ -304,7 +305,7 @@ async function ensurePermission(root: DirectoryHandle): Promise<void> {
   const descriptor = { mode: 'readwrite' as const };
   let permission = await candidate.queryPermission(descriptor);
   if (permission !== 'granted' && candidate.requestPermission) permission = await candidate.requestPermission(descriptor);
-  if (permission !== 'granted') throw new Error('资料目录没有读写权限；请重新授权后再管理片段与模板。');
+  if (permission !== 'granted') throw new ProductError("contentLibraries.theLibraryLacksReadWritePermissionAuthorizeItAgainToManageSnippets");
 }
 
 async function readText(parent: DirectoryHandle, name: string): Promise<string> {
@@ -315,10 +316,10 @@ async function readText(parent: DirectoryHandle, name: string): Promise<string> 
 async function assertFileAvailable(directory: DirectoryHandle, filename: string): Promise<void> {
   try { await directory.getFileHandle(filename); }
   catch (error) { if (isNotFound(error)) return; throw error; }
-  throw new Error(`文件 ${filename} 已存在，不能覆盖。`);
+  throw new ProductError("contentLibraries.fileAlreadyExistsAndCannotBeOverwritten", { "filename": filename });
 }
 
-async function writeManagedFile(directory: DirectoryHandle, filename: string, content: string | ArrayBuffer, label: string): Promise<void> {
+async function writeManagedFile(directory: DirectoryHandle, filename: string, content: string | ArrayBuffer, label: ProductMessageInfo): Promise<void> {
   let file: FileHandle;
   let created = false;
   try {
@@ -336,23 +337,23 @@ async function writeManagedFile(directory: DirectoryHandle, filename: string, co
     await writable.close();
   } catch (error) {
     try { await writable?.abort(); } catch { /* keep the original write error */ }
-    let cleanup = '';
+    let cleanup: string | ProductMessageInfo = '';
     if (created) {
-      try { await directory.removeEntry(filename); } catch { cleanup = '；新文件清理失败，请检查该文件后再重试'; }
+      try { await directory.removeEntry(filename); } catch { cleanup = productReference('contentFileLabels.cleanupFailed'); }
     }
-    throw new Error(`${label}文件 ${filename} 保存失败：${error instanceof Error ? error.message : String(error)}${cleanup}`);
+    throw new ProductError("contentLibraries.theFileCouldNotBeSaved", { "label": label, "filename": filename, "cause": productCause(error), "cleanup": cleanup });
   }
 }
 
 function validateCategory(value: unknown): SnippetCategory {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('分类必须是对象。');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("contentLibraries.theCategoryMustBeAnObject");
   const { id, name, description = '', order = 0, icon } = value as Record<string, unknown>;
-  if (typeof id !== 'string') throw new Error('分类 ID 必须是字符串。');
-  assertId(id, '分类');
-  if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new Error('分类名称不能为空且不得超过 80 字符。');
-  if (typeof description !== 'string' || description.length > 240) throw new Error('分类说明不得超过 240 字符。');
-  if (!Number.isInteger(order) || Number(order) < 0 || Number(order) > 10000) throw new Error('分类顺序须为 0 至 10000 的整数。');
-  if (icon !== undefined && !SNIPPET_CATEGORY_ICONS.some(item => item.id === icon)) throw new Error('请选择有效的分类图标。');
+  if (typeof id !== 'string') throw new ProductError("contentLibraries.theCategoryIdMustBeAString");
+  assertId(id, productReference('contentFileLabels.category'));
+  if (typeof name !== 'string' || !name.trim() || name.length > 80) throw new ProductError("contentLibraries.theCategoryNameMustBeNonemptyAndContainAtMost80Characters");
+  if (typeof description !== 'string' || description.length > 240) throw new ProductError("contentLibraries.theCategoryDescriptionMustContainAtMost240Characters");
+  if (!Number.isInteger(order) || Number(order) < 0 || Number(order) > 10000) throw new ProductError("contentLibraries.categoryOrderMustBeAnIntegerFrom0To10000");
+  if (icon !== undefined && !SNIPPET_CATEGORY_ICONS.some(item => item.id === icon)) throw new ProductError("contentLibraries.chooseAValidCategoryIcon");
   return { id, name: name.trim(), description: description.trim(), order: Number(order), ...(icon === undefined ? {} : { icon: icon as NonNullable<SnippetCategory['icon']> }) };
 }
 
@@ -360,11 +361,11 @@ async function readCategoryIndex(directory: DirectoryHandle): Promise<SnippetCat
   let source: string;
   try { source = await readText(directory, 'index.json'); }
   catch (error) { if (isNotFound(error)) return []; throw error; }
-  if (source.length > 64000) throw new Error('分类索引超过 64 KB。');
+  if (source.length > 64000) throw new ProductError("contentLibraries.theCategoryIndexExceeds64Kb");
   const index = JSON.parse(source);
-  if (index?.version !== 1 || !Array.isArray(index.categories) || index.categories.length > 128) throw new Error('分类索引须为 version 1，categories 最多 128 项。');
+  if (index?.version !== 1 || !Array.isArray(index.categories) || index.categories.length > 128) throw new ProductError("contentLibraries.theCategoryIndexMustUseVersion1WithAtMost128Categories");
   const categories = index.categories.map(validateCategory) as SnippetCategory[];
-  if (new Set(categories.map(category => category.id)).size !== categories.length) throw new Error('分类索引有重复 ID。');
+  if (new Set(categories.map(category => category.id)).size !== categories.length) throw new ProductError("contentLibraries.theCategoryIndexContainsDuplicateIds");
   return categories;
 }
 
@@ -379,30 +380,30 @@ export async function saveTemplateCategory(root: DirectoryHandle, input: Snippet
 async function saveContentCategory(root: DirectoryHandle, kind: 'snippets' | 'templates', input: SnippetCategory, originalId?: string | null): Promise<SnippetCategory> {
   await ensurePermission(root);
   const category = validateCategory(input);
-  if (originalId != null) assertId(originalId, '原分类');
+  if (originalId != null) assertId(originalId, productReference('contentFileLabels.originalCategory'));
   const directory = await root.getDirectoryHandle(kind, { create: true });
   const categories = await readCategoryIndex(directory);
   const renaming = originalId != null && originalId !== category.id;
-  if ((renaming || originalId === null) && categories.some(item => item.id === category.id)) throw new Error('此分类目录已存在，请换一个目录名。');
+  if ((renaming || originalId === null) && categories.some(item => item.id === category.id)) throw new ProductError("contentLibraries.thisCategoryDirectoryAlreadyExistsChooseAnotherDirectoryName");
   const next = [...categories.filter(item => item.id !== category.id && item.id !== originalId), category];
-  if (next.length > 128) throw new Error('分类最多 128 项。');
+  if (next.length > 128) throw new ProductError("contentLibraries.atMost128CategoriesAreAllowed");
   const index = JSON.stringify({ version: 1, categories: next.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'zh-CN')) }, null, 2);
   if (!renaming) {
     if (originalId === null) {
       try { await directory.getDirectoryHandle(category.id); }
       catch (error) { if (!isNotFound(error)) throw error; }
       // Check both indexed and unindexed folders before creating a new category.
-      for await (const [name] of directory.entries()) if (name === category.id) throw new Error('此分类目录已存在，请换一个目录名。');
+      for await (const [name] of directory.entries()) if (name === category.id) throw new ProductError("contentLibraries.thisCategoryDirectoryAlreadyExistsChooseAnotherDirectoryName");
     }
     await directory.getDirectoryHandle(category.id, { create: originalId == null });
-    await writeManagedFile(directory, 'index.json', index, '分类索引');
+    await writeManagedFile(directory, 'index.json', index, productReference('contentFileLabels.categoryIndex'));
     return category;
   }
   const source = await directory.getDirectoryHandle(originalId);
-  for await (const [name] of directory.entries()) if (name === category.id) throw new Error('目标目录已存在，不能覆盖。');
+  for await (const [name] of directory.entries()) if (name === category.id) throw new ProductError("contentLibraries.theTargetDirectoryAlreadyExistsAndCannotBeOverwritten");
   const files: { name: string; bytes: ArrayBuffer }[] = [];
   for await (const [name, entry] of source.entries()) {
-    if (entry.kind !== 'file') throw new Error('分类中包含子目录，请先整理为一层目录再改名。');
+    if (entry.kind !== 'file') throw new ProductError("contentLibraries.theCategoryContainsSubdirectoriesArrangeItAsASingleDirectoryLevelBefore");
     files.push({ name, bytes: await (await entry.getFile()).arrayBuffer() });
   }
   let previousIndex: string | null = null;
@@ -418,31 +419,31 @@ async function saveContentCategory(root: DirectoryHandle, kind: 'snippets' | 'te
           if (record?.categoryId === originalId) contents = JSON.stringify({ ...record, categoryId: category.id }, null, 2);
         } catch { /* Preserve damaged files byte-for-byte; the loader reports them. */ }
       }
-      await writeManagedFile(target, file.name, contents, '分类内容');
+      await writeManagedFile(target, file.name, contents, productReference('contentFileLabels.categoryContent'));
     }
     indexAttempted = true;
-    await writeManagedFile(directory, 'index.json', index, '分类索引');
+    await writeManagedFile(directory, 'index.json', index, productReference('contentFileLabels.categoryIndex'));
     removalStarted = true;
     for (const file of files) await source.removeEntry(file.name);
     await directory.removeEntry(originalId);
   } catch (error) {
-    const failures: string[] = [];
+    const failures: ProductMessageInfo[] = [];
     if (removalStarted) {
       try {
         const restored = await directory.getDirectoryHandle(originalId, { create: true });
-        for (const file of files) await writeManagedFile(restored, file.name, file.bytes, '原分类恢复');
-      } catch { failures.push('原目录恢复失败，新目录副本已保留'); }
+        for (const file of files) await writeManagedFile(restored, file.name, file.bytes, productReference('contentFileLabels.restoreCategory'));
+      } catch { failures.push(productReference('contentFileLabels.restoreDirectoryFailed')); }
     }
     if (indexAttempted) {
       try {
         if (previousIndex === null) await directory.removeEntry('index.json');
-        else await writeManagedFile(directory, 'index.json', previousIndex, '分类索引恢复');
-      } catch { failures.push('索引恢复失败'); }
+        else await writeManagedFile(directory, 'index.json', previousIndex, productReference('contentFileLabels.restoreCategoryIndex'));
+      } catch { failures.push(productReference('contentFileLabels.restoreIndexFailed')); }
     }
     if (!failures.length) {
-      try { await directory.removeEntry(category.id, { recursive: true }); } catch { failures.push('新目录清理失败'); }
+      try { await directory.removeEntry(category.id, { recursive: true }); } catch { failures.push(productReference('contentFileLabels.cleanupDirectoryFailed')); }
     }
-    throw new Error(`分类目录改名失败：${error instanceof Error ? error.message : String(error)}${failures.length ? '；' + failures.join('；') + '，请检查新旧目录和索引' : '；原目录与索引已保留'}`);
+    throw new ProductError("contentLibraries.categoryDirectoryRenamingFailed", { "cause": productCause(error), "details": (failures.length ? productJoin(['；', productJoin(failures, '；'), productReference("contentLibraries.checkBothDirectoriesAndTheIndex")]) : productReference("contentLibraries.theOriginalDirectoryAndIndexAreRetained")) });
   }
   return category;
 }
@@ -456,10 +457,10 @@ async function loadSnippetEntries(directory: DirectoryHandle): Promise<ArticleSn
     for (const snippet of DEFAULT_ARTICLE_SNIPPETS) {
       const { categoryId, ...content } = snippet;
       const folder = folders.get(categoryId ?? 'default');
-      if (!folder) throw new Error(`默认片段分类不存在：${categoryId}`);
-      await writeManagedFile(folder, `${snippet.id}.json`, JSON.stringify(content, null, 2), '片段');
+      if (!folder) throw new ProductError("contentLibraries.theDefaultSnippetCategoryDoesNotExist", { "categoryId": categoryId });
+      await writeManagedFile(folder, `${snippet.id}.json`, JSON.stringify(content, null, 2), productReference('contentFileLabels.snippet'));
     }
-    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: DEFAULT_SNIPPET_CATEGORIES }, null, 2), '分类索引');
+    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: DEFAULT_SNIPPET_CATEGORIES }, null, 2), productReference('contentFileLabels.categoryIndex'));
     for await (const entry of directory.entries()) entries.push(entry);
   }
   const snippets: ArticleSnippet[] = [];
@@ -467,7 +468,7 @@ async function loadSnippetEntries(directory: DirectoryHandle): Promise<ArticleSn
   const issues: ContentLibraryIssue[] = [];
   let indexed: SnippetCategory[] = [];
   try { indexed = await readCategoryIndex(directory); }
-  catch (error) { issues.push({ file: 'index.json', message: `分类索引读取失败：${error instanceof Error ? error.message : String(error)}` }); }
+  catch (error) { issues.push({ file: 'index.json', ...productMessage("contentLibraries.theCategoryIndexCouldNotBeRead", { "cause": productCause(error) }) }); }
   const folders = new Map(entries.filter(([, entry]) => entry.kind === 'directory').map(([name, entry]) => [name, entry as DirectoryHandle]));
   const seenIds = new Set<string>();
   const seenTriggers = new Set<string>();
@@ -476,32 +477,32 @@ async function loadSnippetEntries(directory: DirectoryHandle): Promise<ArticleSn
       const relative = categoryId ? `${categoryId}/${filename}` : filename;
       if (entry.kind !== 'file' || !filename.endsWith('.json') || (!categoryId && filename === 'index.json')) continue;
       const id = filename.slice(0, -5);
-      if (!SAFE_ID.test(id)) { issues.push({ file: relative, message: '片段文件名不安全；应为 <id>.json。' }); continue; }
+      if (!SAFE_ID.test(id)) { issues.push({ file: relative, ...productMessage("contentLibraries.theSnippetFilenameIsUnsafeUseIdJson") }); continue; }
       try {
         const snippet = validateSnippet(JSON.parse(await readText(parent, filename)));
-        if (snippet.id !== id) throw new Error('文件名与片段 ID 不一致。');
-        if (snippet.categoryId && snippet.categoryId !== categoryId) throw new Error('片段分类与所在目录不一致。');
-        if (seenIds.has(id)) throw new Error(`片段 ID ${id} 在其他分类中重复。`);
-        if (seenTriggers.has(snippet.trigger)) throw new Error(`触发词 ${snippet.trigger} 重复。`);
+        if (snippet.id !== id) throw new ProductError("contentLibraries.theFilenameDoesNotMatchTheSnippetId");
+        if (snippet.categoryId && snippet.categoryId !== categoryId) throw new ProductError("contentLibraries.theSnippetCategoryDoesNotMatchItsDirectory");
+        if (seenIds.has(id)) throw new ProductError("contentLibraries.snippetIdIsDuplicatedInAnotherCategory", { "id": id });
+        if (seenTriggers.has(snippet.trigger)) throw new ProductError("contentLibraries.triggerIsDuplicated", { "snippetTrigger": snippet.trigger });
         seenIds.add(id); seenTriggers.add(snippet.trigger);
         snippets.push({ ...snippet, ...(categoryId ? { categoryId } : {}) });
-      } catch (error) { issues.push({ file: relative, message: error instanceof Error ? error.message : String(error) }); }
+      } catch (error) { issues.push({ file: relative, ...productErrorMessage(error) }); }
     }
   };
   await readEntries(directory, entries);
   for (const [id, folder] of [...folders].sort(([a], [b]) => a.localeCompare(b))) {
-    if (!SAFE_ID.test(id)) { issues.push({ file: id, message: '分类目录名不安全；使用小写字母、数字和连字符。' }); continue; }
+    if (!SAFE_ID.test(id)) { issues.push({ file: id, ...productMessage("contentLibraries.theCategoryDirectoryNameIsUnsafeUseLowercaseLettersNumbersAndHyphens") }); continue; }
     categories.push(indexed.find(item => item.id === id) ?? { id, name: id, description: '', order: 10000 });
     try {
       const files: Array<[string, FileHandle | DirectoryHandle]> = [];
       for await (const entry of folder.entries()) {
-        if (entry[1].kind === 'directory') issues.push({ file: `${id}/${entry[0]}`, message: '仅支持一层分类目录。' });
+        if (entry[1].kind === 'directory') issues.push({ file: `${id}/${entry[0]}`, ...productMessage("contentLibraries.onlyOneCategoryDirectoryLevelIsSupported") });
         else files.push(entry);
       }
       await readEntries(folder, files, id);
-    } catch (error) { issues.push({ file: id, message: `分类读取失败：${error instanceof Error ? error.message : String(error)}` }); }
+    } catch (error) { issues.push({ file: id, ...productMessage("contentLibraries.theCategoryCouldNotBeRead", { "cause": productCause(error) }) }); }
   }
-  for (const category of indexed) if (!folders.has(category.id)) issues.push({ file: category.id, message: '索引中的分类目录不存在。' });
+  for (const category of indexed) if (!folders.has(category.id)) issues.push({ file: category.id, ...productMessage("contentLibraries.aCategoryDirectoryListedInTheIndexDoesNotExist") });
   snippets.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
   categories.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'zh-CN'));
   return { snippets, categories, issues };
@@ -517,19 +518,19 @@ export async function loadArticleSnippets(root: DirectoryHandle): Promise<Articl
 export async function saveArticleSnippet(root: DirectoryHandle, input: ArticleSnippet, originalId?: string | null, onFormatIssues?: (issues: ArticleFormatIssue[]) => void): Promise<ArticleSnippet> {
   await ensurePermission(root);
   const validated = validateSnippet(input);
-  if (originalId != null) assertId(originalId, '片段');
+  if (originalId != null) assertId(originalId, productReference('contentFileLabels.snippet'));
   const library = await loadArticleSnippets(root);
   const existing = originalId === null ? undefined : library.snippets.find(item => item.id === (originalId ?? validated.id));
-  if (originalId != null && !existing) throw new Error('原片段文件不存在，请刷新列表后重试。');
-  if (library.snippets.some(item => item.id === validated.id && item.id !== existing?.id)) throw new Error(`文件名 ${validated.id}.json 已被其他片段占用。`);
+  if (originalId != null && !existing) throw new ProductError("contentLibraries.theOriginalSnippetFileDoesNotExistRefreshTheListAndRetry");
+  if (library.snippets.some(item => item.id === validated.id && item.id !== existing?.id)) throw new ProductError("contentLibraries.filenameJsonIsUsedByAnotherSnippet", { "validatedId": validated.id });
   const snippet = { ...validated, ...(validated.categoryId || !existing?.categoryId ? {} : { categoryId: existing.categoryId }) };
-  if (!existing && !snippet.categoryId) throw new Error('新建片段请先选择分类。');
-  if (snippet.categoryId && !library.categories.some(category => category.id === snippet.categoryId)) throw new Error('所选分类不存在，请先创建分类。');
-  if (library.issues.some(issue => issue.file.split('/').at(-1) === `${snippet.id}.json`)) throw new Error(`现有片段文件 ${snippet.id}.json 无法安全更新；请先修复文件内容。`);
-  if (library.snippets.some(item => item.trigger === snippet.trigger && item.id !== existing?.id)) throw new Error(`触发词 ${snippet.trigger} 已被其他片段占用。`);
+  if (!existing && !snippet.categoryId) throw new ProductError("contentLibraries.chooseACategoryBeforeCreatingASnippet");
+  if (snippet.categoryId && !library.categories.some(category => category.id === snippet.categoryId)) throw new ProductError("contentLibraries.theSelectedCategoryDoesNotExistCreateItFirst");
+  if (library.issues.some(issue => issue.file.split('/').at(-1) === `${snippet.id}.json`)) throw new ProductError("contentLibraries.existingSnippetFileJsonCannotBeUpdatedSafelyRepairItsContentFirst", { "snippetId": snippet.id });
+  if (library.snippets.some(item => item.trigger === snippet.trigger && item.id !== existing?.id)) throw new ProductError("contentLibraries.triggerIsUsedByAnotherSnippet", { "snippetTrigger": snippet.trigger });
   const formatIssues = await validateArticleAuthoringMarkdown(validated.content.replace(CURSOR_MARKER, ''), '片段正文');
   const blocking = contentFormatBlockingIssues(formatIssues);
-  if (blocking.length) throw new Error(`片段校验失败：${articleFormatMessage(blocking)}`);
+  if (blocking.length) throw new ProductError("contentLibraries.snippetValidationFailed", { "value": articleFormatMessageReference(blocking) });
   if (formatIssues.length) onFormatIssues?.(formatIssues);
   const base = await root.getDirectoryHandle('snippets');
   const target = snippet.categoryId ? await base.getDirectoryHandle(snippet.categoryId) : base;
@@ -537,14 +538,14 @@ export async function saveArticleSnippet(root: DirectoryHandle, input: ArticleSn
   const moving = existing && (existing.categoryId !== snippet.categoryId || existing.id !== snippet.id);
   if (!existing || moving) await assertFileAvailable(target, filename);
   const { categoryId: _categoryId, ...record } = snippet;
-  await writeManagedFile(target, filename, JSON.stringify(record, null, 2), '片段');
+  await writeManagedFile(target, filename, JSON.stringify(record, null, 2), productReference('contentFileLabels.snippet'));
   if (moving) {
     const source = existing.categoryId ? await base.getDirectoryHandle(existing.categoryId) : base;
     try { await source.removeEntry(`${existing.id}.json`); }
     catch (error) {
-      let rollback = '';
-      try { await target.removeEntry(filename); } catch { rollback = '；目标副本回滚失败，请检查新旧文件'; }
-      throw new Error(`改名或分类移动失败，原文件保留：${error instanceof Error ? error.message : String(error)}${rollback}`);
+      let rollback: string | ProductMessageInfo = '';
+      try { await target.removeEntry(filename); } catch { rollback = productReference('contentFileLabels.rollbackTargetFailed'); }
+      throw new ProductError("contentLibraries.renamingOrCategoryMovementFailedTheOriginalFileIsRetained", { "cause": productCause(error), "rollback": rollback });
     }
   }
   return snippet;
@@ -552,10 +553,10 @@ export async function saveArticleSnippet(root: DirectoryHandle, input: ArticleSn
 
 export async function deleteArticleSnippet(root: DirectoryHandle, id: string): Promise<void> {
   await ensurePermission(root);
-  assertId(id, '片段');
+  assertId(id, productReference('contentFileLabels.snippet'));
   const library = await loadArticleSnippets(root);
   const snippet = library.snippets.find(item => item.id === id);
-  if (!snippet) throw new Error(`找不到片段「${id}」。`);
+  if (!snippet) throw new ProductError("contentLibraries.snippetWasNotFound", { "id": id });
   const base = await root.getDirectoryHandle('snippets');
   const directory = snippet.categoryId ? await base.getDirectoryHandle(snippet.categoryId) : base;
   await directory.removeEntry(`${id}.json`);
@@ -569,51 +570,51 @@ async function loadTemplateEntries(directory: DirectoryHandle): Promise<ArticleT
     for (const category of DEFAULT_TEMPLATE_CATEGORIES) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
     for (const template of DEFAULT_ARTICLE_TEMPLATES) {
       const folder = folders.get(template.categoryId ?? 'default');
-      if (!folder) throw new Error(`默认起稿模板分类不存在：${template.categoryId}`);
-      await writeManagedFile(folder, `${template.id}.md`, template.source, '模板');
+      if (!folder) throw new ProductError("contentLibraries.theDefaultStarterTemplateCategoryDoesNotExist", { "templateCategoryId": template.categoryId });
+      await writeManagedFile(folder, `${template.id}.md`, template.source, productReference('contentFileLabels.template'));
     }
-    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: DEFAULT_TEMPLATE_CATEGORIES }, null, 2), '分类索引');
+    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: DEFAULT_TEMPLATE_CATEGORIES }, null, 2), productReference('contentFileLabels.categoryIndex'));
     for await (const entry of directory.entries()) entries.push(entry);
   }
   const templates: ArticleTemplate[] = [], issues: ContentLibraryIssue[] = [], categories: SnippetCategory[] = [];
   let indexed: SnippetCategory[] = [];
   try { indexed = await readCategoryIndex(directory); }
-  catch (error) { issues.push({ file: 'index.json', message: `分类索引读取失败：${error instanceof Error ? error.message : String(error)}` }); }
+  catch (error) { issues.push({ file: 'index.json', ...productMessage("contentLibraries.theCategoryIndexCouldNotBeRead", { "cause": productCause(error) }) }); }
   const seen = new Set<string>();
   const readEntries = async (parent: DirectoryHandle, files: Array<[string, FileHandle | DirectoryHandle]>, categoryId?: string) => {
     for (const [filename, entry] of files.sort(([a], [b]) => a.localeCompare(b))) {
       const relative = categoryId ? `${categoryId}/${filename}` : filename;
       if (entry.kind !== 'file' || !filename.endsWith('.md')) continue;
       const id = filename.slice(0, -3);
-      if (!SAFE_ID.test(id)) { issues.push({ file: relative, message: '模板文件名不安全；应为不含路径的 <id>.md。' }); continue; }
+      if (!SAFE_ID.test(id)) { issues.push({ file: relative, ...productMessage("contentLibraries.theTemplateFilenameIsUnsafeUseIdMdWithoutAPath") }); continue; }
       try {
         const source = await readText(parent, filename);
-        if (source.length > MAX_TEMPLATE_LENGTH) throw new Error('模板超过 250 KB。');
-        if (seen.has(id)) throw new Error(`模板 ID ${id} 在其他分类中重复。`);
+        if (source.length > MAX_TEMPLATE_LENGTH) throw new ProductError("contentLibraries.theTemplateExceeds250Kb");
+        if (seen.has(id)) throw new ProductError("contentLibraries.templateIdIsDuplicatedInAnotherCategory", { "id": id });
         const parsed = parseArticle(source);
-        if (!parsed.canCopy) issues.push({ file: relative, message: parsed.diagnostics.filter(item => item.level === 'error').map(item => item.message).join('；') });
+        if (!parsed.canCopy) issues.push({ file: relative, ...productMessage('shared.compose', { parts: productJoin(parsed.diagnostics.filter(item => item.level === 'error').map(productDiagnosticReference), '；') }) });
         const icon = parsed.metadata.templateIcon;
-        if (icon !== undefined && !isSnippetCategoryIcon(icon)) issues.push({ file: relative, message: '起稿模板图标无效；已使用默认文档图标。' });
+        if (icon !== undefined && !isSnippetCategoryIcon(icon)) issues.push({ file: relative, ...productMessage("contentLibraries.theStarterTemplateIconIsInvalidTheDefaultDocumentIconWasUsed") });
         seen.add(id);
         templates.push({ id, name: parsed.metadata.title || id, source, ...(categoryId ? { categoryId } : {}), ...(isSnippetCategoryIcon(icon) ? { icon } : {}) });
-      } catch (error) { issues.push({ file: relative, message: error instanceof Error ? error.message : String(error) }); }
+      } catch (error) { issues.push({ file: relative, ...productErrorMessage(error) }); }
     }
   };
   await readEntries(directory, entries);
   const folders = entries.filter(([, entry]) => entry.kind === 'directory');
   for (const [id, entry] of folders.sort(([a], [b]) => a.localeCompare(b))) {
-    if (!SAFE_ID.test(id)) { issues.push({ file: id, message: '分类目录名不安全。' }); continue; }
+    if (!SAFE_ID.test(id)) { issues.push({ file: id, ...productMessage("contentLibraries.theCategoryDirectoryNameIsUnsafe") }); continue; }
     categories.push(indexed.find(item => item.id === id) ?? { id, name: id, description: '', order: 10000 });
     try {
       const folder = entry as DirectoryHandle, files: Array<[string, FileHandle | DirectoryHandle]> = [];
       for await (const child of folder.entries()) {
-        if (child[1].kind === 'directory') issues.push({ file: `${id}/${child[0]}`, message: '仅支持一层分类目录。' });
+        if (child[1].kind === 'directory') issues.push({ file: `${id}/${child[0]}`, ...productMessage("contentLibraries.onlyOneCategoryDirectoryLevelIsSupported") });
         else files.push(child);
       }
       await readEntries(folder, files, id);
-    } catch (error) { issues.push({ file: id, message: error instanceof Error ? error.message : String(error) }); }
+    } catch (error) { issues.push({ file: id, ...productErrorMessage(error) }); }
   }
-  for (const category of indexed) if (!folders.some(([id]) => id === category.id)) issues.push({ file: category.id, message: '索引中的分类目录不存在。' });
+  for (const category of indexed) if (!folders.some(([id]) => id === category.id)) issues.push({ file: category.id, ...productMessage("contentLibraries.aCategoryDirectoryListedInTheIndexDoesNotExist") });
   categories.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, 'zh-CN'));
   templates.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
   return { templates, categories, issues };
@@ -626,38 +627,38 @@ export async function loadArticleTemplates(root: DirectoryHandle): Promise<Artic
 
 export async function saveArticleTemplate(root: DirectoryHandle, id: string, source: string, originalId?: string | null, categoryId?: string, onFormatIssues?: (issues: ArticleFormatIssue[]) => void): Promise<ArticleTemplate> {
   await ensurePermission(root);
-  assertId(id, '模板');
-  if (originalId != null) assertId(originalId, '模板');
-  if (categoryId != null) assertId(categoryId, '分类');
-  if (typeof source !== 'string' || !source.trim() || source.length > MAX_TEMPLATE_LENGTH) throw new Error('模板内容不能为空且不得超过 250 KB。');
+  assertId(id, productReference('contentFileLabels.template'));
+  if (originalId != null) assertId(originalId, productReference('contentFileLabels.template'));
+  if (categoryId != null) assertId(categoryId, productReference('contentFileLabels.category'));
+  if (typeof source !== 'string' || !source.trim() || source.length > MAX_TEMPLATE_LENGTH) throw new ProductError("contentLibraries.templateContentMustBeNonemptyAndNoLargerThan250Kb");
   const parsed = parseArticle(source);
-  if (!parsed.canCopy) throw new Error(`模板 Front Matter 有误：${parsed.diagnostics.filter(item => item.level === 'error').map(item => item.message).join('；')}`);
+  if (!parsed.canCopy) throw new ProductError("contentLibraries.templateFrontMatterIsInvalid", { "details": productJoin(parsed.diagnostics.filter(item => item.level === 'error').map(productDiagnosticReference), '；') });
   const icon = parsed.metadata.templateIcon;
-  if (icon !== undefined && !isSnippetCategoryIcon(icon)) throw new Error('请选择有效的起稿模板图标。');
+  if (icon !== undefined && !isSnippetCategoryIcon(icon)) throw new ProductError("contentLibraries.chooseAValidStarterTemplateIcon");
   const library = await loadArticleTemplates(root);
   const existing = originalId === null ? undefined : library.templates.find(item => item.id === (originalId ?? id));
-  if (originalId != null && !existing) throw new Error('原模板文件不存在，请刷新列表后重试。');
-  if (library.templates.some(item => item.id === id && item.id !== existing?.id)) throw new Error(`文件名 ${id}.md 已被其他模板占用。`);
+  if (originalId != null && !existing) throw new ProductError("contentLibraries.theOriginalTemplateFileDoesNotExistRefreshTheListAndRetry");
+  if (library.templates.some(item => item.id === id && item.id !== existing?.id)) throw new ProductError("contentLibraries.filenameMdIsUsedByAnotherTemplate", { "id": id });
   const category = categoryId ?? existing?.categoryId;
-  if (originalId === null && !category) throw new Error('新建起稿模板请先选择分类。');
-  if (category && !library.categories.some(item => item.id === category)) throw new Error('所选分类不存在，请先创建分类。');
-  if (library.issues.some(issue => issue.file.split('/').at(-1) === `${id}.md`) && !library.templates.some(template => template.id === id)) throw new Error(`现有模板文件 ${id}.md 无法安全更新；请先在文件系统中确认文件可读。`);
+  if (originalId === null && !category) throw new ProductError("contentLibraries.chooseACategoryBeforeCreatingAStarterTemplate");
+  if (category && !library.categories.some(item => item.id === category)) throw new ProductError("contentLibraries.theSelectedCategoryDoesNotExistCreateItFirst");
+  if (library.issues.some(issue => issue.file.split('/').at(-1) === `${id}.md`) && !library.templates.some(template => template.id === id)) throw new ProductError("contentLibraries.existingTemplateFileMdCannotBeUpdatedSafelyCheckThatItIs", { "id": id });
   const formatIssues = await validateArticleAuthoringMarkdown(parsed.body, '起稿模板正文');
   const blocking = contentFormatBlockingIssues(formatIssues);
-  if (blocking.length) throw new Error(`起稿模板校验失败：${articleFormatMessage(blocking)}`);
+  if (blocking.length) throw new ProductError("contentLibraries.starterTemplateValidationFailed", { "value": articleFormatMessageReference(blocking) });
   if (formatIssues.length) onFormatIssues?.(formatIssues);
   const base = await root.getDirectoryHandle('templates');
   const directory = category ? await base.getDirectoryHandle(category) : base;
   const moving = existing && (existing.id !== id || existing.categoryId !== category);
   if (!existing || moving) await assertFileAvailable(directory, `${id}.md`);
-  await writeManagedFile(directory, `${id}.md`, source, '模板');
+  await writeManagedFile(directory, `${id}.md`, source, productReference('contentFileLabels.template'));
   if (moving) {
     const origin = existing.categoryId ? await base.getDirectoryHandle(existing.categoryId) : base;
     try { await origin.removeEntry(`${existing.id}.md`); }
     catch (error) {
-      let rollback = '';
-      try { await directory.removeEntry(`${id}.md`); } catch { rollback = '；新文件回滚失败，请检查新旧文件'; }
-      throw new Error(`改名或分类移动失败，原文件保留：${error instanceof Error ? error.message : String(error)}${rollback}`);
+      let rollback: string | ProductMessageInfo = '';
+      try { await directory.removeEntry(`${id}.md`); } catch { rollback = productReference('contentFileLabels.rollbackNewFileFailed'); }
+      throw new ProductError("contentLibraries.renamingOrCategoryMovementFailedTheOriginalFileIsRetained", { "cause": productCause(error), "rollback": rollback });
     }
   }
   return { id, name: parsed.metadata.title || id, source, ...(category ? { categoryId: category } : {}), ...(isSnippetCategoryIcon(icon) ? { icon } : {}) };
@@ -665,9 +666,9 @@ export async function saveArticleTemplate(root: DirectoryHandle, id: string, sou
 
 export async function deleteArticleTemplate(root: DirectoryHandle, id: string): Promise<void> {
   await ensurePermission(root);
-  assertId(id, '模板');
+  assertId(id, productReference('contentFileLabels.template'));
   const library = await loadArticleTemplates(root);
-  if (!library.templates.some((item) => item.id === id)) throw new Error(`找不到模板「${id}」。`);
+  if (!library.templates.some((item) => item.id === id)) throw new ProductError("contentLibraries.templateWasNotFound", { "id": id });
   const template = library.templates.find(item => item.id === id)!;
   const base = await root.getDirectoryHandle('templates');
   const directory = template.categoryId ? await base.getDirectoryHandle(template.categoryId) : base;

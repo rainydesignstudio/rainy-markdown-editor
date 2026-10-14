@@ -1,4 +1,6 @@
 'use client';
+
+import { productJoin, productDiagnosticReference, productErrorLabel, productErrorMessage, ProductError, productCause, productLabel, productMessage, productReference, productText } from "../lib/i18n/productMessages";
 import { prepareRenderRecord, persistRenderRecord, restoreRenderEnvironment, renderRecordMatches, type RenderRecord } from '../lib/article-format/renderRecords';
 import type { FormatSnapshot } from '../lib/article-format/runtime';
 
@@ -191,7 +193,7 @@ export function useEditorController() {
     : routePath === '/editor' ? 'editor' : preferredArticleMode;
   const navigateArticleMode = useCallback((mode: ArticleMode) => {
     if (mode === 'editor' && !directoryRef.current) {
-      setStatus({ label: '先在设置中选择资料目录，再开始编辑。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeEditing"), tone: 'warning' });
       navigateRoute('/settings/');
       return;
     }
@@ -248,7 +250,7 @@ export function useEditorController() {
   const [articleInfoDialogOpen, setArticleInfoDialogOpen] = useState(false);
   const [projectDeleteTarget, setProjectDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [settingsIssue, setSettingsIssue] = useState<string | null>(null);
-  const [settingsNotice, setSettingsNotice] = useState<{ label: string; tone: Tone }>({ label: '默认间隔：自动保存 60 秒 · 自动快照 30 分钟。', tone: 'neutral' });
+  const [settingsNotice, setSettingsNotice] = useState<{ label: string; tone: Tone }>({ ...productLabel("controller.defaultIntervalsAutoSaveEvery60SecondsAutomaticSnapshotEvery30Minutes"), tone: 'neutral' });
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historySnapshots, setHistorySnapshots] = useState<ArticleHistorySnapshot[]>([]);
@@ -256,11 +258,11 @@ export function useEditorController() {
   const [historySelectedId, setHistorySelectedId] = useState<string | null>(null);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyRefreshPending, setHistoryRefreshPending] = useState(false);
-  const [historyNotice, setHistoryNotice] = useState<{ label: string; tone: Tone }>({ label: '历史记录仅保存在当前文章目录。', tone: 'neutral' });
+  const [historyNotice, setHistoryNotice] = useState<{ label: string; tone: Tone }>({ ...productLabel("controller.historyIsStoredOnlyInTheCurrentArticleDirectory"), tone: 'neutral' });
   const [revision, setRevision] = useState(1);
   const [compiledRevision, setCompiledRevision] = useState<number | null>(null);
   const [compiledCss, setCompiledCss] = useState('');
-  const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number }>({ label: '选择资料目录以开始写作', tone: 'neutral' });
+  const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
   const [formatCheck, setFormatCheck] = useState<{ mode: 'copy' | 'save' | 'inspect' | 'export'; report: ArticleFormatReport } | null>(null);
   const [loadInspectionRevision, setLoadInspectionRevision] = useState<number | null>(null);
   const formatCheckResolveRef = useRef<((proceed: boolean) => void) | null>(null);
@@ -361,18 +363,18 @@ export function useEditorController() {
 
   const persistEditorWorkspace = useCallback((
     update: (current: EditorWorkspace) => EditorWorkspace,
-    notice = '本地项目设置已保存。',
+    notice = productText("controller.localProjectSettingsSaved"),
   ): Promise<boolean> => {
     const root = directoryRef.current;
     if (!root) {
-      setStatus({ label: '先选择资料目录，再保存项目与外观设置。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryBeforeSavingProjectAndAppearanceSettings"), tone: 'warning' });
       return Promise.resolve(false);
     }
     const rootSession = contentLibraryRootSessionRef.current;
     const perform = async () => {
       if (directoryRef.current !== root || contentLibraryRootSessionRef.current !== rootSession) return false;
       if (editorWorkspaceIssue) {
-        setStatus({ label: `${editorWorkspaceIssue} 项目与外观设置保持只读。`, tone: 'error' });
+        setStatus({ ...productLabel("controller.projectAndAppearanceSettingsRemainReadOnly", { "editorWorkspaceIssue": editorWorkspaceIssue }), tone: 'error' });
         return false;
       }
       setEditorWorkspaceBusy(true);
@@ -389,7 +391,7 @@ export function useEditorController() {
         return true;
       } catch (error) {
         if (directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession) {
-          setStatus({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+          setStatus({ ...productErrorLabel(error), tone: 'error' });
         }
         return false;
       } finally {
@@ -411,7 +413,7 @@ export function useEditorController() {
 
   const parsed = useMemo(() => parseArticle(article.source), [article.source]);
   const parseErrors = errorDiagnostics(parsed.diagnostics);
-  const currentTitle = parsed.metadata.title || '未命名文稿';
+  const currentTitle = parsed.metadata.title || productText("articleHistory.untitledManuscript");
   const articleList = directory ? storedArticles : [];
   const currentArticleIsArchived = Boolean(article.folder && article.month && getArticleOrganization(editorWorkspace, articleId(article)).archived);
   const isReadyToCopy = mounted && Boolean(directory && article.folder && article.month) && !currentArticleIsArchived && parseErrors.length === 0 && parsed.canCopy && article.themeValid;
@@ -438,11 +440,11 @@ export function useEditorController() {
     const documentToken = documentTokenRef.current;
     const current = articleRef.current;
     if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, articleId(current)).archived) {
-      setStatus({ label: '归档文章为只读；取消归档后才能编辑。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.archivedArticlesAreReadOnlyUnarchiveTheArticleBeforeEditing"), tone: 'warning' });
       return;
     }
     if (documentToken?.root && mutationQueueRef.current.isDeleting(documentToken.root, documentToken.articleId)) {
-      setStatus({ label: '这篇文章正在删除，无法继续编辑或保存。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.thisArticleIsBeingDeletedEditingAndSavingAreUnavailable"), tone: 'warning' });
       return;
     }
     const changedId = articleId(current);
@@ -463,7 +465,7 @@ export function useEditorController() {
       const nextSource = replaceArticleBody(articleRef.current.source, body);
       updateArticle(nextSource);
     } catch (error) {
-      setStatus({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+      setStatus({ ...productErrorLabel(error), tone: 'error' });
     }
   }, [updateArticle]);
 
@@ -496,7 +498,7 @@ export function useEditorController() {
   const cacheLoadedArticleReport = useCallback((snapshot: ArticleSnapshot, report: ArticleFormatReport, preview: HTMLElement | null) => {
     if (report.complete === false || !preview || !preview.isConnected || preview !== previewRef.current || !matchesSnapshot(snapshot) || !snapshot.folder || !snapshot.month || articleRef.current.dirty) return;
     const parsed = parseArticle(snapshot.source);
-    if (!snapshot.themeValid) parsed.diagnostics.push({ level: 'error', message: '主题快照需修复。' });
+    if (!snapshot.themeValid) parsed.diagnostics.push({ level: 'error', ...productMessage("controller.theThemeSnapshotNeedsRepair") });
     const cached = articleListCheckResult({ id: snapshot.articleId, month: snapshot.month, folder: snapshot.folder, filePath: '', source: snapshot.source, theme: snapshot.theme, themeValid: snapshot.themeValid, parse: parsed }, report);
     setArticleChecks(records => ({ ...records, [snapshot.articleId]: cached }));
   }, [matchesSnapshot]);
@@ -516,7 +518,7 @@ export function useEditorController() {
       flushSync(() => { setCompiledCss(result.css); setCompiledRevision(snapshot.revision); });
       const preview = previewRef.current;
       const report = await inspectArticleFormatReport(snapshot.source, snapshot.theme, preview, { root: snapshot.directory, month: snapshot.month, folder: snapshot.folder }, { deep: false }).catch((cause): ArticleFormatReport => ({
-        theme: { passed: [], issues: [{ kind: 'engine', name: '格式检查引擎', source: '当前文章格式检查', tier: 'unknown', message: `无法核对当前格式：${cause instanceof Error ? cause.message : String(cause)}` }] },
+        theme: { passed: [], issues: [{ kind: 'engine', name: productText("controller.formatCheckEngine"), source: productText("controller.currentArticleFormatCheck"), tier: 'unknown', ...productMessage("controller.theCurrentFormatCouldNotBeChecked", { "cause": productCause(cause) }) }] },
         body: { passed: [], issues: [] },
       }));
       if (requestId !== compileRequestRef.current || !matchesSnapshot(snapshot)) return false;
@@ -526,7 +528,7 @@ export function useEditorController() {
       return true;
     } catch (error) {
       if (requestId === compileRequestRef.current && matchesSnapshot(snapshot)) {
-        setStatus({ label: `样式生成失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+        setStatus({ ...productLabel("controller.styleGenerationFailed", { "cause": productCause(error) }), tone: 'error' });
       }
       return false;
     } finally {
@@ -550,14 +552,14 @@ export function useEditorController() {
   const applyStoredArticle = useCallback(async (stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current) => {
     const documentToken = openDocument(root, stored.id);
     if (!documentToken) {
-      setStatus({ label: '这篇文章正在删除，请稍后刷新文章列表。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.thisArticleIsBeingDeletedRefreshTheArticleListLater"), tone: 'warning' });
       return false;
     }
     let restored: Awaited<ReturnType<typeof restoreRenderEnvironment>> | undefined;
     let renderIssue = stored.renderIssue;
     if (stored.renderRecord && root && !renderIssue) {
       try { restored = await restoreRenderEnvironment(root, stored.renderRecord); }
-      catch (error) { renderIssue = '历史渲染依赖无法载入：' + (error instanceof Error ? error.message : String(error)); }
+      catch (error) { renderIssue = productText("controller.historicalRenderDependenciesCouldNotLoad") + (error instanceof Error ? error.message : String(error)); }
     }
     if (directoryRef.current !== root || documentTokenRef.current !== documentToken) { restored?.dispose(); return false; }
     renderEnvironmentRef.current?.dispose(); renderEnvironmentRef.current = restored ?? null;
@@ -573,7 +575,7 @@ export function useEditorController() {
     setRevision(revisionRef.current);
     setLoadInspectionRevision(revisionRef.current);
     setCompiledRevision(null);
-    setStatus({ label: stored.parse.diagnostics.length > 0 ? `已载入 ${stored.filePath}，请先处理诊断` : `已载入 ${stored.filePath}`, tone: stored.parse.diagnostics.length > 0 ? 'warning' : 'success' });
+    setStatus({ ...(stored.parse.diagnostics.length > 0 ? productLabel("controller.loadedResolveDiagnosticsFirst", { "storedFilePath": stored.filePath }) : productLabel("controller.loaded", { "storedFilePath": stored.filePath })), tone: stored.parse.diagnostics.length > 0 ? 'warning' : 'success' });
     if (navigateToEditor) navigateArticleMode('editor');
     void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
     return true;
@@ -600,11 +602,11 @@ export function useEditorController() {
   const performSaveSnapshot = useCallback(async (snapshot: ArticleSnapshot): Promise<SaveSnapshotResult> => {
     const root = snapshot.directory;
     if (!root) {
-      setStatus({ label: '保存前请先在设置中选择资料目录。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeSaving"), tone: 'warning' });
       return { ok: false, current: matchesSnapshot(snapshot) };
     }
     if (snapshot.folder && snapshot.month && getArticleOrganization(editorWorkspaceRef.current, snapshot.articleId).archived) {
-      setStatus({ label: '归档文章为只读；取消归档后才能保存。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.archivedArticlesAreReadOnlyUnarchiveTheArticleBeforeSaving"), tone: 'warning' });
       return { ok: false, current: matchesSnapshot(snapshot) };
     }
     const parsedSnapshot = parseArticle(snapshot.source);
@@ -624,7 +626,7 @@ export function useEditorController() {
         try {
           prepared = await prepareRenderRecord(nextSource, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: snapshot.folder && snapshot.month ? 'articles/' + snapshot.month + '/' + snapshot.folder : undefined });
         } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
-      } else renderIssue = '当前渲染尚未就绪，请更新样式后再次保存。';
+      } else renderIssue = productText("controller.theCurrentRenderIsNotReadyUpdateStylesAndSaveAgain");
       const result = await saveStoredArticle(root, nextSource, snapshot.theme, snapshot.folder, snapshot.month, { writeTheme: !preserveThemeSnapshot });
       if (prepared && result.article.themeValid) {
         try {
@@ -665,14 +667,14 @@ export function useEditorController() {
           };
         }
         setCompiledRevision(null);
-        if (result.indexUpdated && result.indexError) setStatus({ label: `原文已保存；月索引已重建：${result.indexError}`, tone: 'warning' });
-        else if (result.indexUpdated) setStatus({ label: `原文已保存 · ${result.article.filePath}`, tone: 'success' });
-        else setStatus({ label: `原文已保存；索引未更新：${result.indexError ?? '未知错误'}`, tone: 'warning' });
-        if (renderIssue) setStatus({ label: '原文已保存；渲染记录未更新：' + renderIssue, tone: 'warning' });
+        if (result.indexUpdated && result.indexError) setStatus({ ...productLabel("controller.sourceSavedTheMonthlyIndexWasRebuilt", { "resultIndexError": result.indexError }), tone: 'warning' });
+        else if (result.indexUpdated) setStatus({ ...productLabel("controller.sourceSaved", { "result_articleFilePath": result.article.filePath }), tone: 'success' });
+        else setStatus({ ...productLabel("controller.sourceSavedTheIndexWasNotUpdated", { "value": (result.indexError ?? productReference("controller.unknownError")) }), tone: 'warning' });
+        if (renderIssue) setStatus({ ...productLabel("shared.compose", { parts: productJoin([productReference("controller.sourceSavedTheRenderRecordWasNotUpdated"), renderIssue]) }), tone: 'warning' });
       }
       return { ok: result.sourceSaved, current, savedSnapshot, result };
     } catch (error) {
-      if (matchesSnapshot(snapshot)) setStatus({ label: `保存失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (matchesSnapshot(snapshot)) setStatus({ ...productLabel("themeLibrary.savingFailed", { "cause": productCause(error) }), tone: 'error' });
       return { ok: false, current: matchesSnapshot(snapshot) };
     }
   }, [matchesSnapshot, openDocument]);
@@ -682,7 +684,7 @@ export function useEditorController() {
       const current = matchesSnapshot(snapshot);
       const tokenMatchesSnapshot = snapshot.documentToken.root === snapshot.directory && snapshot.documentToken.articleId === snapshot.articleId;
       if (!tokenMatchesSnapshot || !mutationQueueRef.current.canSave(snapshot.documentToken)) {
-        if (current) setStatus({ label: '保存已取消：这篇文章正在删除或已删除，请重新打开有效文章。', tone: 'warning' });
+        if (current) setStatus({ ...productLabel("controller.savingCancelledThisArticleIsBeingDeletedOrHasBeenDeletedOpen"), tone: 'warning' });
         return { ok: false, current };
       }
       return performSaveSnapshot(snapshot);
@@ -696,7 +698,7 @@ export function useEditorController() {
       const prepared = await prepareRenderRecord(snapshot.source, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: 'articles/' + snapshot.month + '/' + snapshot.folder });
       if (!matchesSnapshot(snapshot)) return false;
       await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new Error('文章会话已变化，渲染记录未更新。');
+        if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new ProductError("controller.theArticleSessionChangedTheRenderRecordWasNotUpdated");
         await persistRenderRecord(root, await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!), prepared);
       });
       if (matchesSnapshot(snapshot)) {
@@ -705,7 +707,7 @@ export function useEditorController() {
       }
       return true;
     } catch (error) {
-      if (matchesSnapshot(snapshot)) setStatus({ label: '原文已保存；渲染记录未更新：' + (error instanceof Error ? error.message : String(error)), tone: 'warning' });
+      if (matchesSnapshot(snapshot)) setStatus({ ...productLabel("shared.compose", { parts: productJoin([productReference("controller.sourceSavedTheRenderRecordWasNotUpdated"), productCause(error)]) }), tone: 'warning' });
       return false;
     }
   }, [matchesSnapshot]);
@@ -726,7 +728,7 @@ export function useEditorController() {
         setFormatCheck({ mode: 'save', report });
       }
       } catch (error) {
-        if (matchesSnapshot(result.savedSnapshot)) setStatus({ label: `原文已保存；格式检查未完成：${error instanceof Error ? error.message : String(error)}`, tone: 'warning' });
+        if (matchesSnapshot(result.savedSnapshot)) setStatus({ ...productLabel("controller.sourceSavedFormatCheckingIsIncomplete", { "cause": productCause(error) }), tone: 'warning' });
       }
     }
     return result.ok;
@@ -736,7 +738,7 @@ export function useEditorController() {
     if (formatInspectionRef.current || formatCheckResolveRef.current || mediaOperationRef.current || historyOperationRef.current) return false;
     const snapshot = snapshotFor();
     if (!parseArticle(snapshot.source).canCopy || !snapshot.themeValid) {
-      setStatus({ label: '请先修复元数据或主题快照，再检查当前文章格式。', tone: 'error' });
+      setStatus({ ...productLabel("controller.repairMetadataOrTheThemeSnapshotBeforeCheckingTheCurrentArticle"), tone: 'error' });
       return false;
     }
     formatInspectionRef.current = true;
@@ -752,7 +754,7 @@ export function useEditorController() {
       setFormatCheck({ mode: 'inspect', report });
       return true;
     } catch (error) {
-      if (matchesSnapshot(snapshot)) setStatus({ label: `格式检查未完成：${error instanceof Error ? error.message : String(error)}`, tone: 'warning' });
+      if (matchesSnapshot(snapshot)) setStatus({ ...productLabel("controller.formatCheckingIsIncomplete", { "cause": productCause(error) }), tone: 'warning' });
       return false;
     } finally { formatInspectionRef.current = false; }
   }, [cacheLoadedArticleReport, compileCurrent, matchesSnapshot, snapshotFor]);
@@ -762,7 +764,7 @@ export function useEditorController() {
     if (!root || !token) return false;
     const loaded = await activateLibraryFormat(root, () => directoryRef.current === root && documentTokenRef.current === token);
     if (!loaded.snapshot || directoryRef.current !== root || documentTokenRef.current !== token) return false;
-    if (loaded.snapshot.error) { setStatus({ label: '样式未更新：' + loaded.snapshot.error, tone: 'error' }); return false; }
+    if (loaded.snapshot.error) { setStatus({ ...productLabel("shared.compose", { parts: productJoin([productReference("controller.stylesWereNotUpdated"), loaded.snapshot.error]) }), tone: 'error' }); return false; }
     renderEnvironmentRef.current?.dispose(); renderEnvironmentRef.current = null;
     const next: WorkingArticle = { ...articleRef.current, renderSnapshot: undefined, renderCss: undefined, renderIssue: undefined, renderRecord: null, dirty: true };
     articleRef.current = next; setArticle(next);
@@ -773,15 +775,15 @@ export function useEditorController() {
     const root = directoryRef.current;
     if (!root) return;
     setSettingsBusy(true);
-    setSettingsNotice({ label: '正在保存 settings.json…', tone: 'warning' });
+    setSettingsNotice({ ...productLabel("controller.savingSettingsJson"), tone: 'warning' });
     try {
       const saved = await saveArticleSettings(root, nextSettings);
       if (directoryRef.current !== root) return;
       setArticleSettings(saved);
       setSettingsIssue(null);
-      setSettingsNotice({ label: '设置已保存；计时器按新配置重新启动。', tone: 'success' });
+      setSettingsNotice({ ...productLabel("controller.settingsSavedTimersRestartedWithTheNewConfiguration"), tone: 'success' });
     } catch (error) {
-      if (directoryRef.current === root) setSettingsNotice({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+      if (directoryRef.current === root) setSettingsNotice({ ...productErrorLabel(error), tone: 'error' });
     } finally {
       if (directoryRef.current === root) setSettingsBusy(false);
     }
@@ -789,9 +791,9 @@ export function useEditorController() {
 
   const setDefaultArticleTheme = useCallback(async (themeId: string, expectedRoot: FileSystemDirectoryHandle) => {
     const root = directoryRef.current;
-    if (settingsIssue) throw new Error('settings.json 需要修复，默认主题尚未保存。');
+    if (settingsIssue) throw new ProductError("controller.settingsJsonNeedsRepairTheDefaultThemeWasNotSaved");
     if (!root || root !== expectedRoot || !themeLibrary.some((theme) => theme.id === themeId)) {
-      throw new Error('当前资料目录或文章主题已变化，请刷新后重试。');
+      throw new ProductError("controller.theCurrentLibraryOrArticleThemeChangedRefreshAndTryAgain");
     }
     const saved = await saveArticleSettings(root, { ...articleSettings, defaultArticleThemeId: themeId });
     if (directoryRef.current !== root) return;
@@ -800,7 +802,7 @@ export function useEditorController() {
   }, [articleSettings, settingsIssue, themeLibrary]);
 
   const saveEditorAppearance = useCallback((appearance: EditorAppearance) => (
-    persistEditorWorkspace((current) => setEditorAppearance(current, appearance), '编辑器外观已保存到当前资料目录。')
+    persistEditorWorkspace((current) => setEditorAppearance(current, appearance), productText("controller.editorAppearanceSavedToTheCurrentLibrary"))
   ), [persistEditorWorkspace]);
 
   const editorThemeOperationRef = useRef(false);
@@ -817,24 +819,24 @@ export function useEditorController() {
       const appearanceUsesOldId = Boolean(renamed && previous.id !== BASE_EDITOR_THEME.id && JSON.stringify(replaceEditorAppearanceThemeId(savedAppearance, previous.id, theme.id)) !== JSON.stringify(savedAppearance));
       await saveEditorTheme(root, theme, previous, appearanceUsesOldId ? {
         commit: async () => {
-          const updated = await persistEditorWorkspace(current => setEditorAppearance(current, replaceEditorAppearanceThemeId(current.appearance, previous!.id, theme.id)), '编辑器主题文件名与外观引用已同步。');
+          const updated = await persistEditorWorkspace(current => setEditorAppearance(current, replaceEditorAppearanceThemeId(current.appearance, previous!.id, theme.id)), productText("controller.theEditorThemeFilenameAndAppearanceReferenceAreSynchronized"));
           setEditorWorkspaceBusy(true);
-          if (!updated) throw new Error('外观引用保存失败，主题文件改名已取消。');
+          if (!updated) throw new ProductError("controller.theAppearanceReferenceCouldNotBeSavedThemeFileRenamingWasCancelled");
         },
         rollback: async () => {
-          const restored = await persistEditorWorkspace(current => setEditorAppearance(current, replaceEditorAppearanceThemeId(current.appearance, theme.id, previous!.id)), '主题改名未完成，外观引用已恢复。');
+          const restored = await persistEditorWorkspace(current => setEditorAppearance(current, replaceEditorAppearanceThemeId(current.appearance, theme.id, previous!.id)), productText("controller.themeRenamingDidNotCompleteTheAppearanceReferenceWasRestored"));
           setEditorWorkspaceBusy(true);
-          if (!restored) throw new Error('主题文件已回滚，但外观引用未能恢复。');
+          if (!restored) throw new ProductError("controller.theThemeFileWasRolledBackButTheAppearanceReferenceCouldNot");
         },
       } : undefined);
       const library = await loadEditorThemeLibrary(root);
       if (directoryRef.current !== root) return false;
       setEditorThemes(library.themes);
       setEditorThemeIssues(library.issues);
-      setStatus({ label: `已保存编辑器主题「${theme.name}」。`, tone: 'success' });
+      setStatus({ ...productLabel("controller.savedEditorTheme", { "themeName": theme.name }), tone: 'success' });
       return true;
     } catch (error) {
-      if (directoryRef.current === root) setStatus({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+      if (directoryRef.current === root) setStatus({ ...productErrorLabel(error), tone: 'error' });
       return false;
     } finally {
       editorThemeOperationRef.current = false;
@@ -853,7 +855,7 @@ export function useEditorController() {
       const library = await loadEditorThemeLibrary(root);
       if (directoryRef.current !== root) return false;
       setEditorThemes(library.themes); setEditorThemeIssues([...library.issues, ...result.issues]);
-      setStatus({ label: `已添加 ${result.added} 套默认编辑器主题，跳过 ${result.skipped} 套已有主题。`, tone: result.issues.length ? 'warning' : 'success' });
+      setStatus({ ...productLabel("controller.defaultEditorThemesAddedExistingThemesSkipped", { "resultAdded": result.added, "resultSkipped": result.skipped }), tone: result.issues.length ? 'warning' : 'success' });
       return !result.issues.length;
     } catch (error) { if (directoryRef.current === root) setStatus({ label: String(error), tone: 'error' }); return false; }
     finally { editorThemeOperationRef.current = false; if (directoryRef.current === root) setEditorWorkspaceBusy(false); }
@@ -871,7 +873,7 @@ export function useEditorController() {
       const library = await loadEditorThemeLibrary(root);
       if (directoryRef.current !== root) return false;
       setEditorThemes(library.themes); setEditorThemeIssues(library.issues);
-      setStatus({ label: '编辑器主题已删除。', tone: 'success' }); return true;
+      setStatus({ ...productLabel("controller.editorThemeDeleted"), tone: 'success' }); return true;
     } catch (error) { if (directoryRef.current === root) setStatus({ label: String(error), tone: 'error' }); return false; }
     finally { editorThemeOperationRef.current = false; if (directoryRef.current === root) setEditorWorkspaceBusy(false); }
   }, [editorWorkspaceIssue]);
@@ -884,16 +886,16 @@ export function useEditorController() {
     const next = setEditorAppearance(editorWorkspaceRef.current, { ...editorWorkspaceRef.current.appearance, colorMode });
     editorWorkspaceRef.current = next;
     setEditorWorkspace(next);
-    setStatus({ label: '当前没有打开资料目录；外观仅在本窗口临时生效。', tone: 'neutral' });
+    setStatus({ ...productLabel("controller.noLibraryIsOpenAppearanceAppliesTemporarilyToThisWindow"), tone: 'neutral' });
     return Promise.resolve(true);
   }, [saveEditorAppearance]);
 
   const resetCurrentEditorAppearance = useCallback(() => {
-    if (directoryRef.current) return persistEditorWorkspace(resetEditorAppearance, '编辑器外观已恢复为默认值。');
+    if (directoryRef.current) return persistEditorWorkspace(resetEditorAppearance, productText("controller.editorAppearanceRestoredToDefaults"));
     const next = resetEditorAppearance(editorWorkspaceRef.current);
     editorWorkspaceRef.current = next;
     setEditorWorkspace(next);
-    setStatus({ label: '默认外观已恢复；没有资料目录，因此未写入文件。', tone: 'neutral' });
+    setStatus({ ...productLabel("controller.defaultAppearanceRestoredNoLibraryIsOpenSoNoFileWasWritten"), tone: 'neutral' });
     return Promise.resolve(true);
   }, [persistEditorWorkspace]);
 
@@ -901,20 +903,20 @@ export function useEditorController() {
     const target = snapshotFor();
     const root = target.directory;
     if (!root || target.documentToken.root !== root || !mutationQueueRef.current.canSave(target.documentToken)) {
-      setHistoryNotice({ label: '当前稿件不属于已授权资料目录；没有读取或写入历史。', tone: 'warning' });
+      setHistoryNotice({ ...productLabel("controller.theCurrentDraftDoesNotBelongToTheAuthorizedLibraryNoHistory"), tone: 'warning' });
       return;
     }
     if (!target.folder || !target.month) {
-      setHistoryNotice({ label: '新稿还没有磁盘历史；先保存文章，再查看版本。当前稿件未改动。', tone: 'warning' });
+      setHistoryNotice({ ...productLabel("controller.thisNewArticleHasNoDiskHistoryYetSaveItBeforeViewing"), tone: 'warning' });
       return;
     }
     const lease = beginHistoryOperation();
     if (!lease) return;
     setHistoryRefreshPending(false);
-    setHistoryNotice({ label: '正在载入历史版本…', tone: 'warning' });
+    setHistoryNotice({ ...productLabel("controller.loadingHistoricalVersions"), tone: 'warning' });
     try {
       const result = await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new Error('文章或资料目录已切换；已取消历史读取。');
+        if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedHistoryReadingWasCancelled");
         return listArticleHistory(root, target.month!, target.folder!);
       });
       if (directoryRef.current !== root || !matchesSnapshot(target)) return;
@@ -924,10 +926,10 @@ export function useEditorController() {
       if (!historyBaselineRef.current || historyBaselineRef.current.root !== root || historyBaselineRef.current.articleId !== target.articleId) {
         historyBaselineRef.current = { root, articleId: target.articleId, fingerprint: null, initialized: false };
       }
-      setHistoryNotice({ label: result.issues.length ? `已载入 ${result.snapshots.length} 个完整版本；另有 ${result.issues.length} 条损坏/不完整记录未参与恢复。` : `已载入 ${result.snapshots.length} 个历史版本。`, tone: result.issues.length ? 'warning' : 'neutral' });
+      setHistoryNotice({ ...(result.issues.length ? productLabel("controller.completeVersionsLoadedDamagedOrIncompleteRecordsExcludedFromRestore", { "result_snapshotsCount": result.snapshots.length, "result_issuesCount": result.issues.length }) : productLabel("controller.historicalVersionsLoaded", { "result_snapshotsCount": result.snapshots.length })), tone: result.issues.length ? 'warning' : 'neutral' });
       setHistoryDialogOpen(true);
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ label: `历史读取失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ ...productLabel("controller.historyReadingFailed", { "cause": productCause(error) }), tone: 'error' });
     } finally {
       finishHistoryOperation(lease);
     }
@@ -938,20 +940,20 @@ export function useEditorController() {
     let target = snapshotFor();
     if (!root || target.directory !== root || target.documentToken.root !== root) return;
     if (target.folder && target.month && getArticleOrganization(editorWorkspaceRef.current, target.articleId).archived) {
-      setHistoryNotice({ label: '归档文章为只读；无法创建历史版本。', tone: 'warning' });
+      setHistoryNotice({ ...productLabel("controller.archivedArticlesAreReadOnlyAHistoricalVersionCannotBeCreated"), tone: 'warning' });
       return;
     }
     const lease = beginHistoryOperation();
     if (!lease) return;
-    setHistoryNotice({ label: '正在保存重要版本…', tone: 'warning' });
+    setHistoryNotice({ ...productLabel("controller.savingAnImportantVersion"), tone: 'warning' });
     try {
       if (!target.folder || !target.month) {
         const archived = await saveSnapshot(target);
-        if (!archived.ok || !archived.current || !archived.savedSnapshot) throw new Error('草稿归档失败；重要版本未创建。');
+        if (!archived.ok || !archived.current || !archived.savedSnapshot) throw new ProductError("controller.draftArchivingFailedTheImportantVersionWasNotCreated");
         target = archived.savedSnapshot;
       }
       const result = await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new Error('文章或资料目录已切换；未创建快照。');
+        if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedNoSnapshotWasCreated");
         return createArticleSnapshot(root, target.month!, target.folder!, target.source, target.theme, {
           kind: 'manual', maxAutoSnapshots: articleSettings.autoSnapshot.maxCount,
         });
@@ -959,23 +961,23 @@ export function useEditorController() {
       if (directoryRef.current !== root || !matchesSnapshot(target)) return;
       setHistorySelectedId(result.snapshot.id);
       historyBaselineRef.current = { root, articleId: target.articleId, fingerprint: articleFingerprint(target.source, target.theme), initialized: true };
-      const cleanupNote = result.cleanupIssues.length ? `；自动清理提示：${result.cleanupIssues.join('；')}` : '';
+      const cleanupNote = result.cleanupIssues.length ? productReference("controller.automaticCleanupNotes", { "details": result.cleanupIssues.join('；') }) : '';
       setHistoryRefreshPending(true);
       try {
         const history = await mutationQueueRef.current.run(async () => {
-          if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new Error('文章或资料目录已切换；已取消列表刷新。');
+          if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedListRefreshWasCancelled");
           return listArticleHistory(root, target.month!, target.folder!);
         });
         if (directoryRef.current !== root || !matchesSnapshot(target)) return;
         setHistorySnapshots(history.snapshots);
         setHistoryIssues(history.issues);
         setHistoryRefreshPending(false);
-        setHistoryNotice({ label: result.created ? `重要版本已保存 · ${result.snapshot.id}${cleanupNote}` : `内容与已有版本相同，未重复写入 · ${result.snapshot.id}${cleanupNote}`, tone: result.cleanupIssues.length ? 'warning' : 'success' });
+        setHistoryNotice({ ...(result.created ? productLabel("controller.importantVersionSaved", { "result_snapshotId": result.snapshot.id, "cleanupNote": cleanupNote }) : productLabel("controller.contentMatchesAnExistingVersionNoDuplicateWasWritten", { "result_snapshotId": result.snapshot.id, "cleanupNote": cleanupNote })), tone: result.cleanupIssues.length ? 'warning' : 'success' });
       } catch (error) {
-        if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ label: `重要版本已保存 · ${result.snapshot.id}，但历史列表刷新失败：${error instanceof Error ? error.message : String(error)}。可重试刷新，不会重复创建版本。`, tone: 'warning' });
+        if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ ...productLabel("controller.importantVersionSavedButTheHistoryListCouldNotRefreshRetryRefresh", { "result_snapshotId": result.snapshot.id, "cause": productCause(error) }), tone: 'warning' });
       }
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ label: `重要版本保存失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ ...productLabel("controller.importantVersionSavingFailed", { "cause": productCause(error) }), tone: 'error' });
     } finally {
       finishHistoryOperation(lease);
     }
@@ -990,11 +992,11 @@ export function useEditorController() {
     let updated: Awaited<ReturnType<typeof setArticleSnapshotRetained>>;
     try {
       updated = await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new Error('文章或资料目录已切换；未更改快照保护状态。');
+        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedSnapshotProtectionWasNotModified");
         return setArticleSnapshotRetained(root, current.month!, current.folder!, snapshot.id, retained);
       });
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ label: `保护状态更新失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productLabel("controller.protectionUpdateFailed", { "cause": productCause(error) }), tone: 'error' });
       finishHistoryOperation(lease);
       return;
     }
@@ -1009,9 +1011,9 @@ export function useEditorController() {
       setHistorySnapshots(history.snapshots);
       setHistoryIssues(history.issues);
       setHistoryRefreshPending(false);
-      setHistoryNotice({ label: updated.retained ? '此自动版本已加入保护，不会被自动清理。' : '已取消保护；清理策略会在后续自动快照时生效。', tone: 'success' });
+      setHistoryNotice({ ...(updated.retained ? productLabel("controller.thisAutomaticVersionIsProtectedAndWillNotBeCleanedAutomatically") : productLabel("controller.protectionRemovedCleanupPolicyAppliesToLaterAutomaticSnapshots")), tone: 'success' });
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ label: `保护状态已成功写入，但历史列表刷新失败：${error instanceof Error ? error.message : String(error)}。可重试刷新；不会重复写入保护状态。`, tone: 'warning' });
+      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productLabel("controller.protectionWasSavedButTheHistoryListCouldNotRefreshRetryRefresh", { "cause": productCause(error) }), tone: 'warning' });
     } finally {
       finishHistoryOperation(lease);
     }
@@ -1024,19 +1026,19 @@ export function useEditorController() {
     const lease = beginHistoryOperation();
     if (!lease) return;
     setHistoryRefreshPending(true);
-    setHistoryNotice({ label: '正在只读刷新历史列表…', tone: 'warning' });
+    setHistoryNotice({ ...productLabel("controller.refreshingTheHistoryListWithoutWritingFiles"), tone: 'warning' });
     try {
       const history = await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new Error('文章或资料目录已切换；已取消历史刷新。');
+        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedHistoryRefreshWasCancelled");
         return listArticleHistory(root, current.month!, current.folder!);
       });
       if (directoryRef.current !== root || !matchesSnapshot(current)) return;
       setHistorySnapshots(history.snapshots);
       setHistoryIssues(history.issues);
       setHistoryRefreshPending(false);
-      setHistoryNotice({ label: `历史列表已刷新 · ${history.snapshots.length} 个完整版本${history.issues.length ? `，${history.issues.length} 条记录无法读取` : ''}。`, tone: history.issues.length ? 'warning' : 'success' });
+      setHistoryNotice({ ...productLabel("controller.historyListRefreshedCompleteVersions", { "history_snapshotsCount": history.snapshots.length, "value": (history.issues.length ? productReference("controller.unreadableRecords", { "history_issuesCount": history.issues.length }) : '') }), tone: history.issues.length ? 'warning' : 'success' });
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ label: `历史列表刷新仍失败：${error instanceof Error ? error.message : String(error)}。保护状态不会重复写入。`, tone: 'warning' });
+      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productLabel("controller.historyRefreshStillFailedProtectionWillNotBeWrittenAgain", { "cause": productCause(error) }), tone: 'warning' });
     } finally {
       finishHistoryOperation(lease);
     }
@@ -1046,40 +1048,40 @@ export function useEditorController() {
     const current = snapshotFor();
     const root = current.directory;
     if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, current.articleId).archived) {
-      setHistoryNotice({ label: '归档文章为只读；取消归档后才能恢复历史版本。', tone: 'warning' });
+      setHistoryNotice({ ...productLabel("controller.archivedArticlesAreReadOnlyUnarchiveTheArticleBeforeRestoringAHistorical"), tone: 'warning' });
       return;
     }
     if (!root || !current.folder || !current.month || !current.themeValid || !targetSnapshot.themeMatches) {
-      setHistoryNotice({ label: '恢复前提不满足：需要有效的当前主题快照与匹配的历史主题。当前文章未改动。', tone: 'error' });
+      setHistoryNotice({ ...productLabel("controller.restoreRequirementsAreNotMetTheCurrentThemeSnapshotMustBeValid"), tone: 'error' });
       return;
     }
     const lease = beginHistoryOperation();
     if (!lease) return;
-    setHistoryNotice({ label: '正在先建立恢复前保护点…', tone: 'warning' });
+    setHistoryNotice({ ...productLabel("controller.creatingACheckpointBeforeRestore"), tone: 'warning' });
     try {
       const result = await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new Error('文章或资料目录已切换；恢复已取消。');
+        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedRestoreWasCancelled");
         const checkpoint = await createArticleSnapshot(root, current.month!, current.folder!, current.source, current.theme, {
           kind: 'before-restore', maxAutoSnapshots: articleSettings.autoSnapshot.maxCount,
         });
         if (directoryRef.current !== root || documentTokenRef.current !== current.documentToken || !mutationQueueRef.current.canSave(current.documentToken)) {
-          throw new Error(`恢复前保护点已保存为 ${checkpoint.snapshot.id}，但当前文章会话已切换；未覆盖目标文章。`);
+          throw new ProductError("controller.checkpointSavedAsButTheArticleSessionChangedTheTargetArticleWas", { "checkpoint_snapshotId": checkpoint.snapshot.id });
         }
         let restored: Awaited<ReturnType<typeof saveStoredArticle>>;
         try {
           restored = await saveStoredArticle(root, targetSnapshot.source, targetSnapshot.theme, current.folder, current.month, { renderRecord: targetSnapshot.renderRecord ?? null });
         } catch (error) {
-          throw new Error(`article.md 写入失败；原稿未覆盖：${error instanceof Error ? error.message : String(error)}；保护点 ${checkpoint.snapshot.id} 已保留。`);
+          throw new ProductError("controller.articleMdWritingFailedTheOriginalManuscriptWasNotOverwrittenCheckpointIs", { "cause": productCause(error), "checkpoint_snapshotId": checkpoint.snapshot.id });
         }
         if (!restored.article.themeValid) {
           let rollback: Awaited<ReturnType<typeof saveStoredArticle>>;
           try {
             rollback = await saveStoredArticle(root, current.source, current.theme, current.folder, current.month, { renderRecord: current.renderRecord ?? null });
           } catch (rollbackError) {
-            throw new Error(`theme.json 写入失败，且回滚未完成：${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}；请从保护点 ${checkpoint.snapshot.id} 手动恢复。`);
+            throw new ProductError("controller.themeJsonWritingFailedAndRollbackIsIncompleteRestoreManuallyFromCheckpoint", { "cause": productCause(rollbackError), "checkpoint_snapshotId": checkpoint.snapshot.id });
           }
-          if (!rollback.article.themeValid) throw new Error(`theme.json 写入失败，且回滚后的主题仍无效；请从保护点 ${checkpoint.snapshot.id} 手动恢复。`);
-          throw new Error(`theme.json 写入或校验失败；已用保护点恢复当前正文与主题。恢复目标未完成，保护点 ${checkpoint.snapshot.id} 保留。`);
+          if (!rollback.article.themeValid) throw new ProductError("controller.themeJsonWritingFailedAndTheRolledBackThemeRemainsInvalidRestore", { "checkpoint_snapshotId": checkpoint.snapshot.id });
+          throw new ProductError("controller.themeJsonWritingOrValidationFailedTheCheckpointRestoredTheCurrentBody", { "checkpoint_snapshotId": checkpoint.snapshot.id });
         }
         return { restored, checkpointId: checkpoint.snapshot.id };
       });
@@ -1090,7 +1092,7 @@ export function useEditorController() {
       setHistoryRefreshPending(true);
       try {
         const history = await mutationQueueRef.current.run(async () => {
-          if (directoryRef.current !== root || articleId(articleRef.current) !== result.restored.article.id) throw new Error('当前文章已切换；仅跳过旧历史视图刷新。');
+          if (directoryRef.current !== root || articleId(articleRef.current) !== result.restored.article.id) throw new ProductError("controller.theCurrentArticleChangedOnlyThePreviousHistoryViewRefreshWasSkipped");
           await loadStoredArticles(root);
           return listArticleHistory(root, current.month!, current.folder!);
         });
@@ -1102,14 +1104,14 @@ export function useEditorController() {
       } catch (error) { refreshError = error; }
       if (directoryRef.current !== root || articleId(articleRef.current) !== result.restored.article.id) return;
       const notes = [
-        result.restored.indexUpdated ? result.restored.indexError : `月索引未更新：${result.restored.indexError ?? '未知错误'}`,
-        refreshError ? `历史/文章列表刷新失败：${refreshError instanceof Error ? refreshError.message : String(refreshError)}` : '',
+        result.restored.indexUpdated ? result.restored.indexError : productReference("controller.theMonthlyIndexWasNotUpdated", { "value": (result.restored.indexError ?? productReference("controller.unknownError")) }),
+        refreshError ? productReference("controller.historyOrArticleListRefreshFailed", { "cause": productCause(refreshError) }) : '',
       ].filter(Boolean);
-      const detail = notes.length ? `；${notes.join('；')}` : '';
-      setHistoryNotice({ label: `已恢复所选版本；恢复前内容保存在 ${result.checkpointId}${detail}`, tone: notes.length ? 'warning' : 'success' });
-      setStatus({ label: `已恢复历史版本；恢复前内容保存在 ${result.checkpointId}${detail}`, tone: notes.length ? 'warning' : 'success' });
+      const detail = notes.length ? productJoin(['；', productJoin(notes, '；')]) : '';
+      setHistoryNotice({ ...productLabel("controller.selectedVersionRestoredContentFromBeforeRestoreIsRetainedIn", { "resultCheckpointId": result.checkpointId, "detail": detail }), tone: notes.length ? 'warning' : 'success' });
+      setStatus({ ...productLabel("controller.historicalVersionRestoredContentFromBeforeRestoreIsRetainedIn", { "resultCheckpointId": result.checkpointId, "detail": detail }), tone: notes.length ? 'warning' : 'success' });
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productErrorLabel(error), tone: 'error' });
     } finally {
       finishHistoryOperation(lease);
     }
@@ -1121,15 +1123,15 @@ export function useEditorController() {
     const cleanTitle = title.trim();
     const persisted = storedArticles.find((item) => item.id === current.articleId);
     if (!root || !current.folder || !current.month || !cleanTitle || !selected.themeMatches || !persisted || !current.themeValid || persisted.parse.diagnostics.some((item) => item.level === 'error')) {
-      setHistoryNotice({ label: '无法安全创建独立副本：需要有效的当前文章、匹配的历史主题和非空标题。', tone: 'error' });
+      setHistoryNotice({ ...productLabel("controller.anIndependentCopyCannotBeCreatedSafelyAValidCurrentArticleMatching"), tone: 'error' });
       return;
     }
     const lease = beginHistoryOperation();
     if (!lease) return;
-    setHistoryNotice({ label: '正在复制文章素材并建立独立版本…', tone: 'warning' });
+    setHistoryNotice({ ...productLabel("controller.copyingArticleAssetsAndCreatingAnIndependentVersion"), tone: 'warning' });
     try {
       const result = await mutationQueueRef.current.run(async () => {
-        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new Error('文章或资料目录已切换；副本创建已取消。');
+        if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedCopyCreationWasCancelled");
         const carrier = await copyStoredArticle(root, current.month!, current.folder!, cleanTitle, targetMonth);
         const timestamp = new Date().toISOString();
         const source = updateFrontMatter(selected.source, {
@@ -1140,21 +1142,21 @@ export function useEditorController() {
         });
         try {
           const saved = await saveStoredArticle(root, source, selected.theme, carrier.article.folder, carrier.article.month, { renderRecord: selected.renderRecord ?? null });
-          if (!saved.article.themeValid) throw new Error(`theme.json 校验失败：${saved.article.parse.diagnostics.map((item) => item.message).join('；')}`);
+          if (!saved.article.themeValid) throw new ProductError("controller.themeJsonValidationFailed", { "details": productJoin(saved.article.parse.diagnostics.map(productDiagnosticReference), '；') });
           return { article: saved.article, folderCollision: carrier.folderCollision, indexUpdated: saved.indexUpdated, indexError: saved.indexError };
         } catch (error) {
           try { await deleteStoredArticle(root, carrier.article.month, carrier.article.folder); }
-          catch (cleanupError) { throw new Error(`历史副本初始化失败：${error instanceof Error ? error.message : String(error)}；未完成副本 ${carrier.article.month}/${carrier.article.folder} 清理失败：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}。`); }
+          catch (cleanupError) { throw new ProductError("controller.historicalCopyInitializationFailedCleanupOfIncompleteCopyAlsoFailed", { "cause": productCause(error), "carrier_articleMonth": carrier.article.month, "carrier_articleFolder": carrier.article.folder, "cause2": productCause(cleanupError) }); }
           throw error;
         }
       });
       if (directoryRef.current !== root) return;
       setStoredArticles((items) => upsertStoredArticle(items, result.article));
       if (!matchesSnapshot(current)) return;
-      const indexNote = result.indexUpdated ? (result.indexError ? `；索引已重建：${result.indexError}` : '') : `；月索引未更新：${result.indexError ?? '未知错误'}`;
-      setHistoryNotice({ label: `已另存为独立文章「${result.article.parse.metadata.title}」；正文使用选中历史，素材已复制且历史未复制${indexNote}`, tone: result.indexUpdated && !result.indexError ? 'success' : 'warning' });
+      const indexNote = result.indexUpdated ? (result.indexError ? productReference("controller.indexRebuilt", { "resultIndexError": result.indexError }) : '') : productReference("controller.monthlyIndexNotUpdated", { "value": (result.indexError ?? productReference("controller.unknownError")) });
+      setHistoryNotice({ ...productLabel("controller.savedAnIndependentArticleItsBodyUsesTheSelectedHistoricalVersionAssets", { "result_article_parse_metadataTitle": result.article.parse.metadata.title, "indexNote": indexNote }), tone: result.indexUpdated && !result.indexError ? 'success' : 'warning' });
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ label: `另存失败：${error instanceof Error ? error.message : String(error)}；原文与原历史未改动。`, tone: 'error' });
+      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productLabel("controller.saveAsFailedTheOriginalManuscriptAndHistoryAreUnchanged", { "cause": productCause(error) }), tone: 'error' });
     } finally {
       finishHistoryOperation(lease);
     }
@@ -1165,14 +1167,14 @@ export function useEditorController() {
       if (directoryRef.current === target.directory) setStatus({ label: message, tone });
       return { ok, message, tone };
     };
-    if (!matchesSnapshot(target) || target.documentToken.root !== target.directory || target.documentToken.articleId !== target.articleId || !mutationQueueRef.current.canSave(target.documentToken)) return notice('稿件已切换；未插入图片引用。', 'warning');
-    if (getArticleOrganization(editorWorkspaceRef.current, target.articleId).archived) return notice('归档文章为只读；未插入图片引用。', 'warning');
-    if (!target.themeValid || !parseArticle(target.source).canCopy) return notice('请先修复元数据或主题快照；未插入图片引用。', 'error');
+    if (!matchesSnapshot(target) || target.documentToken.root !== target.directory || target.documentToken.articleId !== target.articleId || !mutationQueueRef.current.canSave(target.documentToken)) return notice(productText("controller.theManuscriptChangedNoImageReferenceWasInserted"), 'warning');
+    if (getArticleOrganization(editorWorkspaceRef.current, target.articleId).archived) return notice(productText("controller.theArticleIsArchivedAndReadOnlyNoImageReferenceWasInserted"), 'warning');
+    if (!target.themeValid || !parseArticle(target.source).canCopy) return notice(productText("controller.repairMetadataOrTheThemeSnapshotFirstNoImageReferenceWasInserted"), 'error');
     const body = parseArticle(target.source).body;
     const selected = { start: Math.min(body.length, Math.max(0, selection.start)), end: Math.min(body.length, Math.max(0, selection.end)) };
     const nextBody = insertArticleImageReferences(body, fileNames, selected);
     const textarea = sourceTextareaRef.current;
-    if (!textarea || textarea.value !== body) return notice('图片文件已保留；正文输入框不可用，未插入引用。请重新打开文章后采用。', 'warning');
+    if (!textarea || textarea.value !== body) return notice(productText("controller.theImageFileIsRetainedButTheBodyInputIsUnavailableNo"), 'warning');
     let start = selected.start, end = selected.end;
     let text = nextBody.slice(start, nextBody.length - (body.length - end));
     if (body.slice(0, start) + text + body.slice(end) !== nextBody) { start = 0; end = body.length; text = nextBody; }
@@ -1181,9 +1183,9 @@ export function useEditorController() {
     let inserted = false;
     try { inserted = insertUndoableText(textarea, text, start, end, () => parseArticle(articleRef.current.source).body, updateArticleBody); }
     finally { textarea.disabled = wasDisabled; }
-    if (!inserted) return notice('图片文件已保留，但浏览器未能建立可撤销编辑；原文保持不变。', 'warning');
+    if (!inserted) return notice(productText("controller.theImageFileIsRetainedButTheBrowserCouldNotCreateAn"), 'warning');
     void compileCurrent();
-    return notice(`已采用 ${fileNames.length} 张图片；保存稿件后固定这些引用。`, 'warning', true);
+    return notice(productText("controller.imagesInsertedSaveTheManuscriptToRetainTheseReferences", { "fileNamesCount": fileNames.length }), 'warning', true);
   }, [compileCurrent, matchesSnapshot, updateArticleBody]);
 
   const importImagesWithResult = useCallback(async (files: File[], selection: { start: number; end: number }): Promise<MediaActionOutcome> => {
@@ -1193,22 +1195,22 @@ export function useEditorController() {
       if (directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession) setStatus({ label: message, tone });
       return { ok, message, tone };
     };
-    if (!files.length) return notice('没有选择图片。', 'warning');
-    if (mediaOperationRef.current || historyOperationRef.current) return notice('另一个素材或历史操作正在进行；图片未导入。', 'warning');
-    if (!root) return notice('请先选择资料目录；图片尚未导入。', 'warning');
+    if (!files.length) return notice(productText("controller.noImagesSelected"), 'warning');
+    if (mediaOperationRef.current || historyOperationRef.current) return notice(productText("controller.anotherAssetOrHistoryOperationIsInProgressImagesWereNotImported"), 'warning');
+    if (!root) return notice(productText("controller.chooseALibraryFirstImagesWereNotImported"), 'warning');
     const initial = snapshotFor();
-    if (initial.folder && initial.month && getArticleOrganization(editorWorkspaceRef.current, initial.articleId).archived) return notice('归档文章为只读；取消归档后才能导入图片。', 'warning');
-    if (initial.directory !== root || initial.documentToken.root !== root || initial.documentToken.articleId !== initial.articleId || !mutationQueueRef.current.canSave(initial.documentToken)) return notice('当前稿件不属于已选择的资料目录；图片未导入。', 'warning');
-    if (!parseArticle(initial.source).canCopy) return notice('请先修复稿件元数据；图片未导入。', 'error');
+    if (initial.folder && initial.month && getArticleOrganization(editorWorkspaceRef.current, initial.articleId).archived) return notice(productText("controller.archivedArticlesAreReadOnlyUnarchiveTheArticleBeforeImportingImages"), 'warning');
+    if (initial.directory !== root || initial.documentToken.root !== root || initial.documentToken.articleId !== initial.articleId || !mutationQueueRef.current.canSave(initial.documentToken)) return notice(productText("controller.theCurrentManuscriptDoesNotBelongToTheSelectedLibraryImagesWere"), 'warning');
+    if (!parseArticle(initial.source).canCopy) return notice(productText("controller.repairTheManuscriptMetadataFirstImagesWereNotImported"), 'error');
     mediaOperationRef.current = true;
     setMediaOperation('import');
-    notice(initial.folder ? '正在保存图片到当前文章…' : '正在建立文章归档与主题快照…', 'warning');
+    notice(initial.folder ? productText("controller.savingImagesToTheCurrentArticle") : productText("controller.creatingTheArticleArchiveAndThemeSnapshot"), 'warning');
     try {
       let target = initial;
       if (!target.folder || !target.month) {
         const saved = await saveSnapshot(target);
-        if (!saved.ok || !saved.current || !saved.savedSnapshot) return notice('文稿归档未完成；图片没有写入，也没有插入临时引用。', 'error');
-        if (!saved.result?.article.themeValid || !saved.savedSnapshot.themeValid) return notice('文稿已保存，但主题快照未能验证；图片没有写入。', 'error');
+        if (!saved.ok || !saved.current || !saved.savedSnapshot) return notice(productText("controller.articleArchivingDidNotCompleteNoImagesWereWrittenOrTemporaryReferences"), 'error');
+        if (!saved.result?.article.themeValid || !saved.savedSnapshot.themeValid) return notice(productText("controller.theManuscriptWasSavedButItsThemeSnapshotCouldNotBeVerified"), 'error');
         target = saved.savedSnapshot;
         const request = mediaPickerRequestRef.current;
         if (request && request.root === root && request.articleId === initial.articleId) {
@@ -1216,8 +1218,8 @@ export function useEditorController() {
           mediaPickerRequestRef.current = updated;
           setMediaPickerRequest(updated);
         }
-      } else if (!target.themeValid) return notice('当前文章主题快照无效；图片未导入。', 'error');
-      if (!target.folder || !target.month || !matchesSnapshot(target) || contentLibraryRootSessionRef.current !== rootSession) return notice('稿件或资料库已切换；图片未导入。', 'warning');
+      } else if (!target.themeValid) return notice(productText("controller.theCurrentArticleThemeSnapshotIsInvalidImagesWereNotImported"), 'error');
+      if (!target.folder || !target.month || !matchesSnapshot(target) || contentLibraryRootSessionRef.current !== rootSession) return notice(productText("controller.theManuscriptOrLibraryChangedImagesWereNotImported"), 'warning');
       const result = await mutationQueueRef.current.run(async () => {
         const imported: Awaited<ReturnType<typeof importArticleImage>>[] = [];
         const failures: string[] = [];
@@ -1227,17 +1229,17 @@ export function useEditorController() {
         for (const file of files) {
           if (!current()) return { stale: true, imported, failures };
           try { imported.push(await importArticleImage(directory, file)); }
-          catch (error) { failures.push(`${file.name || '图片'}：${error instanceof Error ? error.message : String(error)}`); }
+          catch (error) { failures.push(productText("controller.message", { "value": (file.name || productReference("snippetCategoryIcons.image")), "cause": productCause(error) })); }
         }
         return { stale: !current(), imported, failures };
       });
       if (result.imported.length && directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession) setMediaRefreshRevision((revision) => revision + 1);
-      if (result.stale || !matchesSnapshot(target)) return notice('图片操作已结束，但稿件已切换；未插入引用。已写入的图片保留在原文章中。', 'warning');
-      if (!result.imported.length) return notice(`图片未导入${result.failures.length ? `：${result.failures.join('；')}` : '；原文未改动。'}`, 'error');
+      if (result.stale || !matchesSnapshot(target)) return notice(productText("controller.theImageOperationFinishedButTheManuscriptChangedNoReferencesWereInserted"), 'warning');
+      if (!result.imported.length) return notice(productText("controller.imagesWereNotImported", { "details": (result.failures.length ? `：${result.failures.join('；')}` : productReference("controller.theOriginalManuscriptIsUnchanged")) }), 'error');
       const inserted = insertImagesIntoDraft(target, result.imported.map((image) => image.fileName), selection);
-      if (inserted.ok && result.failures.length) return notice(`${inserted.message} 另有 ${result.failures.length} 张未导入：${result.failures.join('；')}`, 'warning', true);
+      if (inserted.ok && result.failures.length) return notice(productText("controller.additionalImagesNotImported", { "insertedMessage": inserted.message, "result_failuresCount": result.failures.length, "details": result.failures.join('；') }), 'warning', true);
       return inserted;
-    } catch (error) { return notice(`图片导入失败：${error instanceof Error ? error.message : String(error)}；未插入临时引用。`, 'error'); }
+    } catch (error) { return notice(productText("controller.imageImportFailedNoTemporaryReferencesWereInserted", { "cause": productCause(error) }), 'error'); }
     finally { mediaOperationRef.current = false; setMediaOperation(null); }
   }, [insertImagesIntoDraft, matchesSnapshot, saveSnapshot, snapshotFor]);
 
@@ -1252,11 +1254,11 @@ export function useEditorController() {
       if (current()) setStatus({ label: message, tone });
       return { ok, message, tone };
     };
-    if (!root) return notice('请先打开资料库。', 'warning');
-    if (mediaOperationRef.current || historyOperationRef.current) return notice('另一个素材或历史操作正在进行。', 'warning');
-    if (!files.length) return notice('没有选择图片。', 'warning');
+    if (!root) return notice(productText("controller.openALibraryFirst"), 'warning');
+    if (mediaOperationRef.current || historyOperationRef.current) return notice(productText("controller.anotherAssetOrHistoryOperationIsInProgress"), 'warning');
+    if (!files.length) return notice(productText("controller.noImagesSelected"), 'warning');
     mediaOperationRef.current = true; setMediaOperation('import');
-    notice('正在导入共享图片…', 'warning');
+    notice(productText("controller.importingSharedImages"), 'warning');
     try {
       const result = await mutationQueueRef.current.run(async () => {
         let imported = 0;
@@ -1264,22 +1266,22 @@ export function useEditorController() {
         for (const file of files) {
           if (!current()) break;
           try { await importSharedImage(root, file, current); imported += 1; }
-          catch (error) { failures.push(`${file.name || '图片'}：${error instanceof Error ? error.message : String(error)}`); }
+          catch (error) { failures.push(productText("controller.message", { "value": (file.name || productReference("snippetCategoryIcons.image")), "cause": productCause(error) })); }
         }
         return { imported, failures };
       });
-      if (!current()) return { ok: false, message: '资料库已切换；导入结果保留在原资料库中。', tone: 'warning' };
+      if (!current()) return { ok: false, ...productMessage("controller.theLibraryChangedImportedFilesRemainInTheOriginalLibrary"), tone: 'warning' };
       if (result.imported) setMediaRefreshRevision((revision) => revision + 1);
       const failure = result.failures.length ? `；${result.failures.join('；')}` : '';
-      return notice(result.imported ? `已导入 ${result.imported} 张共享图片${failure}` : `共享图片未导入${failure}`, result.failures.length ? 'warning' : result.imported ? 'success' : 'error', result.imported > 0);
-    } catch (error) { return notice(`共享图片导入失败：${error instanceof Error ? error.message : String(error)}`, 'error'); }
+      return notice(result.imported ? productText("controller.sharedImagesImported", { "resultImported": result.imported, "failure": failure }) : productText("controller.sharedImagesWereNotImported", { "failure": failure }), result.failures.length ? 'warning' : result.imported ? 'success' : 'error', result.imported > 0);
+    } catch (error) { return notice(productText("mediaLibrary.sharedImageImportFailed", { "cause": productCause(error) }), 'error'); }
     finally { mediaOperationRef.current = false; setMediaOperation(null); }
   }, []);
 
   const openMediaPicker = useCallback((initialAsset?: LibraryMediaAsset) => {
     const current = articleRef.current, root = directoryRef.current;
     if (!root || !current.source.trim() || !parseArticle(current.source).canCopy || !current.themeValid || (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, articleId(current)).archived)) {
-      setStatus({ label: '先打开一篇可编辑文章，再采用图片。', tone: 'warning' }); return;
+      setStatus({ ...productLabel("controller.openAnEditableArticleBeforeInsertingAnImage"), tone: 'warning' }); return;
     }
     if (mediaOperationRef.current || historyOperationRef.current || formatCheckResolveRef.current) return;
     if (!documentTokenRef.current || documentTokenRef.current.root !== root || documentTokenRef.current.articleId !== articleId(current)) return;
@@ -1304,19 +1306,19 @@ export function useEditorController() {
   const adoptLibraryImage = useCallback(async (asset: LibraryMediaAsset): Promise<MediaActionOutcome> => {
     const request = mediaPickerRequestRef.current;
     const valid = () => Boolean(request && mediaPickerRequestRef.current?.id === request.id && directoryRef.current === request.root && contentLibraryRootSessionRef.current === request.sessionKey && documentTokenRef.current === request.documentToken && articleId(articleRef.current) === request.articleId && parseArticle(articleRef.current.source).body === request.body);
-    if (!request || asset.root !== request.root || !valid()) return { ok: false, message: '稿件或资料库已变化；请重新打开选图弹窗。', tone: 'warning' };
+    if (!request || asset.root !== request.root || !valid()) return { ok: false, ...productMessage("controller.theManuscriptOrLibraryChangedReopenTheImagePicker"), tone: 'warning' };
     try {
       const file = await asset.handle.getFile();
       await inspectArticleImage(file);
-      if (!valid()) return { ok: false, message: '读取期间稿件已变化；未插入引用。', tone: 'warning' };
+      if (!valid()) return { ok: false, ...productMessage("controller.theManuscriptChangedWhileReadingNoReferenceWasInserted"), tone: 'warning' };
       if (asset.kind === 'article' && asset.articleId === request.articleId) {
-        if (mediaOperationRef.current || historyOperationRef.current) return { ok: false, message: '另一个操作正在进行。', tone: 'warning' };
+        if (mediaOperationRef.current || historyOperationRef.current) return { ok: false, ...productMessage("controller.anotherOperationIsInProgress"), tone: 'warning' };
         mediaOperationRef.current = true; setMediaOperation('import');
         try { return insertImagesIntoDraft(snapshotFor(), [asset.fileName], request.selection); }
         finally { mediaOperationRef.current = false; setMediaOperation(null); }
       }
       return await importImagesWithResult([file], request.selection);
-    } catch (error) { return { ok: false, message: `采用失败：${error instanceof Error ? error.message : String(error)}；原文与原图片保留。`, tone: 'error' }; }
+    } catch (error) { return { ok: false, ...productMessage("controller.imageInsertionFailedTheOriginalManuscriptAndImageAreRetained", { "cause": productCause(error) }), tone: 'error' }; }
   }, [importImagesWithResult, insertImagesIntoDraft, snapshotFor]);
 
   useEffect(() => {
@@ -1325,26 +1327,26 @@ export function useEditorController() {
   }, [article, directory, contentLibraryRootSession, currentDocumentGeneration, mediaOperation, closeMediaPicker]);
 
   const renameMediaImage = useCallback(async (asset: ArticleMediaAsset, baseName: string, replacement?: File): Promise<MediaRenameOutcome> => {
-    if (mediaOperationRef.current) return { fileCreated: false, message: '另一个素材操作正在进行；请稍后重试。', tone: 'warning' };
+    if (mediaOperationRef.current) return { fileCreated: false, ...productMessage("controller.anotherAssetOperationIsInProgressTryAgainLater"), tone: 'warning' };
     const root = asset.root;
     const rootSession = contentLibraryRootSessionRef.current;
     if (getArticleOrganization(editorWorkspaceRef.current, asset.articleId).archived) {
-      return { fileCreated: false, message: '归档文章为只读；取消归档后才能改名图片。', tone: 'warning' };
+      return { fileCreated: false, ...productMessage("controller.archivedArticlesAreReadOnlyUnarchiveTheArticleBeforeRenamingImages"), tone: 'warning' };
     }
     const initialToken = documentTokenRef.current;
     const ownerIsCurrent = directoryRef.current === root && initialToken?.root === root && initialToken.articleId === asset.articleId && articleId(articleRef.current) === asset.articleId;
-    if (directoryRef.current !== root) return { fileCreated: false, message: '资料目录已切换；未改名，也没有写入新文件。请重新载入素材列表。', tone: 'warning' };
-    if (!ownerIsCurrent && articleRef.current.dirty) return { fileCreated: false, message: '当前稿件有未保存改动；先保存或处理改动，再改其他文章的图片。', tone: 'warning' };
+    if (directoryRef.current !== root) return { fileCreated: false, ...productMessage("controller.theLibraryChangedNothingWasRenamedOrWrittenReloadTheAssetList"), tone: 'warning' };
+    if (!ownerIsCurrent && articleRef.current.dirty) return { fileCreated: false, ...productMessage("controller.theCurrentManuscriptHasUnsavedChangesSaveOrResolveThemBeforeRenaming"), tone: 'warning' };
 
     mediaOperationRef.current = true;
     setMediaOperation('rename');
-    setStatus({ label: `正在为 ${asset.fileName} 建立新文件并更新文章引用…`, tone: 'warning' });
+    setStatus({ ...productLabel("controller.creatingANewFileForAndUpdatingArticleReferences", { "assetFileName": asset.fileName }), tone: 'warning' });
     const createdRef: { value: Awaited<ReturnType<typeof copyArticleImageAs>> | null } = { value: null };
     const removedSourceRef = { value: false };
     try {
       const result = await mutationQueueRef.current.run(async () => {
         const isRootCurrent = () => directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession;
-        if (!isRootCurrent()) return { fileCreated: false, message: '资料目录会话已切换；没有写入新文件。', tone: 'warning' as const };
+        if (!isRootCurrent()) return { fileCreated: false, ...productMessage("controller.theLibrarySessionChangedNoNewFileWasWritten"), tone: 'warning' as const };
 
         let source: string;
         let folder = asset.folder;
@@ -1354,7 +1356,7 @@ export function useEditorController() {
 
         if (ownerIsCurrent) {
           if (!initialToken || documentTokenRef.current !== initialToken || !mutationQueueRef.current.canSave(initialToken)) {
-            return { fileCreated: false, message: '文章会话已切换或正在删除；没有写入新文件。', tone: 'warning' as const };
+            return { fileCreated: false, ...productMessage("controller.theArticleSessionChangedOrDeletionIsInProgressNoNewFile"), tone: 'warning' as const };
           }
           source = articleRef.current.source;
           folder = articleRef.current.folder ?? asset.folder;
@@ -1363,9 +1365,9 @@ export function useEditorController() {
           currentDocument = true;
         } else {
           const storedArticles = await listStoredArticles(root);
-          if (!isRootCurrent()) return { fileCreated: false, message: '资料目录会话已切换；没有写入新文件。', tone: 'warning' as const };
+          if (!isRootCurrent()) return { fileCreated: false, ...productMessage("controller.theLibrarySessionChangedNoNewFileWasWritten"), tone: 'warning' as const };
           const stored = storedArticles.find((item) => item.id === asset.articleId);
-          if (!stored) return { fileCreated: false, message: '所属文章已不在当前资料目录；没有写入新文件。', tone: 'warning' as const };
+          if (!stored) return { fileCreated: false, ...productMessage("controller.theOwningArticleIsNoLongerInThisLibraryNoNewFile"), tone: 'warning' as const };
           source = stored.source;
           folder = stored.folder;
           month = stored.month;
@@ -1373,38 +1375,38 @@ export function useEditorController() {
         }
 
         const imageDirectory = await getArticleMediaDirectory(root, month, folder, false);
-        if (!isRootCurrent()) return { fileCreated: false, message: '资料目录会话已切换；没有写入新文件。', tone: 'warning' as const };
+        if (!isRootCurrent()) return { fileCreated: false, ...productMessage("controller.theLibrarySessionChangedNoNewFileWasWritten"), tone: 'warning' as const };
         await readMediaMetadata(imageDirectory);
-        if (!isRootCurrent()) throw new Error('资料库会话已切换，未写入新文件。');
+        if (!isRootCurrent()) throw new ProductError("controller.theLibrarySessionChangedNoNewFileWasWritten2");
         createdRef.value = replacement ? await importArticleImage(imageDirectory, new File([replacement], `${baseName}.${replacement.name.split('.').at(-1) ?? 'png'}`)) : await copyArticleImageAs(imageDirectory, asset.handle, baseName);
         if (isRootCurrent()) setMediaRefreshRevision((revision) => revision + 1);
         const created = createdRef.value;
         if (created && asset.description && isRootCurrent()) await saveMediaDescription(imageDirectory, created.fileName, asset.description, isRootCurrent);
-        if (!created) return { fileCreated: false, message: '新文件写入没有返回文件句柄；文章未改名。', tone: 'warning' as const };
-        if (!isRootCurrent()) return { fileCreated: true, fileName: created.fileName, message: `新图片「${created.fileName}」已写入原资料目录；当前目录已切换，未更新文章引用。原文件仍保留。`, tone: 'warning' as const };
+        if (!created) return { fileCreated: false, ...productMessage("controller.writingTheNewFileReturnedNoFileHandleTheArticleWasNot"), tone: 'warning' as const };
+        if (!isRootCurrent()) return { fileCreated: true, fileName: created.fileName, ...productMessage("controller.newImageWasWrittenToTheOriginalLibraryButTheLibraryChanged", { "createdFileName": created.fileName }), tone: 'warning' as const };
 
         const references = rewriteArticleImageReferences(source, asset.fileName, created.fileName);
         if (!references.count) {
           const usage = await inspectMediaUsage({ ...asset, kind: 'article' }, source);
-          if (!isRootCurrent()) return { fileCreated: true, fileName: created.fileName, message: '新图片已保存；资料库会话已切换，原文件保留。', tone: 'warning' as const };
+          if (!isRootCurrent()) return { fileCreated: true, fileName: created.fileName, ...productMessage("controller.newImageSavedTheLibrarySessionChangedTheOriginalFileIsRetained"), tone: 'warning' as const };
           const retained = Boolean(usage.body || usage.history || usage.issues.length);
           if (!retained) { await imageDirectory.removeEntry(asset.fileName); removedSourceRef.value = true; await removeMediaDescription(imageDirectory, asset.fileName, isRootCurrent); }
-          const message = `已${replacement ? '替换' : '改名为'}「${created.fileName}」；${retained ? '已保存正文或历史仍需要原文件，已保留' : '未引用原文件已移除'}。`;
+          const message = productText("controller.imageOperationCompleted", { "value": (replacement ? productReference("mediaManagement.replacedWith") : productReference("mediaManagement.renamedTo")), "createdFileName": created.fileName, "value2": (retained ? productReference("controller.savedBodyOrHistoryStillNeedsTheOriginalFileWhichIsRetained") : productReference("controller.theUnreferencedOriginalFileWasRemoved")) });
           return { fileCreated: true, fileName: created.fileName, message, tone: 'success' as const };
         }
         const nextSource = updateFrontMatter(references.source, { updatedAt: new Date().toISOString() });
 
         if (currentDocument) {
           if (!isRootCurrent() || documentTokenRef.current !== initialToken || articleId(articleRef.current) !== asset.articleId) {
-            return { fileCreated: true, fileName: created.fileName, message: `新图片「${created.fileName}」已保存；稿件会话已切换，未更新当前稿件引用。原文件仍保留。`, tone: 'warning' as const };
+            return { fileCreated: true, fileName: created.fileName, ...productMessage("controller.newImageWasSavedButTheManuscriptSessionChangedCurrentReferencesWere", { "createdFileName": created.fileName }), tone: 'warning' as const };
           }
           updateArticle(nextSource);
           const saveResult = await performSaveSnapshot(snapshotFor());
           const sourceSaved = saveResult.ok && saveResult.current && Boolean(saveResult.savedSnapshot);
-          const indexNote = saveResult.result?.indexError ? `；月索引状态：${saveResult.result.indexError}` : '';
+          const indexNote = saveResult.result?.indexError ? productReference("controller.monthlyIndexStatus", { "saveResult_resultIndexError": saveResult.result.indexError }) : '';
           const message = sourceSaved
-            ? `新图片「${created.fileName}」已保存，当前稿件引用已更新并保存；原文件「${asset.fileName}」保留。${indexNote}`
-            : `新图片「${created.fileName}」已保存，但稿件引用没有确认写入；编辑区保留了未保存改动，原文件「${asset.fileName}」保留。`;
+            ? productText("controller.newImageSavedCurrentManuscriptReferencesWereUpdatedAndSavedOriginalFile", { "createdFileName": created.fileName, "assetFileName": asset.fileName, "indexNote": indexNote })
+            : productText("controller.newImageSavedButWritingManuscriptReferencesWasNotConfirmedUnsavedEdits", { "createdFileName": created.fileName, "assetFileName": asset.fileName });
           setStatus({ label: message, tone: sourceSaved && !saveResult.result?.indexError ? 'success' : 'warning' });
           return { fileCreated: true, fileName: created.fileName, message, tone: sourceSaved && !saveResult.result?.indexError ? 'success' as const : 'warning' as const };
         }
@@ -1412,8 +1414,8 @@ export function useEditorController() {
         const saved = await saveStoredArticle(root, nextSource, theme, folder, month, { writeTheme: false });
         if (isRootCurrent()) setStoredArticles((items) => upsertStoredArticle(items, saved.article));
         const message = saved.sourceSaved
-          ? `新图片「${created.fileName}」已保存，所属文章引用已更新并保存；原文件「${asset.fileName}」保留。${saved.indexError ? ` 月索引状态：${saved.indexError}` : ''}`
-          : `新图片「${created.fileName}」已保存，但所属文章引用没有确认写入；原文件「${asset.fileName}」保留。`;
+          ? productText("controller.newImageSavedReferencesInItsOwningArticleWereUpdatedAndSaved", { "createdFileName": created.fileName, "assetFileName": asset.fileName, "value": (saved.indexError ? productReference("controller.monthlyIndexStatus2", { "savedIndexError": saved.indexError }) : '') })
+          : productText("controller.newImageSavedButWritingReferencesInItsOwningArticleWasNot", { "createdFileName": created.fileName, "assetFileName": asset.fileName });
         if (isRootCurrent()) setStatus({ label: message, tone: saved.sourceSaved && !saved.indexError ? 'success' : 'warning' });
         return { fileCreated: true, fileName: created.fileName, message, tone: saved.sourceSaved && !saved.indexError ? 'success' as const : 'warning' as const };
       });
@@ -1421,7 +1423,7 @@ export function useEditorController() {
     } catch (error) {
       if (createdRef.value) {
         const created = createdRef.value;
-        const message = `新图片「${created.fileName}」已保存，但文章引用更新失败：${error instanceof Error ? error.message : String(error)}。${removedSourceRef.value ? '原文件已移除，描述索引或后续操作未完成' : `原文件「${asset.fileName}」保留`}。`;
+        const message = productText("controller.newImageSavedButArticleReferenceUpdateFailed", { "createdFileName": created.fileName, "cause": productCause(error), "value": (removedSourceRef.value ? productReference("controller.theOriginalFileWasRemovedButTheDescriptionIndexOrLaterOperation") : productReference("controller.originalFileIsRetained", { "assetFileName": asset.fileName })) });
         if (directoryRef.current === root) setStatus({ label: message, tone: 'warning' });
         return { fileCreated: true, fileName: created.fileName, message, tone: 'warning' };
       }
@@ -1442,7 +1444,7 @@ export function useEditorController() {
     void action.run();
   }, []);
 
-  const cancelArticleListCheck = useCallback((clearNotice = false) => { if (articleListAbortRef.current?.kind === 'check') { articleListAbortRef.current.abort(); articleListAbortRef.current = null; setArticleListWork(null); if (!clearNotice) setArticleListNotice({ label: '检查已取消，已完成的记录保留。', tone: 'neutral' }); } if (clearNotice) setArticleListNotice({ label: '', tone: 'neutral' }); }, []);
+  const cancelArticleListCheck = useCallback((clearNotice = false) => { if (articleListAbortRef.current?.kind === 'check') { articleListAbortRef.current.abort(); articleListAbortRef.current = null; setArticleListWork(null); if (!clearNotice) setArticleListNotice({ ...productLabel("controller.checkCancelledCompletedRecordsAreRetained"), tone: 'neutral' }); } if (clearNotice) setArticleListNotice({ label: '', tone: 'neutral' }); }, []);
 
   const checkArticleList = useCallback(async (targets: ArticleSummary[]) => {
     const root = directoryRef.current;
@@ -1452,7 +1454,7 @@ export function useEditorController() {
     const current = () => !abort.signal.aborted && getFormatSnapshot().id === formatId && directoryRef.current === root && articleListAbortRef.current === abort;
     const rows = [...new Map(targets.map(item => [item.id, item])).values()];
     setArticleListWork({ kind: 'check', completed: 0, total: rows.length });
-    setArticleListNotice({ label: '正在检查当前范围…', tone: 'neutral' });
+    setArticleListNotice({ ...productLabel("controller.checkingTheCurrentRange"), tone: 'neutral' });
     try {
       for (let index = 0; index < rows.length && current(); index++) {
         const target = rows[index];
@@ -1465,11 +1467,11 @@ export function useEditorController() {
           setStoredArticles(items => upsertStoredArticle(items, stored));
           setArticleChecks(records => ({ ...records, [stored.id]: articleListCheckResult(stored, report) }));
         } catch (error) {
-          if (current()) setArticleChecks(records => ({ ...records, [target.id]: { signature: articleSummarySignature(target), checkedAt: new Date().toISOString(), state: 'failed', warning: 0, error: 0, message: error instanceof Error ? error.message : String(error) } }));
+          if (current()) setArticleChecks(records => ({ ...records, [target.id]: { signature: articleSummarySignature(target), checkedAt: new Date().toISOString(), state: 'failed', warning: 0, error: 0, ...productErrorMessage(error) } }));
         }
         if (current()) setArticleListWork({ kind: 'check', completed: index + 1, total: rows.length });
       }
-      if (current()) setArticleListNotice({ label: `当前范围检查完成，共 ${rows.length} 篇；详情见各篇记录。`, tone: 'success' });
+      if (current()) setArticleListNotice({ ...productLabel("controller.currentRangeCheckedArticlesSeeEachArticleSRecordForDetails", { "rowsCount": rows.length }), tone: 'success' });
     } finally {
       if (articleListAbortRef.current === abort) { articleListAbortRef.current = null; setArticleListWork(null); }
     }
@@ -1484,9 +1486,9 @@ export function useEditorController() {
       await mutationQueueRef.current.run(() => rebuildArticleIndexes(root, months, abort.signal));
       if (directoryRef.current !== root) return;
       await loadStoredArticles(root);
-      setArticleListNotice({ label: '月索引已重建；原稿与主题快照保留。', tone: 'success' });
+      setArticleListNotice({ ...productLabel("controller.monthlyIndexRebuiltOriginalManuscriptsAndThemeSnapshotsAreRetained"), tone: 'success' });
     } catch (error) {
-      if (directoryRef.current === root) setArticleListNotice({ label: `重建索引失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (directoryRef.current === root) setArticleListNotice({ ...productLabel("controller.indexRebuildFailed", { "cause": productCause(error) }), tone: 'error' });
     } finally {
       if (articleListAbortRef.current === abort) { articleListAbortRef.current = null; setArticleListWork(null); }
     }
@@ -1507,19 +1509,19 @@ export function useEditorController() {
           setArticleChecks(records => { const next = { ...records }; for (const item of result.changed) if (next[item.id]) next[item.id] = { ...next[item.id], state: 'stale' }; return next; });
           const active = result.changed.find(item => item.id === articleId(articleRef.current));
           if (active && !articleRef.current.dirty) applyStoredArticle(active, false, root);
-          const errors = [...result.failures.map(item => `${item.id}：${item.message}`), ...result.indexIssues.map(item => `${item.month}：${item.message}`)];
-          setArticleListNotice({ label: `已移除 ${result.changed.length} 篇文章中的标签；未改动 ${result.skipped.length} 篇${errors.length ? `；${errors.join('；')}` : '。'}`, tone: errors.length ? 'warning' : 'success' });
+          const errors = [...result.failures.map(item => productJoin([item.id, '：', productDiagnosticReference(item)])), ...result.indexIssues.map(item => productJoin([item.month, '：', productDiagnosticReference(item)]))];
+          setArticleListNotice({ ...productLabel("controller.articlesWithTagsRemovedUnchanged", { "result_changedCount": result.changed.length, "result_skippedCount": result.skipped.length, "details": (errors.length ? productJoin(['；', productJoin(errors, '；')]) : '。') }), tone: errors.length ? 'warning' : 'success' });
           if (result.indexIssues.length) setArticleIndexIssues(issues => [...issues.filter(item => !result.indexIssues.some(issue => issue.month === item.month)), ...result.indexIssues]);
           resolve(!errors.length);
         } catch (error) {
-          if (directoryRef.current === root) setArticleListNotice({ label: `标签移除失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+          if (directoryRef.current === root) setArticleListNotice({ ...productLabel("controller.tagRemovalFailed", { "cause": productCause(error) }), tone: 'error' });
           resolve(false);
         } finally {
           if (articleListAbortRef.current === abort) { articleListAbortRef.current = null; setArticleListWork(null); }
         }
       };
       const protectsDraft = articleRef.current.dirty && targets.some(item => item.id === articleId(articleRef.current));
-      runAfterDraftDecision({ label: '移除当前范围的分类标签', run, onCancel: () => resolve(false) }, protectsDraft);
+      runAfterDraftDecision({ label: productText("controller.removeCategoryTagsFromTheCurrentRange"), run, onCancel: () => resolve(false) }, protectsDraft);
     });
   }, [applyStoredArticle, runAfterDraftDecision]);
 
@@ -1533,7 +1535,7 @@ export function useEditorController() {
       setStoredArticles(items => upsertStoredArticle(items, loaded));
       return applyStoredArticle(loaded, navigate, root);
     } catch (error) {
-      if (directoryRef.current === root && request === articleOpenRequestRef.current) setStatus({ label: `文章读取失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (directoryRef.current === root && request === articleOpenRequestRef.current) setStatus({ ...productLabel("controller.articleReadingFailed", { "cause": productCause(error) }), tone: 'error' });
       return false;
     }
   }, [applyStoredArticle]);
@@ -1543,7 +1545,7 @@ export function useEditorController() {
     if (current.folder && current.month) {
       return readAndApplyArticle({ id: articleId(current), month: current.month, folder: current.folder, filePath: '', parse: { metadata: parseArticle(current.source).metadata, diagnostics: [] }, theme: current.theme }, false);
     }
-    const blank = makeWorkingArticle(createArticleSource('未命名技术文稿', current.theme.id), { ...current.theme, tokens: { ...current.theme.tokens } });
+    const blank = makeWorkingArticle(createArticleSource(productText("controller.untitledTechnicalManuscript"), current.theme.id), { ...current.theme, tokens: { ...current.theme.tokens } });
     blank.dirty = false;
     openDocument(directoryRef.current, 'draft');
     articleRef.current = blank;
@@ -1584,10 +1586,10 @@ export function useEditorController() {
     const root = directoryRef.current;
     if (!root) return;
     if (mutationQueueRef.current.isDeleting(root, stored.id)) {
-      setStatus({ label: '这篇文章正在删除，请稍后刷新文章列表。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.thisArticleIsBeingDeletedRefreshTheArticleListLater"), tone: 'warning' });
       return;
     }
-    runAfterDraftDecision({ label: `打开「${stored.parse.metadata.title}」`, run: async () => {
+    runAfterDraftDecision({ label: productText("controller.open", { "stored_parse_metadataTitle": stored.parse.metadata.title }), run: async () => {
       if (directoryRef.current !== root) return;
       await readAndApplyArticle(stored, true, root);
     } });
@@ -1596,7 +1598,7 @@ export function useEditorController() {
   const openArticleInfo = useCallback((stored?: ArticleSummary) => {
     if (stored && stored.id !== articleId(articleRef.current)) {
       runAfterDraftDecision({
-        label: `查看「${stored.parse.metadata.title}」的信息`,
+        label: productText("controller.viewInformationFor", { "stored_parse_metadataTitle": stored.parse.metadata.title }),
         run: async () => {
           if (await readAndApplyArticle(stored, true)) setArticleInfoDialogOpen(true);
         },
@@ -1604,11 +1606,11 @@ export function useEditorController() {
       return;
     }
     if (!directoryRef.current) {
-      setStatus({ label: '先在设置中选择资料目录，再编辑文稿信息。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeEditingArticleInformation"), tone: 'warning' });
       return;
     }
     if (parseArticle(articleRef.current.source).diagnostics.some((item) => item.level === 'error')) {
-      setStatus({ label: '文稿元数据有误；为保护原文，修复 Front Matter 后才能编辑信息。', tone: 'error' });
+      setStatus({ ...productLabel("controller.theManuscriptMetadataIsInvalidRepairFrontMatterBeforeEditingInformationTo"), tone: 'error' });
       return;
     }
     setArticleInfoDialogOpen(true);
@@ -1619,7 +1621,7 @@ export function useEditorController() {
     let id = base;
     let suffix = 2;
     while (editorWorkspaceRef.current.projects.some((project) => project.id === id)) id = `${base}-${suffix++}`;
-    const saved = await persistEditorWorkspace((current) => createEditorProject(current, name, id), `项目「${name.trim()}」已创建。`);
+    const saved = await persistEditorWorkspace((current) => createEditorProject(current, name, id), productText("controller.projectCreated", { "value": name.trim() }));
     if (saved) {
       setSelectedArticleCollection(`project:${id}`);
       if (view === 'articles' && articleMode === 'editor') navigateArticleMode('overview');
@@ -1633,7 +1635,7 @@ export function useEditorController() {
   }, []);
   const scanLibraryMediaReferences = useCallback(async (assets: LibraryMediaAsset[], signal: AbortSignal) => {
     const root = directoryRef.current, session = contentLibraryRootSessionRef.current;
-    if (!root) throw new Error('资料库未连接。');
+    if (!root) throw new ProductError("controller.theLibraryIsNotConnected");
     const article = articleRef.current, source = article.source, id = articleId(article);
     const current = () => directoryRef.current === root && contentLibraryRootSessionRef.current === session && articleId(articleRef.current) === id && articleRef.current.source === source;
     return scanWorkspaceMediaReferences(root, assets, source.trim() ? { source, month: article.month, folder: article.folder } : null, signal, current);
@@ -1642,15 +1644,15 @@ export function useEditorController() {
   const manageLibraryMedia = useCallback(async (operation: MediaMutation): Promise<MediaActionOutcome> => {
     const root = directoryRef.current, session = contentLibraryRootSessionRef.current;
     const current = () => root !== null && directoryRef.current === root && contentLibraryRootSessionRef.current === session;
-    if (!root || !operation.assets.length || mediaOperationRef.current || historyOperationRef.current) return { ok: false, tone: 'warning', message: '另一个操作正在进行，或没有选择素材。' };
+    if (!root || !operation.assets.length || mediaOperationRef.current || historyOperationRef.current) return { ok: false, tone: 'warning', ...productMessage("controller.anotherOperationIsInProgressOrNoAssetIsSelected") };
     const outcomes: MediaActionOutcome[] = [];
     const failedKeys: string[] = [];
     const keyOf = (asset: LibraryMediaAsset) => `${asset.kind}:${asset.kind === 'article' ? asset.articleId : 'shared'}:${asset.fileName}`;
     for (const asset of operation.assets) {
-      if (!current() || asset.root !== root) { outcomes.push({ ok: false, tone: 'warning', message: '资料库会话已切换；剩余素材未处理。' }); failedKeys.push(...operation.assets.slice(operation.assets.indexOf(asset)).map(keyOf)); break; }
+      if (!current() || asset.root !== root) { outcomes.push({ ok: false, tone: 'warning', ...productMessage("controller.theLibrarySessionChangedRemainingAssetsWereNotProcessed") }); failedKeys.push(...operation.assets.slice(operation.assets.indexOf(asset)).map(keyOf)); break; }
       try {
-        if (asset.kind === 'article' && (getArticleOrganization(editorWorkspaceRef.current, asset.articleId).archived || mutationQueueRef.current.isDeleting(root, asset.articleId))) throw new Error('归档或正在删除的文章素材只读。');
-        if (operation.destination?.kind === 'article' && getArticleOrganization(editorWorkspaceRef.current, operation.destination.articleId).archived) throw new Error('目标文章已归档，只读。');
+        if (asset.kind === 'article' && (getArticleOrganization(editorWorkspaceRef.current, asset.articleId).archived || mutationQueueRef.current.isDeleting(root, asset.articleId))) throw new ProductError("controller.assetsInArchivedArticlesOrArticlesBeingDeletedAreReadOnly");
+        if (operation.destination?.kind === 'article' && getArticleOrganization(editorWorkspaceRef.current, operation.destination.articleId).archived) throw new ProductError("controller.theTargetArticleIsArchivedAndReadOnly");
         if ((operation.type === 'rename' || operation.type === 'replace') && asset.kind === 'article') {
           const result = await renameMediaImage(asset, operation.name ?? asset.fileName.replace(/\.[^.]+$/, ''), operation.type === 'replace' ? operation.file : undefined);
           const outcome = { ok: result.fileCreated && result.tone === 'success', tone: result.tone, message: result.message }; outcomes.push(outcome); if (!outcome.ok) failedKeys.push(keyOf(asset));
@@ -1658,18 +1660,18 @@ export function useEditorController() {
         }
         mediaOperationRef.current = true; setMediaOperation('rename');
         const result = await mutationQueueRef.current.run(async (): Promise<MediaActionOutcome> => {
-          if (!current()) throw new Error('资料库会话已切换。');
+          if (!current()) throw new ProductError("controller.theLibrarySessionChanged");
           if (operation.type === 'rename' || operation.type === 'replace') return renameSharedMedia(asset, operation.name ?? asset.fileName, current, operation.type === 'replace' ? operation.file : undefined);
           const directory = await mediaDirectory(asset);
-          if (!current()) throw new Error('资料库会话已切换。');
-          if (operation.type === 'describe') { await saveMediaDescription(directory, asset.fileName, operation.description ?? '', current); return { ok: true, tone: 'success', message: '描述已保存。' }; }
+          if (!current()) throw new ProductError("controller.theLibrarySessionChanged");
+          if (operation.type === 'describe') { await saveMediaDescription(directory, asset.fileName, operation.description ?? '', current); return { ok: true, tone: 'success', ...productMessage("controller.descriptionSaved") }; }
           if (operation.type === 'delete') {
             try { await directory.removeEntry(asset.fileName); } catch (error) { if (!(error && typeof error === 'object' && 'name' in error && error.name === 'NotFoundError')) throw error; }
-            try { await removeMediaDescription(directory, asset.fileName, current); } catch (error) { return { ok: false, tone: 'warning', message: `文件「${asset.fileName}」已删除，描述索引未清理：${error instanceof Error ? error.message : String(error)}` }; } return { ok: true, tone: 'warning', message: `已删除「${asset.fileName}」；正文与历史引用保留。` }; }
-          if (!operation.destination) throw new Error('请选择目标位置。');
+            try { await removeMediaDescription(directory, asset.fileName, current); } catch (error) { return { ok: false, tone: 'warning', ...productMessage("controller.fileWasDeletedButItsDescriptionIndexWasNotCleaned", { "assetFileName": asset.fileName, "cause": productCause(error) }) }; } return { ok: true, tone: 'warning', ...productMessage("controller.deletedBodyAndHistoryReferencesAreRetained", { "assetFileName": asset.fileName }) }; }
+          if (!operation.destination) throw new ProductError("controller.chooseADestination");
           const source = asset.kind === 'article' && articleId(articleRef.current) === asset.articleId ? articleRef.current.source : undefined;
           const usage = await inspectMediaUsage(asset, source);
-          if (!current()) throw new Error('资料库会话已切换。');
+          if (!current()) throw new ProductError("controller.theLibrarySessionChanged");
           return transferMedia(asset, operation.destination, usage, current);
         });
         outcomes.push(result); if (!result.ok) failedKeys.push(keyOf(asset));
@@ -1677,7 +1679,7 @@ export function useEditorController() {
       finally { mediaOperationRef.current = false; if (current()) { setMediaOperation(null); setMediaRefreshRevision(value => value + 1); } }
     }
     const ok = outcomes.every(result => result.ok), tone = outcomes.some(result => !result.ok) ? 'warning' : outcomes.some(result => result.tone === 'warning') ? 'warning' : 'success';
-    const result: MediaActionOutcome = { ok, tone, failedKeys, message: `${outcomes.filter(result => result.ok).length}/${operation.assets.length} 项完成。${outcomes.map(result => result.message.replace(/。$/, '')).join('；')}` };
+    const result: MediaActionOutcome = { ok, tone, failedKeys, ...productMessage("controller.completed", { "outcomes_filter_result_result_ok_Count": outcomes.filter(result => result.ok).length, "operation_assetsCount": operation.assets.length, "details": outcomes.map(result => result.message.replace(/。$/, '')).join('；') }) };
     if (current()) {
       const request = mediaPickerRequestRef.current, snapshot = snapshotFor();
       if (request && request.root === root && request.articleId === snapshot.articleId) { const updated = { ...request, documentToken: snapshot.documentToken, body: parseArticle(snapshot.source).body }; mediaPickerRequestRef.current = updated; setMediaPickerRequest(updated); }
@@ -1686,19 +1688,19 @@ export function useEditorController() {
   }, [articleMode, compileCurrent, renameMediaImage, snapshotFor, view]);
 
   const renameProject = useCallback((id: string, name: string) => (
-    persistEditorWorkspace((current) => renameEditorProject(current, id, name), `项目已改名为「${name.trim()}」。`)
+    persistEditorWorkspace((current) => renameEditorProject(current, id, name), productText("controller.projectRenamedTo", { "value": name.trim() }))
   ), [persistEditorWorkspace]);
 
   const setProjectCollapsed = useCallback((id: string, collapsed: boolean) => (
-    persistEditorWorkspace((current) => setEditorProjectCollapsed(current, id, collapsed), '项目显示状态已保存。')
+    persistEditorWorkspace((current) => setEditorProjectCollapsed(current, id, collapsed), productText("controller.projectDisplayStateSaved"))
   ), [persistEditorWorkspace]);
 
   const setProjectPinned = useCallback((id: string, pinned: boolean) => (
-    persistEditorWorkspace((current) => setEditorProjectPinned(current, id, pinned), pinned ? '项目已置顶。' : '项目已取消置顶。')
+    persistEditorWorkspace((current) => setEditorProjectPinned(current, id, pinned), pinned ? productText("controller.projectPinned") : productText("controller.projectUnpinned"))
   ), [persistEditorWorkspace]);
 
   const reorderPinnedProjects = useCallback((ids: string[]) => (
-    persistEditorWorkspace((current) => reorderPinnedEditorProjects(current, ids), '置顶项目顺序已保存。')
+    persistEditorWorkspace((current) => reorderPinnedEditorProjects(current, ids), productText("controller.pinnedProjectOrderSaved"))
   ), [persistEditorWorkspace]);
 
   const confirmDeleteProject = useCallback(async () => {
@@ -1712,7 +1714,7 @@ export function useEditorController() {
     ]);
     const saved = await persistEditorWorkspace(
       (current) => deleteEditorProject(current, target.id, [...assignedIds]),
-      `项目「${target.name}」已删除；文章已转入未分组，内容未改动。`,
+      productText("controller.projectDeletedArticlesMovedToUnclassifiedTheirContentIsUnchanged", { "targetName": target.name }),
     );
     if (saved) {
       setProjectDeleteTarget(null);
@@ -1732,11 +1734,11 @@ export function useEditorController() {
     const run = () => {
       void persistEditorWorkspace(
         (current) => setArticleArchived(current, stored.id, archived),
-        archived ? `「${stored.parse.metadata.title}」已归档；原文与素材保留。` : `「${stored.parse.metadata.title}」已取消归档。`,
+        archived ? productText("controller.archivedOriginalSourceAndAssetsAreRetained", { "stored_parse_metadataTitle": stored.parse.metadata.title }) : productText("controller.unarchived", { "stored_parse_metadataTitle": stored.parse.metadata.title }),
       );
     };
     const isCurrent = articleId(articleRef.current) === stored.id && documentTokenRef.current?.root === root;
-    if (isCurrent) runAfterDraftDecision({ label: `${archived ? '归档' : '取消归档'}「${stored.parse.metadata.title}」`, run }, articleRef.current.dirty);
+    if (isCurrent) runAfterDraftDecision({ label: productText("controller.archiveActionTitle", { "value": (archived ? productReference("controller.archive") : productReference("controller.unarchive")), "stored_parse_metadataTitle": stored.parse.metadata.title }), run }, articleRef.current.dirty);
     else run();
   }, [persistEditorWorkspace, runAfterDraftDecision]);
 
@@ -1744,16 +1746,16 @@ export function useEditorController() {
     const root = directoryRef.current;
     const ids = [...new Set(targets.map((item) => item.id))];
     if (!root || !ids.length) return;
-    const action = archived ? '归档' : '取消归档';
+    const action = archived ? productText("controller.archive") : productText("controller.unarchive");
     const run = () => {
       if (directoryRef.current !== root) return;
       void persistEditorWorkspace(
         (current) => ids.reduce((workspace, id) => setArticleArchived(workspace, id, archived), current),
-        `${ids.length} 篇文稿已${action}；原文与素材保留。`,
+        productText("controller.manuscriptsOriginalSourceAndAssetsAreRetained", { "idsCount": ids.length, "action": action }),
       );
     };
     const protectDraft = articleRef.current.dirty && documentTokenRef.current?.root === root && ids.includes(articleId(articleRef.current));
-    runAfterDraftDecision({ label: `${action}所选的 ${ids.length} 篇文稿`, run }, protectDraft);
+    runAfterDraftDecision({ label: productText("controller.theSelectedManuscripts", { "action": action, "idsCount": ids.length }), run }, protectDraft);
   }, [persistEditorWorkspace, runAfterDraftDecision]);
 
   const classifyStoredArticles = useCallback((targets: ArticleSummary[], projectId: string | null) => {
@@ -1761,7 +1763,7 @@ export function useEditorController() {
     if (!root || !targets.length) return Promise.resolve(false);
     const project = projectId === null ? null : editorWorkspaceRef.current.projects.find((item) => item.id === projectId);
     if (projectId !== null && !project) {
-      setStatus({ label: '目标项目不存在；所选文稿未改动。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.theTargetProjectDoesNotExistSelectedManuscriptsAreUnchanged"), tone: 'warning' });
       return Promise.resolve(false);
     }
     const ids = [...new Set(targets.map((item) => item.id))];
@@ -1770,12 +1772,12 @@ export function useEditorController() {
       // moveArticleToProject prepends each item; reverse here to preserve the
       // order in which the selected articles appear in the list.
       for (const id of [...ids].reverse()) {
-        if (getArticleOrganization(next, id).archived) throw new Error('归档文章不能分类；请先取消归档。');
+        if (getArticleOrganization(next, id).archived) throw new ProductError("controller.archivedArticlesCannotBeAssignedCategoriesUnarchiveThemFirst");
         const targetOrder = orderArticlesForGroup(storedArticles, next, projectId, false).map((item) => item.id);
         next = moveArticleToProject(next, id, projectId, targetOrder);
       }
       return next;
-    }, `${ids.length} 篇文稿已分类至「${project?.name ?? '未分组'}」。`);
+    }, productText("controller.manuscriptsAssignedTo", { "idsCount": ids.length, "value": (project?.name ?? productReference("controller.unclassified")) }));
   }, [persistEditorWorkspace, storedArticles]);
 
   const moveStoredArticleToProject = useCallback((stored: ArticleSummary, projectId: string | null) => {
@@ -1785,12 +1787,12 @@ export function useEditorController() {
       .map((item) => item.id);
     return persistEditorWorkspace(
       (workspace) => moveArticleToProject(workspace, stored.id, projectId, targetIds),
-      `「${stored.parse.metadata.title}」的项目归属已更新；文件夹与分类未改动。`,
+      productText("controller.projectAssignmentUpdatedForTheDirectoryAndCategoriesAreUnchanged", { "stored_parse_metadataTitle": stored.parse.metadata.title }),
     );
   }, [persistEditorWorkspace, storedArticles]);
 
   const reorderStoredArticleGroup = useCallback((projectId: string | null, ids: string[]) => (
-    persistEditorWorkspace((current) => setArticleGroupOrder(current, projectId, ids), '文章顺序已保存。')
+    persistEditorWorkspace((current) => setArticleGroupOrder(current, projectId, ids), productText("controller.articleOrderSaved"))
   ), [persistEditorWorkspace]);
 
   const moveStoredArticleInOrder = useCallback((stored: ArticleSummary, direction: -1 | 1) => {
@@ -1804,7 +1806,7 @@ export function useEditorController() {
     [ids[index], ids[nextIndex]] = [ids[nextIndex], ids[index]];
     return persistEditorWorkspace(
       (current) => setArticleGroupOrder(current, organization.projectId, ids),
-      `「${stored.parse.metadata.title}」的手动顺序已更新。`,
+      productText("controller.manualOrderUpdatedFor", { "stored_parse_metadataTitle": stored.parse.metadata.title }),
     );
   }, [persistEditorWorkspace, storedArticles]);
 
@@ -1814,7 +1816,7 @@ export function useEditorController() {
       .map((item) => item.id);
     return persistEditorWorkspace(
       (workspace) => moveArticleToProject(workspace, stored.id, projectId, targetIds),
-      `「${stored.parse.metadata.title}」的项目归属已更新；分类标签保持不变。`,
+      productText("controller.projectAssignmentUpdatedForCategoryTagsAreUnchanged", { "stored_parse_metadataTitle": stored.parse.metadata.title }),
     );
   }, [persistEditorWorkspace, storedArticles]);
 
@@ -1832,7 +1834,7 @@ export function useEditorController() {
           if (bookmarkId) activateEditorThemeDirectory(bookmarkId);
           const previousRoot = directoryRef.current;
           directoryRef.current = handle;
-          invalidateFormatBundle(handle.name, '正在载入资料库格式配置…');
+          invalidateFormatBundle(handle.name, productText("controller.loadingLibraryFormatConfiguration"), { loading: true });
           if (previousRoot !== handle) {
             advanceContentLibraryRootSession();
             const blank = makeEmptyWorkingArticle(BASIC_THEME);
@@ -1874,7 +1876,7 @@ export function useEditorController() {
         setEditorWorkspaceBusy(false);
         setSettingsIssue(null);
           setSettingsBusy(false);
-          setSettingsNotice({ label: '正在读取目录设置…', tone: 'warning' });
+          setSettingsNotice({ ...productLabel("controller.readingLibrarySettings"), tone: 'warning' });
           historyBaselineRef.current = null;
           openDocument(handle, articleId(articleRef.current));
           await ensureArticleDirectories(handle);
@@ -1890,7 +1892,7 @@ export function useEditorController() {
               fontSessionDisposeRef.current();
               fontSessionDisposeRef.current = dispose;
             } else dispose();
-          } catch (error) { defaultsIssue = [defaultsIssue, `字体载入失败：${error instanceof Error ? error.message : String(error)}`].filter(Boolean).join('；'); }
+          } catch (error) { defaultsIssue = [defaultsIssue, productText("controller.fontLoadingFailed", { "cause": productCause(error) })].filter(Boolean).join('；'); }
           try { await initializeThemeDefaults(handle); } catch (error) { defaultsIssue = [defaultsIssue, error instanceof Error ? error.message : String(error)].filter(Boolean).join('；'); }
           if (!isCurrentSelection() || directoryRef.current !== handle) return;
           const [themeResult, snippetResult, templateResult, settingsResult, workspaceResult, editorThemeResult] = await Promise.allSettled([
@@ -1939,14 +1941,14 @@ export function useEditorController() {
             setArticleSettings(settingsResult.value.settings);
             setSettingsIssue(settingsResult.value.issue);
             setSettingsNotice({
-              label: settingsResult.value.issue
-                ? 'settings.json 无效；自动保存与快照已暂停。请修复该文件后重新载入资料目录。'
-                : settingsResult.value.fileExists ? '已载入此资料目录的工作流设置。' : '此目录尚无 settings.json，使用默认值且未创建文件。',
+              ...(settingsResult.value.issue
+                ? productLabel("controller.settingsJsonIsInvalidAutoSaveAndSnapshotsArePausedRepairThe")
+                : settingsResult.value.fileExists ? productLabel("controller.workflowSettingsLoadedForThisLibrary") : productLabel("controller.thisDirectoryHasNoSettingsJsonDefaultsAreBeingUsedNoFile")),
               tone: settingsResult.value.issue ? 'warning' : 'neutral',
             });
           } else {
             setSettingsIssue(settingsResult.reason instanceof Error ? settingsResult.reason.message : String(settingsResult.reason));
-            setSettingsNotice({ label: '设置读取失败；自动保存与快照已暂停。', tone: 'error' });
+            setSettingsNotice({ ...productLabel("controller.settingsCouldNotBeReadAutoSaveAndSnapshotsArePaused"), tone: 'error' });
           }
           let availableEditorThemes = editorThemeResult.status === 'fulfilled'
             ? editorThemeResult.value.themes
@@ -1982,15 +1984,15 @@ export function useEditorController() {
           if (view === 'articles') navigateArticleMode('overview');
           else setPreferredArticleMode('overview');
           setStatus({
-            label: workspaceIssue
-              ? `${next.length ? `资料目录已授权 · 已发现 ${next.length} 篇文章` : '资料目录已授权；这里还没有文章。'} ${workspaceIssue} 项目与外观设置保持只读。`
-              : defaultsIssue ? `资料目录已授权；部分默认主题添加失败：${defaultsIssue}` : next.length ? `资料目录已授权 · 已发现 ${next.length} 篇文章` : '资料目录已授权；这里还没有文章。',
+            ...(workspaceIssue
+              ? productLabel("controller.projectAndAppearanceSettingsRemainReadOnly2", { "value": (next.length ? productReference("controller.libraryAuthorizedArticlesFound", { "nextCount": next.length }) : productReference("controller.libraryAuthorizedNoArticlesYet")), "workspaceIssue": workspaceIssue })
+              : defaultsIssue ? productLabel("controller.libraryAuthorizedSomeDefaultThemesCouldNotBeAdded", { "defaultsIssue": defaultsIssue }) : next.length ? productLabel("controller.libraryAuthorizedArticlesFound", { "nextCount": next.length }) : productLabel("controller.libraryAuthorizedNoArticlesYet")),
             tone: workspaceIssue || defaultsIssue ? 'warning' : 'success',
           });
     } catch (error) {
       if (!isCurrentSelection()) return;
       if (!libraryLoadFinished && selectedRoot && directoryRef.current === selectedRoot) setContentLibrariesState('failed');
-      setStatus({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+      setStatus({ ...productErrorLabel(error), tone: 'error' });
     } finally {
       if (isCurrentSelection() && selectedRoot && directoryRef.current === selectedRoot) setEditorAppearanceLoaded(true);
     }
@@ -2015,7 +2017,7 @@ export function useEditorController() {
       },
       (error: unknown) => {
         if (directorySelectionRef.current === selection) {
-          setDirectoryBookmarkIssue(`已打开资料目录，但浏览器未能记住它：${error instanceof Error ? error.message : String(error)}`);
+          setDirectoryBookmarkIssue(productText("controller.theLibraryOpenedButTheBrowserCouldNotRememberIt", { "cause": productCause(error) }));
         }
       },
     );
@@ -2024,10 +2026,10 @@ export function useEditorController() {
   const authorizeDirectory = useCallback(() => {
     const selection = ++directorySelectionRef.current;
     runAfterDraftDecision({
-      label: '切换资料目录',
+      label: productText("controller.switchLibraryDirectories"),
       run: async () => {
         try {
-          setStatus({ label: '请选择已有资料库文件夹。', tone: 'neutral' });
+          setStatus({ ...productLabel("controller.chooseAnExistingLibraryFolder"), tone: 'neutral' });
           const handle = await pickDataDirectory();
           if (directorySelectionRef.current !== selection) return;
           await assertExistingDataDirectory(handle);
@@ -2035,20 +2037,20 @@ export function useEditorController() {
           await openAuthorizedDirectory(handle, selection);
         } catch (error) {
           if (directorySelectionRef.current !== selection || error instanceof DOMException && error.name === 'AbortError') return;
-          setStatus({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+          setStatus({ ...productErrorLabel(error), tone: 'error' });
         }
       },
     });
   }, [openAuthorizedDirectory, rememberAuthorizedDirectory, runAfterDraftDecision]);
 
   const requestCreateDataDirectory = useCallback(() => {
-    runAfterDraftDecision({ label: '新建资料库', run: () => { setCreateLibraryDialogOpen(true); } });
+    runAfterDraftDecision({ label: productText("controller.createALibrary"), run: () => { setCreateLibraryDialogOpen(true); } });
   }, [runAfterDraftDecision]);
 
   const createDataDirectory = useCallback(async (name: string): Promise<LibraryCreationResult> => {
     const selection = ++directorySelectionRef.current;
     try {
-      setStatus({ label: '请选择新资料库的父目录。', tone: 'neutral' });
+      setStatus({ ...productLabel("controller.chooseTheParentDirectoryForTheNewLibrary"), tone: 'neutral' });
       const parent = await pickDataDirectory();
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
       const handle = await createNamedDataDirectory(parent, name);
@@ -2072,14 +2074,14 @@ export function useEditorController() {
       async (permission) => {
         if (directorySelectionRef.current !== selection) return;
         if (permission !== 'granted') {
-          setStatus({ label: '上次使用的资料目录尚未获得读写权限；请授权或选择其他目录。', tone: 'warning' });
+          setStatus({ ...productLabel("controller.thePreviousLibraryLacksReadWritePermissionAuthorizeItOrChooseAnother"), tone: 'warning' });
           return;
         }
         setDirectoryRestoreState('idle');
         await openAuthorizedDirectory(handle, selection);
       },
       (error: unknown) => {
-        if (directorySelectionRef.current === selection) setStatus({ label: error instanceof Error ? error.message : String(error), tone: 'error' });
+        if (directorySelectionRef.current === selection) setStatus({ ...productErrorLabel(error), tone: 'error' });
       },
     );
   }, [openAuthorizedDirectory, rememberedDirectory]);
@@ -2106,20 +2108,20 @@ export function useEditorController() {
 
   const copyRichText = useCallback(async () => {
     if (mediaOperationRef.current) {
-      setStatus({ label: '素材正在写入或改名；请完成后再复制。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.assetsAreBeingWrittenOrRenamedCompleteThatOperationBeforeCopying"), tone: 'warning' });
       return;
     }
     const requestId = ++copyRequestRef.current;
     const initial = snapshotFor();
     setLoadInspectionRevision(null);
     if (!isReadyToCopy || !previewRef.current) {
-      setStatus({ label: '当前文稿还不能复制：先修复 YAML/主题快照或等待预览就绪。', tone: 'error' });
+      setStatus({ ...productLabel("controller.thisManuscriptCannotBeCopiedYetRepairYamlOrTheThemeSnapshot"), tone: 'error' });
       return;
     }
     const saved = initial.directory && articleRef.current.dirty ? await saveSnapshot(initial) : { ok: true, current: matchesSnapshot(initial), savedSnapshot: initial };
     if (!saved.ok) return;
     if (!saved.current || !saved.savedSnapshot || !matchesSnapshot(saved.savedSnapshot) || copyRequestRef.current !== requestId) {
-      setStatus({ label: '保存期间文稿已变化；已丢弃旧 revision，请再次复制当前稿。', tone: 'error' });
+      setStatus({ ...productLabel("controller.theManuscriptChangedDuringSavingTheOldRevisionWasDiscardedCopyThe"), tone: 'error' });
       return;
     }
     const target = saved.savedSnapshot;
@@ -2130,32 +2132,32 @@ export function useEditorController() {
     if (!current() || !previewRef.current) return;
     let report: ArticleFormatReport;
     try { report = await inspectArticleFormatReport(target.source, target.theme, previewRef.current, { root: target.directory, month: target.month, folder: target.folder }); }
-    catch (error) { if (current()) setStatus({ label: `复制检查未完成：${error instanceof Error ? error.message : String(error)}`, tone: 'warning' }); return; }
+    catch (error) { if (current()) setStatus({ ...productLabel("controller.copyCheckingIsIncomplete", { "cause": productCause(error) }), tone: 'warning' }); return; }
     if (!current()) {
-      setStatus({ label: '校验期间文稿已变化；请再次复制当前稿。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.theManuscriptChangedDuringValidationCopyTheCurrentDraftAgain"), tone: 'warning' });
       return;
     }
     if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
-      setStatus({ label: '当前浏览器没有可用的 ClipboardItem 富文本写入能力；未谎报复制成功。', tone: 'error' });
+      setStatus({ ...productLabel("controller.thisBrowserHasNoUsableClipboarditemRichTextWritingSupportNothingWas"), tone: 'error' });
       return;
     }
     try {
       const payload = buildClipboardPayload(previewRef.current, target.renderSnapshot);
       const proceed = await confirmFormatCheck(report);
-      if (!proceed) { setStatus({ label: '已取消复制；剪贴板没有改动。', tone: 'warning' }); return; }
-      if (!current() || !previewRef.current) { setStatus({ label: '校验期间文稿已变化；请再次复制当前稿。', tone: 'warning' }); return; }
-      if (previewRef.current.querySelector('[data-local-asset-src]:not(img), [data-local-asset-srcset]:not(img):not(source)')) throw new Error('本地图片尚未就绪或不可用；请核对图片后重试。');
+      if (!proceed) { setStatus({ ...productLabel("controller.copyCancelledTheClipboardIsUnchanged"), tone: 'warning' }); return; }
+      if (!current() || !previewRef.current) { setStatus({ ...productLabel("controller.theManuscriptChangedDuringValidationCopyTheCurrentDraftAgain"), tone: 'warning' }); return; }
+      if (previewRef.current.querySelector('[data-local-asset-src]:not(img), [data-local-asset-srcset]:not(img):not(source)')) throw new ProductError("controller.localImagesAreNotReadyOrAreUnavailableCheckTheImagesAnd");
       let imageDirectory: Promise<FileSystemDirectoryHandle> | null = null;
-      setStatus({ label: '正在准备整篇富文本与图片…', tone: 'neutral' });
+      setStatus({ ...productLabel("controller.preparingTheCompleteRichTextArticleAndImages"), tone: 'neutral' });
       const complete = await embedClipboardImages(payload, async fileName => {
-        if (!target.directory || !target.month || !target.folder) throw new Error('请先保存文稿并授权图片所在资料库。');
+        if (!target.directory || !target.month || !target.folder) throw new ProductError("controller.saveTheManuscriptAndAuthorizeTheLibraryContainingItsImagesFirst");
         imageDirectory ??= getArticleMediaDirectory(target.directory, target.month, target.folder, false);
         const directory = await imageDirectory;
-        if (!current()) throw new Error('文稿或资料库已变化，已取消旧稿复制。');
+        if (!current()) throw new ProductError("controller.theManuscriptOrLibraryChangedCopyingThePreviousDraftWasCancelled");
         return (await directory.getFileHandle(fileName)).getFile();
       }, current, async () => {
         const response = await fetch(ARTICLE_EXAMPLE_IMAGE);
-        if (!response.ok) throw new Error('示例图片读取失败，请刷新后重试。');
+        if (!response.ok) throw new ProductError("controller.theSampleImageCouldNotBeReadRefreshAndTryAgain");
         return response.blob();
       });
       if (!current()) return;
@@ -2166,13 +2168,13 @@ export function useEditorController() {
       await navigator.clipboard.write([item]);
       if (!current()) return;
       setStatus({
-        label: complete.embeddedImageCount
-          ? `整篇富文本已复制 · ${complete.embeddedImageCount} 处图片已嵌入，可直接粘贴`
-          : '富文本已复制 · 可粘贴到下方接收区',
+        ...(complete.embeddedImageCount
+          ? productLabel("controller.completeRichTextArticleCopiedEmbeddedImageReferencesReadyToPaste", { "completeEmbeddedImageCount": complete.embeddedImageCount })
+          : productLabel("controller.richTextCopiedPasteIntoTheReceivingAreaBelow")),
         tone: 'success',
       });
     } catch (error) {
-      if (current()) setStatus({ label: `整篇复制失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      if (current()) setStatus({ ...productLabel("controller.wholeArticleCopyingFailed", { "cause": productCause(error) }), tone: 'error' });
     }
   }, [compiledRevision, compileCurrent, confirmFormatCheck, isReadyToCopy, matchesSnapshot, saveSnapshot, snapshotFor]);
 
@@ -2180,28 +2182,28 @@ export function useEditorController() {
     const receiver = clipboardReceiverRef.current;
     if (!receiver) return;
     if (!navigator.clipboard?.read) {
-      setStatus({ label: '当前浏览器没有可用的剪贴板读取能力；未谎报粘贴成功。', tone: 'error' });
+      setStatus({ ...productLabel("controller.thisBrowserHasNoUsableClipboardReadingSupportNothingWasPasted"), tone: 'error' });
       return;
     }
     try {
       const items = await navigator.clipboard.read();
       const item = items.find((candidate) => candidate.types.includes('text/html') || candidate.types.includes('text/plain'));
       if (!item) {
-        setStatus({ label: '剪贴板没有可粘贴的 text/html 或 text/plain 内容。', tone: 'error' });
+        setStatus({ ...productLabel("controller.theClipboardContainsNoPasteableTextHtmlOrTextPlainContent"), tone: 'error' });
         return;
       }
       const html = item.types.includes('text/html') ? await (await item.getType('text/html')).text() : '';
       const text = item.types.includes('text/plain') ? await (await item.getType('text/plain')).text() : '';
       const value = html || text;
       if (!value) {
-        setStatus({ label: '剪贴板内容为空；未谎报粘贴成功。', tone: 'error' });
+        setStatus({ ...productLabel("controller.theClipboardIsEmptyNothingWasPasted"), tone: 'error' });
         return;
       }
 
       receiver.focus();
       const selection = window.getSelection();
       if (!selection) {
-        setStatus({ label: '无法定位接收区选区；未谎报粘贴成功。', tone: 'error' });
+        setStatus({ ...productLabel("controller.theReceivingAreaSelectionCouldNotBeLocatedNothingWasPasted"), tone: 'error' });
         return;
       }
       const range = document.createRange();
@@ -2211,19 +2213,19 @@ export function useEditorController() {
       const inserted = document.execCommand(html ? 'insertHTML' : 'insertText', false, value);
       selection.removeAllRanges();
       if (!inserted || !receiver.textContent?.trim()) {
-        setStatus({ label: '浏览器未完成接收区粘贴；未谎报成功。', tone: 'error' });
+        setStatus({ ...productLabel("controller.theBrowserDidNotCompleteThePasteIntoTheReceivingArea"), tone: 'error' });
         return;
       }
-      setStatus({ label: html ? '剪贴板已粘贴 · text/html + text/plain' : '剪贴板已粘贴 · text/plain', tone: 'success' });
+      setStatus({ ...(html ? productLabel("controller.clipboardPastedTextHtmlTextPlain") : productLabel("controller.clipboardPastedTextPlain")), tone: 'success' });
     } catch (error) {
-      setStatus({ label: `剪贴板读取/粘贴失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+      setStatus({ ...productLabel("controller.clipboardReadingOrPastingFailed", { "cause": productCause(error) }), tone: 'error' });
     }
   }, []);
 
   const changeField = useCallback(
     (field: 'title' | 'description' | 'author' | 'categories', value: string) => {
       if (!directoryRef.current) {
-        setStatus({ label: '先在设置中选择资料目录，再修改文稿信息。', tone: 'warning' });
+        setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeModifyingArticleInformation"), tone: 'warning' });
         return;
       }
       const current = articleRef.current;
@@ -2236,17 +2238,17 @@ export function useEditorController() {
 
   const changeTheme = useCallback((theme: ThemeConfig) => {
     if (!directoryRef.current) {
-      setStatus({ label: '先在设置中选择资料目录，再应用主题。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeApplyingATheme"), tone: 'warning' });
       return;
     }
     const current = articleRef.current;
     const currentId = articleId(current);
     if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, currentId).archived) {
-      setStatus({ label: '归档文章为只读；取消归档后才能切换主题。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.archivedArticlesAreReadOnlyUnarchiveTheArticleBeforeSwitchingThemes"), tone: 'warning' });
       return;
     }
     if (parseArticle(current.source).diagnostics.some((item) => item.level === 'error')) {
-      setStatus({ label: 'Front Matter 有误，先修复后再绑定主题。', tone: 'error' });
+      setStatus({ ...productLabel("controller.frontMatterIsInvalidRepairItBeforeBindingATheme"), tone: 'error' });
       return;
     }
     if (current.themeValid && JSON.stringify(current.theme) === JSON.stringify(theme)) {
@@ -2257,22 +2259,22 @@ export function useEditorController() {
     if (!current.folder || !current.month) {
       updateArticle(nextSource, theme);
       setShowThemeDialog(false);
-      setStatus({ label: `已切换新稿主题：${theme.name}；保存时写入文章主题快照。`, tone: 'success' });
+      setStatus({ ...productLabel("controller.newDraftThemeSwitchedToItsArticleThemeSnapshotIsWrittenWhen", { "themeName": theme.name }), tone: 'success' });
       return;
     }
 
     const target = snapshotFor(current);
     const root = target.directory;
     if (!root || target.documentToken.root !== root || !target.themeValid) {
-      setStatus({ label: '当前文章或主题快照无效；未更改主题。', tone: 'error' });
+      setStatus({ ...productLabel("controller.theCurrentArticleOrThemeSnapshotIsInvalidTheThemeWasNot"), tone: 'error' });
       return;
     }
     const lease = beginHistoryOperation();
     if (!lease) return;
-    setHistoryNotice({ label: '正在建立换主题前保护点…', tone: 'warning' });
+    setHistoryNotice({ ...productLabel("controller.creatingACheckpointBeforeChangingTheTheme"), tone: 'warning' });
     void mutationQueueRef.current.run(async () => {
       if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) {
-        throw new Error('文章或资料目录已切换；未更改主题。');
+        throw new ProductError("controller.theArticleOrLibraryChangedTheThemeWasNotModified");
       }
       return createArticleSnapshot(root, target.month!, target.folder!, target.source, target.theme, {
         kind: 'before-theme-change',
@@ -2280,21 +2282,21 @@ export function useEditorController() {
       });
     }).then((checkpoint) => {
       if (directoryRef.current !== root || !matchesSnapshot(target)) {
-        setStatus({ label: `换主题前保护点已保存为 ${checkpoint.snapshot.id}；文章会话已切换，未应用新主题。`, tone: 'warning' });
+        setStatus({ ...productLabel("controller.checkpointSavedAsButTheArticleSessionChangedTheNewThemeWas", { "checkpoint_snapshotId": checkpoint.snapshot.id }), tone: 'warning' });
         return;
       }
       updateArticle(nextSource, theme);
       setShowThemeDialog(false);
-      setHistoryNotice({ label: `已先保存换主题前版本 ${checkpoint.snapshot.id}。`, tone: 'success' });
+      setHistoryNotice({ ...productLabel("controller.savedVersionBeforeChangingTheTheme", { "checkpoint_snapshotId": checkpoint.snapshot.id }), tone: 'success' });
       setStatus({
-        label: checkpoint.cleanupIssues.length
-          ? `保护点已保存；主题已切换为「${theme.name}」。历史清理提示：${checkpoint.cleanupIssues.join('；')}`
-          : `保护点已保存；主题已切换为「${theme.name}」。保存文章后写入原稿。`,
+        ...(checkpoint.cleanupIssues.length
+          ? productLabel("controller.checkpointSavedThemeSwitchedToHistoryCleanupNotes", { "themeName": theme.name, "details": checkpoint.cleanupIssues.join('；') })
+          : productLabel("controller.checkpointSavedThemeSwitchedToSaveTheArticleToWriteItsSource", { "themeName": theme.name })),
         tone: checkpoint.cleanupIssues.length ? 'warning' : 'success',
       });
     }).catch((error) => {
       if (directoryRef.current === root && matchesSnapshot(target)) {
-        setStatus({ label: `换主题前保护点失败；原主题保持不变：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+        setStatus({ ...productLabel("controller.theCheckpointBeforeThemeChangeFailedTheOriginalThemeIsRetained", { "cause": productCause(error) }), tone: 'error' });
       }
     }).finally(() => finishHistoryOperation(lease));
   }, [articleSettings.autoSnapshot.maxCount, beginHistoryOperation, finishHistoryOperation, matchesSnapshot, snapshotFor, updateArticle]);
@@ -2303,7 +2305,7 @@ export function useEditorController() {
     const root = directoryRef.current;
     const current = articleRef.current;
     if (!root || documentTokenRef.current?.root !== root) {
-      setStatus({ label: '当前文稿不属于此资料目录；未应用主题。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.theCurrentManuscriptDoesNotBelongToThisLibraryTheThemeWas"), tone: 'warning' });
       return;
     }
     if (!current.folder || !current.month) {
@@ -2313,11 +2315,11 @@ export function useEditorController() {
     }
     const stored = storedArticles.find(item => item.month === current.month && item.folder === current.folder);
     if (!stored) {
-      setStatus({ label: '没有找到当前文章的已保存版本；请刷新文章列表后重试。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.noSavedVersionOfTheCurrentArticleWasFoundRefreshTheArticle"), tone: 'warning' });
       return;
     }
     if (parseArticle(current.source).diagnostics.some(item => item.level === 'error')) {
-      setStatus({ label: 'Front Matter 有误，先修复后再复制并应用主题。', tone: 'error' });
+      setStatus({ ...productLabel("controller.frontMatterIsInvalidRepairItBeforeCopyingAndApplyingTheTheme"), tone: 'error' });
       return;
     }
     const active = typeof document === 'undefined' ? null : document.activeElement;
@@ -2332,12 +2334,12 @@ export function useEditorController() {
 
   const createNewArticle = useCallback(() => {
     if (!directoryRef.current) {
-      setStatus({ label: '先在设置中选择资料目录，再新建文章。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeCreatingAnArticle"), tone: 'warning' });
       navigateRoute('/settings/');
       return;
     }
     runAfterDraftDecision({
-      label: '新建文章',
+      label: productText("controller.createAnArticle"),
       run: () => {
         navigateArticleMode('overview');
         setShowTemplateDialog(true);
@@ -2347,7 +2349,7 @@ export function useEditorController() {
 
   const createArticleFromTemplate = useCallback((template: ArticleTemplate | null, selectedTheme: ThemeConfig) => {
     if (!directoryRef.current) {
-      setStatus({ label: '先选择资料目录，再创建文章。', tone: 'warning' });
+      setStatus({ ...productLabel("controller.chooseALibraryBeforeCreatingAnArticle"), tone: 'warning' });
       setShowTemplateDialog(false);
       navigateRoute('/settings/');
       return;
@@ -2356,7 +2358,7 @@ export function useEditorController() {
     try {
       const source = template
         ? instantiateArticleTemplate(template.source, { now, theme: selectedTheme })
-        : updateFrontMatter(createArticleSource('未命名技术文稿', selectedTheme.id), {
+        : updateFrontMatter(createArticleSource(productText("controller.untitledTechnicalManuscript"), selectedTheme.id), {
             createdAt: now,
             updatedAt: now,
             theme: { id: selectedTheme.id, version: selectedTheme.version },
@@ -2370,12 +2372,12 @@ export function useEditorController() {
       setArticle(nextArticle);
       setRevision(revisionRef.current);
       setCompiledRevision(null);
-      setStatus({ label: template ? `已从「${template.name}」创建新草稿；原模板与已保存文章未改动。` : '新空白稿已建立；选择资料目录并保存后才会写入磁盘。', tone: 'warning' });
+      setStatus({ ...(template ? productLabel("controller.newDraftCreatedFromTheOriginalTemplateAndSavedArticlesAreUnchanged", { "templateName": template.name }) : productLabel("controller.newBlankDraftCreatedItIsWrittenToDiskOnlyAfterChoosing")), tone: 'warning' });
       setShowTemplateDialog(false);
       navigateArticleMode('editor');
       void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
     } catch (error) {
-      setStatus({ label: `无法使用此模板：${error instanceof Error ? error.message : String(error)}；未创建新稿。`, tone: 'error' });
+      setStatus({ ...productLabel("controller.thisTemplateCannotBeUsedNoNewDraftWasCreated", { "cause": productCause(error) }), tone: 'error' });
     }
   }, [compileCurrent, navigateArticleMode, openDocument, navigateRoute, snapshotFor]);
 
@@ -2398,7 +2400,7 @@ export function useEditorController() {
     if (!target || !root) return;
     const title = copyTitle.trim();
     if (!title) {
-      setStatus({ label: 'Fork 文稿标题不能为空。', tone: 'error' });
+      setStatus({ ...productLabel("controller.theForkTitleCannotBeEmpty"), tone: 'error' });
       return;
     }
     const sourceOverride = copySourceOverride ?? undefined;
@@ -2424,21 +2426,21 @@ export function useEditorController() {
           }
           return { result, refreshError };
         });
-        const monthNote = copyMonth === target.month ? '' : ` · 保存到 ${copyMonth}`;
-        const collisionNote = result.folderCollision ? ` · 目录名冲突，已使用 ${result.article.folder}` : '';
+        const monthNote = copyMonth === target.month ? '' : productReference("controller.savedUnder", { "copyMonth": copyMonth });
+        const collisionNote = result.folderCollision ? productReference("controller.directoryNameConflictUsing", { "result_articleFolder": result.article.folder }) : '';
         const indexNote = result.indexUpdated
-          ? result.indexError ? ` · 月索引已重建：${result.indexError}` : ''
-          : ` · Fork 已写入但月索引未更新：${result.indexError ?? '未知错误'}`;
+          ? result.indexError ? productReference("controller.monthlyIndexRebuilt", { "resultIndexError": result.indexError }) : ''
+          : productReference("controller.forkWrittenButTheMonthlyIndexWasNotUpdated", { "value": (result.indexError ?? productReference("controller.unknownError")) });
         const refreshNote = refreshError
-          ? ` · 列表刷新失败，可点击“刷新”重试：${refreshError instanceof Error ? refreshError.message : String(refreshError)}`
+          ? productReference("controller.listRefreshFailedClickRefreshToRetry", { "cause": productCause(refreshError) })
           : '';
         if (directoryRef.current !== root) return;
         if (openCreatedArticle) applyStoredArticle(result.article, true, root);
-        const themeNote = themeOverride ? ` · 主题 ${themeOverride.name} v${result.article.theme.version}` : '';
-        setStatus({ label: `Fork 已创建：${result.article.parse.metadata.title}${themeNote}${monthNote}${collisionNote}${indexNote}${refreshNote}；原稿保持不变。`, tone: result.indexUpdated && !result.indexError && !refreshError ? 'success' : 'warning' });
+        const themeNote = themeOverride ? productReference("controller.themeV", { "themeOverrideName": themeOverride.name, "result_article_themeVersion": result.article.theme.version }) : '';
+        setStatus({ ...productLabel("controller.forkCreatedTheOriginalManuscriptIsUnchanged", { "result_article_parse_metadataTitle": result.article.parse.metadata.title, "themeNote": themeNote, "monthNote": monthNote, "collisionNote": collisionNote, "indexNote": indexNote, "refreshNote": refreshNote }), tone: result.indexUpdated && !result.indexError && !refreshError ? 'success' : 'warning' });
       } catch (error) {
         if (directoryRef.current !== root) return;
-        setStatus({ label: `Fork 失败：${error instanceof Error ? error.message : String(error)}；原文与未保存状态保持不变。`, tone: 'error' });
+        setStatus({ ...productLabel("controller.forkFailedTheOriginalManuscriptAndUnsavedStateAreRetained", { "cause": productCause(error) }), tone: 'error' });
       }
     })();
   }, [applyStoredArticle, copyFromThemeLibrary, copyMonth, copySourceOverride, copyTarget, copyThemeTarget, copyTitle, loadStoredArticles]);
@@ -2451,7 +2453,7 @@ export function useEditorController() {
     const protectCurrentDraft = documentTokenRef.current?.root === root && targetIds.has(articleId(articleRef.current));
     setDeleteTargets([]);
     runAfterDraftDecision({
-      label: targets.length === 1 ? `删除「${targets[0].parse.metadata.title}」` : `删除所选的 ${targets.length} 篇文稿`,
+      label: targets.length === 1 ? productText("controller.delete", { "targets_0_parse_metadataTitle": targets[0].parse.metadata.title }) : productText("controller.deleteTheSelectedManuscripts", { "targetsCount": targets.length }),
       run: async () => {
         const deletingDocumentToken = directoryRef.current === root &&
           documentTokenRef.current?.root === root &&
@@ -2464,7 +2466,7 @@ export function useEditorController() {
           return token ? [{ target, token }] : [];
         });
         if (!queued.length) {
-          if (directoryRef.current === root) setStatus({ label: '所选文稿正在删除，请稍后刷新文章列表。', tone: 'warning' });
+          if (directoryRef.current === root) setStatus({ ...productLabel("controller.selectedManuscriptsAreBeingDeletedRefreshTheArticleListLater"), tone: 'warning' });
           return;
         }
         const settled = new Set<ReturnType<typeof mutationQueueRef.current.beginDelete>>();
@@ -2486,7 +2488,7 @@ export function useEditorController() {
               } catch (error) {
                 mutationQueueRef.current.failDelete(token);
                 settled.add(token);
-                failedTitles.push(target.parse.metadata.title || '未命名文章');
+                failedTitles.push(target.parse.metadata.title || productText("controller.untitledArticle"));
               }
             }
             if (directoryRef.current === root && deletedIds.length) {
@@ -2499,14 +2501,14 @@ export function useEditorController() {
                 for (const id of deletedIds) delete articleOrganization[id];
                 const articleOrder = Object.fromEntries(Object.entries(current.articleOrder).map(([groupId, ids]) => [groupId, ids.filter((id) => !deletedIds.includes(id))]));
                 return { ...current, articleOrganization, articleOrder };
-              }, '文章的项目与顺序记录已清理。');
-              if (!cleaned) workspaceCleanupError = '编辑器组织记录没有清理；修复 settings.json 后可避免将来重复使用同一目录名时继承旧归属。';
+              }, productText("controller.articleProjectAndOrderRecordsCleaned"));
+              if (!cleaned) workspaceCleanupError = productText("controller.editorOrganizationRecordsWereNotCleanedRepairSettingsJsonToPreventOld");
             }
             if (deletingDocumentToken &&
               directoryRef.current === root &&
               documentTokenRef.current === deletingDocumentToken &&
               deletedIds.includes(articleId(articleRef.current))) {
-              const blank = makeWorkingArticle(createArticleSource('未命名技术文稿', 'basic'), BASIC_THEME);
+              const blank = makeWorkingArticle(createArticleSource(productText("controller.untitledTechnicalManuscript"), 'basic'), BASIC_THEME);
               blank.dirty = false;
               openDocument(root, 'draft');
               articleRef.current = blank;
@@ -2529,19 +2531,19 @@ export function useEditorController() {
           });
           if (clearedCurrent) await compileCurrent(snapshotFor(articleRef.current, revisionRef.current));
           const indexMessage = indexUpdated
-            ? indexError ? `月索引已重建：${indexError}` : ''
-            : `月索引未更新：${indexError || '未知错误'}`;
+            ? indexError ? productReference("controller.monthlyIndexRebuilt2", { "indexError": indexError }) : ''
+            : productReference("controller.theMonthlyIndexWasNotUpdated", { "value": (indexError || productReference("controller.unknownError")) });
           const refreshMessage = refreshError
-            ? `列表待刷新，可点击“刷新文章”重试：${refreshError instanceof Error ? refreshError.message : String(refreshError)}`
+            ? productReference("controller.listRefreshPendingClickRefreshArticlesToRetry", { "cause": productCause(refreshError) })
             : '';
-          const failedMessage = failedTitles.length ? `${failedTitles.length} 篇未删除：${failedTitles.join('、')}` : '';
-          const details = [indexMessage, refreshMessage, workspaceCleanupError, failedMessage].filter(Boolean).join('；');
+          const failedMessage = failedTitles.length ? productReference("controller.articlesNotDeleted", { "failedTitlesCount": failedTitles.length, "details": failedTitles.join('、') }) : '';
+          const details = productJoin([indexMessage, refreshMessage, workspaceCleanupError, failedMessage].filter(Boolean), '；');
           if (directoryRef.current !== root) return;
-          const subject = deletedIds.length === 1 ? '文章' : `${deletedIds.length} 篇文章`;
+          const subject = deletedIds.length === 1 ? productReference("controller.article") : productReference("controller.articles", { "deletedIdsCount": deletedIds.length });
           setStatus({
-            label: deletedIds.length
-              ? `${subject}及其素材、历史已删除。${details ? ` ${details}` : ''}`
-              : `删除失败，文稿未改动。${details ? ` ${details}` : ''}`,
+            ...(deletedIds.length
+              ? productLabel("controller.andItsAssetsAndHistoryWereDeleted", { "subject": subject, "value": productJoin([' ', details]) })
+              : productLabel("controller.deletionFailedTheManuscriptIsUnchanged", { "value": productJoin([' ', details]) })),
             tone: deletedIds.length
               ? (failedTitles.length || !indexUpdated || indexError || refreshError || workspaceCleanupError ? 'warning' : 'success')
               : 'error',
@@ -2549,11 +2551,11 @@ export function useEditorController() {
         } catch (error) {
           for (const { token } of queued) if (!settled.has(token)) mutationQueueRef.current.failDelete(token);
           if (directoryRef.current !== root) return;
-          const subject = deletedIds.length === 1 ? '文章' : `${deletedIds.length} 篇文章`;
+          const subject = deletedIds.length === 1 ? productReference("controller.article") : productReference("controller.articles", { "deletedIdsCount": deletedIds.length });
           setStatus({
-            label: deletedIds.length
-              ? `${subject}已删除，但后续状态更新失败：${error instanceof Error ? error.message : String(error)}；请刷新列表。`
-              : `删除失败：${error instanceof Error ? error.message : String(error)}`,
+            ...(deletedIds.length
+              ? productLabel("controller.wasDeletedButTheSubsequentStateUpdateFailedRefreshTheList", { "subject": subject, "cause": productCause(error) })
+              : productLabel("controller.deletionFailed", { "cause": productCause(error) })),
             tone: deletedIds.length ? 'warning' : 'error',
           });
         }
@@ -2591,11 +2593,11 @@ export function useEditorController() {
           if (!cancelled && directorySelectionRef.current === selection) setDirectoryRestoreState('idle');
         } else {
           setDirectoryRestoreState('permission-needed');
-          setStatus({ label: `已记住上次的资料目录「${handle.name}」；请授权后打开。`, tone: 'warning' });
+          setStatus({ ...productLabel("controller.rememberedLibraryAuthorizeItBeforeOpening", { "handleName": handle.name }), tone: 'warning' });
         }
       } catch (error) {
         if (cancelled || directorySelectionRef.current !== selection) return;
-        setDirectoryBookmarkIssue(`无法恢复上次的资料目录：${error instanceof Error ? error.message : String(error)}`);
+        setDirectoryBookmarkIssue(productText("controller.thePreviousLibraryDirectoryCouldNotBeRestored", { "cause": productCause(error) }));
         setDirectoryRestoreState('idle');
       }
     })();
@@ -2632,7 +2634,7 @@ export function useEditorController() {
       };
     }).catch((error) => {
       if (!cancelled && directoryRef.current === root && documentTokenRef.current === token) {
-        setStatus({ label: `历史基线读取失败，首次自动快照将保留完整版本：${error instanceof Error ? error.message : String(error)}`, tone: 'warning' });
+        setStatus({ ...productLabel("controller.theHistoryBaselineCouldNotBeReadTheFirstAutomaticSnapshotWill", { "cause": productCause(error) }), tone: 'warning' });
       }
     });
     return () => { cancelled = true; };
@@ -2729,15 +2731,15 @@ export function useEditorController() {
             } catch (error) {
               if (directoryRef.current === root && matchesSnapshot(target)) {
                 setHistoryRefreshPending(true);
-                setHistoryNotice({ label: `快照已保存，但历史列表刷新失败：${error instanceof Error ? error.message : String(error)}`, tone: 'warning' });
+                setHistoryNotice({ ...productLabel("controller.snapshotSavedButTheHistoryListCouldNotRefresh", { "cause": productCause(error) }), tone: 'warning' });
               }
             }
             if (directoryRef.current !== root || !matchesSnapshot(target)) return;
-            const cleanupNote = result.cleanupIssues.length ? `；清理提示：${result.cleanupIssues.join('；')}` : '';
-            setStatus({ label: result.created ? `自动历史快照已保存 · ${result.snapshot.id}${cleanupNote}` : `内容未变化，未创建重复历史快照${cleanupNote}`, tone: result.cleanupIssues.length ? 'warning' : result.created ? 'success' : 'neutral' });
+            const cleanupNote = result.cleanupIssues.length ? productReference("controller.cleanupNotes", { "details": result.cleanupIssues.join('；') }) : '';
+            setStatus({ ...(result.created ? productLabel("controller.automaticHistorySnapshotSaved", { "result_snapshotId": result.snapshot.id, "cleanupNote": cleanupNote }) : productLabel("controller.contentIsUnchangedNoDuplicateHistoricalSnapshotWasCreated", { "cleanupNote": cleanupNote })), tone: result.cleanupIssues.length ? 'warning' : result.created ? 'success' : 'neutral' });
           }
         } catch (error) {
-          if (directoryRef.current === root && articleId(articleRef.current) === id && documentTokenRef.current === token) setStatus({ label: `自动历史快照失败：${error instanceof Error ? error.message : String(error)}`, tone: 'error' });
+          if (directoryRef.current === root && articleId(articleRef.current) === id && documentTokenRef.current === token) setStatus({ ...productLabel("controller.automaticHistorySnapshotFailed", { "cause": productCause(error) }), tone: 'error' });
         } finally {
           autoSnapshotBusyRef.current = false;
         }
@@ -2792,12 +2794,12 @@ export function useEditorController() {
         ? orderArticlesForGroup(articleList, editorWorkspace, selectedArticleCollection.slice('project:'.length), false)
         : [...orderedUnclassifiedArticles, ...orderedProjectArticles];
   const articleCollectionTitle = selectedArticleCollection === 'unclassified'
-    ? '未分组'
+    ? productText("controller.unclassified")
     : selectedArticleCollection === 'archived'
-      ? '归档文章'
+      ? productText("controller.archivedArticles")
       : selectedArticleCollection.startsWith('project:')
-        ? editorWorkspace.projects.find((project) => project.id === selectedArticleCollection.slice('project:'.length))?.name ?? '项目'
-        : '全部文章';
+        ? editorWorkspace.projects.find((project) => project.id === selectedArticleCollection.slice('project:'.length))?.name ?? productText("controller.project")
+        : productText("controller.allArticles");
   return {
     mounted, fileSystemReady, view, articleMode, navigateView, navigateArticleMode, registerNavigationGuard,
     directory, setDirectory, contentLibraryRootSession, contentLibrariesState, setContentLibrariesState,

@@ -40,6 +40,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/useEditorController')) return { useEditorController: () => controller };
       if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ error: null }) };
+      if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ ready: true, locale: 'zh-CN' }), useUITranslation: () => ({ t: key => key }) };
       if (id.endsWith('/editorThemes')) return themes;
       if (id.endsWith('/editorThemeCache')) return { ...cache,
         readEditorThemeCache: () => cache.readEditorThemeCache(storage),

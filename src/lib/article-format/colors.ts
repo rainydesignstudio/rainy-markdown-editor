@@ -1,3 +1,5 @@
+import { FRAME_MESSAGES } from './frameMessages';
+
 export function createArticleColorNormalizer(doc: Document) {
   let colorContext: CanvasRenderingContext2D | null = null;
   const normalizedColors = new Map<string, string>();
@@ -12,7 +14,7 @@ export function createArticleColorNormalizer(doc: Document) {
       canvas.width = canvas.height = 1;
       colorContext = canvas.getContext('2d', { willReadFrequently: true });
     }
-    if (!colorContext) throw new Error('浏览器无法解析文章颜色。');
+    if (!colorContext) throw new Error(FRAME_MESSAGES.colorParseFailed);
     colorContext.clearRect(0, 0, 1, 1);
     colorContext.fillStyle = value;
     colorContext.fillRect(0, 0, 1, 1);

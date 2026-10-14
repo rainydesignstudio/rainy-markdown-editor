@@ -1,3 +1,6 @@
+import { formatProductMessage } from '../src/lib/i18n/productMessages.ts';
+import { createUII18n } from '../src/lib/i18n/runtime.ts';
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -14,7 +17,7 @@ function page(fileSystem = {}) {
   const root = { name: 'test-only-theme-library' };
   const props = { root, themes: [...themes.THEMES], issues: [], currentTheme: themes.BASIC_THEME, defaultThemeId: null, currentArticleSaved: false, canApply: true, isRootCurrent: value => value === props.root, onLibraryChange: (...values) => writes.push(values), onApply: value => applied.push(value), async onSetDefault(id, selectedRoot) { defaults.push([id, selectedRoot]); props.defaultThemeId = id; } };
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
@@ -55,7 +58,7 @@ function page(fileSystem = {}) {
       useEffect(effect, dependencies) { const index = cursor++; const old = cells[index]; if (old && dependencies.every((value, i) => Object.is(value, old.dependencies[i]))) return; effects.push(() => { old?.cleanup?.(); cells[index] = { dependencies, cleanup: effect() }; }); },
     };
     throw new Error(`Unexpected theme library import ${id}`);
-  } });
+  }) });
   function render() { cursor = 0; tree = module.exports.ThemeLibrary(props); while (effects.length) effects.shift()(); }
   function all(node) { if (Array.isArray(node)) return node.flatMap(all); if (!node?.props) return []; return [node, ...all(node.props.children)]; }
   function text(node) { if (typeof node === 'string') return node; if (Array.isArray(node)) return node.map(text).join(''); return node?.props ? text(node.props.children) : ''; }
@@ -206,7 +209,7 @@ test('detail deletion replaces its dialog, returns on cancel, and keeps failures
   deletionDialog(view).props.onCancel(); view.render();
   view.find(node => node.type?.name === 'ThemeCardDialog').props.onRequestDelete(); view.render();
   await deletionDialog(view).props.onDelete(); view.render();
-  assert.match(deletionDialog(view).props.error, /权限已失效/);
+  assert.match(formatProductMessage(deletionDialog(view).props.error, createUII18n('zh-CN').getFixedT('zh-CN')), /权限已失效/);
   assert.equal(deletionDialog(view).props.busy, false);
   assert.equal(view.writes.length, 0);
 });

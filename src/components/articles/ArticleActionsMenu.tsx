@@ -1,5 +1,7 @@
 'use client';
 
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import type { ArticleSummary } from '../../lib/types';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 
@@ -23,6 +25,7 @@ function ActionIcon({ name }: { name: 'info' | 'archive' | 'fork' | 'delete' }) 
 }
 
 export function ArticleActionsMenu({ article, archived, disabled = false, insetSummary = false, onInfo, onArchive, onFork, onDelete }: Props) {
+  const { t } = useUITranslation('articles');
   const menuRef = useRef<HTMLDetailsElement | null>(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -50,14 +53,14 @@ export function ArticleActionsMenu({ article, archived, disabled = false, insetS
       event.preventDefault();
       event.stopPropagation();
     }}>
-      <summary className={insetSummary ? 'mr-1' : undefined} aria-label={`更多操作：${article.parse.metadata.title}`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg><span className="article-action-menu-label">更多</span>
+      <summary className={insetSummary ? 'mr-1' : undefined} aria-label={t('articles:actions.moreLabel', { title: article.parse.metadata.title })}>
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg><span className="article-action-menu-label">{t('common:actions.more')}</span>
       </summary>
-      <div role="group" aria-label={`文章操作：${article.parse.metadata.title}`}>
-        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onInfo(article); }}><ActionIcon name="info" />文章信息</button>
-        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onFork(article); }}><ActionIcon name="fork" />Fork 文稿</button>
-        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onArchive(article, !archived); }}><ActionIcon name="archive" />{archived ? '取消归档' : '归档'}</button>
-        {archived ? <><span className="my-1 h-px bg-line" aria-hidden="true" /><button className="text-warning-strong hover:bg-warning-surface hover:text-warning-strong focus-visible:bg-warning-surface focus-visible:text-warning-strong" type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onDelete(article); }}><ActionIcon name="delete" />删除归档</button></> : null}
+      <div role="group" aria-label={t('articles:actions.articleLabel', { title: article.parse.metadata.title })}>
+        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onInfo(article); }}><ActionIcon name="info" />{t('articles:info')}</button>
+        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onFork(article); }}><ActionIcon name="fork" />{t('articles:fork')}</button>
+        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onArchive(article, !archived); }}><ActionIcon name="archive" />{archived ? t('articles:unarchive') : t('articles:collections.archived')}</button>
+        {archived ? <><span className="my-1 h-px bg-line" aria-hidden="true" /><button className="text-warning-strong hover:bg-warning-surface hover:text-warning-strong focus-visible:bg-warning-surface focus-visible:text-warning-strong" type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onDelete(article); }}><ActionIcon name="delete" />{t('articles:deleteArchive')}</button></> : null}
       </div>
     </details>
   );

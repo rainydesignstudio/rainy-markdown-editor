@@ -4,12 +4,15 @@ import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseStaticServerOptions, STATIC_SERVER_HELP } from './static-server-options.mjs';
+import { createCliTranslation } from './cli-locale.mjs';
+
+const t = createCliTranslation();
 
 const host = '127.0.0.1';
 let options;
 try { options = parseStaticServerOptions(process.argv.slice(2)); }
 catch (error) {
-  console.error(`启动参数错误：${error.message}`);
+  console.error(t('cli.invalidOptions', { error: error.messageKey ? t(error.messageKey, error.messageParams) : error.message }));
   process.exit(1);
 }
 if (options.help) {
@@ -21,7 +24,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'out');
 
 if (!fs.existsSync(path.join(output, 'index.html'))) {
-  console.error('启动失败：缺少 out/index.html 静态构建产物，请先在项目目录执行 npm run build，再运行 npm start。');
+  console.error(t('cli.missingBuild'));
   process.exit(1);
 }
 
@@ -106,7 +109,7 @@ const server = http.createServer((request, response) => {
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`启动失败：127.0.0.1:${port} 已被占用；请另选端口或手动处理已有服务。`);
+    console.error(t('cli.portOccupied', { port }));
   } else {
     console.error(error);
   }
@@ -114,5 +117,5 @@ server.on('error', (error) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Rainy 微信编辑器静态服务：http://${host}:${port}`);
+  console.log(t('cli.listening', { host, port }));
 });

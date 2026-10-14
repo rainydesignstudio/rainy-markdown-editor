@@ -1,4 +1,8 @@
 'use client';
+
+import { ProductError, formatDiagnosticMessage, formatProductMessage, productCause, productDiagnosticReference, productJoin, productReference, productText, productErrorMessage, type ProductMessageInfo, type ProductMessageValue } from "../../lib/i18n/productMessages";
+
+import { useUITranslation } from '../global/UILocaleProvider';
 import { useArticleRenderMount } from '../../hooks/useArticleRenderMount';
 import { ArticleDocument } from '../editor/ArticleDocument';
 
@@ -33,7 +37,7 @@ import {
 } from '../../lib/fileSystem';
 import { refreshRootSession } from '../../lib/rootSession';
 import { BASIC_THEME, resolveDefaultArticleTheme, themePreviewCss } from '../../lib/themes';
-import { parseThemeConfigJson, validateThemeConfig, validateThemeCss, validateThemeFormat } from '../../lib/themeValidation';
+import { parseThemeConfigJson, inspectThemeConfig, inspectThemeCss, inspectThemeFormat } from '../../lib/themeValidation';
 import type { ThemeConfig, ThemeNodeKey } from '../../lib/types';
 import { MarkdownPreview } from '../editor/MarkdownPreview';
 import { ARTICLE_EXAMPLE_IMAGE } from '../../lib/articleExamples';
@@ -143,6 +147,7 @@ function ThemeIcon({ name }: { name: 'book' | 'upload' | 'plus' | 'edit' | 'appl
 }
 
 export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'theme-stylebook-reader', framed = false, dark = false, inspection, onLocate, onNodeColors }: { theme: ThemeConfig; source?: string; className?: string; framed?: boolean; dark?: boolean; inspection?: ThemeInspection; onLocate?: (binding: ColorBinding) => void; onNodeColors?: (colors: Partial<Record<ThemeNodeKey, string>>) => void }) {
+  const { t } = useUITranslation('themes');
   const formatSnapshot = useFormatSnapshot();
   const reactId = useId();
   const instanceScope = Array.from(reactId, character => character.codePointAt(0)!.toString(36)).join('-');
@@ -226,9 +231,9 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
     const content = <div className={`${className} ${scopeClass}`} style={previewSurfaceStyle(dark)} data-preview-mode={dark ? 'dark' : 'light'}>
     <div ref={lightHostRef} hidden={dark && !native} className={framed ? 'mx-auto min-h-full min-w-0 w-full max-w-3xl rounded-lg shadow-panel' : 'min-h-full min-w-0 w-full border-0'} aria-busy={!compiledCss && !compileError} />
     {lightTarget ? createPortal(<>{!native ? <style>{articleCss}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }}><MarkdownPreview source={source} placeholderRelativeImages snapshot={formatSnapshot} /></ArticleDocument></>, lightTarget) : null}
-    {compileError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">主题预览编译失败：{compileError}</p> : null}
-    {dark && !native && failed ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">深色预览加载失败，可切回浅色后重试。</p> : null}
-    {dark && !native ? <iframe ref={frameRef} className="block h-full min-w-0 w-full border-0" title="文章主题深色预览" sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} onLoad={() => { const target = frameRef.current?.contentDocument; if (inspection && target) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; target.head.append(style); setInspectionRevision(value => value + 1); } }} /> : null}
+    {compileError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t('themes:ui.themePreviewCompilationFailed')}{formatProductMessage(compileError, t)}</p> : null}
+    {dark && !native && failed ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t('themes:ui.darkPreviewFailedSwitchToLightModeAnd')}</p> : null}
+    {dark && !native ? <iframe ref={frameRef} className="block h-full min-w-0 w-full border-0" title={t('themes:ui.darkArticleThemePreview')} sandbox="allow-scripts allow-same-origin" srcDoc={darkDocument} onLoad={() => { const target = frameRef.current?.contentDocument; if (inspection && target) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; target.head.append(style); setInspectionRevision(value => value + 1); } }} /> : null}
   </div>;
   return inspection ? <ThemeInspectionPreview inspection={inspection} dialogOwner="theme-stylebook-title" rootRef={articleRef} frameRef={dark ? frameRef : undefined} revision={`${inspectionRevision}:${dark}:${articleCss}`} className="flex min-h-0 flex-1 flex-col" onLocate={onLocate} resolve={(element, root) => {
     const light = articleRef.current;
@@ -240,6 +245,7 @@ export function ThemePreview({ theme, source = STYLEBOOK_SAMPLE, className = 'th
 }
 
 export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], issues, currentTheme, defaultThemeId, currentArticleSaved, canApply, isRootCurrent, onLibraryChange, onApply, onSetDefault }: ThemeLibraryProps) {
+  const { t } = useUITranslation('themes');
   const themes = storedThemes;
   const defaultTheme = resolveDefaultArticleTheme(themes, defaultThemeId);
   const { dark, toggle } = useArticlePreviewMode();
@@ -247,11 +253,11 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
   const [selected, setSelected] = useState<ThemeConfig | null>(null);
   const [browsedThemeId, setBrowsedThemeId] = useState<string | null>(null);
   const [stylebookTheme, setStylebookTheme] = useState<ThemeConfig | null>(null);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<string | ProductMessageInfo | { message: string }>('');
   const [working, setWorking] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ThemeConfig | null>(null);
-  const [deleteError, setDeleteError] = useState('');
+  const [deleteError, setDeleteError] = useState<string | ProductMessageInfo | { message: string }>('');
   const deletionRef = useRef<object | null>(null);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const importRef = useRef<HTMLInputElement | null>(null);
@@ -304,10 +310,10 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       if (!isSessionCurrent(operationRoot)) return;
       if (result.kind === 'failed') {
         setRefreshPending(true);
-        setNotice(`操作已完成；主题列表仍未刷新，请稍后重试：${result.error instanceof Error ? result.error.message : String(result.error)}`);
+        setNotice(productReference("themeLibrary.theOperationCompletedButTheThemeListHasNotRefreshedRetryLater", { "cause": productCause(result.error) }));
       } else if (result.kind === 'refreshed') {
         setRefreshPending(false);
-        setNotice('主题列表已重新载入。');
+        setNotice(productReference("themeLibrary.themeListReloaded"));
       }
     } finally {
       if (isSessionCurrent(operationRoot)) setWorking(false);
@@ -336,14 +342,14 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       if (!isSessionCurrent(operationRoot)) return;
       if (refreshed.kind === 'failed') {
         setRefreshPending(true);
-        setNotice(`已复制「${saved.name}」并写入资料目录，但列表刷新失败；操作已完成，不要重复复制。可重试刷新：${refreshed.error instanceof Error ? refreshed.error.message : String(refreshed.error)}`);
+        setNotice(productReference("themeLibrary.copiedToTheLibraryButTheListCouldNotRefreshTheOperation", { "savedName": saved.name, "cause": productCause(refreshed.error) }));
       } else if (refreshed.kind === 'refreshed') {
         setRefreshPending(false);
-        setNotice(`已创建「${saved.name}」。`);
+        setNotice(productReference("themeLibrary.created", { "savedName": saved.name }));
       }
     } catch (error) {
       if (!isSessionCurrent(operationRoot)) return;
-      setNotice(`复制主题失败：${error instanceof Error ? error.message : String(error)}`);
+      setNotice(productReference("themeLibrary.themeCopyFailed", { "cause": productCause(error) }));
     } finally {
       if (isSessionCurrent(operationRoot)) setWorking(false);
     }
@@ -368,14 +374,14 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       if (!isSessionCurrent(operationRoot)) return;
       if (refreshed.kind === 'failed') {
         setRefreshPending(true);
-        setNotice(`已导入「${saved.name}」并写入资料目录，但列表刷新失败；操作已完成，不要重复导入。可重试刷新：${refreshed.error instanceof Error ? refreshed.error.message : String(refreshed.error)}`);
+        setNotice(productReference("themeLibrary.importedIntoTheLibraryButTheListCouldNotRefreshTheOperation", { "savedName": saved.name, "cause": productCause(refreshed.error) }));
       } else if (refreshed.kind === 'refreshed') {
         setRefreshPending(false);
-        setNotice(collision ? `主题 ID 重复，已作为「${saved.name}」导入。` : `已导入「${saved.name}」。`);
+        setNotice(productReference(collision ? 'themeLibrary.importedDuplicate' : 'themeLibrary.imported', { savedName: saved.name }));
       }
     } catch (error) {
       if (!isSessionCurrent(operationRoot)) return;
-      setNotice(`导入失败：${error instanceof Error ? error.message : String(error)}`);
+      setNotice(productReference("themeLibrary.importFailed", { "cause": productCause(error) }));
     } finally {
       if (isSessionCurrent(operationRoot)) {
         setWorking(false);
@@ -386,7 +392,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
 
   const requestDelete = (theme: ThemeConfig) => {
     if (!root || working || themes.length <= 1 || !isSessionCurrent(root)) return;
-    if (theme.id === defaultThemeId) { setNotice('请先将另一套主题设为默认，再删除这套主题。'); return; }
+    if (theme.id === defaultThemeId) { setNotice(productReference("themeLibrary.setAnotherThemeAsTheDefaultBeforeDeletingThisTheme")); return; }
     setDeleteError('');
     setDeleteTarget(theme);
   };
@@ -409,14 +415,14 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       if (!isSessionCurrent(operationRoot)) return;
       if (refreshed.kind === 'failed') {
         setRefreshPending(true);
-        setNotice(`已删除「${theme.name}」；既有文章快照不受影响，但列表刷新失败，操作已完成，不要重复删除。可重试刷新：${refreshed.error instanceof Error ? refreshed.error.message : String(refreshed.error)}`);
+        setNotice(productReference("themeLibrary.deletedExistingArticleSnapshotsAreRetainedTheListCouldNotRefreshDo", { "themeName": theme.name, "cause": productCause(refreshed.error) }));
       } else if (refreshed.kind === 'refreshed') {
         setRefreshPending(false);
-        setNotice(`已从主题库删除「${theme.name}」；既有文章快照不受影响。`);
+        setNotice(productReference("themeLibrary.deletedFromTheThemeLibraryExistingArticleSnapshotsAreRetained", { "themeName": theme.name }));
       }
     } catch (error) {
       if (!isSessionCurrent(operationRoot)) return;
-      const message = `删除失败：${error instanceof Error ? error.message : String(error)}`;
+      const message = productReference('themeLibrary.deleteFailed', { cause: productCause(error) });
       setDeleteError(message);
       setNotice(message);
     } finally {
@@ -434,13 +440,13 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
     anchor.download = `${theme.id}.json`;
     anchor.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 0);
-    setNotice(`已导出 ${theme.id}.json。`);
+    setNotice(productReference("themeLibrary.exportedJson", { "themeId": theme.id }));
   };
 
   const applyTheme = (theme: ThemeConfig) => {
     if (!sessionActive) return;
     if (!canApply) {
-      setNotice('当前打开的文章属于另一个资料目录；请切回其资料目录或打开当前目录内的文章后再应用主题。');
+      setNotice(productReference("themeLibrary.theOpenArticleBelongsToAnotherLibrarySwitchBackToItsLibrary"));
       return;
     }
     onApply(theme);
@@ -454,9 +460,9 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
     setWorking(true);
     try {
       await onSetDefault(theme.id, expectedRoot);
-      if (isSessionCurrent(expectedRoot)) setNotice(`已将「${theme.name}」设为新稿与模板预览的默认主题；已有文章快照未改变。`);
+      if (isSessionCurrent(expectedRoot)) setNotice(productReference("themeLibrary.setAsTheDefaultForNewArticlesAndTemplatePreviewsExistingArticle", { "themeName": theme.name }));
     } catch (error) {
-      if (isSessionCurrent(expectedRoot)) setNotice(`默认主题保存失败：${error instanceof Error ? error.message : String(error)}`);
+      if (isSessionCurrent(expectedRoot)) setNotice(productReference("themeLibrary.defaultThemeSavingFailed", { "cause": productCause(error) }));
     } finally { if (isSessionCurrent(expectedRoot)) setWorking(false); }
   };
 
@@ -470,8 +476,8 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       const refreshed = await updateFromRoot(expectedRoot);
       if (!isSessionCurrent(expectedRoot)) return;
       setRefreshPending(refreshed.kind === 'failed');
-      setNotice(`已添加 ${result.added} 套默认主题，跳过 ${result.skipped} 套已有主题。${result.issues.map(issue => `${issue.file}：${issue.message}`).join('；')}${refreshed.kind === 'failed' ? '列表刷新失败，请重试。' : ''}`);
-    } catch (error) { if (isSessionCurrent(expectedRoot)) setNotice(error instanceof Error ? error.message : String(error)); }
+      setNotice(productReference("themeLibrary.defaultThemesAddedExistingThemesSkipped", { "resultAdded": result.added, "resultSkipped": result.skipped, "details": productJoin(result.issues.map(issue => productJoin([issue.file, '：', productDiagnosticReference(issue)])), '；'), "value": (refreshed.kind === 'failed' ? productReference("themeLibrary.theListCouldNotRefreshTryAgain") : '') }));
+    } catch (error) { if (isSessionCurrent(expectedRoot)) setNotice(productErrorMessage(error)); }
     finally { if (isSessionCurrent(expectedRoot)) setWorking(false); }
   };
 
@@ -483,51 +489,51 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
   };
 
   if (!sessionActive) {
-    return <section className="page-card theme-library-page" aria-label="文章主题"><p className="status-copy" role="status">正在切换资料目录；旧目录中的主题操作已停止。</p></section>;
+    return <section className="page-card theme-library-page" aria-label={t('themes:ui.articleThemes')}><p className="status-copy" role="status">{t('themes:ui.switchingLibrariesThemeOperationsInThePreviousLibrary')}</p></section>;
   }
 
   return (
     <section className="page-card theme-library-page lg:overflow-hidden" aria-labelledby="theme-library-title">
       <PageHeading>
-        <div className="min-w-0"><p id="theme-library-kicker" className="eyebrow">ARTICLE STYLEBOOK</p><h2 id="theme-library-title" className="page-title font-heading">主题库与排印样本册</h2><p className="mt-3 text-sm text-muted">挑一套排印，在完整文章里看看标题、正文与留白。</p></div>
-        <ButtonBar label="主题库操作">
-          <button className="button button-quiet bg-panel" type="button" onClick={() => importRef.current?.click()} disabled={!root || working}><ThemeIcon name="upload" />导入 JSON</button>
-          <input ref={importRef} className="sr-only" type="file" accept=".json,application/json" aria-label="导入主题 JSON 文件" disabled={!root || working} onChange={(event) => void importTheme(event.currentTarget.files?.[0])} />
-          <button className="button button-quiet" type="button" disabled={!root || working} onClick={() => void loadDefaults()}><ThemeIcon name="plus" />载入默认主题</button>
-          <button className="button button-primary" type="button" onClick={createTheme} disabled={!root || working}><ThemeIcon name="plus" />新建主题</button>
+        <div className="min-w-0"><p id="theme-library-kicker" className="eyebrow">{t('themes:ui.articleStylebook')}</p><h2 id="theme-library-title" className="page-title font-heading">{t('themes:ui.themeLibraryAndTypographySamples')}</h2><p className="mt-3 text-sm text-muted">{t('themes:ui.chooseTypographyAndPreviewHeadingsBodyTextAnd')}</p></div>
+        <ButtonBar label={t('themes:ui.themeLibraryActions')}>
+          <button className="button button-quiet bg-panel" type="button" onClick={() => importRef.current?.click()} disabled={!root || working}><ThemeIcon name="upload" />{t('themes:ui.importJson')}</button>
+          <input ref={importRef} className="sr-only" type="file" accept=".json,application/json" aria-label={t('themes:ui.importThemeJsonFile')} disabled={!root || working} onChange={(event) => void importTheme(event.currentTarget.files?.[0])} />
+          <button className="button button-quiet" type="button" disabled={!root || working} onClick={() => void loadDefaults()}><ThemeIcon name="plus" />{t('themes:ui.loadDefaultThemes')}</button>
+          <button className="button button-primary" type="button" onClick={createTheme} disabled={!root || working}><ThemeIcon name="plus" />{t('themes:ui.newTheme')}</button>
         </ButtonBar>
       </PageHeading>
 
-      {!root ? <p className="shrink-0 rounded-lg border border-line bg-list px-4 py-3 text-xs text-muted">连接资料目录后，读取其中的文章主题；首次连接时会添加默认主题。</p> : null}
-      {notice ? <p className="status-copy shrink-0 rounded-lg border border-accent-line bg-accent-soft px-4 py-3" role="status">{notice}</p> : null}
-      {refreshPending ? <button className="button button-quiet self-start" type="button" onClick={() => void retryRefresh()} disabled={working}>重新载入主题列表</button> : null}
-      {issues.length ? <CollapsiblePanel id="theme-library-issues" title="主题文件需要修复" icon={<PanelIcon kind="issues" />} count={issues.length} open={issuesOpen} onToggle={() => setIssuesOpen(value => !value)} className="shrink-0 border-warning-line bg-warning-surface" contentClassName="text-xs text-warning-strong"><div className="grid max-h-32 gap-2 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{issues.map((issue) => <p className="break-words" key={`${issue.file}-${issue.message}`}><code>{issue.file}</code>：{issue.message}</p>)}</div></CollapsiblePanel> : null}
+      {!root ? <p className="shrink-0 rounded-lg border border-line bg-list px-4 py-3 text-xs text-muted">{t('themes:ui.connectALibraryToReadItsArticleThemes')}</p> : null}
+      {notice ? <p className="status-copy shrink-0 rounded-lg border border-accent-line bg-accent-soft px-4 py-3" role="status">{formatProductMessage(notice, t)}</p> : null}
+      {refreshPending ? <button className="button button-quiet self-start" type="button" onClick={() => void retryRefresh()} disabled={working}>{t('themes:ui.reloadThemeList')}</button> : null}
+      {issues.length ? <CollapsiblePanel id="theme-library-issues" title={t('themes:ui.themeFilesNeedRepair')} icon={<PanelIcon kind="issues" />} count={issues.length} open={issuesOpen} onToggle={() => setIssuesOpen(value => !value)} className="shrink-0 border-warning-line bg-warning-surface" contentClassName="text-xs text-warning-strong"><div className="grid max-h-32 gap-2 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{issues.map((issue) => <p className="break-words" key={`${issue.file}-${issue.message}`}><code>{issue.file}</code>：{formatDiagnosticMessage(issue, t)}</p>)}</div></CollapsiblePanel> : null}
 
       {browsedTheme ? (
         <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel lg:flex-1 lg:flex-row">
-          <aside className="flex min-h-0 shrink-0 flex-col border-b border-line bg-list/50 lg:w-72 lg:border-b-0 lg:border-r" aria-label="主题列表">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4"><h3 className="text-sm font-semibold text-primary">文章主题</h3><span className="font-mono text-xs text-faint">{themes.length} 套</span></div>
+          <aside className="flex min-h-0 shrink-0 flex-col border-b border-line bg-list/50 lg:w-72 lg:border-b-0 lg:border-r" aria-label={t('themes:ui.themeList')}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4"><h3 className="text-sm font-semibold text-primary">{t('themes:ui.articleThemes')}</h3><span className="font-mono text-xs text-faint">{t('themes:templates.themeCount', { count: themes.length })}</span></div>
             <div className="grid max-h-56 min-h-0 content-start gap-2 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:max-h-none lg:flex-1">
-              {themes.map((theme) => <button key={theme.id} className="group flex min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-line hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft" type="button" aria-label={`预览主题 ${theme.name}`} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
+              {themes.map((theme) => <button key={theme.id} className="group flex min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-line hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft" type="button" aria-label={t('themes:templates.previewTheme', { name: theme.name })} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-muted group-aria-pressed:border-accent-line group-aria-pressed:text-accent-text"><ThemeIcon name="book" /></span>
-                <span className="grid min-w-0 flex-1 gap-1"><span className="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text">{theme.name}</span><span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />新稿默认</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />当前稿使用</span> : null}</span>
+                <span className="grid min-w-0 flex-1 gap-1"><span className="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text">{theme.name}</span><span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />{t('themes:ui.defaultForNewArticles')}</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />{t('themes:ui.usedByCurrentArticle')}</span> : null}</span>
               </button>)}
             </div>
-            <p className="hidden shrink-0 border-t border-line px-5 py-4 text-xs text-faint lg:block">选择主题即可预览，应用后才会改变文稿。</p>
+            <p className="hidden shrink-0 border-t border-line px-5 py-4 text-xs text-faint lg:block">{t('themes:ui.selectAThemeToPreviewItTheArticle')}</p>
           </aside>
           <section id="theme-library-preview" className="flex min-h-0 min-w-0 flex-1 flex-col" aria-labelledby="theme-preview-title">
             <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4 md:px-6">
-              <div className="min-w-0"><h3 id="theme-preview-title" className="break-words font-heading text-xl font-semibold text-primary">{browsedTheme.name}</h3><p className="mt-1 text-xs text-faint">完整排印预览 <span className="mx-2 text-line-strong" aria-hidden="true">/</span><span className="font-mono">v{browsedTheme.version}</span></p></div>
-              <ButtonBar label="主题预览操作"><PreviewModeSwitch dark={dark} onToggle={toggle} /><button className="button button-quiet" type="button" onClick={() => { setSelected(browsedTheme); setDeleteTarget(null); }}><ThemeIcon name="info" />主题详情</button><button className="button button-quiet" type="button" onClick={() => openStylebook(browsedTheme)} disabled={!root || working}><ThemeIcon name="edit" />编辑主题</button><button className="button button-danger" type="button" onClick={() => requestDelete(browsedTheme)} disabled={!root || working || themes.length <= 1 || browsedTheme.id === defaultThemeId} title={browsedTheme.id === defaultThemeId ? '先选择另一套默认主题' : undefined}><ThemeIcon name="delete" />删除主题</button></ButtonBar>
+              <div className="min-w-0"><h3 id="theme-preview-title" className="break-words font-heading text-xl font-semibold text-primary">{browsedTheme.name}</h3><p className="mt-1 text-xs text-faint">{t('themes:ui.fullTypographyPreview')} <span className="mx-2 text-line-strong" aria-hidden="true">/</span><span className="font-mono">v{browsedTheme.version}</span></p></div>
+              <ButtonBar label={t('themes:ui.themePreviewActions')}><PreviewModeSwitch dark={dark} onToggle={toggle} /><button className="button button-quiet" type="button" onClick={() => { setSelected(browsedTheme); setDeleteTarget(null); }}><ThemeIcon name="info" />{t('themes:ui.themeDetails')}</button><button className="button button-quiet" type="button" onClick={() => openStylebook(browsedTheme)} disabled={!root || working}><ThemeIcon name="edit" />{t('themes:ui.editTheme')}</button><button className="button button-danger" type="button" onClick={() => requestDelete(browsedTheme)} disabled={!root || working || themes.length <= 1 || browsedTheme.id === defaultThemeId} title={browsedTheme.id === defaultThemeId ? t('themes:ui.chooseAnotherDefaultThemeFirst') : undefined}><ThemeIcon name="delete" />{t('themes:ui.deleteTheme')}</button></ButtonBar>
             </header>
             <ThemePreview key={`${browsedTheme.id}-${browsedTheme.version}`} theme={browsedTheme} dark={dark} framed className="h-120 min-h-0 min-w-0 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:h-auto lg:flex-1" />
             <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4 md:px-6">
-              <p className="text-xs text-muted">{currentArticleSaved ? '应用时复制为新文章，原稿与主题快照保留。' : '预览不会改动文稿，应用后可继续编辑。'}</p>
-              <ButtonBar label="主题应用操作"><button className="button button-quiet" type="button" onClick={() => void setDefault(browsedTheme)} disabled={!root || working || browsedTheme.id === defaultTheme.id}><ThemeIcon name="check" />{browsedTheme.id === defaultTheme.id ? '当前默认' : '设为新稿默认'}</button><button className="button button-primary" type="button" onClick={() => applyTheme(browsedTheme)} disabled={!canApply || working}><ThemeIcon name="apply" />{canApply ? currentArticleSaved ? '复制并应用' : '应用到当前稿' : !root ? '连接目录后应用' : '文章来自其他目录'}</button></ButtonBar>
+              <p className="text-xs text-muted">{currentArticleSaved ? t('themes:ui.applyingCreatesANewArticleCopyAndRetains') : t('themes:ui.previewLeavesTheArticleUnchangedContinueEditingAfter')}</p>
+              <ButtonBar label={t('themes:ui.themeApplicationActions')}><button className="button button-quiet" type="button" onClick={() => void setDefault(browsedTheme)} disabled={!root || working || browsedTheme.id === defaultTheme.id}><ThemeIcon name="check" />{browsedTheme.id === defaultTheme.id ? t('themes:ui.currentDefault') : t('themes:ui.setAsDefaultForNewArticles')}</button><button className="button button-primary" type="button" onClick={() => applyTheme(browsedTheme)} disabled={!canApply || working}><ThemeIcon name="apply" />{canApply ? currentArticleSaved ? t('themes:ui.copyAndApply') : t('themes:ui.applyToCurrentArticle') : !root ? t('themes:ui.connectALibraryToApply') : t('themes:ui.articleBelongsToAnotherLibrary')}</button></ButtonBar>
             </footer>
           </section>
         </div>
-      ) : <div className="empty-state"><div><strong>还没有可用主题</strong><p>导入一份主题 JSON，或新建主题开始排印。</p></div></div>}
+      ) : <div className="empty-state"><div><strong>{t('themes:ui.noThemesAvailable')}</strong><p>{t('themes:ui.importThemeJsonOrCreateAThemeTo')}</p></div></div>}
 
       {selected && !stylebookTheme && !deleteTarget ? <ThemeCardDialog
         theme={selected}
@@ -560,7 +566,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
           setStylebookTheme(saved);
           setSelected((current) => current?.id === saved.id ? saved : current);
           publishTheme(savedRoot, saved);
-          setNotice(`已保存「${saved.name}」 · v${saved.version}。文章快照仍保持原样。`);
+          setNotice(productReference("themeLibrary.savedVArticleSnapshotsAreUnchanged", { "savedName": saved.name, "savedVersion": saved.version }));
         }}
       /> : null}
     </section>
@@ -586,21 +592,22 @@ function ThemeCardDialog({
   onApply: () => void;
   onRequestDelete: () => void;
 }) {
+  const { t } = useUITranslation('dialogs');
   const { dark, toggle } = useArticlePreviewMode();
   return <DialogFrame large titleId="theme-card-title" onClose={onClose} dismissible={!busy}>
-    <DialogHeader titleId="theme-card-title" eyebrow={`THEME / ${theme.id} / v${theme.version}`} title={theme.name} onClose={onClose} closeDisabled={busy} />
+    <DialogHeader titleId="theme-card-title" eyebrow={`${t('common:eyebrows.theme')} / ${theme.id} / v${theme.version}`} title={theme.name} onClose={onClose} closeDisabled={busy} />
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
-      <aside className="flex min-h-0 min-w-0 shrink-0 flex-col border-b border-line bg-list/50 md:basis-1/3 md:border-r md:border-b-0" aria-label="主题详情菜单">
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent"><p className="eyebrow mb-3">THEME ACTIONS</p><ButtonBar label="主题详情操作" className="flex-col items-stretch">
-          <button className="button button-primary justify-start" type="button" onClick={onApply} disabled={!canApply || busy}><ThemeIcon name="apply" />{currentArticleSaved ? '复制并应用' : '应用到当前稿'}</button>
-          <button className="button button-quiet justify-start" type="button" onClick={onOpenStylebook} disabled={!root || busy}><ThemeIcon name="edit" />编辑主题</button>
-          <button className="button button-quiet justify-start" type="button" onClick={onCopy} disabled={!root || busy}><ThemeIcon name="copy" />复制主题</button>
-          <button className="button button-quiet justify-start" type="button" onClick={onExport} disabled={busy}><ThemeIcon name="upload" />导出 JSON</button>
-          <button className="button button-danger justify-start" type="button" onClick={onRequestDelete} disabled={!root || !canDelete || busy}><ThemeIcon name="delete" />删除主题</button>
-        </ButtonBar><div className="mt-6 grid gap-3 border-t border-line pt-4 text-xs text-muted"><p className="font-sub-heading text-sm font-semibold text-primary">当前稿使用</p><p className="break-words">{currentTheme.name}</p><p className="font-mono text-2xs text-faint">v{currentTheme.version}</p><p>{currentArticleSaved ? '应用时创建独立副本，保留原文与原主题快照。' : '应用只改变当前稿，保存文章时写入主题快照。'}</p></div>
+      <aside className="flex min-h-0 min-w-0 shrink-0 flex-col border-b border-line bg-list/50 md:basis-1/3 md:border-r md:border-b-0" aria-label={t('dialogs:ui.themeDetailsMenu')}>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent"><p className="eyebrow mb-3">{t('common:eyebrows.themeActions')}</p><ButtonBar label={t('dialogs:ui.themeActions')} className="flex-col items-stretch">
+          <button className="button button-primary justify-start" type="button" onClick={onApply} disabled={!canApply || busy}><ThemeIcon name="apply" />{currentArticleSaved ? t('dialogs:ui.copyAndApply') : t('dialogs:ui.applyToCurrentDraft')}</button>
+          <button className="button button-quiet justify-start" type="button" onClick={onOpenStylebook} disabled={!root || busy}><ThemeIcon name="edit" />{t('dialogs:ui.editTheme')}</button>
+          <button className="button button-quiet justify-start" type="button" onClick={onCopy} disabled={!root || busy}><ThemeIcon name="copy" />{t('dialogs:ui.copyTheme')}</button>
+          <button className="button button-quiet justify-start" type="button" onClick={onExport} disabled={busy}><ThemeIcon name="upload" />{t('dialogs:ui.exportJson')}</button>
+          <button className="button button-danger justify-start" type="button" onClick={onRequestDelete} disabled={!root || !canDelete || busy}><ThemeIcon name="delete" />{t('dialogs:ui.deleteTheme')}</button>
+        </ButtonBar><div className="mt-6 grid gap-3 border-t border-line pt-4 text-xs text-muted"><p className="font-sub-heading text-sm font-semibold text-primary">{t('dialogs:ui.currentDraftUses')}</p><p className="break-words">{currentTheme.name}</p><p className="font-mono text-2xs text-faint">v{currentTheme.version}</p><p>{currentArticleSaved ? t('dialogs:ui.applyCopyRetains') : t('dialogs:ui.applyChangesDraft')}</p></div>
         </div>
       </aside>
-      <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-4 md:min-h-0"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">文章排印预览</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={theme} dark={dark} /></div>
+      <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-4 md:min-h-0"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">{t('dialogs:ui.articleTypographyPreview')}</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={theme} dark={dark} /></div>
     </div>
   </DialogFrame>;
 }
@@ -608,17 +615,18 @@ function ThemeCardDialog({
 function ThemeDeleteDialog({ theme, busy, error, onCancel, onDelete }: {
   theme: ThemeConfig;
   busy: boolean;
-  error: string;
+  error: string | ProductMessageInfo | { message: string };
   onCancel: () => void;
   onDelete: () => Promise<void>;
 }) {
+  const { t } = useUITranslation('dialogs');
   return <DialogFrame titleId="theme-delete-title" descriptionId="theme-delete-description" role="alertdialog" onClose={onCancel} dismissible={!busy}>
-    <DialogHeader titleId="theme-delete-title" eyebrow="DELETE THEME" title="删除主题" onClose={onCancel} closeDisabled={busy} />
+    <DialogHeader titleId="theme-delete-title" eyebrow={t('common:eyebrows.deleteTheme')} title={t('dialogs:ui.deleteTheme')} onClose={onCancel} closeDisabled={busy} />
     <div className="dialog-content">
-      <p id="theme-delete-description" className="text-sm text-muted">确定从主题库删除「{theme.name}」吗？既有文章的主题快照仍会保留。</p>
+      <p id="theme-delete-description" className="text-sm text-muted">{t('dialogs:templates.deleteTheme', { name: theme.name })}</p>
       <p className="break-all font-mono text-xs text-faint">{theme.id}.json</p>
-      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
-      <DialogActions><DialogButton onClick={onCancel} disabled={busy}><ThemeIcon name="close" />取消</DialogButton><DialogButton variant="danger" onClick={() => void onDelete()} disabled={busy}><ThemeIcon name="delete" />{busy ? '删除中…' : '确认删除'}</DialogButton></DialogActions>
+      {error ? <p className="text-sm text-danger" role="alert">{formatProductMessage(error, t)}</p> : null}
+      <DialogActions><DialogButton onClick={onCancel} disabled={busy}><ThemeIcon name="close" />{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" onClick={() => void onDelete()} disabled={busy}><ThemeIcon name="delete" />{busy ? t('dialogs:ui.deleting') : t('dialogs:ui.confirmDeletion')}</DialogButton></DialogActions>
     </div>
   </DialogFrame>;
 }
@@ -632,6 +640,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   onApply: () => void;
   onSaved: (root: FileSystemDirectoryHandle, theme: ThemeConfig) => void;
 }) {
+  const { t } = useUITranslation('dialogs');
   const { dark, toggle } = useArticlePreviewMode();
   const layout = useResizableColumns(100 / 3, '(width >= 48rem)');
   const [picker, setPicker] = useState<{ label: string; token: string; value: string; select: (color: string) => void } | null>(null);
@@ -640,7 +649,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const [applyAfter, setApplyAfter] = useState(false);
   const savedBaseline = useRef(JSON.stringify(theme));
   const savedCode = useRef({ css: theme.css, json: JSON.stringify(theme, null, 2) });
-  const [codeErrors, setCodeErrors] = useState({ css: '', json: '' });
+  const [codeErrors, setCodeErrors] = useState<{ css: ProductMessageValue; json: ProductMessageValue }>({ css: '', json: '' });
   const savingRef = useRef(false);
   const [draft, setDraft] = useState(() => cloneTheme(theme));
   const [previewTheme, setPreviewTheme] = useState(() => cloneTheme(theme));
@@ -667,7 +676,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     });
     return () => cancelAnimationFrame(frame);
   }, [inspection.selected, editorTab]);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ProductMessageValue>('');
   const [savedMessage, setSavedMessage] = useState('');
   const [writeFailed, setWriteFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -678,15 +687,15 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setDraft(next);
     if (!jsonNeedsValidation) setJsonText(JSON.stringify(next, null, 2));
     setSavedMessage('');
-    const errors = [...validateThemeConfig(next), ...validateThemeFormat(next)];
-    if (errors.length) setError(errors.join('；'));
+    const errors = [...inspectThemeConfig(next), ...inspectThemeFormat(next)];
+    if (errors.length) setError(productReference('shared.compose', { parts: productJoin(errors, '；') }));
     else {
       setError('');
       setPreviewTheme(next);
     }
   };
 
-  const formatCodeErrors = (errors: { css: string; json: string }) => [errors.css && `CSS：${errors.css}`, errors.json && `JSON：${errors.json}`].filter(Boolean).join('；');
+  const formatCodeErrors = (errors: { css: ProductMessageValue; json: ProductMessageValue }) => errors.css || errors.json ? productReference('shared.compose', { parts: productJoin([errors.css ? productJoin(['CSS：', errors.css]) : '', errors.json ? productJoin(['JSON：', errors.json]) : ''].filter(Boolean), '；') }) : '';
   const changeCode = (kind: 'css' | 'json', value: string) => {
     setWriteFailed(false);
     if (kind === 'css') setCssText(value); else setJsonText(value);
@@ -697,12 +706,13 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   };
   const validateCode = (): ThemeConfig | null => {
     setWriteFailed(false);
-    const failures = { css: validateThemeCss(cssText).join('；'), json: '' };
+    const cssFailures = inspectThemeCss(cssText);
+    const failures: { css: ProductMessageValue; json: ProductMessageValue } = { css: cssFailures.length ? productReference('shared.compose', { parts: productJoin(cssFailures, '；') }) : '', json: '' };
     let parsed: ThemeConfig | null = null;
     try {
       parsed = parseThemeConfigJson(jsonText);
-      if (parsed.id !== theme.id) throw new Error('不能在编辑器中更改主题 ID；请复制主题后再另存为新主题。');
-    } catch (cause) { failures.json = cause instanceof Error ? cause.message : String(cause); }
+      if (parsed.id !== theme.id) throw new ProductError("themeLibrary.aThemeIdCannotBeChangedInThisEditorCopyTheTheme");
+    } catch (cause) { failures.json = productCause(cause); }
     setCodeErrors(failures);
     if (failures.css || failures.json || !parsed) {
       setError(formatCodeErrors(failures));
@@ -711,10 +721,10 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     }
     // JSON supplies the theme fields; explicitly edited CSS supplies its stylesheet.
     const next = { ...parsed, css: cssNeedsValidation ? cssText : parsed.css };
-    const formatFailures = validateThemeFormat(next);
+    const formatFailures = inspectThemeFormat(next);
     if (formatFailures.length) {
-      setCodeErrors(current => ({ ...current, css: formatFailures.join('；') }));
-      setError(formatFailures.join('；'));
+      setCodeErrors(current => ({ ...current, css: productReference('shared.compose', { parts: productJoin(formatFailures, '；') }) }));
+      setError(productReference('shared.compose', { parts: productJoin(formatFailures, '；') }));
       setSavedMessage('');
       return null;
     }
@@ -723,7 +733,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setCssText(next.css);
     setJsonText(JSON.stringify(next, null, 2));
     setError('');
-    setSavedMessage('CSS 与 JSON 校验通过，已应用到本次临时预览。');
+    setSavedMessage(productText("themeLibrary.cssAndJsonValidationPassedAppliedToThisTemporaryPreview"));
     return next;
   };
 
@@ -732,20 +742,20 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     const operationRoot = root;
     const formatId = getFormatSnapshot().id;
     const target = validatedDraft ?? draft;
-    const errors = [...validateThemeConfig(target), ...validateThemeFormat(target)];
+    const errors = [...inspectThemeConfig(target), ...inspectThemeFormat(target)];
     if (errors.length) {
-      setError(errors.join('；'));
+      setError(productReference('shared.compose', { parts: productJoin(errors, '；') }));
       return false;
     }
     savingRef.current = true;
     setSaving(true);
     setWriteFailed(false);
     setError('');
-    setSavedMessage('保存中…');
+    setSavedMessage(productText("themeLibrary.saving"));
     try {
       const measured = await validateContentSource('snippets', STYLEBOOK_SAMPLE, { theme: target });
       if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId) return false;
-      if (measured.errors.length) { setError(measured.errors.join('；')); setSavedMessage('实际排版检查未通过；主题文件未写入。'); return false; }
+      if (measured.errors.length) { setError(measured.errorMessage ?? measured.errors.join('；')); setSavedMessage(productText("themeLibrary.layoutValidationDidNotPassTheThemeFileWasNotWritten")); return false; }
       const saved = await saveThemeLibraryTheme(operationRoot, target);
       if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId) return false;
       savedBaseline.current = JSON.stringify(saved);
@@ -755,12 +765,12 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
       setCssText(saved.css);
       setJsonText(JSON.stringify(saved, null, 2));
       setError('');
-      setSavedMessage(`已保存 v${saved.version}。既有文章快照未改动。${measured.issues.length ? ` ${measured.issues.length} 项仍需核对。` : ''}`);
+      setSavedMessage(productText("themeLibrary.savedVExistingArticleSnapshotsAreUnchanged", { "savedVersion": saved.version, "value": (measured.issues.length ? productReference("themeLibrary.concernsRequiringReview", { "measured_issuesCount": measured.issues.length }) : '') }));
       onSaved(operationRoot, saved);
       return true;
     } catch (cause) {
       if (!isRootCurrent(operationRoot)) return false;
-      setError(`保存失败：${cause instanceof Error ? cause.message : String(cause)}`);
+      setError(productReference("themeLibrary.savingFailed", { "cause": productCause(cause) }));
       setWriteFailed(true);
       return false;
     } finally {
@@ -809,10 +819,10 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
 
   const activeTab = editorTab;
   const chooseTab = setEditorTab;
-  const tabs = [{ id: 'tokens', label: '常用项', icon: 'edit', pending: false, modified: false, failed: false }, { id: 'css', label: 'CSS', icon: 'code', pending: cssNeedsValidation, modified: cssText !== savedCode.current.css, failed: Boolean(codeErrors.css) }, { id: 'json', label: 'JSON', icon: 'code', pending: jsonNeedsValidation, modified: jsonText !== savedCode.current.json, failed: Boolean(codeErrors.json) }] as const;
+  const tabs = [{ id: 'tokens', label: productText("themeLibrary.commonFields"), icon: 'edit', pending: false, modified: false, failed: false }, { id: 'css', label: 'CSS', icon: 'code', pending: cssNeedsValidation, modified: cssText !== savedCode.current.css, failed: Boolean(codeErrors.css) }, { id: 'json', label: 'JSON', icon: 'code', pending: jsonNeedsValidation, modified: jsonText !== savedCode.current.json, failed: Boolean(codeErrors.json) }] as const;
   const openColor = (label: string, token: string, value: string, select: (color: string) => void) => {
     try { setPicker({ label, token, value: tailwindColorToHex(value, document), select }); }
-    catch { setError('无法解析当前颜色，请在 CSS 或 JSON 中修复。'); }
+    catch { setError(productText("themeLibrary.theCurrentColorCouldNotBeParsedFixItInCssOr")); }
   };
   return <>
     <DialogFrame large titleId="theme-stylebook-title" onClose={close} dismissible={!saving && !picker && !departure} focusActive={!picker && !departure} onKeyDown={event => {
@@ -821,22 +831,22 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
       if (readOnly || savingRef.current || saving || picker || departure || event.repeat || event.nativeEvent.isComposing || event.keyCode === 229) return;
       if (unappliedChanges) { const next = validateCode(); if (next) void save(next); } else void save();
     }}>
-      <header className="dialog-header shrink-0"><div className="min-w-0"><p className="eyebrow">ARTICLE THEME / v{draft.version}</p><h2 id="theme-stylebook-title" className="font-heading dialog-title break-words">{draft.name}</h2></div><ButtonBar label="文章主题编辑操作"><button className="button button-quiet" type="button" onClick={requestApply} disabled={!canApply || saving}><ThemeIcon name="apply" />应用到文章</button><button className="button button-quiet" type="button" onClick={close} disabled={saving}><ThemeIcon name="close" />关闭</button></ButtonBar></header>
+      <header className="dialog-header shrink-0"><div className="min-w-0"><p className="eyebrow">{t('common:eyebrows.articleTheme')} / v{draft.version}</p><h2 id="theme-stylebook-title" className="font-heading dialog-title break-words">{draft.name}</h2></div><ButtonBar label={t('dialogs:ui.articleThemeActions')}><button className="button button-quiet" type="button" onClick={requestApply} disabled={!canApply || saving}><ThemeIcon name="apply" />{t('dialogs:ui.applyToArticle')}</button><button className="button button-quiet" type="button" onClick={close} disabled={saving}><ThemeIcon name="close" />{t('common:actions.close')}</button></ButtonBar></header>
       <div ref={layout.containerRef} className="group/theme-columns flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto data-[wide=true]:flex-row data-[wide=true]:overflow-hidden" data-wide={layout.wideEnough} data-dragging={layout.dragging} style={layout.style}>
-        <aside ref={inspection.listRef} {...inspection.listProps} className="flex h-96 min-h-0 min-w-0 shrink-0 flex-col border-b border-line bg-list/50 group-data-[wide=true]/theme-columns:h-auto group-data-[wide=true]/theme-columns:w-(--editor-source-width) group-data-[wide=true]/theme-columns:border-b-0" aria-label="主题临时编辑器">
-          <div className="shrink-0 border-b border-line p-4"><label className="grid min-w-0 gap-2 text-xs text-muted">主题名称<input className="field min-w-0 w-full" value={draft.name} disabled={readOnly || saving} onChange={event => updateDraft({ ...draft, name: event.target.value })} /></label><p className="mt-2 break-all font-mono text-2xs text-faint">{draft.id}</p></div>
-          <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-line p-3" role="tablist" aria-label="主题编辑菜单">{tabs.map((tab, index) => <button key={tab.id} id={`article-theme-tab-${tab.id}`} role="tab" type="button" tabIndex={activeTab === tab.id ? 0 : -1} aria-selected={activeTab === tab.id} aria-controls="article-theme-editor-panel" disabled={saving} data-validation={tab.failed ? 'failed' : tab.pending ? 'pending' : 'complete'} data-modified={tab.modified} aria-label={tab.failed ? `${tab.label}，校验失败` : tab.modified ? `${tab.label}，已修改` : undefined} className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 py-2 whitespace-nowrap text-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent ${tab.failed ? 'text-danger aria-selected:border-danger aria-selected:bg-danger/10 aria-selected:text-danger' : 'text-muted aria-selected:border-accent-line aria-selected:bg-accent-soft aria-selected:text-accent-text'}`} onClick={() => chooseTab(tab.id)} onKeyDown={event => { const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null; if (next !== null) { event.preventDefault(); chooseTab(tabs[next].id); document.getElementById(`article-theme-tab-${tabs[next].id}`)?.focus(); } }}><ThemeIcon name={tab.icon} />{tab.label}{tab.modified ? <span className={`rounded px-1 text-2xs ${tab.failed ? 'bg-danger/10 text-danger' : 'bg-accent-soft text-accent-text'}`}>已修改</span> : null}</button>)}</nav>
+        <aside ref={inspection.listRef} {...inspection.listProps} className="flex h-96 min-h-0 min-w-0 shrink-0 flex-col border-b border-line bg-list/50 group-data-[wide=true]/theme-columns:h-auto group-data-[wide=true]/theme-columns:w-(--editor-source-width) group-data-[wide=true]/theme-columns:border-b-0" aria-label={t('dialogs:ui.temporaryThemeEditor')}>
+          <div className="shrink-0 border-b border-line p-4"><label className="grid min-w-0 gap-2 text-xs text-muted">{t('dialogs:ui.themeName')}<input className="field min-w-0 w-full" value={draft.name} disabled={readOnly || saving} onChange={event => updateDraft({ ...draft, name: event.target.value })} /></label><p className="mt-2 break-all font-mono text-2xs text-faint">{draft.id}</p></div>
+          <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-line p-3" role="tablist" aria-label={t('dialogs:ui.themeEditMenu')}>{tabs.map((tab, index) => <button key={tab.id} id={`article-theme-tab-${tab.id}`} role="tab" type="button" tabIndex={activeTab === tab.id ? 0 : -1} aria-selected={activeTab === tab.id} aria-controls="article-theme-editor-panel" disabled={saving} data-validation={tab.failed ? 'failed' : tab.pending ? 'pending' : 'complete'} data-modified={tab.modified} aria-label={tab.failed ? t('dialogs:templates.tabFailed', { name: t('dialogs:themeTabs.' + tab.id) }) : tab.modified ? t('dialogs:templates.tabModified', { name: t('dialogs:themeTabs.' + tab.id) }) : undefined} className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 py-2 whitespace-nowrap text-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent ${tab.failed ? 'text-danger aria-selected:border-danger aria-selected:bg-danger/10 aria-selected:text-danger' : 'text-muted aria-selected:border-accent-line aria-selected:bg-accent-soft aria-selected:text-accent-text'}`} onClick={() => chooseTab(tab.id)} onKeyDown={event => { const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null; if (next !== null) { event.preventDefault(); chooseTab(tabs[next].id); document.getElementById(`article-theme-tab-${tabs[next].id}`)?.focus(); } }}><ThemeIcon name={tab.icon} />{t('dialogs:themeTabs.' + tab.id)}{tab.modified ? <span className={`rounded px-1 text-2xs ${tab.failed ? 'bg-danger/10 text-danger' : 'bg-accent-soft text-accent-text'}`}>{t('dialogs:ui.modified')}</span> : null}</button>)}</nav>
           <div id="article-theme-editor-panel" role="tabpanel" aria-labelledby={`article-theme-tab-${activeTab}`} className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
-            {editorTab === 'tokens' ? <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}><ArticleThemeFields theme={draft} nodeColors={nodeColors} disabled={readOnly || saving} nodeKey={nodeKey} onNodeKey={setNodeKey} onToken={setToken} onNodeValue={setNodeValue} onResetNode={resetNode} onColor={openColor} inspection={inspection} /></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><div className="flex min-h-0 flex-1 flex-col gap-2"><span className="shrink-0 font-sub-heading text-xs font-semibold text-primary">{editorTab === 'css' ? '受限主题 CSS' : '完整主题 JSON'}</span><SnippetTextarea ref={editorTab === 'css' ? cssEditorRef : undefined} sourceFont="editor" value={editorTab === 'css' ? cssText : jsonText} snippets={[]} readOnly={readOnly} disabled={saving} ariaLabel={editorTab === 'css' ? '主题 CSS' : '完整主题 JSON'} onChange={value => changeCode(editorTab === 'css' ? 'css' : 'json', value)} /></div><p className="shrink-0 text-2xs text-faint">{editorTab === 'css' ? '静态 CSS 仅作用于文章预览，不支持外链与脚本。' : '主题 ID 保持不变；另存为新主题请使用复制。'}</p></div>}
+            {editorTab === 'tokens' ? <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}><ArticleThemeFields theme={draft} nodeColors={nodeColors} disabled={readOnly || saving} nodeKey={nodeKey} onNodeKey={setNodeKey} onToken={setToken} onNodeValue={setNodeValue} onResetNode={resetNode} onColor={openColor} inspection={inspection} /></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><div className="flex min-h-0 flex-1 flex-col gap-2"><span className="shrink-0 font-sub-heading text-xs font-semibold text-primary">{editorTab === 'css' ? t('dialogs:ui.limitedCss') : t('dialogs:ui.fullThemeJson')}</span><SnippetTextarea ref={editorTab === 'css' ? cssEditorRef : undefined} sourceFont="editor" value={editorTab === 'css' ? cssText : jsonText} snippets={[]} readOnly={readOnly} disabled={saving} ariaLabel={editorTab === 'css' ? t('dialogs:ui.themeCss') : t('dialogs:ui.fullThemeJson')} onChange={value => changeCode(editorTab === 'css' ? 'css' : 'json', value)} /></div><p className="shrink-0 text-2xs text-faint">{editorTab === 'css' ? t('dialogs:ui.cssScope') : t('dialogs:ui.keepThemeId')}</p></div>}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line p-4"><ButtonBar label="文章主题保存" className="w-full justify-between"><button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !dirty} onClick={resetChanges}><ThemeIcon name="reset" />重置修改</button>{editorTab !== 'tokens' ? <button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !unappliedChanges} onClick={validateCode}><ThemeIcon name="check" />校验并预览</button> : null}<span className="inline-flex min-w-0 after:top-auto after:bottom-full after:mb-2 after:mt-0" data-tooltip={unappliedChanges ? '请先完成校验' : undefined} tabIndex={unappliedChanges ? 0 : undefined} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><button className="button button-primary px-2 disabled:pointer-events-none" type="button" onClick={() => void save()} disabled={readOnly || saving || Boolean(error) && !writeFailed || unappliedChanges || !dirty} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><ThemeIcon name="save" />{saving ? '保存中…' : '保存主题'}</button>{unappliedChanges ? <span id="article-theme-validation-hint" className="sr-only">请先完成校验</span> : null}</span></ButtonBar></div>
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line p-4"><ButtonBar label={t('dialogs:ui.themeSaveActions')} className="w-full justify-between"><button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !dirty} onClick={resetChanges}><ThemeIcon name="reset" />{t('dialogs:ui.resetChanges')}</button>{editorTab !== 'tokens' ? <button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !unappliedChanges} onClick={validateCode}><ThemeIcon name="check" />{t('dialogs:ui.validatePreview')}</button> : null}<span className="inline-flex min-w-0 after:top-auto after:bottom-full after:mb-2 after:mt-0" data-tooltip={unappliedChanges ? t('dialogs:ui.validateFirst') : undefined} tabIndex={unappliedChanges ? 0 : undefined} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><button className="button button-primary px-2 disabled:pointer-events-none" type="button" onClick={() => void save()} disabled={readOnly || saving || Boolean(error) && !writeFailed || unappliedChanges || !dirty} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><ThemeIcon name="save" />{saving ? t('dialogs:ui.saving') : t('dialogs:ui.saveTheme')}</button>{unappliedChanges ? <span id="article-theme-validation-hint" className="sr-only">{t('dialogs:ui.validateFirst')}</span> : null}</span></ButtonBar></div>
         </aside>
-        <ColumnSplitter layout={layout} label="调整主题代码与预览宽度" controls="article-theme-editor-panel" />
-        <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-5 group-data-[wide=true]/theme-columns:min-h-0 group-data-[dragging=true]/theme-columns:pointer-events-none"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">实时排印预览</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={previewTheme} dark={dark} inspection={inspection} onLocate={locateInspection} onNodeColors={setNodeColors} /></div>
+        <ColumnSplitter layout={layout} label={t('dialogs:ui.resizeTheme')} controls="article-theme-editor-panel" />
+        <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-5 group-data-[wide=true]/theme-columns:min-h-0 group-data-[dragging=true]/theme-columns:pointer-events-none"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">{t('dialogs:ui.liveTypography')}</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={previewTheme} dark={dark} inspection={inspection} onLocate={locateInspection} onNodeColors={setNodeColors} /></div>
       </div>
-      {error || savedMessage ? <footer className="shrink-0 border-t border-line px-5 py-3">{error ? <p className="text-xs text-danger" role="alert">{error}</p> : <p className="text-xs text-success" role="status">{savedMessage}</p>}</footer> : null}
+      {error || savedMessage ? <footer className="shrink-0 border-t border-line px-5 py-3">{error ? <p className="text-xs text-danger" role="alert">{formatProductMessage(error, t)}</p> : <p className="text-xs text-success" role="status">{formatProductMessage(savedMessage, t)}</p>}</footer> : null}
     </DialogFrame>
-    {departure ? <UnsavedChangesDialog entries={[{ label: draft.name, detail: unappliedChanges ? '代码尚未校验' : '文章主题修改尚未保存' }]} description="文章主题有未保存的内容。" saveLabel={applyAfter ? '保存并应用' : '保存并关闭'} saveDisabled={Boolean(error) && !writeFailed || unappliedChanges || readOnly} onCancel={() => { setDeparture(false); setApplyAfter(false); }} onDiscard={onClose} onSave={async () => { if (!await save()) return false; if (applyAfter) { setApplyAfter(false); onApply(); } else onClose(); return true; }} /> : null}
-    {picker ? <EditorColorPicker label={picker.label} token={picker.token} modeLabel="文章主题" value={picker.value} onClose={() => setPicker(null)} onSelect={picker.select} /> : null}
+    {departure ? <UnsavedChangesDialog entries={[{ label: draft.name, detail: unappliedChanges ? t('dialogs:ui.unvalidatedCode') : t('dialogs:ui.themeChangesUnsaved') }]} description={t('dialogs:ui.themeUnsavedDescription')} saveLabel={applyAfter ? t('dialogs:ui.saveApply') : t('dialogs:ui.saveClose')} saveDisabled={Boolean(error) && !writeFailed || unappliedChanges || readOnly} onCancel={() => { setDeparture(false); setApplyAfter(false); }} onDiscard={onClose} onSave={async () => { if (!await save()) return false; if (applyAfter) { setApplyAfter(false); onApply(); } else onClose(); return true; }} /> : null}
+    {picker ? <EditorColorPicker label={picker.label} token={picker.token} modeLabel={t('dialogs:ui.articleTheme')} value={picker.value} onClose={() => setPicker(null)} onSelect={picker.select} /> : null}
   </>;
 }

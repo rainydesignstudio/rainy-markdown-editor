@@ -1,5 +1,7 @@
 'use client';
 
+import { useUITranslation } from './UILocaleProvider';
+
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import type { ArticleMode, ViewKey } from '../../hooks/useEditorController';
 import type { WorkingArticle } from '../../lib/types';
@@ -20,14 +22,6 @@ function Icon({ name }: { name: IconName }) {
   if (name === 'copy') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9a7 7 0 0 1 12-2L20 12M4 12l2.5 5a7 7 0 0 0 12-2" /></svg>;
 }
-
-const VIEW_LABELS: Record<ViewKey, string> = {
-  articles: '文章',
-  assets: '素材',
-  themes: '文章主题',
-  template: '模板',
-  settings: '设置',
-};
 
 type Props = {
   hidden?: boolean;
@@ -84,6 +78,7 @@ export function EditorTopbar({
   onCompile,
   onCheckFormat,
 }: Props) {
+  const { t } = useUITranslation('shell');
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(currentTitle);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -103,28 +98,28 @@ export function EditorTopbar({
     setEditingTitle(false);
   };
 
-  const viewTitle = view === 'articles' ? articleCollectionTitle : VIEW_LABELS[view];
+  const viewTitle = view === 'articles' ? articleCollectionTitle : t('shell:views.' + view);
 
   return (
     <header hidden={hidden} className="workspace-toolbar">
       <div className="toolbar-context">
         {view === 'articles' ? (
-          <button className="toolbar-icon-button article-sidebar-toggle" type="button" aria-label="显示文章导航" data-tooltip="文章导航" onClick={onToggleArticleSidebar}>
-            <Icon name="menu" /><span className="toolbar-action-copy">文章</span>
+          <button className="toolbar-icon-button article-sidebar-toggle" type="button" aria-label={t('articles:navigation.show')} data-tooltip={t('articles:navigation.label')} onClick={onToggleArticleSidebar}>
+            <Icon name="menu" /><span className="toolbar-action-copy">{t('shell:navigation.articles')}</span>
           </button>
         ) : null}
         {isEditor ? (
           <div className="title-stack">
-            <button className="return-crumb" type="button" onClick={onShowOverview} aria-label={currentArticleIsArchived ? '返回归档文章' : '返回文章总览'} data-tooltip="返回">
-              <span className="return-crumb-icon" aria-hidden="true"><Icon name="back" /></span><span>文章</span>{currentArticleIsArchived ? <><span className="crumb-separator">/</span><span>归档</span></> : null}{currentProjectName ? <><span className="crumb-separator">/</span><span className="crumb-project">{currentProjectName}</span></> : null}
+            <button className="return-crumb" type="button" onClick={onShowOverview} aria-label={currentArticleIsArchived ? t('articles:returnArchive') : t('articles:returnOverview')} data-tooltip={t('common:actions.back')}>
+              <span className="return-crumb-icon" aria-hidden="true"><Icon name="back" /></span><span>{t('shell:navigation.articles')}</span>{currentArticleIsArchived ? <><span className="crumb-separator">/</span><span>{t('articles:collections.archived')}</span></> : null}{currentProjectName ? <><span className="crumb-separator">/</span><span className="crumb-project">{currentProjectName}</span></> : null}
             </button>
             {currentArticleIsArchived ? (
-              <div className="flex min-w-0 items-center gap-2"><h1 className="font-heading truncate text-base font-semibold text-primary">{currentTitle}</h1><span className="shrink-0 rounded-md border border-line bg-rail px-2 py-0.5 text-xs font-semibold text-faint">只读</span></div>
+              <div className="flex min-w-0 items-center gap-2"><h1 className="font-heading truncate text-base font-semibold text-primary">{currentTitle}</h1><span className="shrink-0 rounded-md border border-line bg-rail px-2 py-0.5 text-xs font-semibold text-faint">{t('articles:readOnly')}</span></div>
             ) : editingTitle ? (
               <input
                 ref={titleInputRef}
                 className="title-edit-input font-heading"
-                aria-label="编辑文章标题"
+                aria-label={t('editor:title.edit')}
                 value={titleDraft}
                 onChange={(event) => setTitleDraft(event.target.value)}
                 onBlur={() => {
@@ -137,14 +132,14 @@ export function EditorTopbar({
                 }}
               />
             ) : (
-              <button className="title-trigger font-heading" type="button" onClick={() => setEditingTitle(true)} data-tooltip="修改标题" disabled={!directory || currentArticleIsArchived || !metadataWritable}>
+              <button className="title-trigger font-heading" type="button" onClick={() => setEditingTitle(true)} data-tooltip={t('editor:title.change')} disabled={!directory || currentArticleIsArchived || !metadataWritable}>
                 <span>{currentTitle}</span><span className="title-edit-icon" aria-hidden="true"><Icon name="edit" /></span>
               </button>
             )}
           </div>
         ) : (
           <div className="toolbar-title">
-            <p className="eyebrow">{view === 'articles' ? 'RAINY WORKSPACE' : 'WORKSPACE'}</p>
+            <p className="eyebrow">{view === 'articles' ? t('shell:eyebrow.articles') : t('shell:eyebrow.workspace')}</p>
             <h1 className="font-heading toolbar-heading">{viewTitle}</h1>
           </div>
         )}
@@ -153,15 +148,15 @@ export function EditorTopbar({
       <div className="toolbar-actions">
         {isEditor ? (
           <>
-            <button className="toolbar-icon-button" type="button" aria-label="文章统计" data-tooltip="文章统计" onClick={onShowStatistics}><Icon name="statistics" /><span className="toolbar-action-copy">文章统计</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label="历史版本" data-tooltip="历史版本" data-history-trigger="true" disabled={disabled || !directory || !article.folder} onClick={onOpenHistory}><Icon name="history" /><span className="toolbar-action-copy">历史</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label="从当前文章创建起稿模板" data-tooltip="创建起稿模板" disabled={!directory || mediaOperation !== null || historyBusy} onClick={onCreateTemplate}><Icon name="template" /><span className="toolbar-action-copy">创建模板</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label="导出文章" data-tooltip="导出文章" disabled={!directory || mediaOperation !== null || historyBusy} onClick={onExport}><Icon name="export" /><span className="toolbar-action-copy">导出</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.statistics')} data-tooltip={t('editor:toolbar.statistics')} onClick={onShowStatistics}><Icon name="statistics" /><span className="toolbar-action-copy">{t('editor:toolbar.statistics')}</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.history')} data-tooltip={t('editor:toolbar.history')} data-history-trigger="true" disabled={disabled || !directory || !article.folder} onClick={onOpenHistory}><Icon name="history" /><span className="toolbar-action-copy">{t('editor:toolbar.historyShort')}</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.createTemplate')} data-tooltip={t('editor:toolbar.template')} disabled={!directory || mediaOperation !== null || historyBusy} onClick={onCreateTemplate}><Icon name="template" /><span className="toolbar-action-copy">{t('editor:toolbar.templateShort')}</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.export')} data-tooltip={t('editor:toolbar.export')} disabled={!directory || mediaOperation !== null || historyBusy} onClick={onExport}><Icon name="export" /><span className="toolbar-action-copy">{t('common:actions.export')}</span></button>
             <span className="toolbar-divider" aria-hidden="true" />
-            <button className="toolbar-icon-button" type="button" aria-label="更新样式" data-tooltip={isCompiling ? '正在生成样式' : '更新样式'} disabled={disabled || isCompiling || !directory} onClick={onCompile}><Icon name="refresh" /><span className="toolbar-action-copy">{isCompiling ? '生成中' : '更新样式'}</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label="格式检查" data-tooltip="格式检查" disabled={!directory || mediaOperation !== null || historyBusy || isCompiling || !article.themeValid} onClick={onCheckFormat}><Icon name="check" /><span className="toolbar-action-copy">格式检查</span></button>
-            <button className="toolbar-icon-button toolbar-icon-button--primary" type="button" aria-label="保存文章" data-tooltip="保存文章" disabled={!article.dirty || !directory || disabled} onClick={onSave}><Icon name="save" /><span className="toolbar-action-copy">保存</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label="复制富文本" data-tooltip="复制富文本" disabled={!isReadyToCopy || isCompiling || disabled} onClick={onCopy}><Icon name="copy" /><span className="toolbar-action-copy">复制</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.updateStyles')} data-tooltip={isCompiling ? t('editor:toolbar.generating') : t('editor:toolbar.updateStyles')} disabled={disabled || isCompiling || !directory} onClick={onCompile}><Icon name="refresh" /><span className="toolbar-action-copy">{isCompiling ? t('editor:toolbar.generatingShort') : t('editor:toolbar.updateStyles')}</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.check')} data-tooltip={t('editor:toolbar.check')} disabled={!directory || mediaOperation !== null || historyBusy || isCompiling || !article.themeValid} onClick={onCheckFormat}><Icon name="check" /><span className="toolbar-action-copy">{t('editor:toolbar.check')}</span></button>
+            <button className="toolbar-icon-button toolbar-icon-button--primary" type="button" aria-label={t('editor:toolbar.save')} data-tooltip={t('editor:toolbar.save')} disabled={!article.dirty || !directory || disabled} onClick={onSave}><Icon name="save" /><span className="toolbar-action-copy">{t('common:actions.save')}</span></button>
+            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.copy')} data-tooltip={t('editor:toolbar.copy')} disabled={!isReadyToCopy || isCompiling || disabled} onClick={onCopy}><Icon name="copy" /><span className="toolbar-action-copy">{t('common:actions.copy')}</span></button>
           </>
         ) : null}
       </div>

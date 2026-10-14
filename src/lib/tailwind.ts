@@ -1,3 +1,4 @@
+import { ProductError, productMessage } from "./i18n/productMessages";
 import { compile } from 'tailwindcss';
 import postcss from 'postcss';
 import selectorParser from 'postcss-selector-parser';
@@ -56,14 +57,14 @@ function themeCssForDocument(theme: ThemeConfig, snapshot: FormatSnapshot): stri
 async function createCompiler(theme: ThemeConfig, snapshot: FormatSnapshot = getFormatSnapshot(), environment = snapshot.environment): Promise<Compiler> {
   const errors = validateThemeConfig(theme);
   if (errors.length) throw new Error('主题配置校验失败：' + errors.join('；'));
-  if (snapshot.bundle.formatter.stylesheets && !environment) throw new Error('资料库声明的样式环境尚未载入。');
+  if (snapshot.bundle.formatter.stylesheets && !environment) throw new ProductError("tailwind.theStylesheetEnvironmentDeclaredByTheLibraryIsNotLoaded");
   if (environment) {
     const entry = environment.policy.entry;
     const themeCss = await environment.resolveCss(themeCssForDocument(theme, snapshot), 'themes/article-themes/' + theme.id + '.json');
     return compile(environment.files[entry] + '\n' + themeCss, {
       base: '/' + entry.split('/').slice(0, -1).join('/'),
       loadStylesheet: async (id, base) => libraryStylesheetLoader(environment, id, base),
-      loadModule: async () => { throw new Error('资料库样式不执行JS配置或插件。'); },
+      loadModule: async () => { throw new ProductError("tailwind.libraryStylesDoNotExecuteJsConfigurationOrPlugins"); },
     });
   }
   return compile('@layer theme, base, components, utilities;\n@import "tailwindcss/theme.css" layer(theme);\n@import "tailwindcss/utilities.css" layer(utilities);\n' + themeCssForDocument(theme, snapshot),
@@ -139,7 +140,7 @@ export async function validateArticleUtilityClasses(classes: string[], _label: s
     previous = current;
     if (!added.length) {
       if (snapshot.bundle.formatter.stylesheets?.allowUnknownClasses) continue;
-      issues.push(atSource({ kind: 'value', name: candidate, source: '工具类 ' + candidate, tier: 'unknown', message: '工具类 ' + candidate + ' 无法由当前样式环境编译，未生成可用样式。' }));
+      issues.push(atSource({ kind: 'value', name: candidate, source: '工具类 ' + candidate, sourceKind: 'utility', tier: 'unknown', ...productMessage('diagnostic.utilityUnavailable', { candidate }), domain: 'product' }));
       continue;
     }
     const portable = postcss.parse(added.join('\n'));
@@ -147,7 +148,7 @@ export async function validateArticleUtilityClasses(classes: string[], _label: s
       if (declaration.prop.startsWith('--tw-')) declaration.remove();
       else declaration.prop = snapshot.bundle.formatter.css.utilityPropertyAliases[declaration.prop] ?? declaration.prop;
     });
-    issues.push(...validateArticleFormatCss(portable.toString(), '工具类 ' + candidate, passed).map(atSource));
+    issues.push(...validateArticleFormatCss(portable.toString(), '工具类 ' + candidate, passed).map(issue => atSource({ ...issue, sourceKind: 'utility' })));
   }
   assertCurrentFormat(snapshot);
   return issues;

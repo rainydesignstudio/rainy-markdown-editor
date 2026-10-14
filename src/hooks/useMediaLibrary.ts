@@ -1,5 +1,7 @@
 'use client';
 
+import { productCause, productText } from "../lib/i18n/productMessages";
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getArticleMediaDirectory } from '../lib/fileSystem';
 import { readMediaMetadata } from '../lib/mediaManagement';
@@ -31,9 +33,9 @@ export function useMediaLibrary({ root, sessionKey, refreshSignal, articles, isR
           try {
             const assets = await listSharedImages(root), directory = await getSharedImageDirectory(root);
             try { const metadata: Awaited<ReturnType<typeof readMediaMetadata>> = directory ? await readMediaMetadata(directory) : { version: 1, images: {} }; return { assets: assets.map(asset => ({ ...asset, description: metadata.images[asset.fileName]?.description ?? '' })), issues: [] as string[] }; }
-            catch (error) { return { assets, issues: [`共享描述读取失败：${error instanceof Error ? error.message : String(error)}`] }; }
+            catch (error) { return { assets, issues: [productText("useMediaLibrary.sharedDescriptionReadingFailed", { "cause": productCause(error) })] }; }
           }
-          catch (error) { return { assets: [], issues: [`共享图片读取失败：${error instanceof Error ? error.message : String(error)}`] }; }
+          catch (error) { return { assets: [], issues: [productText("useMediaLibrary.sharedImageReadingFailed", { "cause": productCause(error) })] }; }
         })(),
         ...articles.map(async (article) => {
           if (!current()) return { assets: [], issues: [] as string[] };
@@ -42,7 +44,7 @@ export function useMediaLibrary({ root, sessionKey, refreshSignal, articles, isR
             if (!current()) return { assets: [], issues: [] as string[] };
             const files = await listArticleImages(directory);
             let metadata: Awaited<ReturnType<typeof readMediaMetadata>> = { version: 1, images: {} }, metadataIssue = '';
-            try { metadata = await readMediaMetadata(directory); } catch (error) { metadataIssue = `图片描述读取失败：${error instanceof Error ? error.message : String(error)}`; }
+            try { metadata = await readMediaMetadata(directory); } catch (error) { metadataIssue = productText("useMediaLibrary.imageDescriptionReadingFailed", { "cause": productCause(error) }); }
             return { assets: files.map((file): LibraryMediaAsset => ({ ...file, description: metadata.images[file.fileName]?.description ?? '', kind: 'article', root, articleId: article.id, month: article.month, folder: article.folder, articleTitle: article.parse.metadata.title })), issues: metadataIssue ? [metadataIssue] : [] as string[] };
           } catch (error) {
             if (error && typeof error === 'object' && 'name' in error && error.name === 'NotFoundError') return { assets: [], issues: [] as string[] };

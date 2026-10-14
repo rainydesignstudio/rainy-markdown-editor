@@ -1,3 +1,4 @@
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -30,7 +31,7 @@ const nodes=node=>Array.isArray(node)?node.flatMap(nodes):node?.props?[node,...n
 async function load(relative,dependencies,globals={}){
   const module={exports:{}};
   const code=ts.transpileModule(await readFile(new URL(relative,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
-  vm.runInNewContext(code,{module,exports:module.exports,Set,Object,...globals,require(id){if(id==='react/jsx-runtime')return {jsx,jsxs};if(id in dependencies)return dependencies[id];throw new Error(id)}});
+  vm.runInNewContext(code,{module,exports:module.exports,Set,Object,...globals,require: withUILocaleImports(function(id){if(id==='react/jsx-runtime')return {jsx,jsxs};if(id in dependencies)return dependencies[id];throw new Error(id)})});
   return module.exports;
 }
 const find=(tree,predicate)=>{const result=tree.find(predicate);assert.ok(result);return result};

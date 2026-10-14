@@ -1,5 +1,9 @@
 'use client';
 
+import { formatProductMessage } from "../../lib/i18n/productMessages";
+
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type MutableRefObject } from 'react';
 import type { ArticleSnippet, SnippetCategory, WorkingArticle } from '../../lib/types';
 import type { ArticleFormatIssue } from '../../lib/articleFormat';
@@ -58,6 +62,7 @@ export function SourcePanel({
   mediaBusy,
   readOnly,
 }: Props) {
+  const { t } = useUITranslation('editor');
   const formatSnapshot = useFormatSnapshot();
   const openFindRef = useRef<(() => void) | null>(null);
   const openPickerRef = useRef<(() => void) | null>(null);
@@ -99,7 +104,7 @@ export function SourcePanel({
     event.currentTarget.value = '';
     if (files.length) void onImportFiles(files, selection);
   };
-  const fileName = article.month && article.folder ? 'article.md' : '未保存文稿';
+  const fileName = article.month && article.folder ? 'article.md' : t('editor:source.unsavedTitle');
 
   return (
     <section className="panel source-panel" data-mobile-hidden={mobilePane === 'preview'} onKeyDownCapture={event => {
@@ -110,11 +115,11 @@ export function SourcePanel({
       toggleLineNumbers();
     }}>
       <div className="panel-header source-panel-header">
-        <InformationButton icon={<InformationIcon />} title={fileName} subtitle="点击文件修改基本信息" titleClassName="font-mono" onClick={onOpenInfo} disabled={!directory || readOnly || mediaBusy || parsed.diagnostics.some((item) => item.level === 'error')} />
+        <InformationButton icon={<InformationIcon />} title={fileName} subtitle={t('editor:source.info')} titleClassName="font-mono" onClick={onOpenInfo} disabled={!directory || readOnly || mediaBusy || parsed.diagnostics.some((item) => item.level === 'error')} />
         <div className="toolbar-actions source-actions">
           <input ref={imagePickerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif" multiple hidden onChange={handleImageFiles} />
-          <IconButton tooltip={`${showLineNumbers ? '隐藏行号' : '显示行号'}（⌘/ / Ctrl+/）`} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
-          <IconButton tooltip="查找替换（⌘F / Ctrl+F）" icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
+          <IconButton tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
+          <IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
           <InsertElementsMenu
             disabled={readOnly || mediaBusy}
             readOnly={readOnly}
@@ -143,13 +148,13 @@ export function SourcePanel({
         lineConcerns={lineConcerns}
       />
       <div className="source-footer">
-        <label className="flex shrink-0 items-center gap-1.5 text-2xs text-muted"><input type="checkbox" role="switch" className="size-3 accent-accent" checked={checksEnabled} onChange={event => setChecksEnabled(event.target.checked)} aria-label={checksEnabled ? '错误检查开启' : '错误检查关闭'} />{checksEnabled ? '错误检查开启' : '错误检查关闭'}</label>
-        <span className="status-copy" data-tone={status.tone} role="status">{status.label}</span>
-        <span className="status-copy">{article.dirty ? '未保存' : '已保存'}{status.formatRevision === revision ? '' : ` · revision ${revision}`}</span>
-        {parsed.diagnostics.some((item) => item.level === 'error') ? <span className="status-copy" data-tone="error">元数据错误时正文只读</span> : null}
-        {checksEnabled && lineValidationError ? <span className="status-copy" data-tone="warning" role="status">撰写诊断暂不可用：{lineValidationError}</span> : null}
+        <label className="flex shrink-0 items-center gap-1.5 text-2xs text-muted"><input type="checkbox" role="switch" className="size-3 accent-accent" checked={checksEnabled} onChange={event => setChecksEnabled(event.target.checked)} aria-label={checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')} />{checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')}</label>
+        <span className="status-copy" data-tone={status.tone} role="status">{formatProductMessage(status, t)}</span>
+        <span className="status-copy">{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}{status.formatRevision === revision ? '' : ` · revision ${revision}`}</span>
+        {parsed.diagnostics.some((item) => item.level === 'error') ? <span className="status-copy" data-tone="error">{t('editor:source.metadataReadOnly')}</span> : null}
+        {checksEnabled && lineValidationError ? <span className="status-copy" data-tone="warning" role="status">{t('editor:source.diagnosticsUnavailable', { message: lineValidationError })}</span> : null}
       </div>
-      {directory && article.month && article.folder ? null : <p>文章尚未保存到资料目录；保存前不会生成文章文件。</p>}
+      {directory && article.month && article.folder ? null : <p>{t('editor:source.notStored')}</p>}
     </section>
   );
 }

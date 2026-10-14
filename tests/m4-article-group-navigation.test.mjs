@@ -1,3 +1,4 @@
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -37,7 +38,7 @@ test('project name navigates to its article list while the chevron only collapse
     setProjectCollapsed: (id, value) => { collapsed.push([id, value]); return Promise.resolve(true); } };
   const module = { exports: {} };
   const state = []; let cursor = 0;
-  vm.runInNewContext(code, { module, exports: module.exports, requestAnimationFrame: callback => callback(), require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, requestAnimationFrame: callback => callback(), require: withUILocaleImports(function(id){
     if (id === 'react') return { useState: initial => { const index = cursor++; if (!(index in state)) state[index] = initial; return [state[index], next => { state[index] = typeof next === 'function' ? next(state[index]) : next; }]; }, useRef: initial => ({ current: initial }), useEffect() {} };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/editorWorkspace')) return { orderArticlesForGroup, getArticleOrganization };
@@ -48,7 +49,7 @@ test('project name navigates to its article list while the chevron only collapse
     } };
     if (id.endsWith('/ArticleActionsMenu')) return { ArticleActionsMenu: 'article-menu' };
     throw new Error(`Unexpected import ${id}`);
-  } });
+  }) });
   const render = () => { cursor = 0; return nodes(module.exports.ArticleSidebar({ collapsed: false, mobileOpen: false, onToggleCollapsed() {}, onCloseMobile() { mobileClosed++; } })); };
   let tree = render();
   const name = tree.find(node => node.type === 'button' && node.props['aria-label'] === '测试项目，共 0 篇文档');

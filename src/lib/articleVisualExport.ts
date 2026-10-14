@@ -1,9 +1,10 @@
+import { ProductError } from "./i18n/productMessages";
 import { getFormatSnapshot, getArticleRenderSnapshot, assertCurrentFormat, assertFormatReady } from './article-format/runtime';
 
 function imageReady(image: HTMLImageElement): Promise<void> {
   if (image.complete && image.naturalWidth > 0) return Promise.resolve();
   return image.decode().then(() => {
-    if (!image.naturalWidth) throw new Error('文章图片未能解码，导出已停止。');
+    if (!image.naturalWidth) throw new ProductError("articleVisualExport.anArticleImageCouldNotBeDecodedExportStopped");
   });
 }
 
@@ -14,9 +15,9 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
   const MAX_CANVAS_SIDE = options.maxCanvasSide;
   const originalRoot = article.getRootNode();
   const native = Boolean(snapshot.bundle.formatter.document || snapshot.bundle.formatter.stylesheets);
-  if (!native && !(originalRoot instanceof ShadowRoot)) throw new Error('文章预览尚未就绪，无法生成图片。');
+  if (!native && !(originalRoot instanceof ShadowRoot)) throw new ProductError("articleVisualExport.theArticlePreviewIsNotReadyAnImageCannotBeGenerated");
   const sourceStyle = native ? article.ownerDocument.querySelector<HTMLStyleElement>('style[data-article-style]') : (originalRoot as ShadowRoot).querySelector<HTMLStyleElement>('style[data-article-style]');
-  if (!sourceStyle?.textContent) throw new Error('文章样式尚未就绪，无法生成图片。');
+  if (!sourceStyle?.textContent) throw new ProductError("articleVisualExport.articleStylesAreNotReadyAnImageCannotBeGenerated");
   const host = document.createElement('div');
   host.style.position = 'fixed';
   host.style.left = '-100000px';
@@ -45,14 +46,14 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
   if (native) { copy.getBoundingClientRect(); await doc.fonts.ready; }
   try {
     if (copy.querySelector('span[data-local-asset-src],span[data-local-asset-srcset]')) {
-      throw new Error('本地图片尚未载入，图片和 PDF 导出已停止；请等预览显示图片后重试。');
+      throw new ProductError("articleVisualExport.localImagesAreNotLoadedImageAndPdfExportStoppedWaitFor");
     }
     await Promise.all(Array.from(copy.querySelectorAll('img')).map(imageReady));
     const height = Math.ceil(copy.scrollHeight);
-    if (!height) throw new Error('文章正文为空，无法生成图片。');
-    if (copy.scrollWidth > EXPORT_WIDTH + 1) throw new Error('文章内容超出图片宽度，导出已停止；请调整横向溢出的内容后重试。');
+    if (!height) throw new ProductError("articleVisualExport.theArticleBodyIsEmptyAnImageCannotBeGenerated");
+    if (copy.scrollWidth > EXPORT_WIDTH + 1) throw new ProductError("articleVisualExport.articleContentExceedsTheImageWidthExportStoppedAdjustHorizontalOverflowAnd");
     const pixelRatio = height * 2 <= MAX_CANVAS_SIDE ? 2 : 1;
-    if (height * pixelRatio > MAX_CANVAS_SIDE) throw new Error('文章过长，超出浏览器单张图片的尺寸上限；可改用文档包或 Markdown。');
+    if (height * pixelRatio > MAX_CANVAS_SIDE) throw new ProductError("articleVisualExport.theArticleExceedsTheBrowserSSingleImageSizeLimitExportA");
     const top = copy.getBoundingClientRect().top;
     const blockEnds = Array.from(copy.querySelectorAll('p,h1,h2,h3,h4,h5,h6,ul,ol,pre,blockquote,table,section'))
       .map(element => Math.round((element.getBoundingClientRect().bottom - top) * pixelRatio))
@@ -68,9 +69,9 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
       skipAutoScale: true,
       onImageErrorHandler: () => { imageFailed = true; },
     });
-    if (imageFailed) throw new Error('文章中的图片或背景资源无法载入，导出已停止。');
+    if (imageFailed) throw new ProductError("articleVisualExport.anArticleImageOrBackgroundResourceCouldNotLoadExportStopped");
     if (canvas.width !== EXPORT_WIDTH * pixelRatio || canvas.height !== height * pixelRatio) {
-      throw new Error('浏览器未能完整绘制文章，导出已停止。');
+      throw new ProductError("articleVisualExport.theBrowserCouldNotDrawTheCompleteArticleExportStopped");
     }
     assertCurrentFormat(snapshot);
     return { canvas, blockEnds };
@@ -81,7 +82,7 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
 
 export async function articleCanvasToPng(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('浏览器没有生成完整的 PNG 图片。')), 'image/png');
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new ProductError("articleVisualExport.theBrowserDidNotGenerateACompletePngImage")), 'image/png');
   });
 }
 
@@ -93,7 +94,7 @@ export function articlePdfPageCuts(height: number, maxPageHeight: number, blockE
     const minimum = start + Math.round(maxPageHeight * 0.7);
     const preferred = blockEnds.filter(value => value > minimum && value <= limit).at(-1);
     const end = limit < height && preferred ? preferred : limit;
-    if (end <= start) throw new Error('PDF 分页失败。');
+    if (end <= start) throw new ProductError("articleVisualExport.pdfPaginationFailed");
     cuts.push(end);
     start = end;
   }
@@ -110,7 +111,7 @@ export async function articleCanvasToPdf(canvas: HTMLCanvasElement, blockEnds: r
   const pageHeight = pdf.internal.pageSize.getHeight();
   const imageWidth = pageWidth - PAGE_MARGIN_PT * 2;
   const printableHeight = pageHeight - PAGE_MARGIN_PT * 2;
-  if (imageWidth <= 0 || printableHeight <= 0) throw new Error('PDF边距超过纸面尺寸，请修改formatter配置。');
+  if (imageWidth <= 0 || printableHeight <= 0) throw new ProductError("articleVisualExport.pdfMarginsExceedThePageSizeModifyTheFormatterConfiguration");
   const maxPageHeight = Math.max(1, Math.floor(printableHeight * canvas.width / imageWidth));
   const cuts = articlePdfPageCuts(canvas.height, maxPageHeight, blockEnds);
   let start = 0;
@@ -120,7 +121,7 @@ export async function articleCanvasToPdf(canvas: HTMLCanvasElement, blockEnds: r
     slice.width = canvas.width;
     slice.height = end - start;
     const context = slice.getContext('2d');
-    if (!context) throw new Error('浏览器没有可用的 PDF 绘制画布。');
+    if (!context) throw new ProductError("articleVisualExport.theBrowserHasNoUsablePdfDrawingCanvas");
     context.fillStyle = options.pdfBackground;
     context.fillRect(0, 0, slice.width, slice.height);
     context.drawImage(canvas, 0, start, canvas.width, slice.height, 0, 0, slice.width, slice.height);

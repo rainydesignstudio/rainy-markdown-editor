@@ -1,3 +1,4 @@
+import { ProductError } from "../i18n/productMessages";
 import { articlePreviewStyle } from './preview';
 import { assertCurrentFormat, assertFormatReady, getFormatSnapshot, subscribeFormatSnapshot, type FormatSnapshot } from './runtime';
 
@@ -14,7 +15,7 @@ export function formatPreviewDocument(css: string, html: string, dark: boolean, 
 }
 export async function inspectRenderedFormat(root: HTMLElement, css: string, snapshot: FormatSnapshot = getFormatSnapshot(), signal?: AbortSignal): Promise<RenderedInspection> {
   assertFormatReady(snapshot); signal?.throwIfAborted();
-  if (typeof document === 'undefined') throw new Error('实际布局校验需要浏览器。');
+  if (typeof document === 'undefined') throw new ProductError("runtime.inspectionBrowserRequired");
   const token = crypto.randomUUID(); const frame = document.createElement('iframe');
   const widthRule = snapshot.bundle.validator.rules.find(rule => rule.enabled && rule.operator === 'dom.responsive-width');
   const widths = widthRule?.parameters.widths as number[] | undefined;
@@ -29,8 +30,8 @@ export async function inspectRenderedFormat(root: HTMLElement, css: string, snap
   return new Promise<RenderedInspection>((resolve, reject) => {
     let done = false;
     let unsubscribe = () => {};
-    const abort = () => finish(new Error('实际布局检查已取消。'));
-    const timer = window.setTimeout(() => finish(new Error('布局／深色校验超时，尚未完成核对。')), 20000);
+    const abort = () => finish(new ProductError("runtime.inspectionCancelled"));
+    const timer = window.setTimeout(() => finish(new ProductError("runtime.inspectionTimeout")), 20000);
     const finish = (error?: Error, value?: RenderedInspection) => {
       if (done) return; done = true;
       clearTimeout(timer); unsubscribe(); signal?.removeEventListener('abort', abort); window.removeEventListener('message', receive); frame.remove();
@@ -41,7 +42,7 @@ export async function inspectRenderedFormat(root: HTMLElement, css: string, snap
       if (event.data.error) finish(new Error(event.data.error));
       else if (Array.isArray(event.data.result?.checked) && Array.isArray(event.data.result?.issues)) finish(undefined, event.data.result);
     };
-    unsubscribe = subscribeFormatSnapshot(() => { if (getFormatSnapshot().id !== snapshot.id) finish(new Error('格式配置已切换，旧检查已取消。')); });
+    unsubscribe = subscribeFormatSnapshot(() => { if (getFormatSnapshot().id !== snapshot.id) finish(new ProductError("runtime.inspectionFormatChanged")); });
     signal?.addEventListener('abort', abort, { once: true });
     window.addEventListener('message', receive);
     frame.srcdoc = `<!doctype html><html><head><style>${fullCss.replace(/<\/style/gi, '<\\/style')}</style><script type="application/json" data-article-format-config>${payload}</script><script src="/mp-darkmode.js"></script><script src="/article-format-engine.js"></script><script defer src="/article-format-bootstrap.js"></script></head><body>${html}</body></html>`;

@@ -2,14 +2,16 @@ import { getFormatSnapshot } from './article-format/runtime';
 import type { ArticleSummary, StoredArticle } from './types';
 import type { ArticleFormatReport } from './articleFormatReport';
 import { articleFormatReportCounts } from './articleFormatReport';
+import { isProductMessage, productReference, type ProductMessageInfo } from './i18n/productMessages';
 
-export type ArticleListCheck = {
+export type ArticleListCheck = Partial<ProductMessageInfo> & {
   signature: string;
   checkedAt: string;
   state: 'checked' | 'failed' | 'stale';
   warning: number;
   error: number;
   message?: string;
+  domain?: string;
 };
 
 export function articleSummarySignature(article: ArticleSummary): string {
@@ -21,7 +23,7 @@ export function articleListCheckResult(article: StoredArticle, report: ArticleFo
   const metadataErrors = article.parse.diagnostics.filter(item => item.level === 'error').length;
   const metadataWarnings = article.parse.diagnostics.filter(item => item.level === 'warning').length;
   const engine = [...report.theme.issues, ...report.body.issues].find(item => item.kind === 'engine');
-  return { signature: articleSummarySignature(article), checkedAt: new Date().toISOString(), state: engine ? 'failed' : 'checked', warning: counts.warning + metadataWarnings, error: counts.error + metadataErrors, ...(engine ? { message: engine.message } : {}) };
+  return { signature: articleSummarySignature(article), checkedAt: new Date().toISOString(), state: engine ? 'failed' : 'checked', warning: counts.warning + metadataWarnings, error: counts.error + metadataErrors, ...(engine ? { message: engine.message, domain: engine.domain, ...(isProductMessage(engine) ? productReference(engine.messageKey, engine.messageParams) : {}) } : {}) };
 }
 
 export function summarizeArticleListChecks(articles: ArticleSummary[], records: Record<string, ArticleListCheck>) {

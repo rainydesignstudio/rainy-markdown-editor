@@ -1,0 +1,11 @@
+{
+  "title": "版本与变化",
+  "release": "版本 {{version}}",
+  "expandAll": "全部展开",
+  "collapseAll": "全部收起",
+  "status": {
+    "published": "已发布",
+    "local": "本地版本",
+    "in-progress": "开发中"
+  }
+}

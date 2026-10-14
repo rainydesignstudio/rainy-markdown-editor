@@ -1,3 +1,4 @@
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -23,7 +24,7 @@ const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKi
 function dialog({ library = [latest], blockedReason = '', busy = false } = {}) {
   const selected = [];
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react') return { useState: initial => [initial, () => {}] };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/articleThemeUpdate')) return { availableArticleThemeUpdate };
@@ -32,7 +33,7 @@ function dialog({ library = [latest], blockedReason = '', busy = false } = {}) {
     if (id.endsWith('/InformationButton')) return { InformationIcon: 'information-icon' };
     if (id.endsWith('/ContentRenderPreview')) return { ContentRenderPreview: 'content-preview' };
     throw new Error(`Unexpected import ${id}`);
-  } });
+  }) });
   const tree = module.exports.ThemeDialog({ current, themes: library, source: '正文', busy, blockedReason, onClose() {}, onSelect(theme) { selected.push(theme); } });
   function all(node) {
     if (Array.isArray(node)) return node.flatMap(all);

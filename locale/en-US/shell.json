@@ -1,0 +1,34 @@
+{
+  "brand": {
+    "workspace": "Manuscript Workspace",
+    "name": "RAINY DESIGN"
+  },
+  "navigation": {
+    "label": "Main navigation",
+    "workspace": "Workspace",
+    "articles": "Articles",
+    "themes": "Themes",
+    "template": "Templates",
+    "assets": "Assets",
+    "settings": "Settings"
+  },
+  "views": {
+    "articles": "Articles",
+    "themes": "Article themes",
+    "template": "Templates",
+    "assets": "Assets",
+    "settings": "Settings"
+  },
+  "sidebar": {
+    "expand": "Expand main sidebar",
+    "collapse": "Collapse main sidebar"
+  },
+  "updates": {
+    "open": "View release notes",
+    "aria": "{{title}} v{{version}}, view release notes"
+  },
+  "eyebrow": {
+    "workspace": "WORKSPACE",
+    "articles": "RAINY WORKSPACE"
+  }
+}

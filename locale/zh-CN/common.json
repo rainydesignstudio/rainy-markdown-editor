@@ -1,0 +1,76 @@
+{
+  "app": {
+    "title": "Rainy 文稿台",
+    "description": "本地 Markdown＋HTML 公众号文稿工作台"
+  },
+  "loading": {
+    "label": "正在载入资料库",
+    "message": "正在载入资料库与外观…"
+  },
+  "language": {
+    "title": "界面语言",
+    "current": "界面语言：{{language}}",
+    "zh-CN": "简体中文",
+    "en-US": "English",
+    "preferenceUnsaved": "语言已切换，但浏览器未允许保存偏好。"
+  },
+  "displayMode": {
+    "current": "显示模式：{{mode}}",
+    "light": "浅色模式",
+    "dark": "深色模式",
+    "system": "跟随系统"
+  },
+  "actions": {
+    "cancel": "取消",
+    "confirm": "确认",
+    "close": "关闭",
+    "save": "保存",
+    "retry": "重试",
+    "more": "更多",
+    "back": "返回",
+    "copy": "复制",
+    "export": "导出",
+    "delete": "删除",
+    "refresh": "刷新",
+    "expand": "展开",
+    "collapse": "折叠"
+  },
+  "articleCount_zero": "0 篇文章",
+  "articleCount_one": "{{count}} 篇文章",
+  "articleCount_other": "{{count}} 篇文章",
+  "updateAvailable": "可更新",
+  "dates": {
+    "invalid": "时间无效"
+  },
+  "eyebrows": {
+    "forkManuscript": "FORK MANUSCRIPT",
+    "deleteProject": "DELETE PROJECT",
+    "deleteTemplate": "DELETE TEMPLATE",
+    "newManuscript": "NEW MANUSCRIPT",
+    "exportArticle": "EXPORT ARTICLE",
+    "manuscriptDetails": "MANUSCRIPT DETAILS",
+    "articleStatistics": "ARTICLE STATISTICS",
+    "formatCheck": "FORMAT CHECK",
+    "unsavedChanges": "UNSAVED CHANGES",
+    "imageManagement": "IMAGE MANAGEMENT",
+    "imageLibrary": "IMAGE LIBRARY",
+    "imagePreview": "IMAGE PREVIEW",
+    "createLocalLibrary": "CREATE LOCAL LIBRARY",
+    "colorPalette": "COLOR PALETTE",
+    "editorThemeDesigner": "EDITOR THEME DESIGNER",
+    "deleteEditorTheme": "DELETE EDITOR THEME",
+    "customEditorTheme": "CUSTOM EDITOR THEME",
+    "articleTheme": "ARTICLE THEME",
+    "deleteTheme": "DELETE THEME",
+    "themeActions": "THEME ACTIONS",
+    "localArticleImage": "LOCAL ARTICLE IMAGE",
+    "deleteArchive": "DELETE ARCHIVE",
+    "deleteManuscript": "DELETE MANUSCRIPT",
+    "snippetInformation": "SNIPPET INFORMATION",
+    "templateInformation": "TEMPLATE INFORMATION",
+    "snippetCategory": "SNIPPET CATEGORY",
+    "templateCategory": "TEMPLATE CATEGORY",
+    "releaseNotes": "RELEASE NOTES",
+    "theme": "THEME"
+  }
+}

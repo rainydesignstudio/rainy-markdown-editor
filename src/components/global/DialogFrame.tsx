@@ -1,5 +1,7 @@
 'use client';
 
+import { useUITranslation } from './UILocaleProvider';
+
 import { useRef, type ButtonHTMLAttributes, type KeyboardEventHandler, type ReactNode } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import { ButtonBar } from './ButtonBar';
@@ -53,10 +55,11 @@ export function DialogHeader({ titleId, eyebrow, title, onClose, closeDisabled =
   closeDisabled?: boolean;
   actions?: ReactNode;
 }) {
+  const { t } = useUITranslation('dialogs');
   return (
     <header className="dialog-header">
       <div className="min-w-0"><p className="eyebrow">{eyebrow}</p><h2 className="font-heading dialog-title" id={titleId}>{title}</h2></div>
-      <ButtonBar label={actions ? '弹窗操作' : '关闭弹窗'}>{actions}<DialogButton iconOnly aria-label="关闭弹窗" disabled={closeDisabled} onClick={onClose}>
+      <ButtonBar label={actions ? t('dialogs:ui.dialogActions') : t('dialogs:ui.closeDialog')}>{actions}<DialogButton iconOnly aria-label={t('dialogs:ui.closeDialog')} disabled={closeDisabled} onClick={onClose}>
         <svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 5l14 14M19 5 5 19" /></svg>
       </DialogButton></ButtonBar>
     </header>
@@ -64,7 +67,8 @@ export function DialogHeader({ titleId, eyebrow, title, onClose, closeDisabled =
 }
 
 export function DialogActions({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <ButtonBar label="弹窗操作" className={`dialog-actions ${className}`}>{children}</ButtonBar>;
+  const { t } = useUITranslation('dialogs');
+  return <ButtonBar label={t('dialogs:ui.dialogActions')} className={`dialog-actions ${className}`}>{children}</ButtonBar>;
 }
 
 export function DialogFooter({ children, className = '' }: { children: ReactNode; className?: string }) {

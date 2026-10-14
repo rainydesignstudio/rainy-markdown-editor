@@ -1,3 +1,4 @@
+import { ProductError, productCause, productMessage, productReference, productText } from "./i18n/productMessages";
 import { articleImageReferences, articleLocalImageReferences, copyArticleImageAs, getSharedImageDirectory, importArticleImage, type LibraryMediaAsset, type MediaActionOutcome } from './articleMedia';
 import { getArticleMediaDirectory, getStoredArticleDirectory } from './fileSystem';
 import { listArticleHistory } from './articleHistory';
@@ -34,9 +35,9 @@ export function countCurrentMediaReferences(assets: LibraryMediaAsset[], documen
 }
 /** One explicit pass for the entire selection; reads source text only, never image bytes or themes. */
 export async function scanWorkspaceMediaReferences(root: FileSystemDirectoryHandle, assets: LibraryMediaAsset[], document: MediaReferenceDocument | null, signal: AbortSignal, isCurrent: () => boolean): Promise<MediaReferenceScan> {
-  const check = () => { if (signal.aborted) throw new DOMException('引用扫描已取消。', 'AbortError'); if (!isCurrent()) throw new Error('资料库或当前文稿已变化，请重新扫描。'); };
+  const check = () => { if (signal.aborted) throw new DOMException(productText('mediaManagement.referenceScanCancelled'), 'AbortError'); if (!isCurrent()) throw new ProductError("mediaManagement.theLibraryOrCurrentManuscriptChangedScanAgain"); };
   check();
-  if (assets.some(asset => asset.root !== root)) throw new Error('所选图片不属于当前资料库。');
+  if (assets.some(asset => asset.root !== root)) throw new ProductError("mediaManagement.theSelectedImageDoesNotBelongToThisLibrary");
   const targets = new Set(assets.map(mediaPath));
   const result: MediaReferenceScan = { current: document ? countReferences(document, targets) : null, workspace: 0, issues: [] };
   let articles: FileSystemDirectoryHandle;
@@ -76,7 +77,7 @@ export async function scanWorkspaceMediaReferences(root: FileSystemDirectoryHand
 
 export async function mediaDirectory(asset: LibraryMediaAsset): Promise<FileSystemDirectoryHandle> {
   const directory = asset.kind === 'shared' ? await getSharedImageDirectory(asset.root) : await getArticleMediaDirectory(asset.root, asset.month, asset.folder, false);
-  if (!directory) throw new Error('素材目录不存在。');
+  if (!directory) throw new ProductError("mediaManagement.theAssetDirectoryDoesNotExist");
   return directory;
 }
 export async function readMediaMetadata(directory: FileSystemDirectoryHandle): Promise<Metadata> {
@@ -84,12 +85,12 @@ export async function readMediaMetadata(directory: FileSystemDirectoryHandle): P
   try { text = await (await (await directory.getFileHandle('index.json')).getFile()).text(); }
   catch (error) { if (missing(error)) return { version: 1, images: {} }; throw error; }
   const data = JSON.parse(text);
-  if (!data || data.version !== 1 || !data.images || typeof data.images !== 'object' || Array.isArray(data.images) || Object.values(data.images).some((value) => !value || typeof value !== 'object' || Array.isArray(value) || ('description' in value && typeof value.description !== 'string'))) throw new Error('素材index.json无效；原文件保留。');
+  if (!data || data.version !== 1 || !data.images || typeof data.images !== 'object' || Array.isArray(data.images) || Object.values(data.images).some((value) => !value || typeof value !== 'object' || Array.isArray(value) || ('description' in value && typeof value.description !== 'string'))) throw new ProductError("mediaManagement.theAssetIndexJsonIsInvalidTheOriginalFileIsRetained");
   return data;
 }
 export async function saveMediaDescription(directory: FileSystemDirectoryHandle, fileName: string, description: string, isCurrent: () => boolean = () => true): Promise<void> {
   const metadata = await readMediaMetadata(directory);
-  if (!isCurrent()) throw new Error('资料库会话已切换，未保存描述。');
+  if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionWasNotSaved");
   metadata.images = { ...metadata.images, [fileName]: { ...(Object.hasOwn(metadata.images, fileName) ? metadata.images[fileName] : {}), description } };
   let existed = true;
   try { await directory.getFileHandle('index.json'); } catch (error) { if (missing(error)) existed = false; else throw error; }
@@ -97,9 +98,9 @@ export async function saveMediaDescription(directory: FileSystemDirectoryHandle,
   let writer: FileSystemWritableFileStream | null = null;
   try {
     writer = await handle.createWritable();
-    if (!isCurrent()) throw new Error('资料库会话已切换，未保存描述。');
+    if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionWasNotSaved");
     await writer.write(JSON.stringify(metadata, null, 2) + '\n');
-    if (!isCurrent()) throw new Error('资料库会话已切换，未保存描述。');
+    if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionWasNotSaved");
     await writer.close();
   } catch (error) { try { await writer?.abort(); } catch {} if (!existed) try { await directory.removeEntry('index.json'); } catch {} throw error; }
 }
@@ -107,9 +108,9 @@ export async function removeMediaDescription(directory: FileSystemDirectoryHandl
   const metadata = await readMediaMetadata(directory);
   if (!Object.hasOwn(metadata.images, fileName)) return;
   delete metadata.images[fileName];
-  if (!isCurrent()) throw new Error('资料库会话已切换，描述索引未清理。');
+  if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionIndexWasNotCleaned");
   const writer = await (await directory.getFileHandle('index.json')).createWritable();
-  try { await writer.write(JSON.stringify(metadata, null, 2) + '\n'); if (!isCurrent()) throw new Error('资料库会话已切换，描述索引未清理。'); await writer.close(); }
+  try { await writer.write(JSON.stringify(metadata, null, 2) + '\n'); if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedTheDescriptionIndexWasNotCleaned"); await writer.close(); }
   catch (error) { try { await writer.abort(); } catch {} throw error; }
 }
 export async function inspectMediaUsage(asset: LibraryMediaAsset, currentSource?: string): Promise<MediaUsage> {
@@ -122,41 +123,41 @@ export async function inspectMediaUsage(asset: LibraryMediaAsset, currentSource?
 export async function transferMedia(asset: LibraryMediaAsset, destination: MediaDestination, usage: MediaUsage, isCurrent: () => boolean): Promise<MediaActionOutcome> {
   const targetId = destination.kind === 'shared' ? 'shared' : destination.articleId;
   const originId = asset.kind === 'shared' ? 'shared' : asset.articleId;
-  if (originId === targetId) throw new Error('目标与来源相同，未移动。');
-  if (usage.issues.length) throw new Error('部分历史无法核对，来源文件保留；请先修复历史读取问题。');
+  if (originId === targetId) throw new ProductError("mediaManagement.destinationAndSourceAreTheSameNothingWasMoved");
+  if (usage.issues.length) throw new ProductError("mediaManagement.someHistoryCouldNotBeCheckedTheSourceFileIsRetainedRepair");
   const original = await asset.handle.getFile();
   const sourceDirectory = await mediaDirectory(asset);
   await readMediaMetadata(sourceDirectory);
-  if (!isCurrent()) throw new Error('资料库会话已切换，未移动。');
+  if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedNothingWasMoved");
   const target = destination.kind === 'shared' ? await getSharedImageDirectory(asset.root, true) : await getArticleMediaDirectory(asset.root, destination.month, destination.folder, true);
   if (target) await readMediaMetadata(target);
-  if (!target || !isCurrent()) throw new Error('资料库会话已切换，未移动。');
+  if (!target || !isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedNothingWasMoved");
   const copied = await importArticleImage(target, new File([original], asset.fileName, { type: original.type }));
   let removed = false;
   try {
-    if (!isCurrent()) throw new Error('资料库会话已切换');
+    if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
     if (asset.description) await saveMediaDescription(target, copied.fileName, asset.description, isCurrent);
-    if (!isCurrent()) throw new Error('资料库会话已切换');
-    if (usage.body || usage.history) return { ok: true, tone: 'warning', message: `已复制「${copied.fileName}」；来源被正文或历史引用，已保留。` };
+    if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
+    if (usage.body || usage.history) return { ok: true, tone: 'warning', ...productMessage("mediaManagement.copiedTheSourceIsReferencedByTheBodyOrHistoryAndIs", { "copiedFileName": copied.fileName }) };
     await sourceDirectory.removeEntry(asset.fileName); removed = true;
     await removeMediaDescription(sourceDirectory, asset.fileName, isCurrent);
-    return { ok: true, tone: 'success', message: `已移动「${copied.fileName}」。` };
-  } catch (error) { return { ok: false, tone: 'warning', message: `目标「${copied.fileName}」已写入；${message(error)}；${removed ? '来源文件已删除，描述索引未清理' : '来源文件保留'}。` }; }
+    return { ok: true, tone: 'success', ...productMessage("mediaManagement.moved", { "copiedFileName": copied.fileName }) };
+  } catch (error) { return { ok: false, tone: 'warning', ...productMessage("mediaManagement.destinationWasWritten", { "copiedFileName": copied.fileName, "value": message(error), "value2": (removed ? productReference("mediaManagement.theSourceFileWasDeletedButTheDescriptionIndexWasNotCleaned") : productReference("mediaManagement.theSourceFileIsRetained")) }) }; }
 }
 export async function renameSharedMedia(asset: LibraryMediaAsset, name: string, isCurrent: () => boolean, replacement?: File): Promise<MediaActionOutcome> {
   const directory = await mediaDirectory(asset);
   await readMediaMetadata(directory);
-  if (!isCurrent()) throw new Error('资料库会话已切换，未写入。');
+  if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChangedNothingWasWritten");
   const created = replacement ? await importArticleImage(directory, new File([replacement], `${asset.fileName.replace(/\.[^.]+$/, '')}.${replacement.name.split('.').at(-1) ?? 'png'}`)) : await copyArticleImageAs(directory, asset.handle, name);
   let removed = false;
   try {
-    if (!isCurrent()) throw new Error('资料库会话已切换');
+    if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
     if (asset.description) await saveMediaDescription(directory, created.fileName, asset.description, isCurrent);
-    if (!isCurrent()) throw new Error('资料库会话已切换');
+    if (!isCurrent()) throw new ProductError("mediaManagement.theLibrarySessionChanged");
     await directory.removeEntry(asset.fileName); removed = true;
     await removeMediaDescription(directory, asset.fileName, isCurrent);
-    return { ok: true, tone: 'success', message: `已${replacement ? '替换' : '改名为'}「${created.fileName}」；文章独立副本保持原样。` };
-  } catch (error) { return { ok: false, tone: 'warning', message: `新文件「${created.fileName}」已保存；${message(error)}；${removed ? '原文件已删除，描述索引未清理' : '原文件保留'}。` }; }
+    return { ok: true, tone: 'success', ...productMessage("mediaManagement.imageOperationCompletedTheIndependentArticleCopyIsUnchanged", { "value": (replacement ? productReference("mediaManagement.replacedWith") : productReference("mediaManagement.renamedTo")), "createdFileName": created.fileName }) };
+  } catch (error) { return { ok: false, tone: 'warning', ...productMessage("mediaManagement.newFileWasSaved", { "createdFileName": created.fileName, "value": message(error), "value2": (removed ? productReference("mediaManagement.theOriginalFileWasDeletedButTheDescriptionIndexWasNotCleaned") : productReference("mediaManagement.theOriginalFileIsRetained")) }) }; }
 }
 export async function inspectLocalArticleImages(source: string, root: FileSystemDirectoryHandle | null, month: string | null, folder: string | null): Promise<ArticleFormatIssue[]> {
   const references = articleLocalImageReferences(source);
@@ -170,7 +171,7 @@ export async function inspectLocalArticleImages(source: string, root: FileSystem
     let error: unknown = directoryError;
     if (directory) { try { await (await directory.getFileHandle(fileName)).getFile(); continue; } catch (cause) { error = cause; } }
     const absent = Boolean(root && month && folder && missing(error));
-    issues.push({ kind: 'element', name: `本地图片 ${fileName}`, source: '当前文章正文', tier: absent ? 'danger' : 'conditional', line: lines[0], lines: [...new Set(lines)], message: absent ? `图片文件不存在：media/image/${fileName}` : `暂无法确认本地图片：${error ? message(error) : '文章尚未保存或资料库未授权'}` });
+    issues.push({ kind: 'element', name: `本地图片 ${fileName}`, source: '当前文章正文', tier: absent ? 'danger' : 'conditional', line: lines[0], lines: [...new Set(lines)], ...productMessage(absent ? 'diagnostic.imageMissing' : 'diagnostic.imageUnconfirmed', { fileName, cause: error ? productCause(error) : productReference('diagnostic.articleNotSaved') }), domain: 'product' });
   }
   return issues;
 }

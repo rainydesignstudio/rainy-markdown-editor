@@ -1,5 +1,8 @@
 'use client';
 
+import { useUITranslation } from './UILocaleProvider';
+import { themeBindingLabel, themeBindingToken } from '../../lib/i18n/themeLabels';
+
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { animateInspectionScroll, INSPECTION_CLASSES, inspectionDimmedElements, uniqueBindings, type ColorBinding } from '../../lib/themeInspection';
@@ -45,6 +48,7 @@ type Props = {
 };
 
 export function ThemeInspectionPreview({ inspection, dialogOwner, children, className = '', resolve, rootRef, frameRef, revision, onLocate }: Props) {
+  const { t } = useUITranslation('dialogs');
   const wrapperRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const [popup, setPopup] = useState<Popup | null>(null);
@@ -150,9 +154,9 @@ export function ThemeInspectionPreview({ inspection, dialogOwner, children, clas
     close();
   };
   return <>
-    <div ref={wrapperRef} className={className} tabIndex={0} aria-label="颜色用途预览：悬停查看，方向键浏览，Enter 选择定位" data-inspection-utilities="transition-opacity duration-300 data-[theme-inspection-dim=true]:opacity-50">{children}</div>
-    {popup && typeof document !== 'undefined' ? createPortal(<div ref={popupRef} data-dialog-owner={dialogOwner} data-fading={fading} role="group" aria-label="预览元素的颜色用途" className="fixed z-70 grid w-max max-w-xs gap-1 rounded-lg border border-line-strong bg-popup-bg p-1.5 text-popup-text opacity-100 shadow-(--editor-popup-shadow) transition-opacity duration-200 data-[fading=true]:opacity-0" style={{ left: position.left, top: position.top }} onPointerEnter={keepPopup} onPointerLeave={deferClose} onFocusCapture={keepPopup} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) deferClose(); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); wrapperRef.current?.focus(); } }}>
-      {popup.bindings.map(binding => <button key={binding.key} type="button" className="grid gap-1 rounded-md border-0 bg-transparent px-3 py-2 text-left hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default" disabled={binding.kind === 'css' && binding.start === undefined} onClick={() => locate(binding)}><span className="text-xs font-medium">{binding.label}</span><span className="break-all font-mono text-2xs text-muted">{binding.token}</span>{binding.value && binding.kind === 'css' ? <span className="break-all font-mono text-2xs text-faint">{binding.value}</span> : null}</button>)}
+    <div ref={wrapperRef} className={className} tabIndex={0} aria-label={t('dialogs:ui.colorUsagePreviewHoverToInspectUseArrow')} data-inspection-utilities="transition-opacity duration-300 data-[theme-inspection-dim=true]:opacity-50">{children}</div>
+    {popup && typeof document !== 'undefined' ? createPortal(<div ref={popupRef} data-dialog-owner={dialogOwner} data-fading={fading} role="group" aria-label={t('dialogs:ui.previewElementColorUsage')} className="fixed z-70 grid w-max max-w-xs gap-1 rounded-lg border border-line-strong bg-popup-bg p-1.5 text-popup-text opacity-100 shadow-(--editor-popup-shadow) transition-opacity duration-200 data-[fading=true]:opacity-0" style={{ left: position.left, top: position.top }} onPointerEnter={keepPopup} onPointerLeave={deferClose} onFocusCapture={keepPopup} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) deferClose(); }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); wrapperRef.current?.focus(); } }}>
+      {popup.bindings.map(binding => <button key={binding.key} type="button" className="grid gap-1 rounded-md border-0 bg-transparent px-3 py-2 text-left hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default" disabled={binding.kind === 'css' && binding.start === undefined} onClick={() => locate(binding)}><span className="text-xs font-medium">{themeBindingLabel(binding, t)}</span><span className="break-all font-mono text-2xs text-muted">{themeBindingToken(binding, t)}</span>{binding.value && binding.kind === 'css' ? <span className="break-all font-mono text-2xs text-faint">{binding.value}</span> : null}</button>)}
     </div>, wrapperRef.current?.closest('[role="dialog"]') ?? document.body) : null}
   </>;
 }

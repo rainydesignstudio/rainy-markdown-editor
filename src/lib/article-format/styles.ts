@@ -1,3 +1,4 @@
+import { productCause, ProductError, productJoin, productReference, productText } from "../i18n/productMessages";
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import selectorParser from 'postcss-selector-parser';
@@ -27,30 +28,30 @@ export async function contentHash(value: string | Blob): Promise<string> {
 }
 export function normalizeLibraryPath(input: string, base = ''): string {
   let decoded: string;
-  try { decoded = decodeURIComponent(input); } catch { throw new Error('资源路径编码无效。'); }
-  if (/^[a-z][a-z\d+.-]*:/i.test(decoded) || /[\\\u0000-\u001f]/.test(decoded)) throw new Error('资源路径无效：' + input);
+  try { decoded = decodeURIComponent(input); } catch { throw new ProductError("styles.resourcePathEncodingIsInvalid"); }
+  if (/^[a-z][a-z\d+.-]*:/i.test(decoded) || /[\\\u0000-\u001f]/.test(decoded)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.invalidResourcePath"), input]) });
   const parts = decoded.startsWith('/') ? [] : base.split('/').filter(Boolean);
   for (const part of decoded.split('/')) {
     if (!part || part === '.') continue;
     if (part === '..') {
-      if (!parts.length) throw new Error('资源路径越出授权资料库：' + input);
+      if (!parts.length) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.resourcePathLeavesTheAuthorizedLibrary"), input]) });
       parts.pop();
     } else parts.push(part);
   }
-  if (!parts.length) throw new Error('资源路径不能指向资料库根目录。');
+  if (!parts.length) throw new ProductError("styles.aResourcePathCannotReferToTheLibraryRootDirectory");
   return parts.join('/');
 }
 export function stylesheetAssetPath(uri: string, file: string, publicRoot: string): { path: string; suffix: string } | null {
   if (!uri || uri.startsWith('#')) return null;
   if (/^data:/i.test(uri)) {
-    if (!/^data:(?:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml)|font\/(?:woff2?|ttf|otf));/i.test(uri)) throw new Error('样式内嵌资源类型不受支持。');
+    if (!/^data:(?:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml)|font\/(?:woff2?|ttf|otf));/i.test(uri)) throw new ProductError("styles.theTypeOfTheInlineStylesheetResourceIsUnsupported");
     return null;
   }
-  if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(uri)) throw new Error('样式资源须在授权资料库内：' + uri);
+  if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(uri)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.stylesheetResourcesMustBeWithinTheAuthorizedLibrary"), uri]) });
   const match = /^([^?#]*)(.*)$/.exec(uri)!;
   const suffix = match[2].includes('#') ? match[2].slice(match[2].indexOf('#')) : '';
   const path = uri.startsWith('/') ? normalizeLibraryPath(publicRoot + '/' + match[1].slice(1)) : normalizeLibraryPath(match[1], file.split('/').slice(0, -1).join('/'));
-  if (uri.startsWith('/') && !path.startsWith(normalizeLibraryPath(publicRoot) + '/')) throw new Error('资源路径越出虚拟站点根：' + uri);
+  if (uri.startsWith('/') && !path.startsWith(normalizeLibraryPath(publicRoot) + '/')) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.resourcePathLeavesTheVirtualWebsiteRoot"), uri]) });
   return { path, suffix };
 }
 export async function readLibraryFile(root: FileSystemDirectoryHandle, path: string): Promise<File> {
@@ -67,7 +68,7 @@ function importId(params: string): string {
   const first = nodes[0];
   if (first?.type === 'string' || first?.type === 'word') return first.value;
   if (first?.type === 'function' && first.value.toLowerCase() === 'url') return valueParser.stringify(first.nodes).replace(/^(['"])(.*)\1$/, '$2');
-  throw new Error('CSS @import 需要明确的文件路径。');
+  throw new ProductError("styles.cssImportRequiresAnExplicitFilePath");
 }
 function urls(value: string, visit: (uri: string) => string): string {
   const parsed = valueParser(value);
@@ -90,13 +91,13 @@ export function definedCssClasses(css: string): Set<string> {
 }
 export function assertPortableStyles(css: string) {
   const sheet = postcss.parse(css);
-  sheet.walkAtRules(rule => { if (['import', 'plugin', 'config'].includes(rule.name)) throw new Error('渲染成品不能引入额外代码或样式。'); });
+  sheet.walkAtRules(rule => { if (['import', 'plugin', 'config'].includes(rule.name)) throw new ProductError("styles.aRenderedDocumentCannotIntroduceAdditionalCodeOrStyles"); });
   sheet.walkDecls(declaration => {
-    if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw new Error('渲染成品包含可执行声明。');
+    if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw new ProductError("styles.theRenderedDocumentContainsExecutableDeclarations");
     urls(declaration.value, uri => {
       if (/^article-asset:[a-f0-9]{64}(?:#.*)?$/.test(uri) || uri.startsWith('#')) return uri;
       if (/^data:/i.test(uri)) { stylesheetAssetPath(uri, 'styles/render.css', 'assets'); return uri; }
-      throw new Error('渲染成品包含未留存资源：' + uri);
+      throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.theRenderedDocumentContainsUnsavedResources"), uri]) });
     });
   });
 }
@@ -105,7 +106,7 @@ function sourcePattern(params: string, base: string): StyleSource | null {
   const negative = parsed[0]?.type === 'word' && parsed[0].value === 'not';
   const first = parsed[negative ? 1 : 0];
   if (first?.type === 'function' && first.value === 'inline') return null;
-  if (first?.type !== 'string') throw new Error('目录 @source 须声明资料库内的明确路径。');
+  if (first?.type !== 'string') throw new ProductError("styles.directorySourceRequiresAnExplicitPathWithinTheLibrary");
   return { base, pattern: normalizeLibraryPath(first.value, base), negative };
 }
 function globPattern(pattern: string): RegExp {
@@ -117,7 +118,7 @@ function globPattern(pattern: string): RegExp {
     else if (pattern[i] === '?') result += '[^/]';
     else if (pattern[i] === '{') {
       const end = pattern.indexOf('}', i);
-      if (end < 0) throw new Error('@source glob括号未闭合。');
+      if (end < 0) throw new ProductError("styles.theSourceGlobBracketIsNotClosed");
       result += '(?:' + pattern.slice(i + 1, end).split(',').map(value => value.replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&')).join('|') + ')'; i = end;
     } else result += pattern[i].replace(/[.+^$()|[\]\\]/g, '\\$&');
   }
@@ -143,27 +144,27 @@ async function sourceCandidates(root: FileSystemDirectoryHandle, sources: StyleS
     for (const part of directoryPath) directory = await directory.getDirectoryHandle(part);
     const scan = async (node: FileSystemDirectoryHandle, base: string): Promise<void> => {
       for await (const [name, entry] of node.entries()) {
-        if (++enumerated > 50000) throw new Error('显式 @source 枚举范围超过上限。');
+        if (++enumerated > 50000) throw new ProductError("styles.theExplicitSourceEnumerationRangeExceedsTheLimit");
         if (name.startsWith('.') || name === 'node_modules' || name === 'history') continue;
         const path = base ? base + '/' + name : name;
         if (entry.kind === 'directory') {
           if (recurse) await scan(await node.getDirectoryHandle(name), path);
         } else if (pattern.test(path) && !excluded.some(exclude => exclude.test(path))) matches.add(path);
-        if (matches.size > STYLE_LIMITS.sourceFiles) throw new Error('显式 @source 文件数超过上限。');
+        if (matches.size > STYLE_LIMITS.sourceFiles) throw new ProductError("styles.theExplicitSourceFileCountExceedsTheLimit");
       }
     };
     await scan(directory, directoryPath.join('/'));
   }
   for (const path of matches) {
     const file = await readLibraryFile(root, path);
-    if (file.size > STYLE_LIMITS.cssFileBytes) throw new Error('@source文件过大：' + path);
+    if (file.size > STYLE_LIMITS.cssFileBytes) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.theSourceFileIsTooLarge"), path]) });
     const text = await file.text();
     for (const candidate of text.split(/[\s"'<>={}]+/)) if (candidate && candidate.length <= 256) candidates.add(candidate);
   }
   return [...candidates];
 }
 export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle, policy: StylesheetsPolicy): Promise<StylesheetEnvironment> {
-  if (!/\.css$/i.test(policy.entry)) throw new Error('样式入口必须是CSS文件。');
+  if (!/\.css$/i.test(policy.entry)) throw new ProductError("styles.theStyleEntryMustBeACssFile");
   const rawFiles: Record<string, string> = {}, files: Record<string, string> = {};
   const assetPaths = new Set<string>(), sources: StyleSource[] = [];
   const assetOrigins = new Map<string, string>();
@@ -171,26 +172,26 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
   const assets: CssAsset[] = [];
   let cssBytes = 0, assetBytes = 0;
   const load = async (path: string, chain: string[]): Promise<void> => {
-    if (!/\.css$/i.test(path)) throw new Error('只能导入CSS文件：' + path);
-    if (visiting.has(path)) throw new Error('CSS循环导入：' + [...chain, path].join(' → '));
+    if (!/\.css$/i.test(path)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.onlyCssFilesCanBeImported"), path]) });
+    if (visiting.has(path)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.circularCssImport"), [...chain, path].join(' → ')]) });
     if (complete.has(path)) return;
-    if (chain.length >= STYLE_LIMITS.depth || complete.size + visiting.size >= STYLE_LIMITS.cssFiles) throw new Error('CSS导入深度或文件数超过上限。');
+    if (chain.length >= STYLE_LIMITS.depth || complete.size + visiting.size >= STYLE_LIMITS.cssFiles) throw new ProductError("styles.cssImportDepthOrFileCountExceedsTheLimit");
     visiting.add(path);
     let file: File;
     try { file = await readLibraryFile(root, path); }
-    catch (error) { throw new Error('CSS读取失败：' + [...chain, path].join(' → ') + '；' + (error instanceof Error ? error.message : String(error))); }
+    catch (error) { throw new ProductError('shared.compose', { parts: productJoin([productJoin([productJoin([productReference("styles.cssReadingFailed"), [...chain, path].join(' → ')]), '；']), productCause(error)]) }); }
     cssBytes += file.size;
-    if (file.size > STYLE_LIMITS.cssFileBytes || cssBytes > STYLE_LIMITS.cssBytes) throw new Error('CSS大小超过上限：' + path);
+    if (file.size > STYLE_LIMITS.cssFileBytes || cssBytes > STYLE_LIMITS.cssBytes) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.cssExceedsTheSizeLimit"), path]) });
     const css = await file.text();
     rawFiles[path] = css;
     const sheet = postcss.parse(css, { from: path });
     const imports: string[] = [];
     sheet.walkAtRules(rule => {
-      if (['plugin', 'config'].includes(rule.name)) throw rule.error('资料库CSS不执行JS插件或配置');
+      if (['plugin', 'config'].includes(rule.name)) throw rule.error(productText("styles.libraryCssDoesNotExecuteJsPluginsOrConfiguration"));
       if (rule.name === 'import') {
         const id = importId(rule.params);
         if (!isTailwindImport(id)) {
-          if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(id)) throw rule.error('CSS导入必须位于授权资料库内');
+          if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(id)) throw rule.error(productText("styles.cssImportsMustRemainWithinTheAuthorizedLibrary"));
           imports.push(normalizeLibraryPath(id, path.split('/').slice(0, -1).join('/')));
         }
       } else if (rule.name === 'source') {
@@ -199,14 +200,14 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
       }
     });
     sheet.walkDecls(declaration => {
-      if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw declaration.error('CSS包含可执行内容');
+      if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw declaration.error(productText("styles.cssContainsExecutableContent"));
       urls(declaration.value, uri => {
         const asset = stylesheetAssetPath(uri, path, policy.publicRoot);
         if (asset) { assetPaths.add(asset.path); assetOrigins.set(asset.path, [...chain, path].join(' → ')); }
         return uri;
       });
     });
-    if (assetPaths.size > STYLE_LIMITS.assets) throw new Error('样式资源数超过上限。');
+    if (assetPaths.size > STYLE_LIMITS.assets) throw new ProductError("styles.theStylesheetResourceCountExceedsTheLimit");
     for (const dependency of imports) await load(dependency, [...chain, path]);
     visiting.delete(path); complete.add(path);
   };
@@ -214,12 +215,12 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
     await load(normalizeLibraryPath(policy.entry), []);
     for (const path of assetPaths) {
       const mime = MIME[path.split('.').at(-1)?.toLowerCase() ?? ''];
-      if (!mime) throw new Error('样式资源类型不受支持：' + path);
+      if (!mime) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.unsupportedStylesheetResourceType"), path]) });
       let file: File;
       try { file = await readLibraryFile(root, path); }
-      catch (error) { throw new Error('样式资源读取失败：' + assetOrigins.get(path) + ' → ' + path + '；' + (error instanceof Error ? error.message : String(error))); }
+      catch (error) { throw new ProductError('shared.compose', { parts: productJoin([productJoin([productJoin([productJoin([productJoin([productReference("styles.stylesheetResourceReadingFailed"), assetOrigins.get(path)]), ' → ']), path]), '；']), productCause(error)]) }); }
       assetBytes += file.size;
-      if (assetBytes > STYLE_LIMITS.assetBytes) throw new Error('样式资源总量超过256 MB。');
+      if (assetBytes > STYLE_LIMITS.assetBytes) throw new ProductError("styles.stylesheetResourcesExceed256MbInTotal");
       const blob = new Blob([await file.arrayBuffer()], { type: mime });
       const hash = await contentHash(blob);
       assets.push(Object.freeze({ path, hash, mime, blob, url: URL.createObjectURL(blob) }));
@@ -247,14 +248,14 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
       let pending = pendingAssets.get(path);
       if (!pending) {
         pending = (async () => {
-          if (byPath.size >= STYLE_LIMITS.assets) throw new Error('样式资源数超过上限。');
+          if (byPath.size >= STYLE_LIMITS.assets) throw new ProductError("styles.theStylesheetResourceCountExceedsTheLimit");
           const mime = MIME[path.split('.').at(-1)?.toLowerCase() ?? ''];
-          if (!mime) throw new Error('样式资源类型不受支持：' + path);
+          if (!mime) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.unsupportedStylesheetResourceType"), path]) });
           const file = await readLibraryFile(root, path);
           assetBytes += file.size;
-          if (assetBytes > STYLE_LIMITS.assetBytes) throw new Error('样式资源总量超过256 MB。');
+          if (assetBytes > STYLE_LIMITS.assetBytes) throw new ProductError("styles.stylesheetResourcesExceed256MbInTotal");
           const blob = new Blob([await file.arrayBuffer()], { type: mime });
-          if (disposed) throw new Error('资料库样式环境已关闭。');
+          if (disposed) throw new ProductError("styles.theLibraryStylesheetEnvironmentIsClosed");
           const asset = Object.freeze({ path, mime, blob, hash: await contentHash(blob), url: URL.createObjectURL(blob) });
           byPath.set(path, asset); assets.push(asset); return asset;
         })();
@@ -267,7 +268,7 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
       const sheet = postcss.parse(css, { from: source });
       const references = new Map<string, { path: string; suffix: string }>();
       sheet.walkDecls(declaration => {
-        if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw declaration.error('CSS包含可执行内容');
+        if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw declaration.error(productText("styles.cssContainsExecutableContent"));
         urls(declaration.value, uri => {
           if (assets.some(asset => uri === asset.url || uri.startsWith(asset.url + '#'))) return uri;
           const ref = stylesheetAssetPath(uri, source, policy.publicRoot);
@@ -282,6 +283,6 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
       dispose: () => { disposed = true; for (const asset of assets) URL.revokeObjectURL(asset.url); } });
   } catch (error) {
     for (const asset of assets) URL.revokeObjectURL(asset.url);
-    throw new Error('资料库样式不可用：' + (error instanceof Error ? error.message : String(error)));
+    throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.libraryStylesAreUnavailable"), productCause(error)]) });
   }
 }

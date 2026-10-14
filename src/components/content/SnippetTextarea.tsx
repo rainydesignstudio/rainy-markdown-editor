@@ -1,5 +1,9 @@
 'use client';
 
+import { formatProductMessage, productText } from "../../lib/i18n/productMessages";
+
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import { findSourceMatches, replaceAllSourceMatches } from '../../lib/sourceSearch';
 import { SourceFindBar, FindIcon, type ReplaceAllDecision } from './SourceFindBar';
 import { IconButton } from '../global/IconButton';
@@ -11,7 +15,7 @@ import { forwardRef, useLayoutEffect, useMemo, useRef, useState, type ChangeEven
 import { createPortal } from 'react-dom';
 import { findSnippetMenuMatch, findSnippetSpaceExpansion, groupSnippetMatches, snippetTreeRows, prepareSnippetInsertion } from '../../lib/snippetComposer';
 import { tokenizeEditorSource } from '../../lib/editorSourceHighlight';
-import { logicalSourceLines, type SourceLineConcern } from '../../lib/sourceLineDiagnostics';
+import { logicalSourceLines, sourceLineMessages, sourceLineMessageLevels, type SourceLineConcern } from '../../lib/sourceLineDiagnostics';
 import type { ArticleSnippet, SnippetCategory } from '../../lib/types';
 import { CategoryIcon } from './SnippetCategoryDialog';
 
@@ -59,9 +63,11 @@ export function highlightMarkdownSource(value: string): ReactNode[] {
 }
 
 export const SnippetTextarea = forwardRef(function SnippetTextarea(
-  { value, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel = '文章原始 Markdown 与 HTML 源码', id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
+  { value, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
   forwardedRef: ForwardedRef<HTMLTextAreaElement>,
 ) {
+  const { t } = useUITranslation('editor');
+  const ariaLabel = suppliedAriaLabel ?? t('editor:source.aria');
   const fontClass = sourceFont === 'article' ? 'font-article-source' : 'font-editor-source';
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -263,7 +269,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       onChange(previous);
     })) {
       pendingSelectionRef.current = null;
-      setInsertionIssue('浏览器未能建立可撤销的单步编辑；原文已保留。请重试，或手动修改源码。');
+      setInsertionIssue(productText("uiFeedback.undoableEditFailed"));
       restoreSelection(textarea, { start, end });
       return false;
     }
@@ -437,11 +443,11 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
         if ((event.metaKey || event.ctrlKey) && key === 'f' || event.ctrlKey && key === 'h') { event.preventDefault(); event.stopPropagation(); openFind(); }
       }} onDragEnter={handleDragOver} onDragOver={handleDragOver} onDragLeave={() => setIsDragActive(false)} onDrop={handleDrop}>
       {findOpen ? <SourceFindBar query={findQuery} replacement={findReplacement} matchCase={findCase} count={found.length} index={activeFind} disabled={disabled || readOnly} composing={isComposing} autoFocusQuery={focusFindQuery} focusQueryRef={focusFindRef}
-        decision={replaceAllDecision} scopeLabel={ariaLabel === '文章原始 Markdown 与 HTML 源码' ? '当前文章正文' : `当前${ariaLabel}`} onConfirmAll={confirmReplaceAll} onCancelAll={() => setReplaceAllDecision(null)}
+        decision={replaceAllDecision} scopeLabel={suppliedAriaLabel ? t('editor:find.currentScope', { name: suppliedAriaLabel }) : t('editor:find.scopeBody')} onConfirmAll={confirmReplaceAll} onCancelAll={() => setReplaceAllDecision(null)}
         onQuery={next => { setFindQuery(next); setFindIndex(0); }} onReplacement={setFindReplacement} onCase={() => { setFindCase(current => !current); setFindIndex(0); }} onMove={moveFind}
         onReplace={replaceCurrent} onReplaceAll={requestReplaceAll} onClose={closeFind} /> : null}
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      {!openFindRef && !findOpen ? <div className="absolute top-2 right-2 z-30"><IconButton tooltip="查找替换（⌘F / Ctrl+F）" icon={<FindIcon />} onClick={openFind} /></div> : null}
+      {!openFindRef && !findOpen ? <div className="absolute top-2 right-2 z-30"><IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={openFind} /></div> : null}
       <div ref={viewportRef} data-source-viewport="true" className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto scrollbar-gutter-stable" onScroll={handleViewportScroll}>
       <div data-source-content="true" className="relative min-h-full w-full">
       <div ref={highlightRef} className={`pointer-events-none ${isComposing ? 'opacity-0' : ''}`} aria-hidden="true"><pre ref={sourceRef} className={sourceBoxClass}>{highlightedSource}</pre></div>
@@ -451,8 +457,8 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
             const number = index + 1;
             const concern = lineConcerns.get(number);
             return <div key={number} className="relative min-w-0 whitespace-pre-wrap wrap-anywhere">
-              {showLineNumbers ? concern ? <button className="pointer-events-auto absolute top-0 -left-9 w-5 bg-transparent p-0 pr-1 text-right font-article-source text-faint data-[severity=warning]:text-warning data-[severity=error]:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:-left-12 md:w-8" type="button" data-severity={concern.severity} aria-label={`第 ${number} 行${concern.severity === 'error' ? '错误' : '警告'}：${concern.messages.join('；')}`} onMouseEnter={(event) => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={(event) => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{number}</button> : <span className="absolute top-0 -left-9 w-5 pr-1 text-right font-article-source text-faint md:-left-12 md:w-8" aria-hidden="true">{number}</span> : null}
-              {concern && (!showLineNumbers || concern.severities) ? <button type="button" className={`pointer-events-auto absolute top-0 flex h-6 items-center justify-center gap-0.5 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-accent ${showLineNumbers ? '-left-12 w-3 md:-left-16' : '-left-5 w-4 md:-left-6'}`} aria-label={`第 ${number} 行诊断：${concern.messages.join('；')}`} onMouseEnter={event => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={event => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{(concern.severities ?? [concern.severity]).map(severity => <span key={severity} data-severity={severity} className="size-1.5 shrink-0 rounded-full data-[severity=warning]:bg-warning data-[severity=error]:bg-danger" aria-hidden="true" />)}</button> : null}
+              {showLineNumbers ? concern ? <button className="pointer-events-auto absolute top-0 -left-9 w-5 bg-transparent p-0 pr-1 text-right font-article-source text-faint data-[severity=warning]:text-warning data-[severity=error]:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:-left-12 md:w-8" type="button" data-severity={concern.severity} aria-label={t('editor:diagnostics.line', { line: number, severity: t('editor:diagnostics.' + concern.severity), messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={(event) => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={(event) => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{number}</button> : <span className="absolute top-0 -left-9 w-5 pr-1 text-right font-article-source text-faint md:-left-12 md:w-8" aria-hidden="true">{number}</span> : null}
+              {concern && (!showLineNumbers || concern.severities) ? <button type="button" className={`pointer-events-auto absolute top-0 flex h-6 items-center justify-center gap-0.5 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-accent ${showLineNumbers ? '-left-12 w-3 md:-left-16' : '-left-5 w-4 md:-left-6'}`} aria-label={t('editor:diagnostics.lineLabel', { line: number, messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={event => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={event => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{(concern.severities ?? [concern.severity]).map(severity => <span key={severity} data-severity={severity} className="size-1.5 shrink-0 rounded-full data-[severity=warning]:bg-warning data-[severity=error]:bg-danger" aria-hidden="true" />)}</button> : null}
               <span className="invisible" aria-hidden="true">{line || '\u200b'}</span>
             </div>;
           })}
@@ -499,11 +505,11 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       </div>
       </div>
       </div>
-      {insertionIssue ? <div className="diagnostic" data-level="error" role="alert">{insertionIssue}</div> : null}
+      {insertionIssue ? <div className="diagnostic" data-level="error" role="alert">{formatProductMessage(insertionIssue, t)}</div> : null}
       {visibleMatch ? (
-        <div ref={menuRef} className="snippet-command-menu" aria-label="片段搜索结果">
-          <p className="snippet-command-hint">片段库 · ↑↓ 移动 · ←→ 折叠／展开 · Enter / Tab 插入 · Esc 关闭</p>
-          <div className="snippet-command-list" id="snippet-command-list" role="tree" aria-label="匹配片段分类">
+        <div ref={menuRef} className="snippet-command-menu" aria-label={t('editor:snippets.results')}>
+          <p className="snippet-command-hint">{t('editor:snippets.hint')}</p>
+          <div className="snippet-command-list" id="snippet-command-list" role="tree" aria-label={t('editor:snippets.categories')}>
             {rows.map((row, index) => (
               <button
                 key={row.id}
@@ -530,9 +536,9 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
         <div id={`source-line-${hoveredConcern.line}-issue`} className="fixed z-50 max-h-64 w-64 overflow-x-clip overflow-y-auto rounded-md border border-line-strong bg-popup-bg p-3 text-xs text-popup-text shadow-(--editor-popup-shadow) scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" style={{ top: hoveredConcern.top, left: hoveredConcern.left }} role="tooltip" onMouseEnter={cancelTooltipClose} onMouseLeave={scheduleTooltipClose}>
           <div className="flex items-center gap-2 font-semibold data-[severity=warning]:text-warning data-[severity=error]:text-danger" data-severity={hoveredConcern.concern.severity}>
             <svg className="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7v6m0 4h.01" /></svg>
-            <span>第 {hoveredConcern.line} 行 · {hoveredConcern.concern.severities ? '错误与警告' : hoveredConcern.concern.severity === 'error' ? '错误' : '警告'}</span>
+            <span>{t('editor:diagnostics.lineTitle', { line: hoveredConcern.line, severity: t('editor:diagnostics.' + (hoveredConcern.concern.severities ? 'mixed' : hoveredConcern.concern.severity)) })}</span>
           </div>
-          <ul className="mt-2 grid gap-1 pl-6">{(hoveredConcern.concern.messageLevels ?? hoveredConcern.concern.messages.map(message => ({ message, severity: hoveredConcern.concern.severity }))).map(({ message, severity }) => <li key={`${severity}:${message}`} className="break-words data-[severity=warning]:text-warning data-[severity=error]:text-danger" data-severity={severity}>{message}</li>)}</ul>
+          <ul className="mt-2 grid gap-1 pl-6">{sourceLineMessageLevels(hoveredConcern.concern, t).map(({ message, severity }) => <li key={`${severity}:${message}`} className="break-words data-[severity=warning]:text-warning data-[severity=error]:text-danger" data-severity={severity}>{message}</li>)}</ul>
         </div>, document.body) : null}
     </div>
   );

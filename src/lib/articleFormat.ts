@@ -1,3 +1,4 @@
+import { productCause, productMessage, productText, productReference, productJoin, type ProductMessageInfo, type ProductMessageValue } from "./i18n/productMessages";
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
@@ -17,7 +18,7 @@ type TreeNode = DefaultTreeAdapterMap['node'];
 type MarkdownNode = { type: string; value?: string; tagName?: string; properties?: Record<string, unknown>; children?: MarkdownNode[]; position?: { start?: { line?: number; offset?: number }; end?: { offset?: number } } };
 export type ArticleFormatTier = 'safe' | 'usable' | 'conditional' | 'lowPriority' | 'danger' | 'notAllowed' | 'unknown' | 'warning' | 'error';
 export type ArticleFormatSeverity = 'safe' | 'warning' | 'error';
-export type ArticleFormatIssue = { kind: 'element' | 'attribute' | 'style' | 'value' | 'engine'; name: string; source: string; tier: ArticleFormatTier; line?: number; lines?: number[]; message: string; ruleId?: string; reference?: string; domain?: 'standard' | 'product' };
+export type ArticleFormatIssue = { kind: 'element' | 'attribute' | 'style' | 'value' | 'engine'; name: string; source: string; sourceKind?: 'utility'; tier: ArticleFormatTier; line?: number; lines?: number[]; message: string; ruleId?: string; reference?: string; domain?: 'standard' | 'product' };
 type Sink = { issues: ArticleFormatIssue[]; passed: Set<string> };
 type StyleDeclaration = { property: string; value: string; important?: boolean };
 export type ArticleStyleContext = { element: string; declarations: ReadonlyMap<string, string> };
@@ -27,7 +28,7 @@ export function articleFormatSeverity(tier: ArticleFormatTier): ArticleFormatSev
 }
 export function articleFormatBlocks(tier: ArticleFormatTier): boolean { return ['error', 'danger', 'notAllowed'].includes(tier); }
 export function articleFormatTierLabel(tier: ArticleFormatTier): string {
-  return articleFormatSeverity(tier) === 'safe' ? '检查通过' : tier === 'unknown' ? '未完成核对' : articleFormatSeverity(tier) === 'error' ? '需处理' : '建议核对';
+  return productText('formatTiers.' + (articleFormatSeverity(tier) === 'safe' ? 'safe' : tier === 'unknown' ? 'unknown' : articleFormatSeverity(tier) === 'error' ? 'error' : 'warning'));
 }
 export function articleFormatTierMessage(tier: ArticleFormatTier): string { return articleFormatTierLabel(tier); }
 // An unmentioned HTML/CSS name is not an official permission or prohibition.
@@ -60,7 +61,7 @@ function transparent(value: string): boolean {
   return value.trim().toLowerCase() === 'transparent' || /rgba?\([^)]*[,/]\s*0(?:\.0+)?%?\s*\)$/i.test(value);
 }
 function checkCss(sink: Sink, property: string, value: string, source: string, line?: number): void {
-  if (/(?:expression\s*\(|javascript\s*:|vbscript\s*:|behavior\s*:|-moz-binding)/i.test(value)) sink.issues.push({ kind: 'style', name: property, source, tier: 'error', message: '样式含产品安全边界禁止的可执行内容。', domain: 'product', ...(line ? { line } : {}) });
+  if (/(?:expression\s*\(|javascript\s*:|vbscript\s*:|behavior\s*:|-moz-binding)/i.test(value)) sink.issues.push({ kind: 'style', name: property, source, tier: 'error', ...productMessage("articleFormat.theStyleContainsExecutableContentProhibitedByTheProductSafetyBoundary"), domain: 'product', ...(line ? { line } : {}) });
   const name = property.trim().toLowerCase(); const text = value.replace(/!\s*important\s*$/i, '').trim().toLowerCase();
   for (const rule of getFormatSnapshot().bundle.validator.rules.filter(item => item.enabled && item.stages.includes('authoring') && item.operator.startsWith('style.'))) {
     const matchesProperty = rule.parameters.property === name;
@@ -69,16 +70,16 @@ function checkCss(sink: Sink, property: string, value: string, source: string, l
       : rule.operator === 'style.transparent' ? matchesProperty && transparent(text)
       : rule.operator === 'style.important' ? /!\s*important\s*$/i.test(value) : false;
     if (violation) sink.issues.push(standardFormatIssue(rule, source, line));
-    else if (matchesProperty) sink.passed.add(`规则 ${rule.id}`);
+    else if (matchesProperty) sink.passed.add(productText("articleFormat.rule", { "ruleId": rule.id }));
   }
 }
 function checkStyleText(sink: Sink, style: string, source: string, line?: number): void {
   try { for (const entry of parseInlineStyle(style).filter(item => item.type === 'declaration')) checkCss(sink, entry.property, entry.value, source, line === undefined ? undefined : line + entry.position.start.line - 1); }
-  catch { sink.issues.push({ kind: 'style', name: 'style', source, tier: 'error', message: '内联CSS语法无法解析。', domain: 'product', ...(line ? { line } : {}) }); }
+  catch { sink.issues.push({ kind: 'style', name: 'style', source, tier: 'error', ...productMessage("articleFormat.inlineCssSyntaxCouldNotBeParsed"), domain: 'product', ...(line ? { line } : {}) }); }
 }
 function checkElement(sink: Sink, tag: string, attributes: Record<string, string>, source: string, line?: number, _authoringClasses = false, locations?: Map<string, { name: number; value: number }>): void {
   if (attributes.style) checkStyleText(sink, attributes.style, source, locations?.get('style')?.value ?? line);
-  if (['script', 'iframe', 'object', 'embed', 'base'].includes(tag.toLowerCase()) || Object.keys(attributes).some(name => /^on/i.test(name))) sink.issues.push({ kind: 'element', name: tag, source, tier: 'error', message: '原稿包含产品安全边界禁止的可执行或嵌入内容。', domain: 'product', ...(line ? { line } : {}) });
+  if (['script', 'iframe', 'object', 'embed', 'base'].includes(tag.toLowerCase()) || Object.keys(attributes).some(name => /^on/i.test(name))) sink.issues.push({ kind: 'element', name: tag, source, tier: 'error', ...productMessage("articleFormat.theSourceContainsExecutableOrEmbeddedContentProhibitedByTheProductSafety"), domain: 'product', ...(line ? { line } : {}) });
 }
 export function articleFormatPreviewStructure(body: string): HTMLElement {
   const inert = document.implementation.createHTMLDocument('格式检查');
@@ -209,7 +210,7 @@ export function inspectArticleFormatMarkdown(source: string, label = '正文', a
     if (passed) for (const name of sink.passed) passed.add(name);
     return { issues: sink.issues, classes: [...classes], classLines };
   } catch (error) {
-    return { issues: [{ kind: 'engine', name: 'Markdown', source: label, tier: 'unknown', message: `无法检查文章结构：${error instanceof Error ? error.message : String(error)}` }], classes: [], classLines: new Map() };
+    return { issues: [{ kind: 'engine', name: 'Markdown', source: label, tier: 'unknown', ...productMessage("articleFormat.articleStructureCouldNotBeChecked", { "cause": productCause(error) }) }], classes: [], classLines: new Map() };
   }
 }
 
@@ -222,8 +223,8 @@ export function validateArticleFormatCss(css: string, label = '文章主题 CSS'
   try {
     const sink: Sink = { issues: [], passed: new Set() };
     postcss.parse(css).walkDecls(declaration => checkCss(sink, declaration.prop, `${declaration.value}${declaration.important ? ' !important' : ''}`, label, declaration.source?.start?.line));
-    passed?.add('CSS语法'); for (const rule of sink.passed) passed?.add(rule); return sink.issues;
-  } catch (error) { return [{ kind: 'style', name: 'CSS', source: label, tier: 'error', message: `CSS无法解析：${error instanceof Error ? error.message : String(error)}`, domain: 'product' }]; }
+    passed?.add(productText("articleFormat.cssSyntax")); for (const rule of sink.passed) passed?.add(rule); return sink.issues;
+  } catch (error) { return [{ kind: 'style', name: 'CSS', source: label, tier: 'error', ...productMessage("articleFormat.cssCouldNotBeParsed", { "cause": productCause(error) }), domain: 'product' }]; }
 }
 export function validateRenderedArticleCss(root: HTMLElement, css: string, passed?: Set<string>): ArticleFormatIssue[] {
   const invalid = configurationIssue('当前文章'); if (invalid) return [invalid];
@@ -245,11 +246,17 @@ export function validateArticleFormatHtml(html: string, label = '复制内容', 
 export type ArticleFormatMessagePart = { text: string; emphasis?: boolean };
 
 const SEVERITY_ORDER: ArticleFormatSeverity[] = ['error', 'warning', 'safe'];
-const SEVERITY_HEADING: Record<ArticleFormatSeverity, string> = {
-  error: '以下内容需处理',
-  warning: '以下内容有风险',
-  safe: '以下内容已通过',
-};
+const SEVERITY_HEADING = Object.fromEntries(SEVERITY_ORDER.map(severity => [severity, productText('summary.headings.' + severity)])) as Record<ArticleFormatSeverity, string>;
+
+function groupedSummaryIssues(issues: ArticleFormatIssue[]) {
+  const unique = issues.filter((item, index) => issues.findIndex(other => other.kind === item.kind && other.name === item.name && other.source === item.source && (!item.source.endsWith('HTML 标签结构') || other.line === item.line)) === index);
+  const groups = new Map<ArticleFormatSeverity, ArticleFormatIssue[]>();
+  for (const item of unique) {
+    const severity = articleFormatSeverity(item.tier);
+    groups.set(severity, [...(groups.get(severity) ?? []), item]);
+  }
+  return groups;
+}
 
 // Findings are stated once per severity rather than once per entry, so a clause reads
 // `以下内容需处理 第 27 行：th；第 35 行：figure；…`. The heading is its own part so a UI can set it
@@ -257,19 +264,14 @@ const SEVERITY_HEADING: Record<ArticleFormatSeverity, string> = {
 // so a trailing stop would read `。；` and is dropped.
 export function articleFormatMessageParts(issues: ArticleFormatIssue[], limit = 5): ArticleFormatMessagePart[] {
   // Repeated structural mistakes need each location, even when their descriptions match.
-  const unique = issues.filter((item, index) => issues.findIndex(other => other.kind === item.kind && other.name === item.name && other.source === item.source && (!item.source.endsWith('HTML 标签结构') || other.line === item.line)) === index);
-  const groups = new Map<ArticleFormatSeverity, ArticleFormatIssue[]>();
-  for (const item of unique) {
-    const severity = articleFormatSeverity(item.tier);
-    groups.set(severity, [...(groups.get(severity) ?? []), item]);
-  }
+  const groups = groupedSummaryIssues(issues);
   const parts: ArticleFormatMessagePart[] = [];
   for (const severity of SEVERITY_ORDER) {
     const items = groups.get(severity);
     if (!items?.length) continue;
-    const shown = items.slice(0, limit).map(item => `${item.line ? `第 ${item.line} 行：` : ''}${item.name}`);
+    const shown = items.slice(0, limit).map(item => item.line ? productText('summary.located', { line: item.line, name: item.name }) : item.name);
     parts.push({ text: `${SEVERITY_HEADING[severity]} `, emphasis: true });
-    parts.push({ text: `${shown.join('；')}${items.length > limit ? `；另有 ${items.length - limit} 项` : ''}；` });
+    parts.push({ text: `${shown.join('；')}${items.length > limit ? productText('summary.more', { count: items.length - limit }) : ''}；` });
   }
   const last = parts.at(-1);
   if (last) last.text = `${last.text.slice(0, -1)}。`;
@@ -278,4 +280,23 @@ export function articleFormatMessageParts(issues: ArticleFormatIssue[], limit = 
 
 export function articleFormatMessage(issues: ArticleFormatIssue[], limit = 5): string {
   return articleFormatMessageParts(issues, limit).map(part => part.text).join('');
+}
+
+export function articleFormatMessageReference(issues: ArticleFormatIssue[], limit = 5): ProductMessageInfo {
+  const groups = groupedSummaryIssues(issues);
+  const parts: ProductMessageValue[] = [];
+  for (const severity of SEVERITY_ORDER) {
+    const items = groups.get(severity);
+    if (!items?.length) continue;
+    if (parts.length) parts.push(productReference('summary.separator'));
+    parts.push(productReference('summary.heading', { name: productReference('summary.headings.' + severity) }));
+    const shown = items.slice(0, limit);
+    for (const [index, item] of shown.entries()) {
+      if (index) parts.push(productReference('summary.separator'));
+      parts.push(item.line ? productReference('summary.located', { line: item.line, name: item.name }) : item.name);
+    }
+    if (items.length > limit) parts.push(productReference('summary.more', { count: items.length - limit }));
+  }
+  if (parts.length) parts.push(productReference('summary.stop'));
+  return productReference('shared.compose', { parts: productJoin(parts) });
 }

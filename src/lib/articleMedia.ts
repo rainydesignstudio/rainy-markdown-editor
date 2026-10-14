@@ -1,3 +1,4 @@
+import { ProductError, productCause } from "./i18n/productMessages";
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
@@ -59,9 +60,9 @@ export async function listSharedImages(root: FileSystemDirectoryHandle): Promise
 export async function importSharedImage(root: FileSystemDirectoryHandle, file: File, isCurrent: () => boolean): Promise<LibraryMediaAsset> {
   // Reject unsupported files before lazily creating either shared directory.
   await inspectArticleImage(file);
-  if (!isCurrent()) throw new Error('资料库已切换；图片未导入。');
+  if (!isCurrent()) throw new ProductError("articleMedia.theLibraryChangedTheImageWasNotImported");
   const directory = await getSharedImageDirectory(root, true);
-  if (!directory || !isCurrent()) throw new Error('资料库已切换；图片未导入。');
+  if (!directory || !isCurrent()) throw new ProductError("articleMedia.theLibraryChangedTheImageWasNotImported");
   const image = await importArticleImage(directory, file);
   return { ...image, kind: 'shared', root };
 }
@@ -84,7 +85,7 @@ async function detectImageFormat(file: Blob): Promise<ArticleImageFormat> {
   if (bytes.length >= 12 && ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return IMAGE_FORMATS[3];
   if (bytes.length >= 2 && ascii(0, 2) === 'BM') return IMAGE_FORMATS[4];
   if (bytes.length >= 12 && ascii(4, 8) === 'ftyp' && /avif|avis/.test(ascii(8, bytes.length))) return IMAGE_FORMATS[5];
-  throw new Error('无法从文件内容确认受支持的 PNG、JPEG、GIF、WebP、BMP 或 AVIF 图片；未写入文件。');
+  throw new ProductError("articleMedia.fileContentCouldNotBeIdentifiedAsSupportedPngJpegGifWebp");
 }
 
 export async function inspectArticleImage(file: Blob): Promise<ArticleImageFormat> {
@@ -110,14 +111,14 @@ function safeRenameBaseName(value: string, format: ArticleImageFormat): string {
     const aliases: Record<string, string> = { jpeg: 'jpg', jpe: 'jpg' };
     const normalizedExtension = aliases[extension] ?? extension;
     if (IMAGE_FORMATS.some((item) => item.extension === normalizedExtension) && normalizedExtension !== format.extension) {
-      throw new Error(`文件内容是 .${format.extension} 图片；不能改成 .${extension} 扩展名。`);
+      throw new ProductError("articleMedia.theFileContainsAImageItsExtensionCannotBeChangedTo", { "formatExtension": format.extension, "extension": extension });
     }
     if (normalizedExtension === format.extension) base = base.slice(0, -(extension.length + 1));
   }
   if (!base || base === '.' || base === '..' || base.startsWith('.') || /[<>:"/\\|?*\u0000-\u001f\u007f]/.test(base) || /[. ]$/.test(base)) {
-    throw new Error('文件名无效；请只填写不含路径的图片名称。');
+    throw new ProductError("articleMedia.invalidFilenameEnterAnImageNameWithoutAPath");
   }
-  if (Array.from(base).length > 80) throw new Error('文件名过长；请控制在 80 个字符内。');
+  if (Array.from(base).length > 80) throw new ProductError("articleMedia.theFilenameIsTooLongUseAtMost80Characters");
   return base;
 }
 
@@ -147,7 +148,7 @@ async function writeNewImageFile(
   bytes: ArrayBuffer,
 ): Promise<FileSystemFileHandle> {
   const names = await existingNames(directory);
-  if (names.has(normalizedFileName(fileName))) throw new Error(`素材「${fileName}」已存在；未覆盖任何文件。`);
+  if (names.has(normalizedFileName(fileName))) throw new ProductError("articleMedia.assetAlreadyExistsNoFilesWereOverwritten", { "fileName": fileName });
   let handle: FileSystemFileHandle | null = null;
   let writable: FileSystemWritableFileStream | null = null;
   try {
@@ -161,7 +162,7 @@ async function writeNewImageFile(
     if (handle) {
       try { await directory.removeEntry(fileName); } catch { /* report cleanup failure with the write error */ }
     }
-    throw new Error(`图片文件 ${fileName} 保存失败：${error instanceof Error ? error.message : String(error)}`);
+    throw new ProductError("articleMedia.imageFileCouldNotBeSaved", { "fileName": fileName, "cause": productCause(error) });
   }
 }
 
@@ -278,7 +279,7 @@ export function insertArticleImageReferences(
   if (selection.start < frontMatterEnd || selection.end < frontMatterEnd) start = end = frontMatterEnd;
 
   const references = fileNames.map((fileName) => {
-    if (!fileName || /[\\/\u0000-\u001f\u007f]/.test(fileName)) throw new Error('图片文件名不安全；未插入引用。');
+    if (!fileName || /[\\/\u0000-\u001f\u007f]/.test(fileName)) throw new ProductError("articleMedia.theImageFilenameIsUnsafeNoReferenceWasInserted");
     const label = fileName.replace(/\.[^.]+$/, '').replace(/\\/g, '\\\\').replace(/\[/g, '\\[').replace(/\]/g, '\\]');
     return `![${label}](media/image/${encodeImageFileName(fileName)})`;
   });

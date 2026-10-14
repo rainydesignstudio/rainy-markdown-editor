@@ -1,3 +1,4 @@
+import { ProductError } from "./i18n/productMessages";
 import colors from 'tailwindcss/colors';
 
 // Use the installed Tailwind palette, including new families, without copying
@@ -28,7 +29,7 @@ export function tailwindColorToHex(value: string, document: Document): string {
     context = canvas.getContext('2d', { willReadFrequently: true }) ?? undefined;
     if (context) canvasContexts.set(document, context);
   }
-  if (!context) throw new Error('浏览器无法解析此颜色，请使用 HEX 输入。');
+  if (!context) throw new ProductError("tailwindPalette.theBrowserCouldNotParseThisColorUseHexInput");
   context.clearRect(0, 0, 1, 1);
   context.fillStyle = value;
   context.fillRect(0, 0, 1, 1);

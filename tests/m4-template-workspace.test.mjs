@@ -161,7 +161,7 @@ function workspace() {
       if (id.endsWith('/templateNavigation')) return navigation;
       if (id.endsWith('/DialogFrame')) return { DialogFrame: Dialog, DialogHeader: Dialog, DialogFooter: Dialog, DialogActions: Dialog, DialogButton: Dialog };
       if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-changes-dialog' };
-      if (id.endsWith('/articleFormat')) return { articleFormatMessage: (issues) => (issues ?? []).map((item) => item.message).join('；') };
+      if (id.endsWith('/articleFormat')) return { articleFormatMessage: (issues) => (issues ?? []).map((item) => item.message).join('；'), articleFormatMessageReference: (issues) => ({ messageKey: 'shared.compose', messageParams: { parts: (issues ?? []).map(item => item.message).join('；') } }) };
       if (id.endsWith('/SnippetTextarea')) return textareaModule.exports;
       throw new Error(`Unexpected import: ${id}`);
     }),

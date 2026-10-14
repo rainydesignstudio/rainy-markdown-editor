@@ -1,5 +1,8 @@
 'use client';
 
+import { ProductError } from "../../lib/i18n/productMessages";
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import { articleMarkdownPlugins, articleHtmlPlugins, rehypePreviewOnly } from '../../lib/article-format/pipeline';
@@ -46,6 +49,7 @@ type LocalImageProps = {
 };
 
 function LocalArticleImage(props: LocalImageProps) {
+  const { t } = useUITranslation('messages');
   const [asset, setAsset] = useState<{ handle: FileSystemFileHandle; mimeType: string; size: number } | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
   const currentRef = useRef(props.isCurrent);
@@ -75,7 +79,7 @@ function LocalArticleImage(props: LocalImageProps) {
   }, [props.article.folder, props.article.month, props.fileName, props.root, props.sessionKey]);
 
   if (issue || !asset) {
-    const label = issue ? `本地图片不可用：${props.fileName}` : `正在读取本地图片：${props.fileName}`;
+    const label = t(issue ? 'messages:image.unavailableLabel' : 'messages:image.loadingLabel', { fileName: props.fileName });
     return (
       <span
         className="article-local-image-placeholder"
@@ -87,7 +91,7 @@ function LocalArticleImage(props: LocalImageProps) {
         data-clipboard-src={props.clipboardSource}
         data-clipboard-srcset={props.clipboardSourceSet}
       >
-        {issue ? `本地图片暂不可用 · ${props.fileName}` : '正在读取本地图片…'}
+        {issue ? t('messages:image.unavailable', { fileName: props.fileName }) : t('messages:image.loading')}
       </span>
     );
   }
@@ -137,7 +141,7 @@ async function decodeTemporaryUrl(url: string): Promise<void> {
   }
   await new Promise<void>((resolve, reject) => {
     probe.onload = () => resolve();
-    probe.onerror = () => reject(new Error('浏览器无法解码本地图片。'));
+    probe.onerror = () => reject(new ProductError("markdownPreview.theBrowserCouldNotDecodeTheLocalImage"));
   });
 }
 
@@ -217,6 +221,9 @@ export function MarkdownPreview({
   snapshot?: FormatSnapshot;
   previewOnly?: boolean;
 }) {
+  const { t } = useUITranslation('messages');
+  const translationRef = useRef(t);
+  translationRef.current = t;
   const activeSnapshot = useFormatSnapshot();
   const formatSnapshot = snapshot ?? activeSnapshot;
   const snapshotRef = useRef(formatSnapshot);
@@ -244,7 +251,7 @@ export function MarkdownPreview({
           try {
             const path = originalSrc.startsWith('/') ? stylesheetAssetPath(originalSrc, '', format.bundle.formatter.stylesheets.publicRoot)?.path : normalizeLibraryPath(originalSrc, base);
             if (path) return <LibraryArticleImage root={currentLibrary?.root ?? null} path={path} cachedUrl={format.environment?.assets.find(asset => asset.path === path)?.url} source={originalSrc} imageProps={{ ...imageProps, alt }} />;
-          } catch { return <span role="img" aria-label={'资源路径无效：' + originalSrc}>资源路径无效 · {originalSrc}</span>; }
+          } catch { return <span role="img" aria-label={translationRef.current('messages:image.invalidPathLabel', { path: originalSrc })}>{translationRef.current('messages:image.invalidPath', { path: originalSrc })}</span>; }
         }
         if (isLegacyExampleImage(originalSrc) || (relativeImagePolicyRef.current && originalSrc && !/^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(originalSrc))) {
           return <img {...imageProps} src={ARTICLE_EXAMPLE_IMAGE} alt={alt || '示例图片'} data-example-image="true" />;
@@ -276,12 +283,12 @@ export function MarkdownPreview({
             <span
               className="article-local-image-placeholder"
               role="img"
-              aria-label={`本地图片待补：${fileName}`}
+              aria-label={translationRef.current('messages:image.missingLabel', { path: fileName })}
               data-local-asset-src={originalSrc}
               data-local-asset-srcset={localSourceSet.length ? originalSourceSet : undefined}
               data-clipboard-srcset={originalSourceSet || undefined}
             >
-              本地图片待补 · {fileName}
+              {translationRef.current('messages:image.missing', { path: fileName })}
             </span>
           );
         }

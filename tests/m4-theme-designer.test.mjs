@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import * as sourceHighlight from '../src/lib/editorSourceHighlight.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -10,7 +11,7 @@ import * as fontCatalog from '../src/lib/fontCatalog.ts';
 const panelSource = await readFile(new URL('../src/components/global/CollapsiblePanel.tsx', import.meta.url), 'utf8');
 const panelCode = ts.transpileModule(panelSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 const panelModule = { exports: {} };
-vm.runInNewContext(panelCode, { module: panelModule, exports: panelModule.exports, require: () => ({ jsx, jsxs }) });
+vm.runInNewContext(panelCode, { module: panelModule, exports: panelModule.exports, require: withUILocaleImports(() => ({ jsx, jsxs })) });
 
 const source = await readFile(new URL('../src/components/settings/EditorThemeDesigner.tsx', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -18,7 +19,7 @@ function designer(editing = false, appearanceScheme = 'light') {
   let cursor = 0, tree; const cells = [], effects = []; let closes = 0;
   const props = { editing, appearanceScheme, source: themes.BASE_EDITOR_THEME, themes: [...themes.BUILTIN_EDITOR_THEMES], navigationGuardRef: { current: null }, onClose: () => closes++, onSave: async () => false };
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, require: withUILocaleImports(function(id){
     if (id.endsWith('/ThemeInspection')) return { useThemeInspection: () => ({ listRef: { current: null }, hovered: null, selected: null, rowProps: () => ({}), clear() {}, locate() {} }), ThemeInspectionPreview: 'inspection-preview', INSPECTION_ROW_CLASSES: '' };
     if (id.endsWith('/themeInspection')) return { uniqueBindings: items => items.filter((item, index) => items.findIndex(other => other.key === item.key) === index) };
     if (id.endsWith('/tailwind')) return {};
@@ -37,7 +38,7 @@ function designer(editing = false, appearanceScheme = 'light') {
       useEffect(effect, dependencies) { const index = cursor++; const old = cells[index]; if (old && dependencies.every((value, i) => Object.is(value, old.dependencies[i]))) return; effects.push(() => { old?.cleanup?.(); cells[index] = { dependencies, cleanup: effect() }; }); },
     };
     throw new Error(id);
-  } });
+  }) });
   const all = node => Array.isArray(node) ? node.flatMap(all) : node?.props ? typeof node.type === 'function' && ['CollapsiblePanel', 'PanelHeading', 'PanelIcon'].includes(node.type.name) ? all(node.type(node.props)) : [node, ...all(node.props.children)] : [];
   const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : '';
   const render = () => { cursor = 0; tree = module.exports.EditorThemeDesigner(props); while (effects.length) effects.shift()(); };

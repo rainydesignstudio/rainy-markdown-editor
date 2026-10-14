@@ -1,3 +1,4 @@
+import { ProductError, productCause, productMessage } from "../i18n/productMessages";
 import { DEFAULT_FORMAT_BUNDLE, validateFormatBundle, compileFormatBundle, type RawFormatBundle } from './config';
 import { activateFormatBundle, invalidateFormatBundle, type FormatSnapshot } from './runtime';
 import { loadStylesheetEnvironment, type StylesheetEnvironment } from './styles';
@@ -8,18 +9,18 @@ export type FormatLibraryResult = { bundle: RawFormatBundle | null; source: 'bui
 export async function readLibraryFormat(root: FileSystemDirectoryHandle): Promise<FormatLibraryResult> {
   let directory: FileSystemDirectoryHandle;
   try { directory = await root.getDirectoryHandle('format'); }
-  catch (error) { if (missing(error)) return { bundle: DEFAULT_FORMAT_BUNDLE, source: 'built-in', message: '资料库没有format目录，当前明示使用内置默认配置。' }; throw error; }
+  catch (error) { if (missing(error)) return { bundle: DEFAULT_FORMAT_BUNDLE, source: 'built-in', ...productMessage("library.theLibraryHasNoFormatDirectoryTheBuiltInDefaultConfigurationIs") }; throw error; }
   const texts: (string | null)[] = [];
   for (const name of FORMAT_FILES) {
-    try { const file = await (await directory.getFileHandle(name)).getFile(); if (file.size > 1_000_000) throw new Error(`${name}过大。`); texts.push(await file.text()); }
+    try { const file = await (await directory.getFileHandle(name)).getFile(); if (file.size > 1_000_000) throw new ProductError("library.exceedsTheSizeLimit", { "name": name }); texts.push(await file.text()); }
     catch (error) { if (missing(error)) texts.push(null); else throw error; }
   }
-  if (texts.every(value => value === null)) return { bundle: DEFAULT_FORMAT_BUNDLE, source: 'built-in', message: 'format目录为空，当前明示使用内置默认配置。' };
-  if (texts.some(value => value === null)) return { bundle: null, source: 'invalid', message: `格式三件套不完整：${FORMAT_FILES.filter((_, i) => texts[i] === null).join('、')}缺失。请先修复或迁移，不会混用默认文件。` };
+  if (texts.every(value => value === null)) return { bundle: DEFAULT_FORMAT_BUNDLE, source: 'built-in', ...productMessage("library.theFormatDirectoryIsEmptyTheBuiltInDefaultConfigurationIsBeing") };
+  if (texts.some(value => value === null)) return { bundle: null, source: 'invalid', ...productMessage("library.theFormatTrioIsIncompleteMissingRepairOrMigrateItFirstDefault", { "details": FORMAT_FILES.filter((_, i) => texts[i] === null).join('、') }) };
   try {
     const [support, validator, formatter] = texts.map(value => JSON.parse(value!));
     return { bundle: validateFormatBundle({ support, validator, formatter }), source: 'library', message: null };
-  } catch (error) { return { bundle: null, source: 'invalid', message: `资料库格式配置不可用：${error instanceof Error ? error.message : String(error)}` }; }
+  } catch (error) { return { bundle: null, source: 'invalid', ...productMessage("library.theLibraryFormatConfigurationIsUnavailable", { "cause": productCause(error) }) }; }
 }
 export async function activateLibraryFormat(root: FileSystemDirectoryHandle, isCurrent: () => boolean): Promise<{ snapshot: FormatSnapshot | null; message: string | null }> {
   const result = await readLibraryFormat(root);

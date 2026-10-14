@@ -1,3 +1,4 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
 const formatRuntime = await import('../src/lib/article-format/runtime.ts');
 const formatPreview = await import('../src/lib/article-format/preview.ts');
 import assert from 'node:assert/strict';
@@ -7,6 +8,7 @@ import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { BASIC_THEME } from '../src/lib/themes.ts';
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 
 const code = ts.transpileModule(await readFile(new URL('../src/components/content/ContentRenderPreview.tsx', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 } }).outputText;
 
@@ -26,11 +28,13 @@ function preview() {
     useEffect(effect, dependencies) { const i = cursor++, old = cells[i]; if (old && dependencies.every((value, n) => Object.is(value, old.dependencies[n]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { dependencies, cleanup: effect() }; }); },
   };
   const mountModule = { exports: {} };
-  vm.runInNewContext(mountCode, { module: mountModule, exports: mountModule.exports, require: id => id === 'react' ? { ...react, useLayoutEffect: react.useEffect } : {} });
+  vm.runInNewContext(mountCode, {
+...productMessages, module: mountModule, exports: mountModule.exports, require: withUILocaleImports(id => id === 'react' ? { ...react, useLayoutEffect: react.useEffect } : {}) });
   vm.runInNewContext(code, {
+...productMessages,
     module, exports: module.exports,
     window: { addEventListener() {}, removeEventListener() {}, setTimeout(fn, delay) { assert.equal(delay, 200); timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } },
-    require(id) {
+    require: withUILocaleImports(function(id){
     if (id.endsWith('/useArticleRenderMount')) return mountModule.exports;
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => formatRuntime.getFormatSnapshot() };
@@ -43,7 +47,7 @@ function preview() {
       if (id.endsWith('/localFonts')) return { shareLocalFontsWithPreview: () => () => {} };
       if (id.endsWith('/tailwind')) return { compileArticleStyles(source, theme) { return new Promise((resolve, reject) => calls.push({ source, theme, resolve, reject })); } };
       throw new Error(id);
-    },
+    }),
   });
   const walk = node => Array.isArray(node) ? node.flatMap(walk) : node?.props ? [node, ...walk(node.props.children)] : [];
   function render() {

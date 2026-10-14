@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -43,6 +43,13 @@ test('missing static output exits with an explicit build instruction', (t) => {
   mkdirSync(scripts);
   copyFileSync(startScript, path.join(scripts, 'start-static.mjs'));
   copyFileSync(new URL('../scripts/static-server-options.mjs', import.meta.url), path.join(scripts, 'static-server-options.mjs'));
+  copyFileSync(new URL('../scripts/cli-locale.mjs', import.meta.url), path.join(scripts, 'cli-locale.mjs'));
+  for (const locale of ['zh-CN', 'en-US']) {
+    const target = path.join(directory, 'locale', locale);
+    mkdirSync(target, { recursive: true });
+    copyFileSync(new URL(`../locale/${locale}/messages.json`, import.meta.url), path.join(target, 'messages.json'));
+  }
+  symlinkSync(fileURLToPath(new URL('../node_modules', import.meta.url)), path.join(directory, 'node_modules'), 'dir');
   const result = spawnSync(process.execPath, [path.join(scripts, 'start-static.mjs')], { encoding: 'utf8', timeout: 5000 });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /缺少 out\/index\.html/);

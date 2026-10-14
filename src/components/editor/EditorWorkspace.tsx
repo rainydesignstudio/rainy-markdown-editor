@@ -1,5 +1,9 @@
 'use client';
 
+import { formatDiagnosticMessage } from "../../lib/i18n/productMessages";
+
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import type { MutableRefObject } from 'react';
 import { useResizableColumns } from '../../hooks/useResizableColumns';
 import { ColumnSplitter } from '../global/ColumnSplitter';
@@ -70,6 +74,7 @@ export function EditorWorkspace({
   mediaBusy,
   readOnly,
 }: EditorWorkspaceProps) {
+  const { t } = useUITranslation('editor');
   const layout = useResizableColumns();
   const { containerRef: gridRef, wideEnough, dragging, style: splitStyle } = layout;
   const diagnosticErrors = parsed.diagnostics.filter((item) => item.level === 'error');
@@ -77,11 +82,11 @@ export function EditorWorkspace({
   return (
     <div className="editor-workspace" data-wide={wideEnough} data-read-only={readOnly}>
       {!readOnly && (!wideEnough || diagnosticErrors.length > 0) ? <div className="editor-workspace-toolbar">
-        <div className="preview-toggle" role="group" aria-label="窄屏编辑与预览切换">
-          <button type="button" aria-pressed={mobilePane === 'source'} data-active={mobilePane === 'source'} onClick={() => onSetMobilePane('source')} disabled={mediaBusy}>正文</button>
-          <button type="button" aria-pressed={mobilePane === 'preview'} data-active={mobilePane === 'preview'} onClick={() => onSetMobilePane('preview')} disabled={mediaBusy}>预览</button>
+        <div className="preview-toggle" role="group" aria-label={t('editor:workspace.panes')}>
+          <button type="button" aria-pressed={mobilePane === 'source'} data-active={mobilePane === 'source'} onClick={() => onSetMobilePane('source')} disabled={mediaBusy}>{t('editor:workspace.body')}</button>
+          <button type="button" aria-pressed={mobilePane === 'preview'} data-active={mobilePane === 'preview'} onClick={() => onSetMobilePane('preview')} disabled={mediaBusy}>{t('editor:workspace.preview')}</button>
         </div>
-        {diagnosticErrors.length ? <p className="editor-diagnostic-summary" role="alert">元数据有误 · 正文编辑已暂停</p> : null}
+        {diagnosticErrors.length ? <p className="editor-diagnostic-summary" role="alert">{t('editor:workspace.metadataPaused')}</p> : null}
       </div> : null}
       <div ref={gridRef} className={readOnly && !wideEnough ? 'editor-grid grid-rows-2' : 'editor-grid'} data-wide={wideEnough} data-dragging={dragging} style={splitStyle}>
         <div className="editor-source-pane" data-mobile-hidden={!readOnly && mobilePane === 'preview'}>
@@ -106,7 +111,7 @@ export function EditorWorkspace({
             readOnly={readOnly}
           />
         </div>
-        <ColumnSplitter layout={layout} label="调整正文与预览宽度" />
+        <ColumnSplitter layout={layout} label={t('editor:workspace.resize')} />
         <div className="editor-preview-pane" data-mobile-hidden={!readOnly && mobilePane === 'source'}>
           <PreviewPanel
             onOpenTheme={onOpenTheme}
@@ -125,7 +130,7 @@ export function EditorWorkspace({
           />
         </div>
       </div>
-      {parsed.diagnostics.length ? <section className="diagnostic-stack editor-diagnostics" aria-label="文章诊断">{parsed.diagnostics.map((diagnostic, index) => <p key={`${diagnostic.message}-${index}`} className="diagnostic" data-level={diagnostic.level}>{diagnostic.message}</p>)}</section> : null}
+      {parsed.diagnostics.length ? <section className="diagnostic-stack editor-diagnostics" aria-label={t('editor:workspace.diagnostics')}>{parsed.diagnostics.map((diagnostic, index) => <p key={`${diagnostic.message}-${index}`} className="diagnostic" data-level={diagnostic.level}>{formatDiagnosticMessage(diagnostic, t)}</p>)}</section> : null}
     </div>
   );
 }

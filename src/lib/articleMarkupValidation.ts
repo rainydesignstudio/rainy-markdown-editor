@@ -1,3 +1,4 @@
+import { productText } from "./i18n/productMessages";
 import { html, Tokenizer, TokenizerMode, type TokenHandler } from 'parse5';
 import type { ArticleFormatIssue } from './articleFormat';
 
@@ -14,21 +15,21 @@ const OPTIONAL_END_TAGS = new Set('html head body p li dt dd rt rp option optgro
 const P_CLOSING_STARTS = new Set('address article aside blockquote details div dl fieldset figcaption figure footer form h1 h2 h3 h4 h5 h6 header hgroup hr main menu nav ol p pre section table ul'.split(' '));
 const KNOWN_TAGS = new Set<string>(Object.values(html.TAG_NAMES));
 const SYNTAX_ERRORS: Record<string, string> = {
-  'eof-in-tag': '标签不完整，或属性引号未闭合',
-  'eof-before-tag-name': '标签缺少名称',
-  'missing-end-tag-name': '闭合标签缺少名称',
-  'end-tag-with-attributes': '闭合标签不能带属性或正文',
-  'end-tag-with-trailing-solidus': '闭合标签不能使用自闭合写法',
-  'unexpected-solidus-in-tag': '标签中的斜杠位置错误',
-  'invalid-first-character-of-tag-name': '标签名称开头无效',
-  'unexpected-equals-sign-before-attribute-name': '属性缺少名称',
-  'unexpected-character-in-attribute-name': '属性名称含无效字符',
-  'unexpected-character-in-unquoted-attribute-value': '属性值含无效字符，请检查引号',
-  'missing-attribute-value': '属性缺少值',
-  'missing-whitespace-between-attributes': '属性之间缺少空格',
-  'duplicate-attribute': '标签包含重复属性',
-  'eof-in-comment': 'HTML 注释未闭合',
-  'eof-in-doctype': 'DOCTYPE 声明未闭合',
+  'eof-in-tag': productText("articleMarkupValidation.theTagIsIncompleteOrAnAttributeQuoteIsNotClosed"),
+  'eof-before-tag-name': productText("articleMarkupValidation.theTagNameIsMissing"),
+  'missing-end-tag-name': productText("articleMarkupValidation.theClosingTagNameIsMissing"),
+  'end-tag-with-attributes': productText("articleMarkupValidation.aClosingTagCannotContainAttributesOrBodyText"),
+  'end-tag-with-trailing-solidus': productText("articleMarkupValidation.aClosingTagCannotUseSelfClosingSyntax"),
+  'unexpected-solidus-in-tag': productText("articleMarkupValidation.theSlashIsMisplacedInTheTag"),
+  'invalid-first-character-of-tag-name': productText("articleMarkupValidation.theTagNameHasAnInvalidFirstCharacter"),
+  'unexpected-equals-sign-before-attribute-name': productText("articleMarkupValidation.theAttributeNameIsMissing"),
+  'unexpected-character-in-attribute-name': productText("articleMarkupValidation.theAttributeNameContainsAnInvalidCharacter"),
+  'unexpected-character-in-unquoted-attribute-value': productText("articleMarkupValidation.theAttributeValueContainsAnInvalidCharacterCheckItsQuotes"),
+  'missing-attribute-value': productText("articleMarkupValidation.theAttributeValueIsMissing"),
+  'missing-whitespace-between-attributes': productText("articleMarkupValidation.attributesRequireASeparatingSpace"),
+  'duplicate-attribute': productText("articleMarkupValidation.theTagContainsADuplicateAttribute"),
+  'eof-in-comment': productText("articleMarkupValidation.theHtmlCommentIsNotClosed"),
+  'eof-in-doctype': productText("articleMarkupValidation.theDoctypeDeclarationIsNotClosed"),
 };
 
 export function articleHtmlSourceMask(source: string, tree: MarkdownNode): string {
@@ -88,7 +89,7 @@ export function validateArticleMarkup(source: string, tree: MarkdownNode, label:
   const lineAt = (offset: number) => source.slice(0, offset).split(/\r\n|\r|\n/).length;
   const report = (name: string, line: number, message = name) => {
     if (!issues.some(issue => issue.name === name && issue.line === line)) {
-      issues.push({ kind: 'element', name, source: `${label} · HTML 标签结构`, tier: 'danger', message, line });
+      issues.push({ kind: 'element', name, source: productText("articleMarkupValidation.htmlTagStructure", { "label": label }), tier: 'danger', message, line });
     }
   };
   const markEnd = (token: { location: { endOffset: number } | null }) => { lastTokenEnd = token.location?.endOffset ?? lastTokenEnd; };
@@ -111,7 +112,7 @@ export function validateArticleMarkup(source: string, tree: MarkdownNode, label:
       const foreign = ['svg', 'math'].includes(token.tagName) || stack.some(item => ['svg', 'math'].includes(item.name));
       if (!VOID_TAGS.has(token.tagName) && !(token.selfClosing && foreign)) {
         const line = token.location?.startLine ?? 1;
-        if (token.selfClosing) report(`<${token.tagName}/> 不能自闭合，应补充 </${token.tagName}>`, line);
+        if (token.selfClosing) report(productText("articleMarkupValidation.cannotBeSelfClosingAdd", { "tokenTagName": token.tagName, "tokenTagName2": token.tagName }), line);
         stack.push({ name: token.tagName, line, reported: token.selfClosing });
       }
       tokenizer.inForeignNode = stack.some(item => ['svg', 'math'].includes(item.name));
@@ -122,16 +123,16 @@ export function validateArticleMarkup(source: string, tree: MarkdownNode, label:
     onEndTag(token) {
       markEnd(token);
       const line = token.location?.startLine ?? 1;
-      if (VOID_TAGS.has(token.tagName)) { report(`空元素 <${token.tagName}> 不应有闭合标签 </${token.tagName}>`, line); return; }
+      if (VOID_TAGS.has(token.tagName)) { report(productText("articleMarkupValidation.voidElementMustNotHaveClosingTag", { "tokenTagName": token.tagName, "tokenTagName2": token.tagName }), line); return; }
       const index = stack.findLastIndex(item => item.name === token.tagName);
       if (index < 0) {
         const open = stack.at(-1);
-        report(open ? `闭合标签 </${token.tagName}> 不匹配，当前应为 </${open.name}>` : `闭合标签 </${token.tagName}> 没有对应的开始标签`, line);
+        report(open ? productText("articleMarkupValidation.closingTagDoesNotMatchExpected", { "tokenTagName": token.tagName, "openName": open.name }) : productText("articleMarkupValidation.closingTagHasNoCorrespondingOpeningTag", { "tokenTagName": token.tagName }), line);
         if (open) open.reported = true;
         return;
       }
       const unclosed = stack.slice(index + 1).filter(item => !OPTIONAL_END_TAGS.has(item.name));
-      if (unclosed.length) report(`闭合顺序错误：${unclosed.map(item => `<${item.name}>`).join('、')} 尚未闭合，就遇到 </${token.tagName}>`, line);
+      if (unclosed.length) report(productText("articleMarkupValidation.closingOrderIsIncorrectRemainsUnclosedBefore", { "details": unclosed.map(item => `<${item.name}>`).join('、'), "tokenTagName": token.tagName }), line);
       stack.splice(index);
       tokenizer.inForeignNode = stack.some(item => ['svg', 'math'].includes(item.name));
     },
@@ -143,7 +144,7 @@ export function validateArticleMarkup(source: string, tree: MarkdownNode, label:
       report(message, line);
     },
     onEof() {
-      for (const open of stack) if (!open.reported && !OPTIONAL_END_TAGS.has(open.name)) report(`<${open.name}> 未闭合，缺少 </${open.name}>`, open.line);
+      for (const open of stack) if (!open.reported && !OPTIONAL_END_TAGS.has(open.name)) report(productText("articleMarkupValidation.isNotClosedIsMissing", { "openName": open.name, "openName2": open.name }), open.line);
     },
     onComment: markEnd,
     onDoctype: markEnd,

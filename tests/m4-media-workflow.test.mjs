@@ -1,3 +1,5 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -19,7 +21,7 @@ function action(name, context) {
   visit(ast); assert.ok(initializer, name);
   const code = ts.transpileModule(`globalThis.action = ${initializer.getText(ast)};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   context.useCallback = callback => callback; context.Error = Error;
-  vm.runInNewContext(code, context);
+  vm.runInNewContext(code, Object.assign(context, productMessages));
   return context.action;
 }
 const body = 'before\n\nafter';
@@ -118,7 +120,8 @@ function picker(onAdopt, onImport = async () => ({ ok: true, message: 'imported'
   let cursor = 0, tree, closes = 0, calls = 0;
   const module = { exports: {} };
   const render = () => { cursor = 0; tree = nodes(module.exports.MediaPickerDialog({ root: asset.root, sessionKey: 1, refreshSignal: 0, articles: [], articleId: 'target', articleTitle: '目标稿', initialAsset: asset, isCurrent: () => true, busy: false, onImport, onAdopt: image => { calls++; return onAdopt(image); }, onClose: () => closes++ })); };
-  vm.runInNewContext(pickerCode, { module, exports: module.exports, Error, require(id) {
+  vm.runInNewContext(pickerCode, {
+...productMessages, module, exports: module.exports, Error, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
@@ -136,7 +139,7 @@ function picker(onAdopt, onImport = async () => ({ ok: true, message: 'imported'
     if (id.endsWith('/MediaToolbar')) return { MediaToolbar: 'toolbar' };
     if (id.endsWith('/MediaGallery')) return { MediaDetails: 'detail', MediaGallery: 'gallery', MediaBrowseControls: 'browse', sortMediaAssets: values => values, MediaIcon: 'icon', MediaImportButton: 'import', MediaSourceSwitch: 'switch', mediaAssetKey: a => a.fileName };
     throw new Error(id);
-  } });
+  }) });
   const find = predicate => { const result = tree.find(predicate); assert.ok(result); return result; };
   render();
   return { render, find, get closes() { return closes; }, get calls() { return calls; }, adopt: () => find(node => node.type === 'button' && text(node).includes('采用图片')).props.onClick(), cancel: () => find(node => node.type === 'button' && text(node).includes('取消')).props.onClick() };

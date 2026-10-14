@@ -1,3 +1,4 @@
+import { ProductError } from "./i18n/productMessages";
 import { getFormatSnapshot } from './article-format/runtime';
 import { formatPreviewDocument } from './article-format/frame';
 // Configured conversion runs only in a fresh document. The light DOM remains untouched.
@@ -26,7 +27,7 @@ export function cloneArticleForDarkPreview(root: HTMLElement): HTMLElement {
   const clone = root.cloneNode(true) as HTMLElement;
   clone.removeAttribute('hidden');
   const view = root.ownerDocument.defaultView;
-  if (!view) throw new Error('文章预览尚未挂载。');
+  if (!view) throw new ProductError("articleDarkPreview.theArticlePreviewIsNotMountedYet");
   const originals = [root, ...root.querySelectorAll<HTMLElement>('*')];
   const copies = [clone, ...clone.querySelectorAll<HTMLElement>('*')];
   const options = getFormatSnapshot().bundle.formatter.output;

@@ -1,0 +1,445 @@
+{
+  "title": "Release notes",
+  "release": "Version {{version}}",
+  "expandAll": "Expand all",
+  "collapseAll": "Collapse all",
+  "status": {
+    "published": "Published",
+    "local": "Local version",
+    "in-progress": "In development"
+  },
+  "releases": {
+    "v0_1_1": {
+      "summary": "Split the article editor into page and business components while preserving existing article assets and writing workflows."
+    },
+    "v0_1_2": {
+      "summary": "Redesigned the workspace and added projects, archiving, Fork, history comparisons and editor appearance settings. Article directories can be restored after refresh. Light/dark article preview switching was not yet available."
+    },
+    "v0_1_3": {
+      "summary": "Editor themes manage colors and fonts, with JSON import/export, custom combinations and migration of older appearance settings. Source coloring follows the editor theme; Rainy Studio Slate adds local fonts. Article themes and exports remain independent. The app version comes from package.json and release notes use a separate JSON file."
+    },
+    "v0_1_3_1": {
+      "summary": "Separated heading and interface fonts; adapted four built-in themes, with neutral gray colors and serif headings for Mist Gray. Eyebrows use English; page headings and eyebrows share styles and specification IDs. Headings use mt-1 and adjacent descriptions use mt-3."
+    },
+    "v0_1_4": {
+      "summary": "Continued improvements to templates, snippets, themes and writing. This version was in development; changes are grouped by feature.",
+      "sections": [
+        {
+          "title": "Templates and libraries",
+          "items": [
+            "Synced built-in themes, snippets, categories and starter templates from the user's local library. Renamed the general snippet category to Default; new libraries include Default and Zixu categories, retaining icons and user edits.",
+            "Starter templates use category directories and an index for names, descriptions, order and icons. They share collapsible category panels and creation controls with snippets. Renaming migrates files and indexes; failures restore the original directory and report incomplete rollback.",
+            "Merged snippets and starter templates into the Templates page with tabs, unified navigation, URL state and redirects from old routes.",
+            "Lists and details scroll independently. Expanded categories scroll with the list; narrow screens cap list height to leave room for editing.",
+            "User snippets use category directories, with names, descriptions, order and icons in an index. Uncategorized snippets also have their own directory.",
+            "Category cards reuse collapsible panels. The edit button sits left of the count, appears on hover or keyboard focus, and its tooltip is not clipped.",
+            "Category dialogs include icon selection. Whole snippet and starter-template cards can be selected.",
+            "Both content types share a separate information dialog. Starter-template source editing hides metadata while preserving unknown fields, dates, theme bindings and comments.",
+            "Click snippet or template source to type; changes show Source editing. Cancel and Save content stay at the bottom right. Names share a row with triggers or filenames; descriptions stay in the list and information dialog.",
+            "New snippets and starter templates require a filename. Confirming information keeps a draft; the first content save writes filename, metadata and body together. Existing files can be renamed, with collision checks, original-file retention and new-file rollback on failure.",
+            "Cmd/Ctrl+S saves current snippet or template content. With an information dialog open, it saves that form without also saving the article. Read-only, unchanged, composition, saving and confirmation states retain their guards.",
+            "Existing-file information and body are saved separately. Cancelling information edits preserves the body draft, and saving information retains unsaved body edits. Both previews reuse the light/dark switch and conversion workflow.",
+            "Markdown and Tailwind utilities render live beside the source; a draggable divider adjusts widths. Invalid metadata can be repaired separately.",
+            "Preserved drafts in both tabs, departure confirmation, failed-write protection, refresh retry and directory-session isolation."
+          ]
+        },
+        {
+          "title": "Snippet input and keyboard controls",
+          "items": [
+            "Insert element Markdown actions use one native edit and support Cmd/Ctrl+Z undo and redo. Imported-image references also enter undo history; original content remains protected on failure.",
+            "The snippet library in Insert element now has one Open snippet library action: insert // at the start of a line, adding a newline first when necessary, then open the list.",
+            "The list groups snippets by library category. Left/right expands, collapses or returns to the parent; up/down moves through categories and snippets.",
+            "Typing a trigger filters and expands matching categories. Enter or Tab inserts a snippet; Esc closes the list. Completion is suspended during input-method composition.",
+            "The keyboard-selected item scrolls into view while preserving editor scroll position and input focus.",
+            "Removed preset leading blank lines from snippets. Insertion checks line position and combines any required newline with the snippet in one undoable edit.",
+            "Cursor markers restore the insertion point. Input and highlight layers use matching line breaks; delayed cursor callbacks that could overwrite later selections were removed."
+          ]
+        },
+        {
+          "title": "Article themes",
+          "items": [
+            "Color-use inspection now covers currentColor, transparent backgrounds and gradient sources. Node palettes read actual CSS defaults so body and code colors are not mistaken for heading colors.",
+            "Added reading hints, tinted quotations and code samples covering all 11 color tokens. Variable-based border/background shorthands are no longer falsely reported as fixed colors; actual fixed CSS colors remain locatable.",
+            "Article previews and color controls work both ways: preview popups show actual tokens and locate their controls; hovering a control highlights matching article nodes. Node overrides and fixed CSS colors retain their own provenance. Light/dark inspection is consistent, with 300ms opacity transitions.",
+            "Renamed Basic Typography to Basic and redesigned headings, body, quotes and tables for Basic, Rainy Paper, Jiangxu, Mokan and Qingyan, incrementing each theme once. Rainy Paper uses brand blue-gray and Sen; exports include layout styles needed by heading tags.",
+            "The preview toolbar shows a book icon, theme name and version. It opens a picker with themes on the left and the current article preview on the right.",
+            "Previewing and applying are separate. Returning to editing keeps the original theme; applying returns to the editor. Manuscript information uses the same picker.",
+            "Moved the light/dark switch beside the theme button and save status to the far right. File and theme information buttons share components and classes.",
+            "Added theme deletion with confirmation; deleting a library entry retains existing article snapshots. Removed eight experimental themes and added Zixu with matching snippets.",
+            "CSS/JSON validation is available after edits and validates both together. Failed tabs use danger styling; unvalidated edits show a modified marker.",
+            "Theme saving requires successful validation. Disabled saving explains Validate first, and Reset changes includes an icon.",
+            "Moved validation to the footer, enlarged code areas and added draggable column widths. Node reset buttons sit directly left of color controls.",
+            "Removed extra borders around article previews. Dark-mode theme switching updates the body snapshot and avoids blank content or duplicate navigation."
+          ]
+        },
+        {
+          "title": "Manuscript information and drafting",
+          "items": [
+            "New article entry points share a drafting dialog with a structure menu on the left, layout preview on the right and creation controls at the bottom.",
+            "Manuscript information uses the shared dialog frame, grouping basic information, layout/ownership and management; save actions stay in the footer.",
+            "Dialog height follows content. Field cards no longer stretch with the adjacent panel; duplicate project-order buttons were removed.",
+            "Retained title, description, author, categories and project editing, plus history, deletion and unarchiving.",
+            "New drafts use new dates and the current article theme. Editing information or template bodies preserves existing metadata and body boundaries."
+          ]
+        },
+        {
+          "title": "Appearance and settings",
+          "items": [
+            "Fixed ordinary source text staying fully opaque when inspecting headings, quotes or syntax markers. Related text remains bright; other text fades to 50% over 300ms.",
+            "Corrected source backgrounds, covered ancestor backgrounds, placeholders and derived button colors. Theme copying retains palette references; independent fields with equal HEX values are not merged.",
+            "Editor themes include color-use inspection. Hover a preview element to see its role and token, then click to locate its control. Hovering or focusing a color control keeps related preview content fully opaque and fades other branches to 50%, with smooth positioning and opacity.",
+            "Color-use popups fade out over 200ms after leaving. Passing over other preview elements delays replacement; entering the popup cancels closing and switching so its actions remain clickable.",
+            "Editor-theme previews follow the workspace display mode and system changes. Sun/moon buttons show light and dark modes; a temporary preview override remains available.",
+            "Entering the color list restores all control opacities. The editor preview covers all 33 roles, including popups, hover, progress, selection, accent, warning and danger examples; forms moved to the top right.",
+            "Settings use three tabs with a compact local-directory layout. Appearance supports live preview, cancellation and explicit saving.",
+            "The editor-theme header edits name, JSON filename ID and version. Regular renames check collisions and update saved appearance references. Changing the Basic theme ID saves a separate file. Versions still increment automatically when not edited manually.",
+            "Custom combinations use separate color and font card dialogs; the two can come from different themes.",
+            "Added Liuzi, Muxue, Yanyang and Mobai appearances. The first three retain their full-color variants as II, with consistent theme ordering.",
+            "Mobai uses black, white and gray. Color cards show an accent swatch followed by equal-width semantic colors.",
+            "Color, font and typography-node panels share components and classes; local utilities retain differences.",
+            "Selectable palette colors show HEX on hover/focus and a Tailwind name for exact matches. Current colors in the picker use the same labels; custom colors are not approximated.",
+            "Decorative eyebrows share one primitive, theme accent color and independent font field. Heading, body and source fonts have separate responsibilities.",
+            "Added local fonts and font previews with support for older theme fields. Themes appear after restoration and validation to reduce appearance flashes on refresh.",
+            "Preview selection opacity, warning text and danger-button states follow actual components. Unsaved drafts and temporary display modes are identified; color roles retain independent references."
+          ]
+        },
+        {
+          "title": "Preview, styles and experience fixes",
+          "items": [
+            "Articles, snippets and templates share Markdown rendering and on-demand styles. Theme CSS does not load external links or scripts; safe HTML styling is retained.",
+            "Article styling is isolated in Shadow DOM so body utilities cannot alter the tool interface. Fixed cursor/highlight misalignment in long HTML.",
+            "Live preview coalesces rapid style compilation and ignores obsolete results. Switching articles or themes cleans up old preview listeners.",
+            "Image examples use Rainy Design reference artwork. Old built-in placeholder paths can also preview samples without requesting missing images.",
+            "Author/ending content uses themed closing, author and contact layouts. Horizontal scrolling shows three sample images with captions following the article theme.",
+            "Release notes use the standard close button and group current-version changes into collapsible categories."
+          ]
+        },
+        {
+          "title": "Article copying and format references",
+          "items": [
+            "Copying retains horizontal-image dimensions, spacing, shrinking and scrolling, plus gradients, paper backgrounds and specified image attributes. Responsive dimensions use CSS Typed OM so automatic widths are not fixed to pixels.",
+            "Article copying and dark preview share RGB conversion and preserve alpha in gradients and shadows. Conversion failures appear as copy errors.",
+            "Created JSON and Markdown format references from three user-provided images, recording sources, supported items, restrictions and exceptions. Real editor verification and validator integration were left for later discussion.",
+            "New snippet, starter-template and article-theme writes are checked against the format JSON. Copying checks source structure, theme/compiled styles and output HTML. Tailwind classes are checked for permitted static conversion before removal from output. Older content remains readable; unmatched items identify locations and block writing or copying."
+          ]
+        }
+      ]
+    },
+    "v0_1_5": {
+      "summary": "Completed component/style cleanup, named-library creation guards, and fixes to draft previews and theme copying.",
+      "sections": [
+        {
+          "title": "Components and styles",
+          "items": [
+            "Peer top-level dialogs are mutually exclusive; specified parent/child dialogs retain their hierarchy.",
+            "Removed 39 declarations duplicating preflight defaults; retained six padding declarations that override defaults at the md breakpoint or on icon buttons.",
+            "Editor-theme variables come from one :root stylesheet in head and also apply to dialogs mounted under body.",
+            "Audited and removed unused component styles and the old article-renaming dialog. Simple one-off styles moved to their call sites to reduce duplication."
+          ]
+        },
+        {
+          "title": "Libraries",
+          "items": [
+            "Creating a library requires a directory name before selecting a parent. Files are generated only inside the named child directory.",
+            "Existing same-name child directories are rejected with a readable explanation.",
+            "Opening a library checks its structure. Failed initialization cleans up its newly created directory only after confirming there is no other content, preventing unintended writes or deletion."
+          ]
+        },
+        {
+          "title": "Drafting and theme workflows",
+          "items": [
+            "Draft previews use the same Markdown/Tailwind layout pipeline as article bodies and show the layout expected after creation.",
+            "Copy and apply in the article-theme library creates and opens a Fork for saved manuscripts while retaining the original. An unsaved new draft adopts the theme directly and returns to editing."
+          ]
+        },
+        {
+          "title": "Known limitations",
+          "items": [
+            "Copying was blocked, with locations reported, when body markup such as m-0, <th> or <h4> was absent from the WeChat format list."
+          ]
+        }
+      ]
+    },
+    "v0_1_6": {
+      "summary": "Improved article management, format checking and theme/template workflows; added statistics/export, refined local-library dialogs, and remembered line-number and ungrouped-collapse preferences globally.",
+      "sections": [
+        {
+          "title": "Release notes",
+          "items": [
+            "Release blocks collapse to version, status and summary; inner category rows collapse with them.",
+            "Added Expand all/Collapse all for release blocks, using 200ms max-height transitions and respecting reduced motion.",
+            "Dialog sections share compact padding and footer actions, reducing layout differences between pages."
+          ]
+        },
+        {
+          "title": "Clipboard receiver",
+          "items": [
+            "The receiver is an expandable bottom panel. Paste controls and received content appear when expanded; its surface follows article-preview light/dark mode."
+          ]
+        },
+        {
+          "title": "Local libraries",
+          "items": [
+            "New library uses a shared dialog for naming, previewing the child location and selecting its parent before creation; the Settings page layout is retained.",
+            "Names are validated before directory selection. Cancelling the picker, collisions and write failures retain input for retry. Creation shows progress and prevents duplicate submission or closing.",
+            "Unsaved article and appearance changes are handled first. The dialog joins mutual exclusion, focuses the name field and retains keyboard focus/return behavior."
+          ]
+        },
+        {
+          "title": "Article management",
+          "items": [
+            "Article lists support multiple selection and Select all filtered results, with clear selected states.",
+            "Unarchived articles can move to projects/Ungrouped or archive in bulk. Archived articles can be restored or deleted; deletion lists each target and asks for confirmation.",
+            "Project names open their article collections. Articles without a project are called Ungrouped.",
+            "The Ungrouped sidebar list collapses independently; its name still opens the collection.",
+            "Ungrouped collapse state is a browser-wide preference, retained across pages, libraries, refreshes and restarts, with cross-tab synchronization.",
+            "Clicking Archive again toggles its sidebar manuscripts. Hover/focus on collection names moves labels upward over 300ms to show document counts, with reduced-motion support.",
+            "Moved the new-project form beneath the sidebar Projects heading. Renamed the bulk-action destination to Group into, distinguishing projects from category tags.",
+            "Moved project pinning after the settings menu, adjusted header spacing and enlarged the new-project hit area."
+          ]
+        },
+        {
+          "title": "WeChat format checking",
+          "items": [
+            "The format list became a tiered risk record distinguishing shorthands, longhands and alternatives; unlisted items are explicitly unverified.",
+            "Snippets and starter templates validate before saving; prohibited formats and engine failures block writes, while review notices remain visible. Copying consolidates source, rendering and output findings for the user's decision.",
+            "Results identify source/render provenance and locatable lines. Built-in snippets and article themes were revised against the current format list.",
+            "The full WeChat copy, paste, save-draft, reopen and mobile-preview workflow was tested.",
+            "Tested portions of the format list passed for the tested cases. Broader HTML/CSS compatibility and stability remained for later review.",
+            "Checks source tag structure before browser HTML repair, locating unclosed/mismatched tags, nesting, attribute quotes and content in closing tags. Errors block snippet/template writes. Code examples, escaped text, autolinks, void elements and legal omitted closing tags are handled separately.",
+            "Fixed four incorrect span closing tags and one missing h2 closing tag in the Rainy Design sample, syncing the library, project mirror and built-in templates.",
+            "Added Format check between Update styles and Save. It checks the current draft without writing the article or clipboard; its only footer action is Close. Close, Do not copy and Copy anyway use consistent icons."
+          ]
+        },
+        {
+          "title": "Article themes",
+          "items": [
+            "Synced built-in and local article themes. Article lists, editor and theme dialogs show available updates and can adopt the latest library version.",
+            "Applying an article theme asks how to handle unsaved edits, with explicit Save, Discard and Cancel outcomes.",
+            "Dark preview uses the page surface rather than writing a light paper background into the body; fixed divider contrast in both modes.",
+            "Article themes no longer specify reader fonts; the separate font panel was removed.",
+            "All article-theme images retain automatic height, max-width 100% and block display as baseline rules."
+          ]
+        },
+        {
+          "title": "Editor appearance",
+          "items": [
+            "Editor-theme cards use a 4×3 array of dots to show twelve semantic colors."
+          ]
+        },
+        {
+          "title": "Source and preview",
+          "items": [
+            "Body line numbers count actual newlines rather than visual wraps. Highlight and input share font, padding and width and stay aligned when resizing columns.",
+            "Line-number visibility is globally remembered across articles, navigation and restarts, and synchronized across tabs.",
+            "Source lines with warnings/errors use different colors; hovering a line number explains the finding.",
+            "Inserting a snippet regenerates its required styles immediately, without manually clicking Update styles.",
+            "Code blocks retain line breaks; two or more consecutive blank lines remain visible as empty paragraphs in previews and output.",
+            "Article preview styles are isolated from editor appearance so tool fonts and colors cannot affect the body.",
+            "Style updates and post-save compilation summarize revision, class count and pass/warning/error totals from the same check. Styles generated is hidden for warnings/errors. The latest preview is committed before checking; delayed mounts trigger a new check and stale results cannot overwrite the current manuscript."
+          ]
+        },
+        {
+          "title": "Snippets and starter templates",
+          "items": [
+            "Replaced automatic table-of-contents generation with an insertable built-in text snippet that authors can adjust.",
+            "Snippets have independent icons shown in the library and insertion menu; older snippets use defaults.",
+            "Starter templates also support icons. Their information dialogs and both category types share icon selection and previews.",
+            "Snippet/template cards include quick editing, and starter-template cards always show category tags.",
+            "The current article, including unsaved edits, can become a starter template. Its information dialog collects filename, category and metadata without changing the article. Local-media references explain that assets must be reimported.",
+            "Cmd/Ctrl+S validates and saves snippet, template and article-theme code in one action. Failed validation retains drafts; saving shows progress and the final result retains review notices.",
+            "Side-by-side and three-image layouts use table cells instead of prohibited div/flex/gap. Replaced built-in content with the current library's 7 article themes, 20 snippets and 5 starter templates, removing old entries while retaining categories, icons and metadata.",
+            "Merged the external library's updates for paired images, simple tables and three-image rows into built-in snippets and the project mirror. Categories, triggers, icons and templates match the current library."
+          ]
+        },
+        {
+          "title": "Article statistics and export",
+          "items": [
+            "The editor's statistics show body characters, reading time and counts of headings, paragraphs, images, links and code blocks. The five lower counts have individual icons.",
+            "Export the current Markdown source or a ZIP containing article.md and media/ assets.",
+            "Moved Export article left of the toolbar divider beside statistics, history and template creation.",
+            "Long images and A4 PDFs use the current article theme's light preview. PDF pages contain images, so text is not selectable. Unloaded resources or browser canvas limits stop the operation explicitly."
+          ]
+        }
+      ]
+    },
+    "v0_1_7": {
+      "summary": "Completed shared-image and asset management, bulk organization, image information, local-image diagnostics and full-article copying with mixed images; unified previews, pagination and workspace branding.",
+      "sections": [
+        {
+          "title": "Interface branding",
+          "items": [
+            "The upper-left workspace logo uses the existing R/ SVG favicon, with background/foreground colors from the editor theme. Expanded/collapsed sidebars share it, retaining expansion controls and keyboard focus."
+          ]
+        },
+        {
+          "title": "Built-in library",
+          "items": [
+            "Synced wording revisions in starter samples from the current library while retaining categories, metadata and other template content."
+          ]
+        },
+        {
+          "title": "Assets and image reuse",
+          "items": [
+            "Assets distinguish shared and article images, with search, owning-article filtering, previews and details. Long filenames truncate in lists/details and show their full value on hover.",
+            "Shared images live in shared/image, created on first import rather than empty reads. Supports multiple imports, image-content identification and collision-safe naming.",
+            "Insert element includes Choose from assets. The picker identifies the target article and cursor location; adopting from Assets returns to the current article with the selection retained.",
+            "Adopted shared images become independent article copies using media/image references. Existing current-article images insert references only. Native undo/redo is supported; saving, reopening, Fork and ZIP export retain images.",
+            "Processing prevents duplicate adoption/closing; failures retain selection for retry. Results check library, manuscript and request identity to keep old operations out of new drafts. Archived articles and invalid metadata/theme snapshots remain protected.",
+            "Successful imports clear old filters/selections, and library changes reset gallery state. Images fit fully inside fixed-aspect containers. Filenames truncate at complete Unicode characters, and references encode parentheses and other symbols."
+          ]
+        },
+        {
+          "title": "Asset management and authoring checks",
+          "items": [
+            "Unified page headers for articles, templates, themes, settings and assets, aligning action bars at the bottom. Assets omit the library description, add source icons and filter by group/article. Entry from an article selects its assets.",
+            "Source, search and browsing controls share one toolbar. Selection sits left of search; group, article, sort and layout use right-side icons. Menus are exclusive, sorting changes direction, and a remembered 1–4 slider controls layout; one column is a horizontal list. Assets and the image picker share the toolbar, with horizontal scrolling on narrow screens.",
+            "Supports bulk move/copy and confirmed deletion. Selection expands actions in place; collapse retains checks, while source/filter/search changes clear them. Unreferenced images move; referenced images copy and retain originals. Partial failures identify retryable items.",
+            "Filename and rename pencil stay adjacent; long names reserve button space. Card backgrounds use the normal cursor, while images/names/buttons use a pointer. Other background areas select details or toggle selection; interactive controls remain independent. Top-left checkboxes appear on hover/focus and remain visible for touch or selection. Download, delete, adopt and resolution/description/replacement details are retained.",
+            "Small asset buttons share one component. Regular actions are 36×36 squares; filename/description pencils have no background and sit beside text. Cards, details, toolbar and image picker share colors, corners and tooltips, including disabled explanations.",
+            "Filename/description pencils align vertically with text. Detail-image clicks or View original open a shared preview with zoom, 100% and fit controls. Arrow keys browse all images in the current sorted directory; Esc returns to the opener.",
+            "Assets and the image picker share pagination: 10, 20, 50 or 100 per page, default 20, remembered globally. Only current-page thumbnails mount. Paging retains checks; Select all targets the page, bulk actions target all checked images, and filtering/sorting/page-size changes return to page one.",
+            "Full-article rich-text copying embeds local image bytes at their original positions, retaining Markdown/HTML/repeated-image order and reading repeated images once. Read failures or unready images leave the clipboard intact. Library/article changes or newer copy requests cancel old results. Saving, styling and format checks remain; preparation no longer requests local images over HTTP.",
+            "Body checks distinguish missing local image files from temporarily unverifiable ones. They locate Markdown/HTML references and ignore code examples.",
+            "Authoring checks work independently of line numbers. Hidden numbers still show red/yellow diagnostic dots and both severities can share a line. The global error-checking switch affects live checks; save, manual and copy checks still run.",
+            "Disabled icon actions retain native disabling while exposing purpose/reason on hover or keyboard focus. Menus support keyboard navigation, Esc and focus return.",
+            "Mobile display mode shows only its current icon and opens downward on click; desktop sidebar menus continue opening upward.",
+            "Deletion/move dialogs show reference counts in the footer and list filenames once. Opening counts current-draft body references only; Scan references explicitly reads saved workspace bodies/history. One scan handles a selection, supports cancellation and reports incomplete reads for retry. Actual paths distinguish independent article copies."
+          ]
+        }
+      ]
+    },
+    "v0_1_8": {
+      "summary": "Improved README, numbered Agent tutorials and theme documentation; added configurable static-server ports, monthly article indexes, scoped category/check management and bulk tag removal. Unified image-combination checks/copying, synced built-in resources and adopted MIT licensing.",
+      "sections": [
+        {
+          "title": "Documentation and tutorials",
+          "items": [
+            "Rewrote the human README with an Agent Readable link, installation/startup, data/backups, FAQ and capability boundaries.",
+            "Added staged installation and three numbered AGENT-GUIDE tutorials. THEME centralizes creation rules and complete examples for editor/article themes, snippets, starter templates and full articles."
+          ]
+        },
+        {
+          "title": "Local startup",
+          "items": [
+            "The static server supports --port and --help, defaults to 3500 and binds only to 127.0.0.1. Invalid, duplicate and unknown arguments fail before building; occupied ports do not cause existing processes to be terminated."
+          ]
+        },
+        {
+          "title": "Article lists and categories",
+          "items": [
+            "Lists read monthly index summaries first and read source/theme snapshots only for the opened article. Old indexes can be explicitly rebuilt. Saves synchronize categories/summaries, with batched monthly index writes.",
+            "Categories follow the current group/archive scope. Multiple-tag selection and removal confirmation affect only filtered unarchived articles, retaining body, other metadata and history; partial failures are reported separately.",
+            "List checks are independent of editor state. Checking the current scope shows progress and supports cancellation, aggregating unchecked/stale/failed records by article. Results describe the last check; old tasks cannot populate a new scope.",
+            "The index scan/rebuild button uses a document/circular-arrow icon with the same tooltip and behavior."
+          ]
+        },
+        {
+          "title": "Image layout and format checking",
+          "items": [
+            "The format list recorded the complete image combination max-width:100%, height:auto and display:block. Matching on one image rule or inline style treated automatic height as usable; isolated height stayed low priority. Shared theme/article/snippet/template checks did not combine separate rules or utilities for exemptions.",
+            "Rich-text copying retained qualifying image height:auto instead of freezing preview pixel height. Other dimension handling, sanitization and mixed-image copying followed the existing workflow."
+          ]
+        },
+        {
+          "title": "Local milestone and open-source preparation",
+          "items": [
+            "0.1.8 passed local acceptance, reached its local milestone, adopted MIT licensing and prepared source/static release candidates."
+          ]
+        }
+      ]
+    },
+    "v0_2_0": {
+      "summary": "First public release: library format strategies are decoupled into external support rules, validator and formatter; WeChat defaults follow official specifications, with shared find/replace and guided initialization.",
+      "sections": [
+        {
+          "title": "Format strategies and validation",
+          "items": [
+            "Each library binds one trio under format/. validator.rules[] and formatter.steps[] call registered capabilities. Unknown fields, parameters/capabilities, duplicate IDs and conflicts produce explicit errors.",
+            "WeChat defaults follow the official plugin specification. Removed older compatibility tiers, font exemptions and the three-image-property criterion; mp-darkmode converts an isolated copy.",
+            "JSON controls line breaks, blank lines, code whitespace/colors, preview backgrounds, conversions, retained attributes and export options; editor themes remain independent.",
+            "Live checks are separate from actual layout/dark-mode checks. Cancellation or resource/measurement failures are not passes. Duplicate notices merge, and failed rules cannot also appear as passed.",
+            "leaf/nodeleaf structure is checked before browser HTML repair, avoiding missed invalid children moved by the parser.",
+            "Library changes/reloads invalidate old tasks, styles and caches. Damaged configuration prompts repair; a wholly missing trio explicitly identifies built-in fallback.",
+            "Previews and layout checks use local static bootstrap scripts and non-executable JSON, compatible with existing static-server CSP."
+          ]
+        },
+        {
+          "title": "Editing and initialization",
+          "items": [
+            "Article bodies, theme CSS/JSON, snippets and starter templates share find/replace, with case matching, counts, next/previous, single/all replacement and one-step undo. Read-only, composition and save guards remain.",
+            "Undo/redo for Find, Replace and source is isolated by current focus. Cmd/Ctrl+G navigates matches, Shift reverses direction, and Cmd/Ctrl+Enter in Replace replaces the current match. Replace all confirms scope/count/deletion semantics and remains one undoable action.",
+            "The Agent guide uses available question tools to choose new/existing libraries, default data/my-library or a custom path, and format configuration. Browser authorization is completed separately.",
+            "Built-in resources sync from the approved test-library inventory, retaining themes, snippets, starter templates and categories; articles/ contains no preloaded bodies, snapshots, history or monthly indexes.",
+            "The default starter-template group starts collapsed in the new-article dialog.",
+            "Refresh/library loading uses a full-screen state that fades out over 300ms with the current editor appearance.",
+            "Clipboard-receiver instructions are placeholders rather than real content, so pasting/typing does not insert help text.",
+            "The default editor appearance is Rainy Design · Slate with system-following color mode.",
+            "Line-number and Insert element actions use shared icon buttons with popup labels, retaining visibility state and native menu behavior.",
+            "Source highlighting and native input share one scroll container, removing scrollTop catch-up between text layers. Cursor visibility, find navigation and post-insertion scrolling use that same viewport."
+          ]
+        },
+        {
+          "title": "Documentation and status",
+          "items": [
+            "Added FORMAT.md MVP examples, editable boundaries, official sources and migration guidance; updated README, Agent guide and theme documentation.",
+            "Automated checks, browser observations and user acceptance are recorded separately. Source and static release packages use the same milestone commit; manual checks remain as documented."
+          ]
+        }
+      ]
+    },
+    "v0_2_1": {
+      "summary": "library style entry points, CSS modules and local dependencies, with render snapshots and website Markdown-body adaptation.",
+      "sections": [
+        {
+          "title": "Library rendering",
+          "items": [
+            "Libraries can declare CSS entries/modules with Tailwind layers, imports, nesting, fonts and local image/SVG assets. formatter configures virtual site-path mappings.",
+            "Added body containers, CSS viewports, display zoom, explicit heading anchors, node defaults and Prism code wrapping. Articles, themes, snippets and templates use isolated canvases.",
+            "Saving can record rendered output and immutable dependencies; history/Fork retain references. Existing records adopt a new environment only after explicit style updates; older manuscripts are not automatically migrated.",
+            "Added Markdown-body output. Document packages include required rendering dependencies; input, scrolling and unchanged candidate classes reuse compilation caches.",
+            "Website-body geometry at three viewports and existing WeChat flows were regression-tested. The static server supports local fonts/compression tasks; export child-window and preview-only output boundaries were fixed. General functionality has passed user acceptance."
+          ]
+        }
+      ]
+    },
+    "v0_2_2": {
+      "summary": "Chinese/English UI, browser language preferences and bilingual documentation, implemented and audited one item at a time.",
+      "sections": [
+        {
+          "title": "Interface localization",
+          "items": [
+            "Added i18next/react-i18next. Product dictionaries are organized by language and feature under locale/, with Chinese fallback, interpolation and plurals.",
+            "Language preferences live independently in the browser. Cold startup resolves language before showing the existing loading state; libraries and user content are not translated.",
+            "A language menu sits below the version, mutually exclusive with display mode. It reuses icons/tooltips/popovers, supports keyboard selection and preserves drafts/native undo.",
+            "Navigation, article lists, source toolbar, previews and find/replace use bilingual dictionaries. Product collection labels use IDs, user names/content remain unchanged, and language changes do not rebuild article canvases.",
+            "Theme, template, asset and settings pages use bilingual dictionaries. Filters, pagination, settings and actions retain IDs; library names, code and content remain original."
+          ]
+        },
+        {
+          "title": "Dialogs and product feedback",
+          "items": [
+            "Dialogs, color/icon pickers, confirmations and disabled reasons use bilingual dictionaries; library names, code and custom-rule descriptions remain original.",
+            "Product diagnostics, statuses and errors retain stable message codes/parameters. Language changes update existing results, including source dots, provenance and line locations.",
+            "The static-start CLI shows Chinese/English help and errors according to system locale, retaining arguments, ports and exit behavior.",
+            "Restored sidebar display-mode padding, icons and compact menu sizing, with matching language controls; peer menus remain exclusive and keyboard-accessible."
+          ]
+        },
+        {
+          "title": "Release notes and localized display",
+          "items": [
+            "Release notes retain original Chinese history and one source for version/status metadata, with separate English wording. Language changes preserve release/category expansion state.",
+            "Dates, months, counts, file sizes and zoom use UI-locale display formatting. Stored values, directories, sorting, filtering and form input remain unchanged."
+          ]
+        },
+        {
+          "title": "Bilingual documentation",
+          "items": [
+            "Moved complete README, Agent, theme/snippet/template and format guides into zh-CN/en-US under docs/locale. The root README remains a bilingual entry; screenshots are shared through GitHub attachment URLs.",
+            "Updated language navigation, stable anchors, setup guidance and runtime repair-document paths. Complete examples in both languages are checked by production validators, configuration compilation and save/reload tests."
+          ]
+        }
+      ]
+    }
+  }
+}

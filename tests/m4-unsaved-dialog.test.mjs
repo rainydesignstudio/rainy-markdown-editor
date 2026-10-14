@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -13,7 +14,7 @@ function dialog() {
   let resolveSave;
   const props = { entries: [{ label: '测试外观', detail: '雾灰配色' }], description: '外观尚未保存。', onCancel: () => calls.cancel++, onDiscard: () => calls.discard++, onSave: () => { calls.save++; return new Promise(resolve => { resolveSave = resolve; }); } };
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'frame', DialogHeader: 'header', DialogActions: 'actions', DialogButton: 'button' };
     if (id === 'react') return {
@@ -22,7 +23,7 @@ function dialog() {
       useRef(initial) { const index = cursor++; return cells[index] ??= { current: initial }; },
     };
     throw new Error(`Unexpected dialog import ${id}`);
-  } });
+  }) });
   function all(node) { if (Array.isArray(node)) return node.flatMap(all); if (!node?.props) return []; return [node, ...all(node.props.children)]; }
   function text(node) { if (typeof node === 'string') return node; if (Array.isArray(node)) return node.map(text).join(''); return node?.props ? text(node.props.children) : ''; }
   function render() { cursor = 0; tree = module.exports.UnsavedChangesDialog(props); }

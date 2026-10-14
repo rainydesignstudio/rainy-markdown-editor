@@ -1,3 +1,4 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { articleLocalImageReferences, copyArticleImageAs, importArticleImage, rewriteArticleImageReferences } from '../src/lib/articleMedia.ts';
@@ -105,7 +106,7 @@ function controllerAction(name, context) {
   const visit = node => { if (ts.isVariableDeclaration(node) && node.name.getText(ast) === name) declaration = node.initializer; ts.forEachChild(node, visit); };
   visit(ast); assert.ok(declaration);
   context.useCallback = callback => callback;
-  vm.runInNewContext(ts.transpileModule(`globalThis.action = ${declaration.getText(ast)};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+  vm.runInNewContext(ts.transpileModule(`globalThis.action = ${declaration.getText(ast)};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
   return context.action;
 }
 function managementContext(root) {

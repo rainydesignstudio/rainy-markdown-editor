@@ -10,13 +10,20 @@ function getFocusableElements(dialog: HTMLElement): HTMLElement[] {
 
 export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose: () => void, active = true): void {
   const onCloseRef = useRef(onClose);
+  const returnFocusRef = useRef<HTMLElement | null | undefined>(undefined);
   onCloseRef.current = onClose;
+
+  // Suspending a parent for its child must preserve the child's opener.
+  // Restore the original opener only when this dialog actually unmounts.
+  useEffect(() => () => {
+    if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
+  }, []);
 
   useEffect(() => {
     if (!active) return;
     const dialog = dialogRef.current;
     if (!dialog) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (returnFocusRef.current === undefined) returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     let cancelled = false;
     const focusFrame = window.requestAnimationFrame(() => {
       if (cancelled || !dialog.isConnected) return;
@@ -52,7 +59,6 @@ export function useDialogFocus(dialogRef: RefObject<HTMLElement | null>, onClose
       cancelled = true;
       window.cancelAnimationFrame(focusFrame);
       window.removeEventListener('keydown', onKeyDown);
-      if (previousFocus?.isConnected) previousFocus.focus();
     };
   }, [dialogRef, active]);
 }

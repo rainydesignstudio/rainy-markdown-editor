@@ -1,3 +1,4 @@
+import { productCause, productMessage } from "./i18n/productMessages";
 type ThemeDirectoryIssue = { file: string; message: string };
 const MIGRATION_MARKER = 'legacy-migration.done';
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
@@ -37,7 +38,7 @@ export async function getThemeDirectory(root: FileSystemDirectoryHandle, kind: '
     if (entry.kind !== 'file' || !name.endsWith('.json')) continue;
     legacyFiles += 1;
     if (!/^[a-z0-9][a-z0-9-]{0,47}\.json$/.test(name)) {
-      issues.push({ file: name, message: '旧主题文件名不安全；未复制，原文件保留。' });
+      issues.push({ file: name, ...productMessage("themeDirectories.theOldThemeFilenameIsUnsafeItWasNotCopiedTheOriginal") });
       continue;
     }
     try {
@@ -47,7 +48,7 @@ export async function getThemeDirectory(root: FileSystemDirectoryHandle, kind: '
       await writeNewFile(directory, name, raw);
     } catch (error) {
       complete = false;
-      issues.push({ file: name, message: `主题迁移失败；原文件保留：${error instanceof Error ? error.message : String(error)}` });
+      issues.push({ file: name, ...productMessage("themeDirectories.themeMigrationFailedTheOriginalFileIsRetained", { "cause": productCause(error) }) });
     }
   }
   if (complete) await writeNewFile(directory, MIGRATION_MARKER, JSON.stringify({ version: 1, legacyFiles }));

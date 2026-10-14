@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -29,7 +30,7 @@ test('picker exposes all swatches, blocks invalid HEX and uses one tab stop with
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   let cursor = 0, selected, closed = 0; const cells = [];
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, document: {}, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, document: {}, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return { useState(value) { const index = cursor++; if (!(index in cells)) cells[index] = value; return [cells[index], next => { cells[index] = typeof next === 'function' ? next(cells[index]) : next; }]; } };
     if (id.endsWith('/ButtonBar')) return { ButtonBar: 'button-bar' };
@@ -37,7 +38,7 @@ test('picker exposes all swatches, blocks invalid HEX and uses one tab stop with
     if (id.endsWith('/tailwindPalette')) return palette;
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'dialog', DialogHeader: 'header', DialogActions: 'actions', DialogButton: 'button' };
     throw new Error(id);
-  } });
+  }) });
   const props = { label: '工作区背景', token: '--color-canvas', modeLabel: '浅色', value: '#ffffff', onSelect: value => { selected = value; }, onClose: () => { closed++; } };
   const all = node => Array.isArray(node) ? node.flatMap(all) : node?.props ? [node, ...all(node.props.children)] : [];
   const render = () => { cursor = 0; return all(module.exports.EditorColorPicker(props)); };
@@ -62,7 +63,7 @@ test('inactive parent dialog does not trap focus or process Escape while a color
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
   const listeners = new Set(), cleanups = []; let closes = 0;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, HTMLElement: class {}, document: { activeElement: null }, window: { requestAnimationFrame: () => 1, cancelAnimationFrame() {}, addEventListener: (_, listener) => listeners.add(listener), removeEventListener: (_, listener) => listeners.delete(listener) }, require() { return { useRef: value => ({ current: value }), useEffect: effect => cleanups.push(effect()) }; } });
+  vm.runInNewContext(code, { module, exports: module.exports, HTMLElement: class {}, document: { activeElement: null }, window: { requestAnimationFrame: () => 1, cancelAnimationFrame() {}, addEventListener: (_, listener) => listeners.add(listener), removeEventListener: (_, listener) => listeners.delete(listener) }, require: withUILocaleImports(function(){ return { useRef: value => ({ current: value }), useEffect: effect => cleanups.push(effect()) }; }) });
   const ref = { current: {} };
   module.exports.useDialogFocus(ref, () => { closes++; }, false);
   assert.equal(listeners.size, 0);

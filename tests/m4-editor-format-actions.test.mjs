@@ -1,3 +1,5 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 const formatRuntime = await import('../src/lib/article-format/runtime.ts');
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -22,7 +24,7 @@ function action(name, next, context) {
   const end = controllerSource.indexOf(`\n\n  const ${next}`, start);
   assert.ok(start >= 0 && end > start);
   const source = controllerSource.slice(start, end) + `\nglobalThis.action = ${name};`;
-  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
   return context.action;
 }
 
@@ -40,7 +42,8 @@ test('inspection has only a close action, and close/cancel/copy controls carry i
   const source = await readFile(new URL('../src/components/global/FormatCheckDialog.tsx', import.meta.url), 'utf8');
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, require(id) {
+...productMessages,
+    module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => formatRuntime.getFormatSnapshot() };
       if (id === 'react') return { useState: initial => [typeof initial === 'function' ? initial() : initial, () => {}] };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
@@ -49,7 +52,7 @@ test('inspection has only a close action, and close/cancel/copy controls carry i
       if (id.endsWith('/useAnimatedMaxHeight')) return { useAnimatedMaxHeight: () => ({ current: null }) };
       if (id.endsWith('/DialogFrame')) return { DialogFrame: 'dialog', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'dialog-button' };
       throw new Error(id);
-    },
+    }),
   });
   for (const [mode, labels] of [['inspect', ['关闭']], ['save', ['关闭']], ['copy', ['先不复制', '仍然复制']]]) {
     const decisions = [];
@@ -68,11 +71,12 @@ test('toolbar places export before the divider and inspection between refresh an
   const source = await readFile(new URL('../src/components/global/EditorTopbar.tsx', import.meta.url), 'utf8');
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, require(id) {
+...productMessages,
+    module, exports: module.exports, require: withUILocaleImports(function(id){
       if (id === 'react') return { useState: initial => [initial, () => {}], useRef: initial => ({ current: initial }), useEffect() {} };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       throw new Error(id);
-    },
+    }),
   });
   let inspected = 0;
   const tree = nodes(module.exports.EditorTopbar({ view: 'articles', articleMode: 'editor', currentTitle: '当前稿', currentProjectName: null, articleCollectionTitle: '全部文章', article: { dirty: true, folder: 'current', themeValid: true }, directory: {}, isReadyToCopy: true, mediaOperation: null, historyBusy: false, isCompiling: false, currentArticleIsArchived: false, metadataWritable: true, onCheckFormat: () => inspected++ }));
@@ -139,7 +143,7 @@ test('a preview mounted after compilation replaces the not-ready report with the
     inspectArticleFormatReport: async (_source, _theme, node) => { assert.equal(node, preview); return report; },
   };
   fixture.cache.current = { snapshot: fixture.snapshot, report: { theme: { passed: [], issues: [] }, body: { passed: [], issues: [] } }, classes: 2, preview: null, requestId: 0 };
-  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(fixture.cache.current.preview, preview);
   assert.equal(fixture.cache.current.report, report);

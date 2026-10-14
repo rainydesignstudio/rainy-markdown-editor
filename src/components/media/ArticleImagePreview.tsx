@@ -1,5 +1,8 @@
 'use client';
 
+import { ProductError } from "../../lib/i18n/productMessages";
+import { useUITranslation } from '../global/UILocaleProvider';
+
 import { useEffect, useRef, useState, type ComponentProps, type KeyboardEvent } from 'react';
 
 type Props = {
@@ -19,6 +22,7 @@ type Props = {
 };
 
 export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath, sourceSetPath, clipboardSource, clipboardSourceSet, imageProps, onOpen, isCurrent, sessionKey, onDimensions }: Props) {
+  const { t } = useUITranslation('messages');
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
   const currentRef = useRef(isCurrent);
@@ -44,7 +48,7 @@ export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath
         if (typeof probe.decode === 'function') await probe.decode();
         else await new Promise<void>((resolve, reject) => {
           probe.onload = () => resolve();
-          probe.onerror = () => reject(new Error('浏览器无法解码图片。'));
+          probe.onerror = () => reject(new ProductError("articleImagePreview.theBrowserCouldNotDecodeTheImage"));
         });
         if (!current()) {
           URL.revokeObjectURL(url);
@@ -82,7 +86,7 @@ export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath
     ...(clipboardSource !== undefined ? { 'data-clipboard-src': clipboardSource } : {}),
     ...(clipboardSourceSet ? { 'data-clipboard-srcset': clipboardSourceSet } : {}),
   };
-  const missingLabel = issue ? `本地图片不可用：${fileName}` : `正在读取本地图片：${fileName}`;
+  const missingLabel = t(issue ? 'messages:image.unavailableLabel' : 'messages:image.loadingLabel', { fileName });
   const variantClass = variant === 'tile' ? 'media-image-tile' : variant === 'dialog' ? 'media-image-dialog' : 'article-local-image-open';
 
   if (!objectUrl) {
@@ -94,7 +98,7 @@ export function ArticleImagePreview({ handle, fileName, alt, variant, sourcePath
         aria-busy={!issue}
         {...marker}
       >
-        {issue ? `本地图片暂不可用 · ${fileName}` : '正在读取本地图片…'}
+        {issue ? t('messages:image.unavailable', { fileName }) : t('messages:image.loading')}
       </span>
     );
   }

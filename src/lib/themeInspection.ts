@@ -1,3 +1,4 @@
+import { productText } from "./i18n/productMessages";
 import { getFormatSnapshot } from './article-format/runtime';
 import type { ThemeConfig, ThemeNodeKey } from './types';
 
@@ -106,7 +107,7 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
     if (cached) return cached;
     const tokens = [...value.matchAll(/var\(\s*--(color-article-[a-z-]+)/g)].map(match => match[1]);
     const entries: ColorBinding[] = tokens.map(token => ({ key: token, label: ARTICLE_COLOR_LABELS[token] ?? token, token: `--${token}`, kind: 'color', value }));
-    if (node) entries.unshift({ key: `node:${node}`, label: `${node} · 节点文字色`, token: `nodes.${node}.color`, kind: 'node', node, value });
+    if (node) entries.unshift({ key: `node:${node}`, label: productText("themeInspection.nodeTextColor", { "node": node }), token: `nodes.${node}.color`, kind: 'node', node, value });
     if (!entries.length) {
       const normalizedSelector = compact(selector.replaceAll(`${scope} `, ''));
       const candidates = sourceRules.filter(match => compact(match[1]).split(/\s*,\s*/).join(', ') === normalizedSelector.split(/\s*,\s*/).join(', ')).flatMap(rule =>
@@ -116,7 +117,7 @@ export function createArticleColorInspection(root: HTMLElement, theme: ThemeConf
         })));
       const original = candidates.findLast(candidate => candidate.value === compact(value)) ?? candidates.at(-1);
       const start = original?.start;
-      entries.push({ key: `css:${start ?? 'generated'}:${property}`, label: '固定色值', token: start === undefined ? '主题生成样式' : `CSS · 第 ${theme.css.slice(0, start).split('\n').length} 行`, kind: 'css', start, end: original ? original.start + original.length : undefined, value });
+      entries.push({ key: `css:${start ?? 'generated'}:${property}`, label: productText("themeInspection.fixedColor"), token: start === undefined ? '主题生成样式' : `CSS · 第 ${theme.css.slice(0, start).split('\n').length} 行`, kind: 'css', start, end: original ? original.start + original.length : undefined, value });
     }
     const id = `source-${counter++}`;
     bindings.set(id, uniqueBindings(entries));

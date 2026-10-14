@@ -1,5 +1,7 @@
 'use client';
 
+import { formatProductMessage, productLabel, productReference } from "../../lib/i18n/productMessages";
+
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { useEditorControllerContext } from './AppProviders';
 import { AppDialogs } from './AppDialogs';
@@ -15,8 +17,11 @@ import { ArticleExportDialog } from '../editor/ArticleExportDialog';
 import { getFormatSnapshot } from '../../lib/article-format/runtime';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { parseArticle } from '../../lib/frontMatter';
+import { useUITranslation } from './UILocaleProvider';
+import { articleCollectionLabel } from '../../lib/i18n/articleLabels';
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useUITranslation('articles');
   const format = useFormatSnapshot();
   const controller = useEditorControllerContext();
   const historyArticle = controller.article;
@@ -83,7 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             articleMode={controller.articleMode}
             currentTitle={controller.currentTitle}
             currentProjectName={controller.currentProjectName}
-            articleCollectionTitle={controller.articleCollectionTitle}
+            articleCollectionTitle={articleCollectionLabel(controller.selectedArticleCollection, controller.articleCollectionTitle, t)}
             article={controller.article}
             directory={controller.directory}
             currentArticleIsArchived={controller.currentArticleIsArchived}
@@ -104,7 +109,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onCompile={() => void controller.updateCurrentStyles()}
             onCheckFormat={() => void controller.checkCurrentFormat()}
           />
-          {format.library && format.error !== '正在载入资料库格式配置…' && (format.error || format.source === 'built-in') ? <p className="shrink-0 border-b border-warning-line bg-warning-surface px-4 py-2 text-xs text-warning-strong" role={format.error ? 'alert' : 'status'}>{format.error ?? '当前资料库未提供格式三件套，正在使用内置默认整套配置。'}{format.error && format.error !== '正在载入资料库格式配置…' ? ' 请按 FORMAT.md 修复三件套，再重新打开当前资料库。' : ''}</p> : null}
+          {format.library && !format.loading && (format.error || format.source === 'built-in') ? <p className="shrink-0 border-b border-warning-line bg-warning-surface px-4 py-2 text-xs text-warning-strong" role={format.error ? 'alert' : 'status'}>{format.error ? formatProductMessage(format.error, t) : t("messages:uiFeedback.defaultFormat")}{format.error && !format.loading ? t("messages:uiFeedback.repairFormat") : ''}</p> : null}
           <div className="workspace-main" hidden={historyViewOpen}>{children}</div>
           {historyViewOpen && historyRoot && historyArticle.month && historyArticle.folder ? (
             <ArticleHistoryView
@@ -138,11 +143,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </section>
       </div>
-      {statisticsOpen ? <ArticleStatisticsDialog title={controller.currentTitle} dirty={controller.article.dirty} statistics={controller.parsed.canCopy && controller.article.themeValid && controller.previewRef.current?.querySelector('.article-body') ? articleStatisticsFromHtml(controller.previewRef.current.querySelector('.article-body')!.innerHTML) : null} issue={!controller.parsed.canCopy || !controller.article.themeValid ? '请先修复元数据或主题快照，再查看正文统计。' : undefined} onClose={() => setStatisticsOpen(false)} /> : null}
+      {statisticsOpen ? <ArticleStatisticsDialog title={controller.currentTitle} dirty={controller.article.dirty} statistics={controller.parsed.canCopy && controller.article.themeValid && controller.previewRef.current?.querySelector('.article-body') ? articleStatisticsFromHtml(controller.previewRef.current.querySelector('.article-body')!.innerHTML) : null} issue={!controller.parsed.canCopy || !controller.article.themeValid ? t("messages:uiFeedback.repairBeforeStatistics") : undefined} onClose={() => setStatisticsOpen(false)} /> : null}
       {templateSnapshot ? <CreateTemplateFromArticleDialog source={templateSnapshot.source} dirty={templateSnapshot.dirty} root={templateSnapshot.root} categories={controller.templateCategories} templates={controller.templates} isCurrent={() => controller.directoryRef.current === templateSnapshot.root && controller.contentLibraryRootSessionRef.current === templateSnapshot.sessionKey} onCreated={(template, formatIssueCount, hasLocalMedia) => {
         if (controller.directoryRef.current === templateSnapshot.root && controller.contentLibraryRootSessionRef.current === templateSnapshot.sessionKey) {
           controller.setTemplates(previous => [...previous.filter(item => item.id !== template.id), template].sort((left, right) => left.name.localeCompare(right.name, 'zh-CN')));
-          controller.setStatus({ label: `起稿模板已创建：${template.name}${formatIssueCount ? ` · 格式检查提示 ${formatIssueCount} 项` : ''}${hasLocalMedia ? ' · 本地媒体文件未随模板保存' : ''}`, tone: formatIssueCount || hasLocalMedia ? 'warning' : 'success' });
+          controller.setStatus({ ...productLabel("appShell.starterTemplateCreated", { "templateName": template.name, "value": (formatIssueCount ? productReference("appShell.formatConcerns", { "formatIssueCount": formatIssueCount }) : ''), "value2": (hasLocalMedia ? productReference("appShell.localMediaFilesWereNotSavedWithTheTemplate") : '') }), tone: formatIssueCount || hasLocalMedia ? 'warning' : 'success' });
         }
         setTemplateSnapshot(null);
       }} onClose={() => setTemplateSnapshot(null)} /> : null}
@@ -152,7 +157,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           && current.month === exportSnapshot.month && current.folder === exportSnapshot.folder
           && current.theme.id === exportSnapshot.themeId && current.theme.version === exportSnapshot.themeVersion
           && parseArticle(current.source).body === exportSnapshot.body;
-      }} prepareVisual={controller.prepareVisualExport} onExported={(fileName, mediaFiles) => controller.setStatus({ label: `已导出 ${fileName}${mediaFiles === undefined ? '' : ` · 包含 ${mediaFiles} 个媒体文件`}`, tone: 'success' })} onClose={() => setExportSnapshot(null)} /> : null}
+      }} prepareVisual={controller.prepareVisualExport} onExported={(fileName, mediaFiles) => controller.setStatus({ ...productLabel("appShell.exported", { "fileName": fileName, "value": (mediaFiles === undefined ? '' : productReference("appShell.includedMediaFiles", { "mediaFiles": mediaFiles })) }), tone: 'success' })} onClose={() => setExportSnapshot(null)} /> : null}
       {changelogOpen ? <ChangelogDialog onClose={() => setChangelogOpen(false)} /> : null}
       <AppDialogs />
     </main>

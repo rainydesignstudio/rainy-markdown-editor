@@ -1,3 +1,4 @@
+import { productMessage, productReference, productText, productLabel, productErrorMessage } from "./i18n/productMessages";
 import { inspectLocalArticleImages } from './mediaManagement';
 import type { ThemeConfig } from './types';
 import { parseArticle } from './frontMatter';
@@ -18,7 +19,7 @@ export function finalizeFormatSection(section: FormatCheckSection, failedRules =
     const key = issue.ruleId ? JSON.stringify([issue.ruleId, issue.line, issue.tier]) : JSON.stringify([issue.kind, issue.name, issue.source, issue.line, issue.tier]);
     if (seen.has(key)) return false; seen.add(key); return true;
   });
-  return { passed: section.passed.filter(name => ![...failedRules].some(id => name === `规则 ${id}`)), issues };
+  return { passed: section.passed.filter(name => ![...failedRules].some(id => name === productText("articleFormatReport.rule", { "id": id }))), issues };
 }
 
 export function articleFormatReportCounts(report: ArticleFormatReport): { pass: number; warning: number; error: number } {
@@ -33,8 +34,7 @@ export function articleFormatReportCounts(report: ArticleFormatReport): { pass: 
 export function compiledArticleFormatStatus(report: ArticleFormatReport, revision: number, classes: number): { label: string; tone: 'success' | 'warning' | 'error'; formatRevision: number } {
   const counts = articleFormatReportCounts(report);
   const tone = counts.error ? 'error' : counts.warning ? 'warning' : 'success';
-  const label = `revision ${revision} · ${classes} 个类 · ${counts.pass} 个 pass · ${counts.warning} 个 warning · ${counts.error} 个 error`;
-  return { label: `${tone === 'success' ? '样式已生成 · ' : ''}${label}${report.complete === false ? ' · 布局与深色未完成核对' : ''}`, tone, formatRevision: revision };
+  return { ...productLabel('report.compiled', { revision, classes, pass: counts.pass, warning: counts.warning, error: counts.error, prefix: tone === 'success' ? productReference('articleFormatReport.stylesGenerated') : '', suffix: report.complete === false ? productReference('articleFormatReport.layoutAndDarkModeCheckingAreIncomplete') : '' }), tone, formatRevision: revision };
 }
 
 export function hasFormatConcerns(report: ArticleFormatReport): boolean {
@@ -55,7 +55,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   if (body.trim()) {
     themeIssues = preview
       ? validateRenderedArticleCss(preview, themeAuthoredCss(theme), themePassed)
-      : [{ kind: 'engine', name: '主题预览', source: '当前文章主题', tier: 'unknown', message: '预览尚未就绪，无法核对当前文章使用的主题规则。' }];
+      : [{ kind: 'engine', name: '主题预览', source: '当前文章主题', tier: 'unknown', ...productMessage("articleFormatReport.thePreviewIsNotReadyThemeRulesUsedByTheCurrentArticle") }];
     const cssLines = theme.css.split(/\r?\n/).length;
     themeIssues = themeIssues.map(issue => issue.line && issue.line > cssLines
       ? { ...issue, source: '主题节点样式', line: undefined }
@@ -70,7 +70,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
       let checked;
       try { checked = await inspectRenderedFormat(assets.root, css, snapshot, options.signal); }
       finally { assets.dispose(); }
-      for (const id of checked.checked) bodyPassed.add(`规则 ${id}`);
+      for (const id of checked.checked) bodyPassed.add(productText("articleFormatReport.rule", { "id": id }));
       for (const finding of checked.issues) {
         const rule = snapshot.bundle.validator.rules.find(item => item.id === finding.ruleId);
         if (!rule) continue;
@@ -85,7 +85,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
       }
       complete = !checked.issues.some(item => item.outcome === 'incomplete');
     } catch (error) {
-      bodyIssues.push({ kind: 'engine', name: '实际布局／转换检查', source: '当前正文', tier: 'unknown', message: error instanceof Error ? error.message : String(error), domain: 'product' });
+      bodyIssues.push({ kind: 'engine', name: '实际布局／转换检查', source: '当前正文', tier: 'unknown', ...productErrorMessage(error), domain: 'product' });
     }
   }
   options.signal?.throwIfAborted();

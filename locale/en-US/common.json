@@ -1,0 +1,76 @@
+{
+  "app": {
+    "title": "Rainy Manuscript Workspace",
+    "description": "A local Markdown and HTML writing workspace"
+  },
+  "loading": {
+    "label": "Loading library",
+    "message": "Loading your library and appearance…"
+  },
+  "language": {
+    "title": "Interface language",
+    "current": "Interface language: {{language}}",
+    "zh-CN": "简体中文",
+    "en-US": "English",
+    "preferenceUnsaved": "Language changed, but the browser could not save your preference."
+  },
+  "displayMode": {
+    "current": "Display mode: {{mode}}",
+    "light": "Light mode",
+    "dark": "Dark mode",
+    "system": "Follow system"
+  },
+  "actions": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "close": "Close",
+    "save": "Save",
+    "retry": "Retry",
+    "more": "More",
+    "back": "Back",
+    "copy": "Copy",
+    "export": "Export",
+    "delete": "Delete",
+    "refresh": "Refresh",
+    "expand": "Expand",
+    "collapse": "Collapse"
+  },
+  "articleCount_zero": "0 articles",
+  "articleCount_one": "{{count}} article",
+  "articleCount_other": "{{count}} articles",
+  "updateAvailable": "Update available",
+  "dates": {
+    "invalid": "Invalid date"
+  },
+  "eyebrows": {
+    "forkManuscript": "FORK MANUSCRIPT",
+    "deleteProject": "DELETE PROJECT",
+    "deleteTemplate": "DELETE TEMPLATE",
+    "newManuscript": "NEW MANUSCRIPT",
+    "exportArticle": "EXPORT ARTICLE",
+    "manuscriptDetails": "MANUSCRIPT DETAILS",
+    "articleStatistics": "ARTICLE STATISTICS",
+    "formatCheck": "FORMAT CHECK",
+    "unsavedChanges": "UNSAVED CHANGES",
+    "imageManagement": "IMAGE MANAGEMENT",
+    "imageLibrary": "IMAGE LIBRARY",
+    "imagePreview": "IMAGE PREVIEW",
+    "createLocalLibrary": "CREATE LOCAL LIBRARY",
+    "colorPalette": "COLOR PALETTE",
+    "editorThemeDesigner": "EDITOR THEME DESIGNER",
+    "deleteEditorTheme": "DELETE EDITOR THEME",
+    "customEditorTheme": "CUSTOM EDITOR THEME",
+    "articleTheme": "ARTICLE THEME",
+    "deleteTheme": "DELETE THEME",
+    "themeActions": "THEME ACTIONS",
+    "localArticleImage": "LOCAL ARTICLE IMAGE",
+    "deleteArchive": "DELETE ARCHIVE",
+    "deleteManuscript": "DELETE MANUSCRIPT",
+    "snippetInformation": "SNIPPET INFORMATION",
+    "templateInformation": "TEMPLATE INFORMATION",
+    "snippetCategory": "SNIPPET CATEGORY",
+    "templateCategory": "TEMPLATE CATEGORY",
+    "releaseNotes": "RELEASE NOTES",
+    "theme": "THEME"
+  }
+}

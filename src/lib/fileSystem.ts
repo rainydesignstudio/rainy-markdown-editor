@@ -1,3 +1,4 @@
+import { ProductError, productCause, productMessage, productReference, productText } from "./i18n/productMessages";
 import { initializeLibraryFormat } from './article-format/library';
 import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { parseArticle, updateFrontMatter } from './frontMatter';
@@ -21,7 +22,7 @@ function isValidMonthKey(value: string): boolean {
 }
 
 function assertMonthKey(value: string): string {
-  if (!isValidMonthKey(value)) throw new Error(`文章年月目录无效：${value}；只接受 YYYY-MM。`);
+  if (!isValidMonthKey(value)) throw new ProductError("fileSystem.invalidArticleMonthDirectoryOnlyYyyyMmIsAccepted", { "value": value });
   return value;
 }
 
@@ -34,7 +35,7 @@ async function ensurePermission(handle: DirectoryHandle): Promise<void> {
   const descriptor = { mode: 'readwrite' as const };
   let permission = await candidate.queryPermission(descriptor);
   if (permission !== 'granted' && candidate.requestPermission) permission = await candidate.requestPermission(descriptor);
-  if (permission !== 'granted') throw new Error('资料目录没有读写权限；请重新授权后再保存。');
+  if (permission !== 'granted') throw new ProductError("fileSystem.theLibraryLacksReadWritePermissionAuthorizeItAgainBeforeSaving");
 }
 
 async function getOrCreateDirectory(parent: FileSystemDirectoryHandle, name: string): Promise<FileSystemDirectoryHandle> {
@@ -65,7 +66,7 @@ export function supportsFileSystemAccess(): boolean {
 }
 
 export async function pickDataDirectory(): Promise<DirectoryHandle> {
-  if (!supportsFileSystemAccess()) throw new Error('当前浏览器不支持目录授权；请使用桌面 Chrome 或 Edge。');
+  if (!supportsFileSystemAccess()) throw new ProductError("fileSystem.thisBrowserDoesNotSupportDirectoryAuthorizationUseDesktopChromeOrEdge");
   const picker = (window as unknown as Window & {
     showDirectoryPicker: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
   }).showDirectoryPicker;
@@ -83,14 +84,14 @@ export async function assertExistingDataDirectory(handle: DirectoryHandle): Prom
     if (entry.kind === 'directory') names.add(name);
   }
   if (DATA_DIRECTORY_NAMES.some(name => !names.has(name))) {
-    throw new Error('所选目录不是完整的资料库；新建资料库请先输入名称，再选择它的父目录。');
+    throw new ProductError("fileSystem.theSelectedDirectoryIsNotACompleteLibraryToCreateOneEnter");
   }
 }
 
 export function normalizeDataDirectoryName(input: string): string {
   const name = input.normalize('NFKC').trim();
   if (!name || name.length > 80 || name === '.' || name === '..' || /[\\/:*?"<>|\u0000-\u001f]|[. ]$/.test(name)) {
-    throw new Error('资料库名称须为 1–80 个字符，不能包含路径分隔符、系统保留字符或末尾句点。');
+    throw new ProductError("fileSystem.theLibraryNameMustContain180CharactersWithoutPathSeparatorsReserved");
   }
   return name;
 }
@@ -100,12 +101,12 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
   const name = normalizeDataDirectoryName(input);
   for await (const [existing] of parent.entries()) {
     if (existing.normalize('NFKC').toLowerCase() === name.toLowerCase()) {
-      throw new Error(`父目录中已有「${name}」；请换一个名称，或用“打开已有资料库”。`);
+      throw new ProductError("fileSystem.alreadyExistsInTheParentDirectoryChooseAnotherNameOrOpenThe", { "name": name });
     }
   }
   const child = await parent.getDirectoryHandle(name, { create: true });
   for await (const _entry of child.entries()) {
-    throw new Error(`「${name}」已包含文件；没有修改该目录。请换一个名称或打开已有资料库。`);
+    throw new ProductError("fileSystem.alreadyContainsFilesTheDirectoryIsUnchangedChooseAnotherNameOrOpen", { "name": name });
   }
   try {
     await ensureArticleDirectories(child);
@@ -125,12 +126,12 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
       if (!rollbackSafe) break;
     }
     if (!rollbackSafe) {
-      throw new Error(`资料库初始化失败；新目录「${name}」出现其他内容，未自动清理。原错误：${error instanceof Error ? error.message : String(error)}`);
+      throw new ProductError("fileSystem.libraryInitializationFailedNewDirectoryContainsOtherContentAndWasNotCleaned", { "name": name, "cause": productCause(error) });
     }
     try {
       await parent.removeEntry(name, { recursive: true });
     } catch (rollbackError) {
-      throw new Error(`资料库初始化失败，且无法清理新目录「${name}」：${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+      throw new ProductError("fileSystem.libraryInitializationFailedAndNewDirectoryCouldNotBeCleaned", { "name": name, "cause": productCause(rollbackError) });
     }
     throw error;
   }
@@ -138,7 +139,7 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
 }
 
 export function displayDirectoryName(handle: DirectoryHandle): string {
-  return handle.name || '已授权资料目录';
+  return handle.name || productText("fileSystem.authorizedLibraryDirectory");
 }
 
 export function monthKey(date = new Date()): string {
@@ -177,7 +178,7 @@ export type ThemeLibraryIssue = { file: string; message: string };
 export type ThemeLibraryResult = { themes: ThemeConfig[]; issues: ThemeLibraryIssue[] };
 
 function assertThemeId(id: string): string {
-  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id)) throw new Error('主题 ID 不安全；只接受小写字母、数字和连字符。');
+  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id)) throw new ProductError("fileSystem.theThemeIdIsUnsafeOnlyLowercaseLettersNumbersAndHyphensAre");
   return id;
 }
 
@@ -202,7 +203,7 @@ async function writeThemeFile(directory: DirectoryHandle, theme: ThemeConfig): P
     if (created) {
       try { await directory.removeEntry(filename); } catch { /* report the original write error */ }
     }
-    throw new Error(`主题文件 ${filename} 保存失败：${error instanceof Error ? error.message : String(error)}`);
+    throw new ProductError("fileSystem.themeFileCouldNotBeSaved", { "filename": filename, "cause": productCause(error) });
   }
 }
 
@@ -236,13 +237,13 @@ export async function loadThemeLibrary(root: DirectoryHandle): Promise<ThemeLibr
   for (const [filename, entry] of entries) {
     if (entry.kind !== 'file' || !filename.endsWith('.json')) continue;
     if (!/^[a-z0-9][a-z0-9-]{0,47}\.json$/.test(filename)) {
-      issues.push({ file: filename, message: '主题文件名不安全；应为不含路径的 <id>.json。' });
+      issues.push({ file: filename, ...productMessage("fileSystem.theThemeFilenameIsUnsafeUseIdJsonWithoutAPath") });
       continue;
     }
     try {
       const theme = parseThemeConfigJson(await readText(directory, filename));
-      if (theme.id !== filename.slice(0, -5)) throw new Error('文件名与主题 ID 不一致。');
-      if (seenIds.has(theme.id)) throw new Error(`主题 ID ${theme.id} 重复。`);
+      if (theme.id !== filename.slice(0, -5)) throw new ProductError("editorThemeLibrary.theFilenameDoesNotMatchTheThemeId");
+      if (seenIds.has(theme.id)) throw new ProductError("fileSystem.themeIdIsDuplicated", { "themeId": theme.id });
       seenIds.add(theme.id);
       themes.push(theme);
     } catch (error) {
@@ -256,7 +257,7 @@ export async function loadThemeLibrary(root: DirectoryHandle): Promise<ThemeLibr
 export async function saveThemeLibraryTheme(root: DirectoryHandle, input: ThemeConfig): Promise<ThemeConfig> {
   await ensurePermission(root);
   const errors = [...validateThemeConfig(input), ...validateThemeFormat(input)];
-  if (errors.length) throw new Error(`主题配置校验失败：${errors.join('；')}`);
+  if (errors.length) throw new ProductError("fileSystem.themeConfigurationValidationFailed", { "details": errors.join('；') });
   const { directory } = await getThemeDirectory(root, 'article-themes');
   const filename = `${assertThemeId(input.id)}.json`;
   let previous: ThemeConfig | null = null;
@@ -264,7 +265,7 @@ export async function saveThemeLibraryTheme(root: DirectoryHandle, input: ThemeC
     previous = parseThemeConfigJson(await readText(directory, filename));
   } catch (error) {
     if (!(error instanceof DOMException && error.name === 'NotFoundError')) {
-      throw new Error(`现有主题文件无法安全更新：${error instanceof Error ? error.message : String(error)}`);
+      throw new ProductError("fileSystem.theExistingThemeFileCannotBeUpdatedSafely", { "cause": productCause(error) });
     }
   }
   const saved = previous
@@ -278,8 +279,8 @@ export async function deleteThemeLibraryTheme(root: DirectoryHandle, id: string)
   await ensurePermission(root);
   assertThemeId(id);
   const library = await loadThemeLibrary(root);
-  if (!library.themes.some((theme) => theme.id === id)) throw new Error(`找不到主题「${id}」。`);
-  if (library.themes.length <= 1) throw new Error('主题库至少保留一套主题；请先导入或复制另一套主题。');
+  if (!library.themes.some((theme) => theme.id === id)) throw new ProductError("fileSystem.themeWasNotFound", { "id": id });
+  if (library.themes.length <= 1) throw new ProductError("fileSystem.theThemeLibraryMustRetainAtLeastOneThemeImportOrCopy");
   const { directory } = await getThemeDirectory(root, 'article-themes');
   await directory.removeEntry(`${id}.json`);
 }
@@ -298,7 +299,7 @@ async function readTheme(articleDirectory: FileSystemDirectoryHandle, metadata: 
     return {
       theme: getTheme(metadata.theme?.id),
       valid: false,
-      diagnostics: [diagnostic('文章缺少 theme.json 主题快照；请重新绑定主题并保存后再复制。')],
+      diagnostics: [diagnostic(productText("fileSystem.theArticleHasNoThemeJsonSnapshotBindAThemeAgainAnd"))],
     };
   }
   let parsed: unknown;
@@ -308,19 +309,19 @@ async function readTheme(articleDirectory: FileSystemDirectoryHandle, metadata: 
     return {
       theme: getTheme(metadata.theme?.id),
       valid: false,
-      diagnostics: [diagnostic(`theme.json 不是有效 JSON：${error instanceof Error ? error.message : String(error)}`)],
+      diagnostics: [diagnostic(productText("fileSystem.themeJsonIsNotValidJson", { "cause": productCause(error) }))],
     };
   }
   if (!isThemeConfig(parsed)) {
     return {
       theme: getTheme(metadata.theme?.id),
       valid: false,
-      diagnostics: [diagnostic('theme.json 结构不完整；未静默回退到最新全局主题。')],
+      diagnostics: [diagnostic(productText("fileSystem.themeJsonIsIncompleteTheLatestGlobalThemeWasNotSubstitutedSilently"))],
     };
   }
   const diagnostics: ArticleDiagnostic[] = [];
   if (parsed.id !== metadata.theme?.id || parsed.version !== metadata.theme?.version) {
-    diagnostics.push(diagnostic(`文章 Front Matter 绑定 ${metadata.theme?.id ?? '未知'}@${metadata.theme?.version ?? '未知'}，但主题快照是 ${parsed.id}@${parsed.version}；请明确重新绑定。`));
+    diagnostics.push(diagnostic(productText("fileSystem.articleFrontMatterBindsButTheThemeSnapshotIsBindTheTheme", { "value": (metadata.theme?.id ?? productReference("fileSystem.unknown")), "value2": (metadata.theme?.version ?? productReference("fileSystem.unknown")), "parsedId": parsed.id, "parsedVersion": parsed.version })));
   }
   return { theme: parsed, valid: diagnostics.length === 0, diagnostics };
 }
@@ -347,7 +348,7 @@ async function readStoredArticle(month: string, folder: string, articleDirectory
   } catch (error) {
     parse = {
       ...parse,
-      diagnostics: [diagnostic(`文章缺少 article.md 或无法读取：${error instanceof Error ? error.message : String(error)}`)],
+      diagnostics: [diagnostic(productText("fileSystem.theArticleHasNoArticleMdOrItCouldNotBeRead", { "cause": productCause(error) }))],
       canCopy: false,
     };
   }
@@ -403,8 +404,8 @@ export async function readStoredArticleById(root: DirectoryHandle, month: string
   const article = await readStoredArticle(month, folder, directory);
   try {
     article.renderRecord = await readRenderRecord(directory);
-    if (article.renderRecord && !await renderRecordMatches(article.renderRecord, article.source, article.theme)) article.renderIssue = '渲染记录与正文或主题不匹配；请显式更新样式后保存。';
-  } catch (error) { article.renderIssue = '渲染记录无法读取：' + (error instanceof Error ? error.message : String(error)); }
+    if (article.renderRecord && !await renderRecordMatches(article.renderRecord, article.source, article.theme)) article.renderIssue = productText("fileSystem.theRenderRecordDoesNotMatchTheBodyOrThemeUpdateStyles");
+  } catch (error) { article.renderIssue = productText("fileSystem.theRenderRecordCouldNotBeRead") + (error instanceof Error ? error.message : String(error)); }
   return article;
 }
 
@@ -418,14 +419,14 @@ export async function listArticleSummaries(root: DirectoryHandle): Promise<{ art
     const monthDirectory = await articlesDirectory.getDirectoryHandle(month);
     try {
       const value: unknown = JSON.parse(await readText(monthDirectory, 'index.json'));
-      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('index.json 不是对象。');
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("fileSystem.indexJsonIsNotAnObject");
       let incomplete = false;
       for (const [folder, raw] of Object.entries(value)) {
         assertStoredTarget(month, folder);
-        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`「${folder}」索引条目无效。`);
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new ProductError("fileSystem.indexEntryIsInvalid", { "folder": folder });
         const entry = raw as Record<string, unknown>;
         const binding = entry.theme as Record<string, unknown> | undefined;
-        if (typeof entry.title !== 'string' || !Array.isArray(entry.categories) || entry.categories.some(item => typeof item !== 'string') || typeof entry.updatedAt !== 'string' || !binding || typeof binding.id !== 'string' || typeof binding.version !== 'string') throw new Error(`「${folder}」索引必要字段无效。`);
+        if (typeof entry.title !== 'string' || !Array.isArray(entry.categories) || entry.categories.some(item => typeof item !== 'string') || typeof entry.updatedAt !== 'string' || !binding || typeof binding.id !== 'string' || typeof binding.version !== 'string') throw new ProductError("fileSystem.requiredFieldsInIndexEntryAreInvalid", { "folder": folder });
         const ready = entry.summaryVersion === 1 && typeof entry.description === 'string' && typeof entry.author === 'string' && typeof entry.createdAt === 'string' && Array.isArray(entry.diagnostics);
         incomplete ||= !ready;
         const diagnostics = Array.isArray(entry.diagnostics) ? entry.diagnostics.filter((item): item is ArticleDiagnostic => Boolean(item && typeof item === 'object' && ['error', 'warning', 'info'].includes(item.level) && typeof item.message === 'string' && (item.line === undefined || Number.isInteger(item.line)))) : [];
@@ -436,9 +437,9 @@ export async function listArticleSummaries(root: DirectoryHandle): Promise<{ art
           indexState: ready ? 'ready' : 'repair-needed',
         });
       }
-      if (incomplete) issues.push({ month, message: '旧月索引缺少摘要字段；已知标题与分类可用，摘要及保存诊断需主动重建后补全。' });
+      if (incomplete) issues.push({ month, ...productMessage("fileSystem.theOldMonthlyIndexLacksSummaryFieldsKnownTitlesAndCategoriesRemain") });
     } catch (error) {
-      issues.push({ month, message: `月索引需修复：${error instanceof Error ? error.message : String(error)}` });
+      issues.push({ month, ...productMessage("fileSystem.theMonthlyIndexNeedsRepair", { "cause": productCause(error) }) });
     }
   }
   return { articles: articles.sort((a, b) => b.parse.metadata.updatedAt.localeCompare(a.parse.metadata.updatedAt)), issues, months };
@@ -460,7 +461,7 @@ export async function rebuildArticleIndexes(root: DirectoryHandle, months: strin
 function assertStoredTarget(month: string, folder: string): void {
   assertMonthKey(month);
   if (!folder || sanitizeFolderName(folder) !== folder || folder === '.' || folder === '..') {
-    throw new Error('文章目录名不安全；已拒绝执行文件操作。');
+    throw new ProductError("fileSystem.theArticleDirectoryNameIsUnsafeFileOperationsWereRejected");
   }
 }
 
@@ -521,7 +522,7 @@ async function writeMonthIndexEntry(
   try {
     const current = await readText(monthDirectory, 'index.json').catch(() => '{}');
     const parsed = JSON.parse(current) as unknown;
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('index.json 不是对象。');
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new ProductError("fileSystem.indexJsonIsNotAnObject");
     const next = parsed as Record<string, unknown>;
     if (entry) next[folder] = entry;
     else delete next[folder];
@@ -533,12 +534,12 @@ async function writeMonthIndexEntry(
       await writeText(monthDirectory, 'index.json', JSON.stringify(rebuilt, null, 2));
       return {
         updated: true,
-        error: `原月索引无法读取，已从文章目录重建：${error instanceof Error ? error.message : String(error)}`,
+        error: productText("fileSystem.theOriginalMonthlyIndexCouldNotBeReadAndWasRebuiltFrom", { "cause": productCause(error) }),
       };
     } catch (rebuildError) {
       return {
         updated: false,
-        error: `月索引未更新：${rebuildError instanceof Error ? rebuildError.message : String(rebuildError)}`,
+        error: productText("fileSystem.theMonthlyIndexWasNotUpdated", { "cause": productCause(rebuildError) }),
       };
     }
   }
@@ -566,10 +567,10 @@ export async function copyStoredArticle(
   const selectedTheme = options.themeOverride ?? applyTheme;
   if (selectedTheme) {
     const themeErrors = validateThemeConfig(selectedTheme);
-    if (themeErrors.length) throw new Error(`目标主题配置校验失败：${themeErrors.join('；')}`);
+    if (themeErrors.length) throw new ProductError("fileSystem.targetThemeConfigurationValidationFailed", { "details": themeErrors.join('；') });
   }
   const cleanTitle = title.trim();
-  if (!cleanTitle) throw new Error('副本显示标题不能为空。');
+  if (!cleanTitle) throw new ProductError("fileSystem.theCopySDisplayTitleCannotBeEmpty");
 
   const articlesDirectory = await getOrCreateDirectory(root, 'articles');
   const sourceMonth = await articlesDirectory.getDirectoryHandle(month);
@@ -578,16 +579,16 @@ export async function copyStoredArticle(
   const source = options.sourceOverride ?? sourceArticle.source;
   const parsedSource = parseArticle(source);
   if (parsedSource.diagnostics.some((item) => item.level === 'error')) {
-    throw new Error('原文 Front Matter 有错误；修复后才能复制。');
+    throw new ProductError("fileSystem.theOriginalFrontMatterHasErrorsRepairItBeforeCopying");
   }
-  if (!sourceArticle.themeValid && !selectedTheme) throw new Error('文章主题快照无效；修复后才能复制。');
+  if (!sourceArticle.themeValid && !selectedTheme) throw new ProductError("fileSystem.theArticleThemeSnapshotIsInvalidRepairItBeforeCopying");
   const copiedTheme = selectedTheme ?? sourceArticle.theme;
 
   const targetMonthDirectory = await getOrCreateDirectory(articlesDirectory, targetMonth);
   const targetFolder = await uniqueFolderName(targetMonthDirectory, cleanTitle);
   try {
     await targetMonthDirectory.getDirectoryHandle(targetFolder);
-    throw new Error(`副本目录「${targetFolder}」刚刚出现冲突；原文未改动，请刷新后重试。`);
+    throw new ProductError("fileSystem.copyDirectoryNowConflictsWithAnotherEntryTheOriginalManuscriptIsUnchanged", { "targetFolder": targetFolder });
   } catch (error) {
     if (!isNotFound(error)) throw error;
   }
@@ -602,7 +603,7 @@ export async function copyStoredArticle(
       updatedAt: timestamp,
       theme: { id: copiedTheme.id, version: copiedTheme.version },
     });
-    if (nextSource === source) throw new Error('无法更新副本标题；原文未改动。');
+    if (nextSource === source) throw new ProductError("fileSystem.theCopyTitleCouldNotBeUpdatedTheOriginalManuscriptIsUnchanged");
     await writeText(destinationDirectory, 'article.md', nextSource);
     await writeText(destinationDirectory, 'theme.json', JSON.stringify(copiedTheme, null, 2));
     let sourceMedia: DirectoryHandle | null = null;
@@ -610,7 +611,7 @@ export async function copyStoredArticle(
       sourceMedia = await sourceDirectory.getDirectoryHandle('media');
     } catch (error) {
       if (!isNotFound(error)) {
-        throw new Error(`复制本地素材失败：${error instanceof Error ? error.message : String(error)}`);
+        throw new ProductError("fileSystem.localAssetCopyingFailed", { "cause": productCause(error) });
       }
     }
     if (sourceMedia) {
@@ -618,7 +619,7 @@ export async function copyStoredArticle(
         const destinationMedia = await destinationDirectory.getDirectoryHandle('media', { create: true });
         await copyDirectoryContents(sourceMedia, destinationMedia);
       } catch (error) {
-        throw new Error(`复制本地素材失败：${error instanceof Error ? error.message : String(error)}`);
+        throw new ProductError("fileSystem.localAssetCopyingFailed", { "cause": productCause(error) });
       }
     }
 
@@ -637,7 +638,7 @@ export async function copyStoredArticle(
       try {
         await targetMonthDirectory.removeEntry(targetFolder, { recursive: true });
       } catch (cleanupError) {
-        throw new Error(`${error instanceof Error ? error.message : String(error)}；未完成副本目录「${targetFolder}」回收失败：${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}。原文未改动。`);
+        throw new ProductError("fileSystem.cleanupOfIncompleteCopyDirectoryAlsoFailedTheOriginalManuscriptIsUnchanged", { "cause": productCause(error), "targetFolder": targetFolder, "cause2": productCause(cleanupError) });
       }
     }
     throw error;
@@ -666,16 +667,16 @@ export async function renameStoredArticle(
   await ensurePermission(root);
   assertStoredTarget(month, folder);
   const cleanTitle = title.trim();
-  if (!cleanTitle) throw new Error('显示标题不能为空。');
+  if (!cleanTitle) throw new ProductError("fileSystem.theDisplayTitleCannotBeEmpty");
   const articlesDirectory = await getOrCreateDirectory(root, 'articles');
   const monthDirectory = await articlesDirectory.getDirectoryHandle(month);
   const articleDirectory = await monthDirectory.getDirectoryHandle(folder);
   const stored = await readStoredArticle(month, folder, articleDirectory);
   if (parseArticle(stored.source).diagnostics.some((item) => item.level === 'error')) {
-    throw new Error('Front Matter 有错误；修复后才能更改显示标题。');
+    throw new ProductError("fileSystem.frontMatterHasErrorsRepairItBeforeChangingTheDisplayTitle");
   }
   const source = updateFrontMatter(stored.source, { title: cleanTitle, updatedAt: new Date().toISOString() });
-  if (source === stored.source) throw new Error('无法更新显示标题；物理目录保持不变。');
+  if (source === stored.source) throw new ProductError("fileSystem.theDisplayTitleCouldNotBeUpdatedThePhysicalDirectoryIsUnchanged");
   return saveStoredArticle(root, source, stored.theme, folder, month, { writeTheme: stored.themeValid });
 }
 
@@ -722,10 +723,10 @@ export async function saveStoredArticle(
   options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string; renderRecord?: RenderRecord | null } = {},
 ): Promise<SaveResult> {
   await ensurePermission(root);
-  if (Boolean(existingFolder) !== Boolean(existingMonth)) throw new Error('已有文章必须同时提供固定目录名和年月目录。');
+  if (Boolean(existingFolder) !== Boolean(existingMonth)) throw new ProductError("fileSystem.existingArticlesRequireBothAFixedDirectoryNameAndAMonthDirectory");
   if (options.writeTheme !== false) {
     const themeErrors = validateThemeConfig(theme);
-    if (themeErrors.length) throw new Error(`主题快照校验失败：${themeErrors.join('；')}`);
+    if (themeErrors.length) throw new ProductError("articleHistory.themeSnapshotValidationFailed", { "details": themeErrors.join('；') });
   }
   const parsed = parseArticle(source);
   const month = existingMonth ? assertMonthKey(existingMonth) : monthKey();
@@ -733,19 +734,19 @@ export async function saveStoredArticle(
   const monthDirectory = options.expectedSource !== undefined ? await articlesDirectory.getDirectoryHandle(month) : await getOrCreateDirectory(articlesDirectory, month);
   let folder: string;
   if (existingFolder) {
-    if (sanitizeFolderName(existingFolder) !== existingFolder) throw new Error('已有文章目录名不安全，已拒绝改写。');
+    if (sanitizeFolderName(existingFolder) !== existingFolder) throw new ProductError("fileSystem.theExistingArticleDirectoryNameIsUnsafeRewritingWasRejected");
     folder = existingFolder;
   } else {
     folder = await uniqueFolderName(monthDirectory, parsed.metadata.title);
   }
   const articleDirectory = options.expectedSource !== undefined ? await monthDirectory.getDirectoryHandle(folder) : await getOrCreateDirectory(monthDirectory, folder);
   if (options.expectedSource !== undefined && await readText(articleDirectory, 'article.md') !== options.expectedSource) {
-    throw new Error('文章已在外部变化，本次未覆盖；请刷新后重试。');
+    throw new ProductError("fileSystem.theArticleChangedExternallyAndWasNotOverwrittenRefreshAndRetry");
   }
   try {
     await writeText(articleDirectory, 'article.md', source);
   } catch (error) {
-    throw new Error(`article.md 保存失败：${error instanceof Error ? error.message : String(error)}`);
+    throw new ProductError("fileSystem.articleMdSavingFailed", { "cause": productCause(error) });
   }
 
   const writeTheme = options.writeTheme ?? true;
@@ -756,7 +757,7 @@ export async function saveStoredArticle(
       await writeText(articleDirectory, 'theme.json', JSON.stringify(theme, null, 2));
       themeResult = await readTheme(articleDirectory, parsed.metadata);
     } catch (error) {
-      themeWriteError = `theme.json 保存失败：${error instanceof Error ? error.message : String(error)}`;
+      themeWriteError = productText("fileSystem.themeJsonSavingFailed", { "cause": productCause(error) });
       themeResult = await readTheme(articleDirectory, parsed.metadata);
       themeResult = {
         ...themeResult,
@@ -772,9 +773,9 @@ export async function saveStoredArticle(
   let renderIssue: string | undefined;
   if (options.renderRecord !== undefined) {
     try {
-      if (options.renderRecord && !await renderRecordMatches(options.renderRecord, source, themeResult.theme)) throw new Error('正文或主题与渲染记录不匹配。');
+      if (options.renderRecord && !await renderRecordMatches(options.renderRecord, source, themeResult.theme)) throw new ProductError("fileSystem.theBodyOrThemeDoesNotMatchTheRenderRecord");
       await writeRenderRecord(articleDirectory, options.renderRecord);
-    } catch (error) { renderIssue = '原文已保存；渲染依赖未保存：' + (error instanceof Error ? error.message : String(error)); }
+    } catch (error) { renderIssue = productText("fileSystem.sourceSavedRenderDependenciesWereNotSaved") + (error instanceof Error ? error.message : String(error)); }
   }
   const savedArticle: StoredArticle = {
     id: `${month}/${folder}`,
@@ -794,14 +795,14 @@ export async function saveStoredArticle(
   if (options.updateIndex === false) {
     // The batch owner commits the successful rows together, once per month.
   } else if (parsed.diagnostics.some((item) => item.level === 'error')) {
-    indexError = 'Front Matter 未通过校验，原文已保存但索引未更新。';
+    indexError = productText("fileSystem.frontMatterValidationDidNotPassSourceWasSavedButTheIndex");
   } else if (!themeResult.valid) {
-    indexError = `主题快照未通过校验，原文已保存但索引未更新：${themeResult.diagnostics.map((item) => item.message).join('；')}`;
+    indexError = productText("fileSystem.themeSnapshotValidationDidNotPassSourceWasSavedButTheIndex", { "details": themeResult.diagnostics.map((item) => item.message).join('；') });
   } else {
     try {
       const current = await readText(monthDirectory, 'index.json').catch(() => '{}');
       const index = JSON.parse(current) as unknown;
-      if (!index || typeof index !== 'object' || Array.isArray(index)) throw new Error('index.json 不是对象，将从文章目录重建。');
+      if (!index || typeof index !== 'object' || Array.isArray(index)) throw new ProductError("fileSystem.indexJsonIsNotAnObjectItWillBeRebuiltFromArticle");
       (index as Record<string, unknown>)[folder] = indexEntry(savedArticle);
       await writeText(monthDirectory, 'index.json', JSON.stringify(index, null, 2));
       indexUpdated = true;
@@ -811,9 +812,9 @@ export async function saveStoredArticle(
         rebuilt[folder] = indexEntry(savedArticle);
         await writeText(monthDirectory, 'index.json', JSON.stringify(rebuilt, null, 2));
         indexUpdated = true;
-        indexError = `原 index.json 无法读取，已从当前年月文章目录重建：${error instanceof Error ? error.message : String(error)}`;
+        indexError = productText("fileSystem.theOriginalIndexJsonCouldNotBeReadAndWasRebuiltFrom", { "cause": productCause(error) });
       } catch (rebuildError) {
-        indexError = `原文已保存；月索引更新失败：${rebuildError instanceof Error ? rebuildError.message : String(rebuildError)}`;
+        indexError = productText("fileSystem.sourceSavedMonthlyIndexUpdateFailed", { "cause": productCause(rebuildError) });
       }
     }
   }
@@ -835,12 +836,12 @@ export async function writeArticleSummaryBatch(root: DirectoryHandle, articles: 
       const directory = await (await root.getDirectoryHandle('articles')).getDirectoryHandle(month);
       const raw = await readText(directory, 'index.json');
       const value: unknown = JSON.parse(raw);
-      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('月索引无效，需主动重建。');
+      if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("fileSystem.theMonthlyIndexIsInvalidAndNeedsAManualRebuild");
       const index = value as Record<string, unknown>;
       for (const article of rows) index[article.folder] = indexEntry(article);
       await writeText(directory, 'index.json', JSON.stringify(index, null, 2));
     } catch (error) {
-      issues.push({ month, message: `原文已保存；月索引未更新：${error instanceof Error ? error.message : String(error)}` });
+      issues.push({ month, ...productMessage("fileSystem.sourceSavedTheMonthlyIndexWasNotUpdated", { "cause": productCause(error) }) });
     }
   }
   return issues;

@@ -1,5 +1,6 @@
+import { ProductError, productJoin } from "./i18n/productMessages";
 import type { ThemeConfig } from './types';
-import { validateThemeConfig } from './themeValidation';
+import { inspectThemeConfig } from './themeValidation';
 import { BASIC_THEME, THEMES } from '../themes/article-themes/index';
 export { BASIC_THEME, RAINY_THEME, ARTICLE_THEME_PRESETS, THEMES } from '../themes/article-themes/index';
 import type { ThemeNodeKey } from './types';
@@ -24,8 +25,8 @@ export function resolveDefaultArticleTheme(themes: readonly ThemeConfig[], id: s
 }
 
 function assertValidTheme(theme: ThemeConfig): void {
-  const errors = validateThemeConfig(theme);
-  if (errors.length) throw new Error(`主题配置校验失败：${errors.join('；')}`);
+  const errors = inspectThemeConfig(theme);
+  if (errors.length) throw new ProductError("fileSystem.themeConfigurationValidationFailed", { "details": productJoin(errors, '；') });
 }
 
 function nodeOverrideCss(theme: ThemeConfig, scope = ''): string {
@@ -56,7 +57,7 @@ function themeTokenDeclarations(theme: ThemeConfig): string {
 
 export function themePreviewCss(theme: ThemeConfig, instanceScope: string): string {
   assertValidTheme(theme);
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(instanceScope)) throw new Error('主题预览实例作用域无效。');
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(instanceScope)) throw new ProductError("themes.theThemePreviewInstanceScopeIsInvalid");
   const scope = `.theme-preview-instance-${instanceScope}`;
   const scopedCss = theme.css.replace(/\.article-preview/g, `${scope} .article-preview`);
   return `${scope} .article-preview {\n${themeTokenDeclarations(theme)}\n}\n${scopedCss}\n${articleCodeHighlightCss(scope)}\n${nodeOverrideCss(theme, scope)}`;

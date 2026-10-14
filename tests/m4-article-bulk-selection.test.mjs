@@ -1,3 +1,5 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -35,7 +37,8 @@ function page(collection = 'all', options = {}) {
   Object.assign(props, options);
   const cells = []; let cursor = 0;
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, document: { body: {} }, require(id) {
+  vm.runInNewContext(code, {
+...productMessages, module, exports: module.exports, document: { body: {} }, require: withUILocaleImports(function(id){
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
       useMemo(calculate) { cursor++; return calculate(); },
@@ -54,7 +57,7 @@ function page(collection = 'all', options = {}) {
     if (id.endsWith('/ThemeUpdateTag')) return { ThemeUpdateTag: 'theme-update-tag' };
     if (id.endsWith('/ArticleActionsMenu')) return { ArticleActionsMenu: 'article-menu' };
     throw new Error(`Unexpected import ${id}`);
-  } });
+  }) });
   function all(node) { if (Array.isArray(node)) return node.flatMap(all); if (!node?.props) return []; return [node, ...all(node.props.children)]; }
   function text(node) { if (Array.isArray(node)) return node.map(text).join(''); if (node?.props) return text(node.props.children); return typeof node === 'string' || typeof node === 'number' ? String(node) : ''; }
   function render() { cursor = 0; return all(module.exports.ArticlesPage(props)); }
@@ -106,7 +109,7 @@ function controllerAction(startMarker, endMarker, context, exportName) {
   const end = controllerSource.indexOf(endMarker, start);
   assert.ok(start >= 0 && end > start);
   const snippet = `${controllerSource.slice(start, end)}\nglobalThis.action = ${exportName};`;
-  vm.runInNewContext(ts.transpileModule(snippet, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, context);
+  vm.runInNewContext(ts.transpileModule(snippet, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, Object.assign(context, productMessages));
   return context.action;
 }
 

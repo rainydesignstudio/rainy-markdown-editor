@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useUITranslation } from '../components/global/UILocaleProvider';
+import { isProductCancellation } from '../lib/i18n/productMessages';
 import { nativeDarkRendition } from '../lib/article-format/nativeDark';
 import { observeArticlePreview } from '../lib/articleDarkPreview';
 import { sanitizeHtml } from '../lib/article-format/sanitize';
@@ -13,6 +15,9 @@ function relayPreviewShortcut(event: KeyboardEvent) {
 }
 
 export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>, snapshot: FormatSnapshot, css: string, dark = false) {
+  const { t } = useUITranslation('editor');
+  const frameTitles = useRef({ light: '', dark: '' });
+  frameTitles.current = { light: t('preview.frame'), dark: t('preview.nativeDarkFrame') };
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [darkIssue, setDarkIssue] = useState('');
   const native = Boolean(snapshot.bundle.formatter.stylesheets || snapshot.bundle.formatter.document);
@@ -27,10 +32,10 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
       return;
     }
     const frame = document.createElement('iframe');
-    frame.title = '文章排版预览';
+    frame.title = frameTitles.current.light;
     frame.setAttribute('sandbox', 'allow-same-origin');
     frame.setAttribute('allow', 'clipboard-write');
-    frame.dataset.articleFrame = '';
+    frame.dataset.articleFrame = 'light';
     frame.style.cssText = 'position:absolute;top:0;border:0;transform-origin:top left';
     host.style.position = 'relative'; host.style.height = '100%'; host.style.overflow = 'hidden';
     host.append(frame);
@@ -65,6 +70,12 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
     return () => { observer.disconnect(); doc.removeEventListener('keydown', relayPreviewShortcut); setTarget(null); frame.remove(); host.style.position = ''; host.style.height = ''; host.style.overflow = ''; };
   }, [hostRef, native, snapshot.bundle.formatter.document]);
   useLayoutEffect(() => {
+    if (!native) return;
+    hostRef.current?.querySelectorAll<HTMLIFrameElement>('iframe[data-article-frame]').forEach(frame => {
+      frame.title = frame.dataset.articleFrame === 'dark' ? frameTitles.current.dark : frameTitles.current.light;
+    });
+  }, [hostRef, native, target, t]);
+  useLayoutEffect(() => {
     if (!native || !target) return;
     const doc = target.ownerDocument;
     const preview = snapshot.bundle.formatter.preview;
@@ -88,12 +99,13 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
       void nativeDarkRendition(root, css, snapshot, controller.signal).then(result => {
         if (!active) return;
         overlay?.remove(); observer?.disconnect();
-        overlay = document.createElement('iframe'); overlay.title = '深色文章排版预览';
+        overlay = document.createElement('iframe'); overlay.title = frameTitles.current.dark; overlay.dataset.articleFrame = 'dark';
         overlay.setAttribute('sandbox', 'allow-same-origin');
         overlay.style.cssText = 'position:absolute;top:0;border:0;transform-origin:top left';
         host.append(overlay);
         const doc = overlay.contentDocument!;
         doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close();
+        doc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
         doc.body.style.margin = '0';
         doc.documentElement.style.scrollbarWidth = 'none';
         doc.documentElement.style.overflowX = 'clip';
@@ -109,7 +121,7 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
           mount.style.width = viewport.contentWidth + 'px'; mount.style.marginLeft = (viewport.width - viewport.contentWidth) + 'px';
         };
         observer = new ResizeObserver(size); observer.observe(host); size();
-      }).catch(error => { if (active && error?.name !== 'AbortError' && !String(error).includes('已取消')) setDarkIssue(error instanceof Error ? error.message : String(error)); });
+      }).catch(error => { if (active && error?.name !== 'AbortError' && !isProductCancellation(error)) setDarkIssue(error instanceof Error ? error.message : String(error)); });
     };
     const stop = observeArticlePreview(target, render);
     return () => { active = false; stop(); controller?.abort(); observer?.disconnect(); overlay?.remove(); };

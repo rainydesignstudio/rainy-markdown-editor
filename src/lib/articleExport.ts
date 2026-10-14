@@ -1,3 +1,4 @@
+import { ProductError, productJoin, productReference, productText } from "./i18n/productMessages";
 import { getStoredArticleDirectory } from './fileSystem';
 import { readRenderRecord, renderRecordMatches } from './article-format/renderRecords';
 import { readLibraryFile, contentHash } from './article-format/styles';
@@ -5,7 +6,7 @@ import { parseArticle } from './frontMatter';
 
 export function articleMarkdownBody(source: string): string {
   const parsed = parseArticle(source);
-  if (!parsed.canCopy) throw new Error('元数据边界或内容无效，无法可靠提取Markdown正文。');
+  if (!parsed.canCopy) throw new ProductError("articleExport.metadataBoundariesOrContentAreInvalidTheMarkdownBodyCannotBeExtracted");
   return parsed.body;
 }
 
@@ -29,7 +30,7 @@ export function downloadArticleBlob(blob: Blob, fileName: string): void {
 
 function safeArchiveName(name: string): string {
   if (!name || name === '.' || name === '..' || /[\\/\u0000-\u001f\u007f]/.test(name)) {
-    throw new Error(`资源文件名不安全：${name || '空名称'}；文档包没有生成。`);
+    throw new ProductError("articleExport.unsafeResourceFilenameTheDocumentPackageWasNotGenerated", { "value": (name || productReference("articleExport.emptyName")) });
   }
   return name;
 }
@@ -51,7 +52,7 @@ export async function createArticleDocumentPackage(source: string, root: FileSys
       } else {
         const file = await (await directory.getFileHandle(name)).getFile();
         totalBytes += file.size;
-        if (totalBytes > MAX_PACKAGE_BYTES) throw new Error('文档包超过 256 MB，无法在浏览器内完整生成。');
+        if (totalBytes > MAX_PACKAGE_BYTES) throw new ProductError("articleExport.theDocumentPackageExceeds256MbAndCannotBeGeneratedCompletelyIn");
         entries[path] = new Uint8Array(await file.arrayBuffer());
         mediaFiles += 1;
       }
@@ -61,7 +62,7 @@ export async function createArticleDocumentPackage(source: string, root: FileSys
     const articleDirectory = await getStoredArticleDirectory(root, month, folder);
     const include = async (name: string, file: Blob) => {
       totalBytes += file.size;
-      if (totalBytes > MAX_PACKAGE_BYTES) throw new Error('文档包超过256 MB，未生成。');
+      if (totalBytes > MAX_PACKAGE_BYTES) throw new ProductError("articleExport.theDocumentPackageExceeds256MbAndWasNotGenerated");
       entries[name] = new Uint8Array(await file.arrayBuffer());
     };
     try { await include('theme.json', await (await articleDirectory.getFileHandle('theme.json')).getFile()); }
@@ -69,17 +70,17 @@ export async function createArticleDocumentPackage(source: string, root: FileSys
     const record = await readRenderRecord(articleDirectory);
     if (record) {
       const theme = JSON.parse(await (await articleDirectory.getFileHandle('theme.json')).getFile().then(file => file.text()));
-      if (!await renderRecordMatches(record, source, theme)) throw new Error('渲染记录与待导出原文不一致，请更新样式并保存后重试。');
+      if (!await renderRecordMatches(record, source, theme)) throw new ProductError("articleExport.theRenderRecordDoesNotMatchTheSourceBeingExportedUpdateStyles");
       const manifestPath = 'styles/.versions/' + record.environmentHash + '/manifest.json';
       const manifest = await readLibraryFile(root, manifestPath);
-      if (await contentHash(await manifest.text()) !== record.environmentHash) throw new Error('渲染版本清单校验失败，文档包未生成。');
+      if (await contentHash(await manifest.text()) !== record.environmentHash) throw new ProductError("articleExport.renderVersionManifestVerificationFailedTheDocumentPackageWasNotGenerated");
       await include('render.json', new Blob([JSON.stringify(record)]));
       await include(manifestPath, manifest);
       for (const asset of record.assets) {
         const name = 'assets/.objects/' + asset.hash;
         if (entries[name]) continue;
         const file = await readLibraryFile(root, name);
-        if (await contentHash(file) !== asset.hash) throw new Error('渲染资源缺失或损坏：' + asset.path);
+        if (await contentHash(file) !== asset.hash) throw new ProductError('shared.compose', { parts: productJoin([productReference("articleExport.renderResourceIsMissingOrDamaged"), asset.path]) });
         await include(name, file);
       }
     }

@@ -1,3 +1,4 @@
+import { ProductError, productMessage, productText, productReference, type ProductMessageInfo } from "./i18n/productMessages";
 import { parseDocument } from 'yaml';
 import type { ArticleDiagnostic, ArticleMeta, ParsedArticle, ThemeConfig } from './types';
 
@@ -25,8 +26,8 @@ function defaultMeta(title = '未命名文稿', themeId = 'basic'): ArticleMeta 
   };
 }
 
-function typeDiagnostic(field: string, expected: string): ArticleDiagnostic {
-  return { level: 'error', message: `Front Matter 字段「${field}」类型错误，应为 ${expected}。` };
+function typeDiagnostic(field: string, expected: ProductMessageInfo): ArticleDiagnostic {
+  return { level: 'error', ...productMessage("frontMatter.frontMatterFieldHasAnInvalidTypeExpected", { "field": field, "expected": expected }) };
 }
 
 function readString(
@@ -38,7 +39,7 @@ function readString(
   const value = record[field];
   if (value === undefined) return fallback;
   if (typeof value === 'string') return value;
-  diagnostics.push(typeDiagnostic(field, '字符串'));
+  diagnostics.push(typeDiagnostic(field, productReference("frontMatter.string")));
   return fallback;
 }
 
@@ -46,7 +47,7 @@ function readCategories(record: Record<string, unknown>, diagnostics: ArticleDia
   const value = record.categories;
   if (value === undefined) return [];
   if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return [...value];
-  diagnostics.push(typeDiagnostic('categories', '字符串数组'));
+  diagnostics.push(typeDiagnostic('categories', productReference("frontMatter.arrayOfStrings")));
   return [];
 }
 
@@ -54,7 +55,7 @@ function readTheme(record: Record<string, unknown>, diagnostics: ArticleDiagnost
   const value = record.theme;
   if (value === undefined) return { id: 'basic', version: '1.0.0' };
   if (!isRecord(value)) {
-    diagnostics.push(typeDiagnostic('theme', '包含 id/version 的对象'));
+    diagnostics.push(typeDiagnostic('theme', productReference("frontMatter.objectContainingIdVersion")));
     return { id: 'basic', version: '1.0.0' };
   }
   return {
@@ -69,7 +70,7 @@ export function normalizeMeta(
   diagnostics: ArticleDiagnostic[] = [],
 ): ArticleMeta {
   const record = isRecord(value) ? value : {};
-  if (!isRecord(value)) diagnostics.push({ level: 'error', message: 'Front Matter 必须解析为对象。' });
+  if (!isRecord(value)) diagnostics.push({ level: 'error', ...productMessage("frontMatter.frontMatterMustParseToAnObject") });
   return {
     ...record,
     title: readString(record, 'title', fallbackTitle, diagnostics) || fallbackTitle,
@@ -98,7 +99,7 @@ function uncertainFrontMatter(source: string): ParsedArticle {
     metadata: defaultMeta(),
     hasFrontMatter: true,
     frontMatterRange: { start: 0, end: source.length },
-    diagnostics: [{ level: 'error', message: '检测到 Front Matter 起始边界，但没有找到闭合的 ---；为避免误把元数据写入正文，预览与复制已阻止。' }],
+    diagnostics: [{ level: 'error', ...productMessage("frontMatter.aFrontMatterOpeningBoundaryWasFoundButNoClosingExistsPreview") }],
     canCopy: false,
   };
 }
@@ -113,7 +114,7 @@ export function parseArticle(source: string): ParsedArticle {
       metadata: defaultMeta(),
       hasFrontMatter: false,
       frontMatterRange: null,
-      diagnostics: [{ level: 'warning', message: '未发现完整 Front Matter；首次明确保存会补齐最小元数据，正文保持不重排。' }],
+      diagnostics: [{ level: 'warning', ...productMessage("frontMatter.noCompleteFrontMatterWasFoundTheFirstExplicitSaveAddsMinimal") }],
       canCopy: true,
     };
   }
@@ -223,7 +224,7 @@ export function updateFrontMatter(source: string, patch: Partial<ArticleMeta>, o
 export function replaceArticleBody(source: string, body: string): string {
   const parsed = parseArticle(source);
   const errors = parsed.diagnostics.filter((item) => item.level === 'error');
-  if (errors.length) throw new Error(`Front Matter 有误，正文未写入：${errors.map((item) => item.message).join('；')}`);
+  if (errors.length) throw new ProductError("frontMatter.frontMatterIsInvalidTheBodyWasNotWritten", { "details": errors.map((item) => item.message).join('；') });
   const bodyStart = source.length - parsed.body.length;
   return `${source.slice(0, bodyStart)}${body}`;
 }
@@ -238,7 +239,7 @@ export function instantiateArticleTemplate(
 ): string {
   const before = parseArticle(source);
   const errors = before.diagnostics.filter((item) => item.level === 'error');
-  if (errors.length) throw new Error(`模板 Front Matter 有误：${errors.map((item) => item.message).join('；')}`);
+  if (errors.length) throw new ProductError("contentLibraries.templateFrontMatterIsInvalid", { "details": errors.map((item) => item.message).join('；') });
 
   const now = options.now ?? nowIso();
   const result = updateFrontMatter(source, {
@@ -248,12 +249,12 @@ export function instantiateArticleTemplate(
   }, ['templateIcon']);
   const after = parseArticle(result);
   if (!after.hasFrontMatter || after.diagnostics.some((item) => item.level === 'error')) {
-    throw new Error('模板 Front Matter 无法安全更新；未创建新稿。');
+    throw new ProductError("frontMatter.templateFrontMatterCannotBeUpdatedSafelyNoNewDraftWasCreated");
   }
   if (after.metadata.createdAt !== now || after.metadata.updatedAt !== now ||
       after.metadata.theme.id !== options.theme.id || after.metadata.theme.version !== options.theme.version) {
-    throw new Error('模板时间或主题绑定无法验证；未创建新稿。');
+    throw new ProductError("frontMatter.templateDatesOrThemeBindingCouldNotBeVerifiedNoNewDraft");
   }
-  if (Object.hasOwn(after.metadata, 'templateIcon')) throw new Error('模板图标未能从新稿移除；未创建新稿。');
+  if (Object.hasOwn(after.metadata, 'templateIcon')) throw new ProductError("frontMatter.theTemplateIconCouldNotBeRemovedFromTheNewDraftNo");
   return result;
 }

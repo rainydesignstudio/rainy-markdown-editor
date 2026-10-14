@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
@@ -74,7 +75,7 @@ async function dialog(scanner) {
   let cursor = 0, tree, closes = 0, scans = 0, lastSignal;
   const request = { type: 'delete', assets: [{ kind: 'shared', fileName: 'sample.png' }] };
   const props = { request, articles: [], busy: false, isCurrent: () => true, currentReferences: 2, scanReferences: (assets, signal) => { scans++; lastSignal = signal; return scanner(assets, signal); }, onClose: () => closes++, onSubmit: async () => ({ ok: true }) };
-  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText, { module, exports: module.exports, AbortController, Error, require(id) {
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText, { module, exports: module.exports, AbortController, Error, require: withUILocaleImports(function(id){
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id === 'react') return {
       useState(initial) { const index = cursor++; if (!(index in cells)) cells[index] = initial; return [cells[index], value => { cells[index] = typeof value === 'function' ? value(cells[index]) : value; }]; },
@@ -84,7 +85,7 @@ async function dialog(scanner) {
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'dialog', DialogHeader: 'header', DialogFooter: 'footer', DialogActions: 'actions', DialogButton: 'button' };
     if (id.endsWith('/MediaGallery')) return { MediaIcon: 'icon' };
     throw new Error(id);
-  } });
+  }) });
   const render = () => { cursor = 0; tree = nodes(module.exports.MediaManagementDialog(props)); while (effects.length) effects.shift()(); return tree; };
   const button = label => { const node = tree.find(node => node.type === 'button' && text(node) === label); assert.ok(node); return node.props; };
   render();

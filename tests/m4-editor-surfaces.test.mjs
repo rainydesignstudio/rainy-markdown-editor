@@ -1,3 +1,4 @@
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
@@ -138,13 +139,13 @@ test('editing and forking a soft theme preserve surfaces and keep preview tokens
   const source = await readFile(new URL('../src/components/settings/EditorThemeDesigner.tsx', import.meta.url), 'utf8');
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const module = { exports: {} };
-  vm.runInNewContext(output + '\nexports.Preview = Preview;', { module, exports: module.exports, require(id) {
+  vm.runInNewContext(output + '\nexports.Preview = Preview;', { module, exports: module.exports, require: withUILocaleImports(function(id){
     if (id.endsWith('/editorThemes')) return themes;
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/editorSourceHighlight')) return { tokenizeEditorSource: value => [{ text: value }] };
     if (id.endsWith('/ThemeInspection')) return { ThemeInspectionPreview: 'inspection-preview' };
     return {};
-  } });
+  }) });
   const original = themeWithSurfaces(), before = JSON.stringify(original);
   const fork = module.exports.forkEditorTheme(original);
   assert.deepEqual(themes.validateEditorTheme(fork), []);

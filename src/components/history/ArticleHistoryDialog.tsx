@@ -1,5 +1,12 @@
 'use client';
 
+import { formatDiagnosticMessage, formatProductMessage } from "../../lib/i18n/productMessages";
+
+import { useUITranslation, useUILocale } from '../global/UILocaleProvider';
+
+import { formatUIDate, formatUIMonth } from '../../lib/i18n/formatters';
+import type { UILocale } from '../../lib/i18n/preferences';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { changedThemeSnapshotFields, type ArticleHistoryIssue, type ArticleHistorySnapshot } from '../../lib/articleHistory';
 import type { StoredArticle, ThemeConfig } from '../../lib/types';
@@ -38,16 +45,8 @@ type Props = {
 
 type DiffRow = { left: string | null; right: string | null; kind: 'same' | 'removed' | 'added' };
 
-const KIND_LABEL: Record<ArticleHistorySnapshot['kind'], string> = {
-  automatic: '自动快照',
-  manual: '重要版本',
-  'before-restore': '恢复前保护点',
-  'before-theme-change': '换主题前保护点',
-};
-
-function formatSnapshotTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '时间无效' : date.toLocaleString('zh-CN');
+function formatSnapshotTime(value: string, locale: UILocale, invalid: string): string {
+  return formatUIDate(value, locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }, invalid);
 }
 
 function diffLines(previous: string, current: string): DiffRow[] {
@@ -100,20 +99,20 @@ function metadataPairs(previous: ArticleHistorySnapshot, currentSource: string, 
   const themeLabel = (theme: ThemeConfig) => `${theme.name} · v${theme.version}`;
   const themeChanges = changedThemeSnapshotFields(previous.theme, currentTheme);
   const pairs = [
-    { label: '标题', before: previous.parsed.metadata.title, after: current.title },
-    { label: '摘要', before: previous.parsed.metadata.description, after: current.description },
-    { label: '作者', before: previous.parsed.metadata.author, after: current.author },
-    { label: '分类', before: previous.parsed.metadata.categories.join('、') || '无', after: current.categories.join('、') || '无' },
-    { label: '文章主题', before: themeLabel(previous.theme), after: themeLabel(currentTheme) },
+    { key: 'title', before: previous.parsed.metadata.title, after: current.title },
+    { key: 'description', before: previous.parsed.metadata.description, after: current.description },
+    { key: 'author', before: previous.parsed.metadata.author, after: current.author },
+    { key: 'categories', before: previous.parsed.metadata.categories.join('、'), after: current.categories.join('、') },
+    { key: 'theme', before: themeLabel(previous.theme), after: themeLabel(currentTheme) },
   ];
   if (themeChanges.length) pairs.push({
-    label: '主题快照内容',
-    before: '历史快照',
-    after: `变化字段：${themeChanges.join('、')}`,
+    key: 'themeSnapshot',
+    before: '',
+    after: themeChanges.join('、'),
   });
   return pairs.map((item) => ({
     ...item,
-    changed: item.label === '文章主题' ? item.before !== item.after || themeChanges.length > 0 : item.before !== item.after,
+    changed: item.key === 'theme' ? item.before !== item.after || themeChanges.length > 0 : item.before !== item.after,
   }));
 }
 
@@ -128,26 +127,29 @@ function HistoryRestoreConfirm({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useUITranslation('dialogs');
   const dialogRef = useRef<HTMLElement | null>(null);
   useDialogFocus(dialogRef, onCancel);
   return (
     <div className="history-restore-confirm-backdrop" role="presentation">
       <section ref={dialogRef} tabIndex={-1} className="history-restore-confirm" role="alertdialog" aria-modal="true" aria-labelledby="history-restore-title">
-        <div><strong id="history-restore-title">恢复到这个版本？</strong><p>会先保存当前稿保护点，再恢复历史正文与主题。当前内容不会被静默覆盖。</p></div>
-        <div><button className="button button-quiet" type="button" disabled={busy} onClick={onCancel}>取消</button><button className="button button-danger" type="button" disabled={busy || !canRestore} onClick={onConfirm}>确认恢复</button></div>
+        <div><strong id="history-restore-title">{t('dialogs:ui.restoreThisVersion')}</strong><p>{t('dialogs:ui.aProtectedCheckpointIsSavedFirstThenThe')}</p></div>
+        <div><button className="button button-quiet" type="button" disabled={busy} onClick={onCancel}>{t('common:actions.cancel')}</button><button className="button button-danger" type="button" disabled={busy || !canRestore} onClick={onConfirm}>{t('dialogs:ui.confirmRestore')}</button></div>
       </section>
     </div>
   );
 }
 
 export function ArticleHistoryView(props: Props) {
+  const { t } = useUITranslation('dialogs');
+  const { locale } = useUILocale();
   const {
     articleTitle, currentSource, currentTheme, currentThemeValid, currentDirty, month, folder, root, mediaArticle,
     snapshots, issues, selectedId, busy, canRestore, canSaveAs, refreshPending, notice, months, onClose,
     getReturnFocus, onSelect, onManualSnapshot, onRestore, onSaveAs, onToggleRetention, onRefreshHistory,
   } = props;
   const selected = snapshots.find((item) => item.id === selectedId) ?? snapshots[0] ?? null;
-  const [copyTitle, setCopyTitle] = useState(`${articleTitle} 历史 Fork`);
+  const [copyTitle, setCopyTitle] = useState(() => t('dialogs:history.forkTitle', { title: articleTitle }));
   const [copyMonth, setCopyMonth] = useState(month);
   const [previewMode, setPreviewMode] = useState<'source' | 'render'>('source');
   const [restoreTarget, setRestoreTarget] = useState<ArticleHistorySnapshot | null>(null);
@@ -200,54 +202,54 @@ export function ArticleHistoryView(props: Props) {
       <header className="history-view-header">
         <button ref={backButtonRef} className="button button-quiet history-view-back" type="button" data-history-back="true" onClick={onClose} disabled={busy}>
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m14.5 5-7 7 7 7M8 12h12" /></svg>
-          <span>返回编辑器</span>
+          <span>{t('dialogs:ui.backToEditorAlternative')}</span>
         </button>
-        <div className="history-view-heading"><p className="eyebrow">VERSION HISTORY</p><h1 className="font-heading history-view-title" id="history-view-title">「{articleTitle}」的历史版本</h1><p className="status-copy mt-3">{month}/{folder} · 正文与主题按快照成对保存</p></div>
+        <div className="history-view-heading"><p className="eyebrow">{t('dialogs:ui.versionHistory')}</p><h1 className="font-heading history-view-title" id="history-view-title">{t('dialogs:templates.historyTitle', { title: articleTitle })}</h1><p className="status-copy mt-3">{month}/{folder} {t('dialogs:ui.bodyAndThemeArePairedInSnapshots')}</p></div>
       </header>
       <div className="history-view-content">
-          {issues.length ? <div className="content-library-issues" role="status">{issues.map((item) => <p className="break-words" key={`${item.snapshotId}:${item.message}`}><strong>{item.snapshotId}</strong> · {item.message}</p>)}</div> : null}
+          {issues.length ? <div className="content-library-issues" role="status">{issues.map((item) => <p className="break-words" key={`${item.snapshotId}:${item.message}`}><strong>{item.snapshotId}</strong> · {formatDiagnosticMessage(item, t)}</p>)}</div> : null}
           <div className="flex flex-wrap items-center gap-2">
-            <p className="status-copy m-0" data-tone={notice.tone} role="status">{notice.label}</p>
-            {refreshPending ? <button className="button button-quiet" type="button" onClick={onRefreshHistory} disabled={busy}>重试刷新历史</button> : null}
-            <button className="button button-quiet" type="button" onClick={onManualSnapshot} disabled={busy || !canRestore}>保存重要版本</button>
+            <p className="status-copy m-0" data-tone={notice.tone} role="status">{formatProductMessage(notice, t)}</p>
+            {refreshPending ? <button className="button button-quiet" type="button" onClick={onRefreshHistory} disabled={busy}>{t('dialogs:ui.retryRefreshingHistory')}</button> : null}
+            <button className="button button-quiet" type="button" onClick={onManualSnapshot} disabled={busy || !canRestore}>{t('dialogs:ui.saveImportantVersion')}</button>
           </div>
           <div className="history-grid">
-            <nav className="history-list" aria-label="历史版本列表">
+            <nav className="history-list" aria-label={t('dialogs:ui.historyList')}>
               {snapshots.map((snapshot) => (
                 <div className="history-item" key={snapshot.id} data-current={selected?.id === snapshot.id}>
                   <button className="history-item-select" type="button" onClick={() => { onSelect(snapshot.id); setRestoreTarget(null); }} disabled={busy} aria-current={selected?.id === snapshot.id ? 'true' : undefined}>
-                    <strong>{snapshot.title || '未命名文稿'}</strong>
-                    <span>{formatSnapshotTime(snapshot.createdAt)} · {KIND_LABEL[snapshot.kind]}{snapshot.retained ? ' · 已保护' : ''}</span>
+                    <strong>{snapshot.title || t('dialogs:ui.untitledManuscript')}</strong>
+                    <span>{formatSnapshotTime(snapshot.createdAt, locale, t('common:dates.invalid'))} · {t(`dialogs:historyKinds.${snapshot.kind}`)}{snapshot.retained ? t('dialogs:ui.protected') : ''}</span>
                   </button>
-                  {snapshot.kind === 'automatic' ? <button className="history-retain" type="button" onClick={() => onToggleRetention(snapshot, !snapshot.retained)} disabled={busy || refreshPending}>{snapshot.retained ? '取消保护' : '保护此版'}</button> : null}
+                  {snapshot.kind === 'automatic' ? <button className="history-retain" type="button" onClick={() => onToggleRetention(snapshot, !snapshot.retained)} disabled={busy || refreshPending}>{snapshot.retained ? t('dialogs:ui.unprotect') : t('dialogs:ui.protectVersion')}</button> : null}
                 </div>
               ))}
-              {!snapshots.length ? <p className="status-copy">还没有完整历史版本。手动保存重要版本，或等待自动快照间隔。</p> : null}
+              {!snapshots.length ? <p className="status-copy">{t('dialogs:ui.noCompleteHistoryYetSaveAnImportantVersion')}</p> : null}
             </nav>
-            <section className="history-detail" aria-label="历史版本与当前稿对比">
+            <section className="history-detail" aria-label={t('dialogs:ui.compareHistoryWithCurrentManuscript')}>
               {selected ? <>
-                <div className="history-detail-heading"><div><h3 className="font-heading">{selected.title || '未命名文稿'}</h3><p className="mt-3">{formatSnapshotTime(selected.createdAt)} · {KIND_LABEL[selected.kind]}{currentDirty ? ' · 当前稿有未保存修改' : ''}</p></div></div>
-                {!selected.themeMatches ? <div className="content-library-note" data-tone="warning">此历史版本的 Front Matter 与主题快照不一致。恢复和另存已停用，以免绑定错误主题。</div> : null}
-                <div className="history-preview-tabs" role="group" aria-label="版本对比方式">
-                  <button className="button button-quiet" type="button" aria-pressed={previewMode === 'source'} onClick={() => setPreviewMode('source')}>源码与信息</button>
-                  <button className="button button-quiet" type="button" aria-pressed={previewMode === 'render'} onClick={() => setPreviewMode('render')} disabled={!selected.parsed.canCopy || !currentParsed.canCopy || !currentThemeValid}>排版效果</button>
+                <div className="history-detail-heading"><div><h3 className="font-heading">{selected.title || t('dialogs:ui.untitledManuscript')}</h3><p className="mt-3">{formatSnapshotTime(selected.createdAt, locale, t('common:dates.invalid'))} · {t(`dialogs:historyKinds.${selected.kind}`)}{currentDirty ? t('dialogs:ui.currentManuscriptHasUnsavedChanges') : ''}</p></div></div>
+                {!selected.themeMatches ? <div className="content-library-note" data-tone="warning">{t('dialogs:ui.historicalFrontMatterDoesNotMatchTheTheme')}</div> : null}
+                <div className="history-preview-tabs" role="group" aria-label={t('dialogs:ui.comparisonMode')}>
+                  <button className="button button-quiet" type="button" aria-pressed={previewMode === 'source'} onClick={() => setPreviewMode('source')}>{t('dialogs:ui.sourceAndMetadata')}</button>
+                  <button className="button button-quiet" type="button" aria-pressed={previewMode === 'render'} onClick={() => setPreviewMode('render')} disabled={!selected.parsed.canCopy || !currentParsed.canCopy || !currentThemeValid}>{t('dialogs:ui.renderedLayout')}</button>
                 </div>
                 {previewMode === 'source' ? (
                   <div className="history-source-comparison">
-                    <div className="history-diff-columns" aria-label="源码双栏对比">
-                      <section><h4 className="font-heading">历史版本</h4><pre className="history-diff-lines" tabIndex={0} aria-label="历史版本源码">{sourceDiff.map((row, index) => <span key={`left-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.left === null ? '' : String(index + 1)}</i><code>{row.left ?? ' '}</code></span>)}</pre></section>
-                      <section><h4 className="font-heading">当前稿</h4><pre className="history-diff-lines" tabIndex={0} aria-label="当前稿源码">{sourceDiff.map((row, index) => <span key={`right-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.right === null ? '' : String(index + 1)}</i><code>{row.right ?? ' '}</code></span>)}</pre></section>
+                    <div className="history-diff-columns" aria-label={t('dialogs:ui.sourceSideBySide')}>
+                      <section><h4 className="font-heading">{t('dialogs:ui.historicalVersion')}</h4><pre className="history-diff-lines" tabIndex={0} aria-label={t('dialogs:ui.historicalSource')}>{sourceDiff.map((row, index) => <span key={`left-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.left === null ? '' : String(index + 1)}</i><code>{row.left ?? ' '}</code></span>)}</pre></section>
+                      <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><pre className="history-diff-lines" tabIndex={0} aria-label={t('dialogs:ui.currentSource')}>{sourceDiff.map((row, index) => <span key={`right-${index}`} className="history-diff-row" data-kind={row.kind}><i>{row.right === null ? '' : String(index + 1)}</i><code>{row.right ?? ' '}</code></span>)}</pre></section>
                     </div>
-                    <section className="history-metadata-comparison" aria-label="文章信息变化"><h4 className="font-heading">文章信息与主题</h4>{metadata.map((item) => <div key={item.label} className="history-metadata-row" data-changed={item.changed}><strong>{item.label}</strong><span>{item.before || '—'}</span><span>{item.after || '—'}</span></div>)}</section>
+                    <section className="history-metadata-comparison" aria-label={t('dialogs:ui.articleInformationChanges')}><h4 className="font-heading">{t('dialogs:ui.articleInformationAndTheme')}</h4>{metadata.map((item) => <div key={item.key} className="history-metadata-row" data-changed={item.changed}><strong>{t(`dialogs:historyFields.${item.key}`)}</strong><span>{item.key === 'themeSnapshot' ? t('dialogs:history.savedSnapshot') : item.before || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span><span>{item.key === 'themeSnapshot' ? t('dialogs:history.changedFields', { fields: item.after }) : item.after || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span></div>)}</section>
                   </div>
                 ) : (
                   <div className="history-render-comparison">
-                    {selected.parsed.canCopy ? <section><h4 className="font-heading">历史版本</h4><HistorySnapshotPreview key={`old-${selected.id}`} snapshot={selected} root={root} article={mediaArticle} articleTitle={selected.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">历史版本解析失败；只显示源码，不执行或渲染其中的内容。</div>}
-                    {currentParsed.canCopy && currentThemeValid ? <section><h4 className="font-heading">当前稿</h4><HistorySnapshotPreview key="current-editor-revision" snapshot={currentSnapshot} root={root} article={mediaArticle} articleTitle={currentParsed.metadata.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">当前稿无法安全渲染；请先修复文章元数据或主题快照。</div>}
+                    {selected.parsed.canCopy ? <section><h4 className="font-heading">{t('dialogs:ui.historicalVersion')}</h4><HistorySnapshotPreview key={`old-${selected.id}`} snapshot={selected} root={root} article={mediaArticle} articleTitle={selected.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">{t('dialogs:ui.historyCouldNotBeParsedOnlySourceIs')}</div>}
+                    {currentParsed.canCopy && currentThemeValid ? <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><HistorySnapshotPreview key="current-editor-revision" snapshot={currentSnapshot} root={root} article={mediaArticle} articleTitle={currentParsed.metadata.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">{t('dialogs:ui.currentManuscriptCannotRenderSafelyRepairArticleMetadata')}</div>}
                   </div>
                 )}
                 <div className="history-detail-actions">
-                  <button className="button button-quiet" type="button" onClick={() => setRestoreTarget(selected)} disabled={busy || !canRestore || !selected.themeMatches}>恢复此版本</button>
+                  <button className="button button-quiet" type="button" onClick={() => setRestoreTarget(selected)} disabled={busy || !canRestore || !selected.themeMatches}>{t('dialogs:ui.restoreThisVersionAlternative')}</button>
                 </div>
                 {restoreTarget ? <HistoryRestoreConfirm
                   busy={busy}
@@ -256,15 +258,15 @@ export function ArticleHistoryView(props: Props) {
                   onConfirm={() => { onRestore(restoreTarget); setRestoreTarget(null); }}
                 /> : null}
                 <form className="history-copy-form" onSubmit={(event) => { event.preventDefault(); onSaveAs(selected, copyTitle, copyMonth); }}>
-                  <h4 className="font-heading">从历史版本 Fork</h4>
+                  <h4 className="font-heading">{t('dialogs:ui.forkFromHistory')}</h4>
                   <div className="history-copy-fields">
-                    <label className="field-stack"><span className="field-label">新文稿标题</span><input className="field" value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches} /></label>
-                    <label className="field-stack"><span className="field-label">保存年月</span><select className="field" value={copyMonth} onChange={(event) => setCopyMonth(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches}>{monthOptions.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+                    <label className="field-stack"><span className="field-label">{t('dialogs:ui.newManuscriptTitle')}</span><input className="field" value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches} /></label>
+                    <label className="field-stack"><span className="field-label">{t('dialogs:ui.savedMonth')}</span><select className="field" value={copyMonth} onChange={(event) => setCopyMonth(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches}>{monthOptions.map((value) => <option key={value} value={value}>{formatUIMonth(value, locale)}</option>)}</select></label>
                   </div>
-                  <p className="status-copy">复制文章素材和选中版本的主题快照；新文稿从自身开始记录历史。</p>
-                  <button className="button button-primary" type="submit" disabled={busy || !canSaveAs || !selected.themeMatches || !copyTitle.trim()}>创建独立 Fork</button>
+                  <p className="status-copy">{t('dialogs:ui.copyArticleAssetsAndTheSelectedThemeSnapshot')}</p>
+                  <button className="button button-primary" type="submit" disabled={busy || !canSaveAs || !selected.themeMatches || !copyTitle.trim()}>{t('dialogs:ui.createIndependentFork')}</button>
                 </form>
-              </> : <div className="empty-state"><strong>选择一个历史版本</strong><p>历史与当前稿会在此对比。</p></div>}
+              </> : <div className="empty-state"><strong>{t('dialogs:ui.chooseAHistoricalVersion')}</strong><p>{t('dialogs:ui.historyAndCurrentManuscriptWillBeComparedHere')}</p></div>}
             </section>
           </div>
       </div>

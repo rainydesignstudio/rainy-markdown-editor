@@ -1,3 +1,4 @@
+import { productText } from "../i18n/productMessages";
 import supportDefaults from './defaults/format-support.json' with { type: 'json' };
 import validatorDefaults from './defaults/validator.json' with { type: 'json' };
 import formatterDefaults from './defaults/formatter.json' with { type: 'json' };
@@ -52,8 +53,8 @@ export type RawFormatBundle = { support: FormatSupport; validator: FormatValidat
 export const DEFAULT_FORMAT_BUNDLE = { support: supportDefaults, validator: validatorDefaults, formatter: formatterDefaults } as unknown as RawFormatBundle;
 export const FORMAT_OPERATORS = new Set(Object.keys(VALIDATOR_CAPABILITIES));
 
-const identifier: Guard = (value, path) => { text(value, path); if (!/^[a-z0-9][a-z0-9._-]*$/i.test(String(value))) fail(path, '无效ID'); };
-const pattern: Guard = (value, path) => { text(value, path); if (String(value).length > 512) fail(path, '正则过长'); try { new RegExp(String(value), 'u'); } catch { fail(path, '无效正则'); } };
+const identifier: Guard = (value, path) => { text(value, path); if (!/^[a-z0-9][a-z0-9._-]*$/i.test(String(value))) fail(path, productText("config.invalidId")); };
+const pattern: Guard = (value, path) => { text(value, path); if (String(value).length > 512) fail(path, productText("config.regularExpressionIsTooLong")); try { new RegExp(String(value), 'u'); } catch { fail(path, productText("config.invalidRegularExpression")); } };
 const sourceGuard = shape({ url: text }, { version: text, commit: text });
 const themeGuard = shape({
   tokens: strings, cssProperties: array(property), nodes: mapping(array(selector, 1), identifier),
@@ -68,35 +69,35 @@ export function validateFormatBundle(input: unknown): RawFormatBundle {
   }), validator: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }), product: shape({ theme: themeGuard }),
     rules: array(shape({ id: identifier, operator: text, enabled: bool, stages: array(choice('authoring', 'rendered'), 1), parameters: (value, path) => { record(value, path); } })),
   }), formatter: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }), steps: array(shape({ id: identifier, operator: text, enabled: bool, parameters: (value, path) => { record(value, path); } })) }),
-  })(input, '格式三件套');
+  })(input, productText("config.formatTrio"));
   const bundle = input as RawFormatBundle;
-  if (new Set([bundle.support.meta.id, bundle.validator.meta.id, bundle.formatter.meta.id]).size !== 1) fail('meta.id', '三份配置不一致，不能混配');
-  const unique = (values: string[], path: string) => { if (new Set(values).size !== values.length) fail(path, 'ID或值重复'); };
-  unique([...bundle.support.rules, ...bundle.support.manualReview].map(rule => rule.id), 'format-support规则ID');
-  unique(bundle.support.rules.map(rule => rule.validator), 'format-support校验引用');
-  unique(bundle.validator.rules.map(rule => rule.id), 'validator规则ID');
-  unique(bundle.formatter.steps.map(step => step.id), 'formatter步骤ID');
+  if (new Set([bundle.support.meta.id, bundle.validator.meta.id, bundle.formatter.meta.id]).size !== 1) fail('meta.id', productText("config.theThreeConfigurationsDoNotAgreeAndCannotBeMixed"));
+  const unique = (values: string[], path: string) => { if (new Set(values).size !== values.length) fail(path, productText("config.duplicateIdOrValue")); };
+  unique([...bundle.support.rules, ...bundle.support.manualReview].map(rule => rule.id), productText("config.formatSupportRuleId"));
+  unique(bundle.support.rules.map(rule => rule.validator), productText("config.formatSupportValidatorReference"));
+  unique(bundle.validator.rules.map(rule => rule.id), productText("config.validatorRuleId"));
+  unique(bundle.formatter.steps.map(step => step.id), productText("config.formatterStepId"));
   for (const rule of bundle.support.rules) {
-    if (!Object.hasOwn(bundle.support.meta.sources, rule.source)) fail(rule.id, '规范来源不存在');
-    if (!bundle.validator.rules.some(item => item.id === rule.validator)) fail(rule.id, '校验引用不存在');
+    if (!Object.hasOwn(bundle.support.meta.sources, rule.source)) fail(rule.id, productText("config.theStandardsSourceDoesNotExist"));
+    if (!bundle.validator.rules.some(item => item.id === rule.validator)) fail(rule.id, productText("config.theValidatorReferenceDoesNotExist"));
   }
-  for (const rule of bundle.support.manualReview) if (!Object.hasOwn(bundle.support.meta.sources, rule.source)) fail(rule.id, '人工核对项来源不存在');
+  for (const rule of bundle.support.manualReview) if (!Object.hasOwn(bundle.support.meta.sources, rule.source)) fail(rule.id, productText("config.theManualReviewItemSourceDoesNotExist"));
   for (const rule of bundle.validator.rules) {
-    if (!bundle.support.rules.some(item => item.validator === rule.id)) fail(rule.id, '校验未对应规范条目');
-    if (!Object.hasOwn(VALIDATOR_CAPABILITIES, rule.operator)) fail(rule.id, `未知校验能力${rule.operator}`);
+    if (!bundle.support.rules.some(item => item.validator === rule.id)) fail(rule.id, productText("config.theValidatorHasNoCorrespondingStandardsEntry"));
+    if (!Object.hasOwn(VALIDATOR_CAPABILITIES, rule.operator)) fail(rule.id, productText("config.unknownValidationOperator", { "ruleOperator": rule.operator }));
     const contract = VALIDATOR_CAPABILITIES[rule.operator];
     contract.parameters(rule.parameters, `validator.${rule.id}.parameters`);
     unique(rule.stages, `${rule.id}.stages`);
-    if (['dom.leaf-content', 'dom.nodeleaf-content'].includes(rule.operator) && rule.stages.includes('authoring') && !SOURCE_STRUCTURE_SELECTOR.test(String(rule.parameters.selector))) fail(rule.id, '源码结构检查仅支持标签或标签[属性]选择器，复杂选择器需用rendered阶段');
-    if (rule.stages.some(stage => !contract.stages.includes(stage))) fail(rule.id, '能力不支持指定阶段');
-    if (rule.operator.startsWith('style.') && rule.parameters.selector && rule.stages.includes('authoring')) fail(rule.id, '选择器限定需在rendered阶段使用');
+    if (['dom.leaf-content', 'dom.nodeleaf-content'].includes(rule.operator) && rule.stages.includes('authoring') && !SOURCE_STRUCTURE_SELECTOR.test(String(rule.parameters.selector))) fail(rule.id, productText("config.sourceStructureChecksSupportOnlyTagOrTagAttributeSelectorsComplexSelectors"));
+    if (rule.stages.some(stage => !contract.stages.includes(stage))) fail(rule.id, productText("config.theOperatorDoesNotSupportTheSpecifiedStage"));
+    if (rule.operator.startsWith('style.') && rule.parameters.selector && rule.stages.includes('authoring')) fail(rule.id, productText("config.selectorScopingRequiresTheRenderedStage"));
   }
   const used = new Set<string>();
   for (const step of bundle.formatter.steps) {
-    if (!Object.hasOwn(FORMATTER_CAPABILITIES, step.operator)) fail(step.id, `未知格式化能力${step.operator}`);
+    if (!Object.hasOwn(FORMATTER_CAPABILITIES, step.operator)) fail(step.id, productText("config.unknownFormattingOperator", { "stepOperator": step.operator }));
     const contract = FORMATTER_CAPABILITIES[step.operator];
     contract.parameters(step.parameters, `formatter.${step.id}.parameters`);
-    if (step.enabled && used.has(step.operator) && !contract.multiple) fail(step.id, '同一能力有多个启用步骤，会产生冲突');
+    if (step.enabled && used.has(step.operator) && !contract.multiple) fail(step.id, productText("config.multipleEnabledStepsUseTheSameOperatorAndWouldConflict"));
     if (step.enabled) used.add(step.operator);
   }
   return bundle;
@@ -132,7 +133,7 @@ export function compileFormatBundle(input: RawFormatBundle): FormatBundle {
       case 'output.css': case 'output.html': Object.assign(formatter.output, p); break;
       case 'output.text': Object.assign(formatter.output.plainText, p); break;
       case 'output.visual': Object.assign(formatter.output.visual, p); break;
-      default: fail(step.id, '能力没有执行实现');
+      default: fail(step.id, productText("config.theOperatorHasNoExecutionImplementation"));
     }
   }
   formatter.output.dropCssProperties = [...new Set(formatter.output.dropCssProperties)];

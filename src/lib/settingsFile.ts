@@ -1,3 +1,4 @@
+import { ProductError, productCause } from "./i18n/productMessages";
 import { DEFAULT_ARTICLE_SETTINGS, validateArticleSettings, type ArticleSettings } from './articleSettings';
 import { createDefaultEditorWorkspace, validateEditorWorkspace, type EditorWorkspace, type LegacyEditorAppearance } from './editorWorkspace';
 
@@ -29,7 +30,7 @@ function contentOf(document: SettingsDocument): string {
 }
 
 async function replaceFile(root: FileSystemDirectoryHandle, content: string, expected: string | null) {
-  if (await textFile(root, SETTINGS_FILE) !== expected) throw new Error('settings.json 已在外部变化；本次没有覆盖。请刷新后重试。');
+  if (await textFile(root, SETTINGS_FILE) !== expected) throw new ProductError("settingsFile.settingsJsonChangedExternallyAndWasNotOverwrittenRefreshAndRetry");
   const file = await root.getFileHandle(SETTINGS_FILE, { create: true });
   let writable: FileSystemWritableFileStream | undefined;
   try {
@@ -37,21 +38,21 @@ async function replaceFile(root: FileSystemDirectoryHandle, content: string, exp
   } catch (error) {
     try { await writable?.abort(); } catch { /* retain failure */ }
     if (expected === null) try { await root.removeEntry(SETTINGS_FILE); } catch { /* retain failure */ }
-    throw new Error(`settings.json 保存失败：${error instanceof Error ? error.message : String(error)}。原文件保留。`);
+    throw new ProductError("settingsFile.settingsJsonSavingFailedTheOriginalFileIsRetained", { "cause": productCause(error) });
   }
 }
 
 async function readDocument(root: FileSystemDirectoryHandle): Promise<SettingsDocument> {
   const rawContent = await textFile(root, SETTINGS_FILE);
   const parsed = rawContent === null ? null : JSON.parse(rawContent);
-  if (rawContent !== null && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))) throw new Error('settings.json 顶层必须是对象。');
+  if (rawContent !== null && (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))) throw new ProductError("articleSettings.theTopLevelOfSettingsJsonMustBeAnObject");
   let settings = defaults();
   let workspace = createDefaultEditorWorkspace();
   let workspaceExists = false;
   let legacyAppearance: LegacyEditorAppearance | undefined;
   if (parsed?.version === 2) {
     const keys = ['version', 'defaultArticleThemeId', 'autoSave', 'autoSnapshot', 'projects', 'projectOrder', 'articleOrganization', 'articleOrder', 'appearance'];
-    if (Object.keys(parsed).some(key => !keys.includes(key))) throw new Error('settings.json 含未知字段；原文件未改写。');
+    if (Object.keys(parsed).some(key => !keys.includes(key))) throw new ProductError("settingsFile.settingsJsonContainsUnknownFieldsTheOriginalFileWasNotRewritten");
     settings = validateArticleSettings({ version: 1, defaultArticleThemeId: parsed.defaultArticleThemeId, autoSave: parsed.autoSave, autoSnapshot: parsed.autoSnapshot });
     const legacy = parsed.appearance && typeof parsed.appearance === 'object' && 'preset' in parsed.appearance;
     workspace = validateEditorWorkspace({ version: legacy ? 1 : 2, projects: parsed.projects, projectOrder: parsed.projectOrder, articleOrganization: parsed.articleOrganization, articleOrder: parsed.articleOrder, appearance: parsed.appearance });

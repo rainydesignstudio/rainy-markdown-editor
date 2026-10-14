@@ -1,3 +1,4 @@
+import { withUILocaleImports } from './ui-locale-fixture.mjs';
 const formatRuntime = await import('../src/lib/article-format/runtime.ts');
 const formatPreview = await import('../src/lib/article-format/preview.ts');
 import assert from 'node:assert/strict';
@@ -21,7 +22,7 @@ function editor(theme = FORMAT_THEME) {
   const props = { theme, root: {}, isRootCurrent: () => true, canApply: true, onClose: () => closes++, onApply() {}, onSaved: () => saves++ };
   let persist = async (_, value) => ({ ...value, version: '1.0.1' });
   const module = { exports: {} };
-  vm.runInNewContext(`${code}\nexports.Stylebook = ThemeStylebookDialog;`, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, document: { getElementById: () => ({ focus() {} }) }, require(id) {
+  vm.runInNewContext(`${code}\nexports.Stylebook = ThemeStylebookDialog;`, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, document: { getElementById: () => ({ focus() {} }) }, require: withUILocaleImports(function(id){
     if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
@@ -58,7 +59,7 @@ function editor(theme = FORMAT_THEME) {
       useEffect(effect, dependencies) { const index = cursor++, old = cells[index]; if (old && dependencies.every((value, i) => Object.is(value, old.dependencies[i]))) return; effects.push(() => { old?.cleanup?.(); cells[index] = { dependencies, cleanup: effect() }; }); },
     };
     throw new Error(id);
-  } });
+  }) });
   const all = node => Array.isArray(node) ? node.flatMap(all) : node?.props ? [node, ...all(node.props.children)] : [];
   const text = node => typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : '';
   const render = () => { cursor = 0; tree = module.exports.Stylebook(props); while (effects.length) effects.shift()(); };

@@ -1,3 +1,4 @@
+import { ProductError, productCause, productText } from "./i18n/productMessages";
 import { loadSettingsDocument, updateSettingsDocument } from './settingsFile';
 export type ArticleSettings = {
   version: 1;
@@ -41,32 +42,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function assertOnlyKeys(value: Record<string, unknown>, expected: string[], label: string): void {
   const unexpected = Object.keys(value).filter((key) => !expected.includes(key));
-  if (unexpected.length) throw new Error(`${label} 含未知字段：${unexpected.join('、')}；为保护文件未自动改写。`);
+  if (unexpected.length) throw new ProductError("articleSettings.containsUnknownFieldsTheFileWasNotRewrittenAutomatically", { "label": label, "details": unexpected.join('、') });
 }
 
 function assertInterval(value: unknown, label: string, minimum: number, maximum: number): asserts value is number {
   if (typeof value !== 'number' || !Number.isInteger(value) || value < minimum || value > maximum) {
-    throw new Error(`${label}必须是 ${minimum}–${maximum} 之间的整数间隔。`);
+    throw new ProductError("articleSettings.mustBeAnIntegerIntervalFromTo", { "label": label, "minimum": minimum, "maximum": maximum });
   }
 }
 
 export function validateArticleSettings(value: unknown): ArticleSettings {
-  if (!isRecord(value)) throw new Error('settings.json 顶层必须是对象。');
+  if (!isRecord(value)) throw new ProductError("articleSettings.theTopLevelOfSettingsJsonMustBeAnObject");
   assertOnlyKeys(value, ['version', 'defaultArticleThemeId', 'autoSave', 'autoSnapshot'], 'settings.json');
-  if (value.version !== 1) throw new Error('settings.json 版本不受支持；为保护文件未自动改写。');
+  if (value.version !== 1) throw new ProductError("articleSettings.theSettingsJsonVersionIsUnsupportedTheFileWasNotRewrittenAutomatically");
   if (value.defaultArticleThemeId !== undefined && value.defaultArticleThemeId !== null &&
       (typeof value.defaultArticleThemeId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(value.defaultArticleThemeId))) {
-    throw new Error('默认文章主题 ID 无效；为保护文件未自动改写。');
+    throw new ProductError("articleSettings.theDefaultArticleThemeIdIsInvalidTheFileWasNotRewritten");
   }
-  if (!isRecord(value.autoSave)) throw new Error('settings.json 的 autoSave 必须是对象。');
-  if (!isRecord(value.autoSnapshot)) throw new Error('settings.json 的 autoSnapshot 必须是对象。');
+  if (!isRecord(value.autoSave)) throw new ProductError("articleSettings.theAutosaveFieldInSettingsJsonMustBeAnObject");
+  if (!isRecord(value.autoSnapshot)) throw new ProductError("articleSettings.theAutosnapshotFieldInSettingsJsonMustBeAnObject");
   assertOnlyKeys(value.autoSave, ['enabled', 'intervalSeconds'], 'autoSave');
   assertOnlyKeys(value.autoSnapshot, ['enabled', 'intervalMinutes', 'maxCount'], 'autoSnapshot');
-  if (typeof value.autoSave.enabled !== 'boolean') throw new Error('自动保存开关必须是布尔值。');
-  if (typeof value.autoSnapshot.enabled !== 'boolean') throw new Error('自动快照开关必须是布尔值。');
-  assertInterval(value.autoSave.intervalSeconds, '自动保存间隔', 1, 86_400);
-  assertInterval(value.autoSnapshot.intervalMinutes, '自动快照间隔', 1, 10_080);
-  assertInterval(value.autoSnapshot.maxCount, '自动快照保留数', 1, 100);
+  if (typeof value.autoSave.enabled !== 'boolean') throw new ProductError("articleSettings.theAutoSaveSwitchMustBeABoolean");
+  if (typeof value.autoSnapshot.enabled !== 'boolean') throw new ProductError("articleSettings.theAutomaticSnapshotSwitchMustBeABoolean");
+  assertInterval(value.autoSave.intervalSeconds, productText("articleSettings.autoSaveInterval"), 1, 86_400);
+  assertInterval(value.autoSnapshot.intervalMinutes, productText("articleSettings.automaticSnapshotInterval"), 1, 10_080);
+  assertInterval(value.autoSnapshot.maxCount, productText("articleSettings.automaticSnapshotRetention"), 1, 100);
   return {
     version: 1,
     defaultArticleThemeId: value.defaultArticleThemeId ?? null,
@@ -88,7 +89,7 @@ async function ensureReadWritePermission(root: FileSystemDirectoryHandle): Promi
   const descriptor = { mode: 'readwrite' as const };
   let permission = await candidate.queryPermission(descriptor);
   if (permission !== 'granted' && candidate.requestPermission) permission = await candidate.requestPermission(descriptor);
-  if (permission !== 'granted') throw new Error('资料目录没有读写权限；请重新授权后再管理设置。');
+  if (permission !== 'granted') throw new ProductError("articleSettings.theLibraryLacksReadWritePermissionAuthorizeItAgainToManageSettings");
 }
 
 export async function loadArticleSettings(root: FileSystemDirectoryHandle): Promise<ArticleSettingsLoadResult> {
@@ -97,7 +98,7 @@ export async function loadArticleSettings(root: FileSystemDirectoryHandle): Prom
     const result = await loadSettingsDocument(root);
     return { settings: result.settings, issue: null, fileExists: result.fileExists };
   } catch (error) {
-    return { settings: defaultSettings(), issue: `settings.json 无效或无法读取：${error instanceof Error ? error.message : String(error)}。原文件未改写。`, fileExists: true };
+    return { settings: defaultSettings(), issue: productText("articleSettings.settingsJsonIsInvalidOrUnreadableTheOriginalFileWasNotRewritten", { "cause": productCause(error) }), fileExists: true };
   }
 }
 

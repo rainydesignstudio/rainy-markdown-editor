@@ -1,5 +1,6 @@
 'use client';
 
+import { useUITranslation } from '../global/UILocaleProvider';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { compileArticleStyles } from '../../lib/tailwind';
@@ -16,6 +17,7 @@ import type { FormatSnapshot } from '../../lib/article-format/runtime';
 
 type Props = { snapshot: ArticleHistorySnapshot; root: FileSystemDirectoryHandle | null; article: Pick<StoredArticle, 'id' | 'month' | 'folder'>; articleTitle: string };
 export function HistorySnapshotPreview({ snapshot, root, article, articleTitle }: Props) {
+  const { t } = useUITranslation('dialogs');
   const live = useFormatSnapshot();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [rendition, setRendition] = useState<{ id: string; css: string; html?: string; format: FormatSnapshot } | null>(null);
@@ -43,10 +45,10 @@ export function HistorySnapshotPreview({ snapshot, root, article, articleTitle }
   }, [snapshot.id, snapshot.source, snapshot.theme, snapshot.renderRecord, snapshot.renderIssue, root, live.id]);
   const media: ArticleMediaContext = { root, article, articleTitle, sessionKey: 'history-' + snapshot.id,
     isCurrent: () => identity.current.id === snapshot.id && identity.current.root === root && identity.current.articleId === article.id };
-  return <div className="history-render-scroll" aria-label="历史文章排版预览">
-    {!snapshot.renderRecord && !issue ? <p className="content-library-note" data-tone="warning">此旧版本未留存渲染依赖，以下使用当前资料库环境预览。</p> : null}
-    {issue ? <p className="content-library-note" data-tone="error" role="alert">历史渲染无法复现：{issue}。原文保留，可切换到源码查看。</p> : null}
-    {!rendition && !issue ? <p className="status-copy" role="status">正在载入此版本自己的主题与样式…</p> : null}
+  return <div className="history-render-scroll" aria-label={t('dialogs:history.previewLabel')}>
+    {!snapshot.renderRecord && !issue ? <p className="content-library-note" data-tone="warning">{t('dialogs:history.legacyEnvironment')}</p> : null}
+    {issue ? <p className="content-library-note" data-tone="error" role="alert">{t('dialogs:history.restoreIssue', { issue })}</p> : null}
+    {!rendition && !issue ? <p className="status-copy" role="status">{t('dialogs:history.loading')}</p> : null}
     <div ref={hostRef} className="history-render-host" aria-busy={!rendition && !issue} />
     {target && rendition?.id === snapshot.id ? createPortal(<>
       {!native ? <style data-article-style>{articlePreviewStyle(rendition.css)}</style> : null}

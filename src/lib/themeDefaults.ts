@@ -1,6 +1,7 @@
 import { BUILTIN_EDITOR_THEMES } from './editorThemes';
 import { THEMES } from '../themes/article-themes/index';
 import { getThemeDirectory } from './themeDirectories';
+import { ProductError, productDiagnosticReference, productErrorMessage, productJoin } from './i18n/productMessages';
 
 const MARKER = 'default-themes.loaded';
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
@@ -20,7 +21,7 @@ export async function copyDefaultThemes(root: FileSystemDirectoryHandle, kind: '
       try { writable = await file.createWritable(); await writable.write(JSON.stringify(theme, null, 2)); await writable.close(); }
       catch (error) { try { await writable?.abort(); } catch { /* retain failure */ } try { await directory.removeEntry(name); } catch { /* retain failure */ } throw error; }
       result.added++;
-    } catch (error) { result.issues.push({ file: name, message: error instanceof Error ? error.message : String(error) }); }
+    } catch (error) { result.issues.push({ file: name, ...productErrorMessage(error) }); }
   }
   return result;
 }
@@ -33,7 +34,7 @@ export async function initializeThemeDefaults(root: FileSystemDirectoryHandle): 
   catch (error) { if (!missing(error)) throw error; }
   const article = await copyDefaultThemes(root, 'article-themes');
   const editor = await copyDefaultThemes(root, 'editor-themes');
-  if (article.issues.length || editor.issues.length) throw new Error([...article.issues, ...editor.issues].map(issue => `${issue.file}：${issue.message}`).join('；'));
+  if (article.issues.length || editor.issues.length) throw new ProductError('shared.compose', { parts: productJoin([...article.issues, ...editor.issues].map(issue => productJoin([issue.file, '：', productDiagnosticReference(issue)])), '；') });
   const file = await themes.getFileHandle(MARKER, { create: true });
   let writable: FileSystemWritableFileStream | undefined;
   try { writable = await file.createWritable(); await writable.write(JSON.stringify({ version: 1 })); await writable.close(); }

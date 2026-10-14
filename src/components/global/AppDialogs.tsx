@@ -1,5 +1,7 @@
 'use client';
 
+import { useUITranslation } from "./UILocaleProvider";
+
 import { CopyDialog, DeleteDialog } from '../articles/ArticleDialogs';
 import { ProjectDeleteDialog } from '../articles/ProjectDeleteDialog';
 import { ArticleInfoDialog } from '../editor/ArticleInfoDialog';
@@ -15,6 +17,7 @@ import { FormatCheckDialog } from './FormatCheckDialog';
 import { CreateLibraryDialog } from '../settings/CreateLibraryDialog';
 
 export function AppDialogs() {
+  const { t } = useUITranslation('messages');
   const controller = useEditorControllerContext();
   const {
     article,
@@ -110,7 +113,7 @@ export function AppDialogs() {
         source={controller.parsed.body}
         media={controller.articleMediaContext}
         busy={mediaOperation !== null || historyBusy || editorWorkspaceBusy}
-        blockedReason={controller.currentArticleIsArchived ? '归档文章只读，取消归档后可以采用主题。' : controller.parsed.diagnostics.some(item => item.level === 'error') ? '请先修复文章元数据，再采用主题。' : !article.themeValid && article.folder ? '请先修复当前文章主题快照。' : ''}
+        blockedReason={controller.currentArticleIsArchived ? t("messages:uiFeedback.themeArchived") : controller.parsed.diagnostics.some(item => item.level === 'error') ? t("messages:uiFeedback.themeRepairMetadata") : !article.themeValid && article.folder ? t("messages:uiFeedback.themeRepairSnapshot") : ''}
         issue={controller.status.tone === 'error' ? controller.status.label : ''}
         onClose={() => controller.setShowThemeDialog(false)}
         onSelect={changeTheme}
@@ -175,7 +178,7 @@ export function AppDialogs() {
         key={`${mediaTarget.articleId}:${mediaTarget.fileName}`}
         asset={mediaTarget}
         canRename={directory === mediaTarget.root && documentTokenRef.current?.root === mediaTarget.root && (controller.getCurrentArticleId() === mediaTarget.articleId || !controller.articleRef.current.dirty) && !mutationQueueRef.current.isDeleting(mediaTarget.root, mediaTarget.articleId)}
-        renameBlockedReason={directory !== mediaTarget.root ? '请先选择这张图片所属的资料目录。' : documentTokenRef.current?.root !== mediaTarget.root ? '当前稿件来自另一个资料目录；重新打开该目录中的稿件后才能改名。' : controller.articleRef.current.dirty && controller.getCurrentArticleId() !== mediaTarget.articleId ? '当前稿件有未保存改动；先保存或处理后，再改其他文章的图片。' : mutationQueueRef.current.isDeleting(mediaTarget.root, mediaTarget.articleId) ? '所属文章正在删除；请刷新素材列表后重试。' : undefined}
+        renameBlockedReason={directory !== mediaTarget.root ? t("messages:uiFeedback.imageLibrary") : documentTokenRef.current?.root !== mediaTarget.root ? t("messages:uiFeedback.imageOtherLibrary") : controller.articleRef.current.dirty && controller.getCurrentArticleId() !== mediaTarget.articleId ? t("messages:uiFeedback.imageDirty") : mutationQueueRef.current.isDeleting(mediaTarget.root, mediaTarget.articleId) ? t("messages:uiFeedback.imageDeleting") : undefined}
         busy={mediaOperation !== null}
         sessionKey={controller.contentLibraryRootSession}
         isCurrent={() => directory === mediaTarget.root && controller.contentLibraryRootSessionRef.current === controller.contentLibraryRootSession}

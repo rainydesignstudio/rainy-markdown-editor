@@ -1,3 +1,5 @@
+import * as productMessages from '../src/lib/i18n/productMessages.ts';
+import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -17,7 +19,8 @@ function picker() {
   const props = { current: BASIC_THEME, themes: [BASIC_THEME, alternate], source: '# 当前正文', onClose: () => closed++, onSelect: theme => selected.push(theme) };
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(moduleSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, require(id) {
+...productMessages,
+    module, exports: module.exports, require: withUILocaleImports(function(id){
       if (id === 'react') return { useState(initial) { const i = cursor++; if (!(i in cells)) cells[i] = initial; return [cells[i], value => { cells[i] = value; }]; } };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/DialogFrame')) return { DialogFrame: 'dialog-frame', DialogHeader: 'dialog-header', DialogFooter: 'dialog-footer', DialogActions: 'dialog-actions', DialogButton: 'dialog-button' };
@@ -26,7 +29,7 @@ function picker() {
       if (id.endsWith('/articleThemeUpdate')) return { availableArticleThemeUpdate };
       if (id.endsWith('/ThemeUpdateTag')) return { ThemeUpdateTag: 'theme-update-tag' };
       throw new Error(id);
-    },
+    }),
   });
   const render = () => { cursor = 0; return nodes(module.exports.ThemeDialog(props)); };
   const control = (text) => render().find(n => ['button', 'dialog-button'].includes(n.type) && label(n) === text);
@@ -77,7 +80,7 @@ function themeChange({ fail = false } = {}) {
     createArticleSnapshot: async () => { checkpoints++; if (fail) throw new Error('checkpoint failed'); return { snapshot: { id: 'checkpoint' }, cleanupIssues: [] }; },
   };
   const code = ts.transpileModule(controllerSource.slice(start, end) + '\nglobalThis.change = changeTheme;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-  vm.runInNewContext(code, context);
+  vm.runInNewContext(code, Object.assign(context, productMessages));
   return { context, current, updates, statuses, checkpoints: () => checkpoints, finishes: () => finishes, hidden: () => hidden };
 }
 
@@ -127,7 +130,7 @@ test('theme library forks a saved article with its current source and the select
     setCopyTitle: value => updates.push(['title', value]), setCopyMonth: value => updates.push(['month', value]),
   };
   const code = ts.transpileModule(source.slice(start, end) + '\nglobalThis.apply = applyThemeFromLibrary;', { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
-  vm.runInNewContext(code, context);
+  vm.runInNewContext(code, Object.assign(context, productMessages));
   context.apply(BASIC_THEME);
   assert.deepEqual(updates.map(([kind]) => kind), ['theme', 'source', 'fromLibrary', 'target', 'title', 'month']);
   assert.equal(updates[0][1], BASIC_THEME);

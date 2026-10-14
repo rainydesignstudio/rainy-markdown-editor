@@ -1,5 +1,9 @@
 'use client';
 
+import { useUITranslation, useUILocale } from '../global/UILocaleProvider';
+
+import { formatUINumber } from '../../lib/i18n/formatters';
+
 import type { ArticleStatistics } from '../../lib/articleStatistics';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 
@@ -24,25 +28,27 @@ export function ArticleStatisticsDialog({ title, dirty, statistics, issue, onClo
   issue?: string;
   onClose: () => void;
 }) {
-  const count = (value: number) => value.toLocaleString('zh-CN');
+  const { t } = useUITranslation('dialogs');
+  const { locale } = useUILocale();
+  const count = (value: number) => formatUINumber(value, locale);
   return <DialogFrame titleId="article-statistics-title" descriptionId="article-statistics-description" onClose={onClose} className="max-w-2xl">
-    <DialogHeader titleId="article-statistics-title" eyebrow="ARTICLE STATISTICS" title="文章统计" onClose={onClose} />
+    <DialogHeader titleId="article-statistics-title" eyebrow={t('common:eyebrows.articleStatistics')} title={t('dialogs:ui.articleStatistics')} onClose={onClose} />
     <div className="grid gap-4 p-4">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-list/50 p-4">
         <strong className="min-w-0 truncate font-sub-heading text-sm text-primary">{title}</strong>
-        <span className="text-xs text-muted">当前编辑稿{dirty ? ' · 含未保存修改' : ''}</span>
+        <span className="text-xs text-muted">{t('dialogs:ui.currentDraft')}{dirty ? t('dialogs:ui.includesUnsavedChanges') : ''}</span>
       </div>
       {statistics ? <>
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-line bg-panel p-4"><p className="text-xs text-muted">正文字符</p><strong className="mt-2 block font-mono text-3xl font-semibold text-primary">{count(statistics.characters)}</strong></div>
-          <div className="rounded-lg border border-line bg-panel p-4"><p className="text-xs text-muted">预计阅读</p><strong className="mt-2 block font-mono text-3xl font-semibold text-primary">约 {count(statistics.readingMinutes)} 分钟</strong></div>
+          <div className="rounded-lg border border-line bg-panel p-4"><p className="text-xs text-muted">{t('dialogs:ui.bodyCharacters')}</p><strong className="mt-2 block font-mono text-3xl font-semibold text-primary">{count(statistics.characters)}</strong></div>
+          <div className="rounded-lg border border-line bg-panel p-4"><p className="text-xs text-muted">{t('dialogs:ui.estimatedReading')}</p><strong className="mt-2 block font-mono text-3xl font-semibold text-primary">{t('dialogs:templates.readingMinutes', { count: statistics.readingMinutes })}</strong></div>
         </div>
         <dl className="grid grid-cols-2 gap-3 rounded-lg border border-line bg-list/50 p-4 text-sm md:grid-cols-5">
-          {([['标题', statistics.headings, 'heading'], ['段落', statistics.paragraphs, 'paragraph'], ['图片', statistics.images, 'image'], ['链接', statistics.links, 'link'], ['代码块', statistics.codeBlocks, 'code']] as const).map(([label, value, icon]) => <div key={label}><dt className="flex items-center gap-2 text-xs text-muted"><StatisticsIcon name={icon} />{label}</dt><dd className="mt-2 font-mono font-semibold text-primary">{count(value)}</dd></div>)}
+          {([[t('dialogs:ui.headings'), statistics.headings, 'heading'], [t('dialogs:ui.paragraphs'), statistics.paragraphs, 'paragraph'], [t('dialogs:ui.images'), statistics.images, 'image'], [t('dialogs:ui.links'), statistics.links, 'link'], [t('dialogs:ui.codeBlocks'), statistics.codeBlocks, 'code']] as const).map(([label, value, icon]) => <div key={label}><dt className="flex items-center gap-2 text-xs text-muted"><StatisticsIcon name={icon} />{label}</dt><dd className="mt-2 font-mono font-semibold text-primary">{count(value)}</dd></div>)}
         </dl>
-        <p id="article-statistics-description" className="text-xs text-faint">按当前预览正文统计；不计元数据、空白占位段及空白字符。阅读时间按每分钟 300 字符估算。</p>
-      </> : <p id="article-statistics-description" className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="status">{issue || '正文预览尚未就绪，请稍后重试。'}</p>}
+        <p id="article-statistics-description" className="text-xs text-faint">{t('dialogs:ui.statisticsUseTheCurrentPreviewBodyExcludingMetadata')}</p>
+      </> : <p id="article-statistics-description" className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="status">{issue || t('dialogs:ui.bodyPreviewIsNotReadyTryAgainShortly')}</p>}
     </div>
-    <DialogFooter><DialogActions><DialogButton onClick={onClose}>关闭</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton onClick={onClose}>{t('common:actions.close')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

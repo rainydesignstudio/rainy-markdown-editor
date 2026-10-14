@@ -1,3 +1,4 @@
+import { ProductError, productCause } from "./i18n/productMessages";
 import { parseFragment, serialize, type DefaultTreeAdapterMap } from 'parse5';
 import { articleImageFileNameFromSource, articleImageSourceSetCandidates, inspectArticleImage, replaceArticleImageSourceSetUrls } from './articleMedia';
 import { ARTICLE_EXAMPLE_IMAGE } from './articleExamples';
@@ -17,20 +18,20 @@ export async function embedClipboardImages(payload: ClipboardPayload, readImage:
   document.childNodes.forEach(visit);
   const cache = new Map<string, Promise<string>>();
   let embeddedImageCount = 0;
-  const assertCurrent = () => { if (!isCurrent()) throw new Error('文稿或资料库已变化，已取消旧稿复制。'); };
+  const assertCurrent = () => { if (!isCurrent()) throw new ProductError("controller.theManuscriptOrLibraryChangedCopyingThePreviousDraftWasCancelled"); };
   const embed = async (source: string): Promise<string> => {
     const fileName = articleImageFileNameFromSource(source);
     const example = source === ARTICLE_EXAMPLE_IMAGE;
     if (!fileName && !example) {
-      if (/^(?:blob:|\.\.?\/|media\/image\/)/i.test(source)) throw new Error(`无法读取本地图片引用：${source}`);
+      if (/^(?:blob:|\.\.?\/|media\/image\/)/i.test(source)) throw new ProductError("clipboardImages.theLocalImageReferenceCouldNotBeRead", { "source": source });
       return source;
     }
     assertCurrent();
     const key = example ? ARTICLE_EXAMPLE_IMAGE : fileName!;
     if (!cache.has(key)) cache.set(key, (async () => {
       let file: Blob;
-      try { file = example ? await (readExample?.() ?? Promise.reject(new Error('示例图片不可读取。'))) : await readImage(fileName!); }
-      catch (error) { throw new Error(`图片「${key}」读取失败：${error instanceof Error ? error.message : String(error)}`); }
+      try { file = example ? await (readExample?.() ?? Promise.reject(new ProductError("clipboardImages.theSampleImageCannotBeRead"))) : await readImage(fileName!); }
+      catch (error) { throw new ProductError("clipboardImages.imageCouldNotBeRead", { "key": key, "cause": productCause(error) }); }
       assertCurrent();
       const format = await inspectArticleImage(file);
       const bytes = new Uint8Array(await file.arrayBuffer());

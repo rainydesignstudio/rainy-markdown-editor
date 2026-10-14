@@ -1,4 +1,5 @@
-import { BASE_EDITOR_THEME, parseEditorThemeJson, validateEditorTheme, type EditorTheme } from './editorThemes';
+import { ProductError, productCause, productErrorMessage, productJoin, productMessage, productText } from "./i18n/productMessages";
+import { BASE_EDITOR_THEME, parseEditorThemeJson, inspectEditorTheme, type EditorTheme } from './editorThemes';
 import { getThemeDirectory } from './themeDirectories';
 
 export const EDITOR_THEME_DIRECTORY = 'themes/editor-themes';
@@ -10,7 +11,7 @@ function notFound(error: unknown): boolean {
 }
 
 function safeId(id: string): void {
-  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id)) throw new Error('Editor theme ID 不安全。');
+  if (!/^[a-z0-9][a-z0-9-]{0,47}$/.test(id)) throw new ProductError("editorThemeLibrary.theEditorThemeIdIsUnsafe");
 }
 
 export async function loadEditorThemeLibrary(root: FileSystemDirectoryHandle): Promise<EditorThemeLibrary> {
@@ -22,16 +23,16 @@ export async function loadEditorThemeLibrary(root: FileSystemDirectoryHandle): P
   for await (const [filename, handle] of directory.entries()) {
     if (!filename.endsWith('.json')) continue;
     if (handle.kind !== 'file' || !/^[a-z0-9][a-z0-9-]{0,47}\.json$/.test(filename)) {
-      issues.push({ file: filename, message: '文件名无效；须为安全的 <id>.json。' });
+      issues.push({ file: filename, ...productMessage("editorThemeLibrary.invalidFilenameUseASafeIdJson") });
       continue;
     }
     try {
       const theme = parseEditorThemeJson(await (await handle.getFile()).text());
-      if (theme.id !== filename.slice(0, -5)) throw new Error('文件名与主题 ID 不一致。');
-      if (themes.some((item) => item.id === theme.id)) throw new Error('主题 ID 重复。');
+      if (theme.id !== filename.slice(0, -5)) throw new ProductError("editorThemeLibrary.theFilenameDoesNotMatchTheThemeId");
+      if (themes.some((item) => item.id === theme.id)) throw new ProductError("editorThemeLibrary.theThemeIdIsDuplicated");
       themes.push(theme);
     } catch (error) {
-      issues.push({ file: filename, message: error instanceof Error ? error.message : String(error) });
+      issues.push({ file: filename, ...productErrorMessage(error) });
     }
   }
   return { themes, issues };
@@ -40,8 +41,8 @@ export async function loadEditorThemeLibrary(root: FileSystemDirectoryHandle): P
 type RenameHooks = { commit: () => Promise<void>; rollback: () => Promise<void> };
 
 export async function saveEditorTheme(root: FileSystemDirectoryHandle, input: EditorTheme, previous?: EditorTheme, renameHooks?: RenameHooks): Promise<EditorTheme> {
-  const errors = validateEditorTheme(input);
-  if (errors.length) throw new Error(errors.join('；'));
+  const errors = inspectEditorTheme(input);
+  if (errors.length) throw new ProductError('shared.compose', { parts: productJoin(errors, '；') });
   safeId(input.id);
   if (previous) safeId(previous.id);
   const { directory } = await getThemeDirectory(root, 'editor-themes');
@@ -51,10 +52,10 @@ export async function saveEditorTheme(root: FileSystemDirectoryHandle, input: Ed
     const oldName = `${previous.id}.json`;
     let oldRaw: string;
     try { oldRaw = await (await (await directory.getFileHandle(oldName)).getFile()).text(); }
-    catch (error) { if (notFound(error)) throw new Error('要编辑的主题已被移除；原文件未改动。'); throw error; }
+    catch (error) { if (notFound(error)) throw new ProductError("editorThemeLibrary.theThemeBeingEditedWasRemovedTheOriginalFileIsUnchanged"); throw error; }
     const stored = parseEditorThemeJson(oldRaw);
-    if (stored.id !== previous.id || JSON.stringify(stored) !== JSON.stringify(previous)) throw new Error('原主题已在外部改变；未改名。');
-    try { await directory.getFileHandle(filename); throw new Error(`文件名 ${filename} 已存在；原文件未改动。`); }
+    if (stored.id !== previous.id || JSON.stringify(stored) !== JSON.stringify(previous)) throw new ProductError("editorThemeLibrary.theOriginalThemeChangedExternallyItWasNotRenamed");
+    try { await directory.getFileHandle(filename); throw new ProductError("editorThemeLibrary.filenameAlreadyExistsTheOriginalFileIsUnchanged", { "filename": filename }); }
     catch (error) { if (!notFound(error)) throw error; }
     if (input.version === stored.version) {
       const parts = stored.version.split('.').map(Number);
@@ -64,22 +65,22 @@ export async function saveEditorTheme(root: FileSystemDirectoryHandle, input: Ed
     const target = await directory.getFileHandle(filename, { create: true });
     let committed = false;
     try {
-      if ((await target.getFile()).size) throw new Error(`文件名 ${filename} 已存在；原文件未改动。`);
+      if ((await target.getFile()).size) throw new ProductError("editorThemeLibrary.filenameAlreadyExistsTheOriginalFileIsUnchanged", { "filename": filename });
       const writable = await target.createWritable();
       try { await writable.write(JSON.stringify(input, null, 2)); await writable.close(); }
       catch (error) { try { await writable.abort(); } catch { /* retain failure */ } throw error; }
       if (!preserveBase) {
         if (renameHooks) { committed = true; await renameHooks.commit(); }
-        if (await (await (await directory.getFileHandle(oldName)).getFile()).text() !== oldRaw) throw new Error('原主题已在外部改变；未移除原文件。');
+        if (await (await (await directory.getFileHandle(oldName)).getFile()).text() !== oldRaw) throw new ProductError("editorThemeLibrary.theOriginalThemeChangedExternallyTheOriginalFileWasNotRemoved");
         await directory.removeEntry(oldName);
       }
       return input;
     } catch (error) {
       const rollbackIssues: string[] = [];
       let keepNewForReferences = false;
-      if (committed) try { await renameHooks?.rollback(); } catch (failure) { keepNewForReferences = true; rollbackIssues.push(`外观引用回滚失败，新文件 ${filename} 已保留以避免悬空引用：${failure instanceof Error ? failure.message : String(failure)}`); }
-      if (!keepNewForReferences) try { await directory.removeEntry(filename); } catch (failure) { rollbackIssues.push(`新文件 ${filename} 清理失败：${failure instanceof Error ? failure.message : String(failure)}`); }
-      throw new Error(`Editor theme 改名失败，原文件保留：${error instanceof Error ? error.message : String(error)}${rollbackIssues.length ? `；${rollbackIssues.join('；')}` : ''}`);
+      if (committed) try { await renameHooks?.rollback(); } catch (failure) { keepNewForReferences = true; rollbackIssues.push(productText("editorThemeLibrary.appearanceReferenceRollbackFailedNewFileIsRetainedToAvoidABroken", { "filename": filename, "cause": productCause(failure) })); }
+      if (!keepNewForReferences) try { await directory.removeEntry(filename); } catch (failure) { rollbackIssues.push(productText("editorThemeLibrary.newFileCouldNotBeCleaned", { "filename": filename, "cause": productCause(failure) })); }
+      throw new ProductError("editorThemeLibrary.editorThemeRenamingFailedTheOriginalFileIsRetained", { "cause": productCause(error), "details": (rollbackIssues.length ? `；${rollbackIssues.join('；')}` : '') });
     }
   }
   let existingRaw: string | null = null;
@@ -88,7 +89,7 @@ export async function saveEditorTheme(root: FileSystemDirectoryHandle, input: Ed
     const current = await (await existing.getFile()).text();
     const stored = parseEditorThemeJson(current);
     if (JSON.stringify(stored) === JSON.stringify(input)) return stored;
-    if (!previous || JSON.stringify(stored) !== JSON.stringify(previous)) throw new Error(`主题 ${input.id} 已存在或已被修改；原文件未覆盖。`);
+    if (!previous || JSON.stringify(stored) !== JSON.stringify(previous)) throw new ProductError("editorThemeLibrary.themeAlreadyExistsOrWasModifiedTheOriginalFileWasNotOverwritten", { "inputId": input.id });
     existingRaw = current;
     if (input.version === stored.version) {
       const parts = stored.version.split('.').map(Number);
@@ -97,10 +98,10 @@ export async function saveEditorTheme(root: FileSystemDirectoryHandle, input: Ed
     }
   } catch (error) {
     if (!notFound(error)) throw error;
-    if (previous) throw new Error('要编辑的主题已被移除；未重新创建。');
+    if (previous) throw new ProductError("editorThemeLibrary.theThemeBeingEditedWasRemovedItWasNotRecreated");
   }
   const file = await directory.getFileHandle(filename, { create: true });
-  if (existingRaw !== null && await (await file.getFile()).text() !== existingRaw) throw new Error('主题文件已在外部改变；未覆盖。');
+  if (existingRaw !== null && await (await file.getFile()).text() !== existingRaw) throw new ProductError("editorThemeLibrary.theThemeFileChangedExternallyAndWasNotOverwritten");
   let writable: FileSystemWritableFileStream | undefined;
   try {
     writable = await file.createWritable();
@@ -109,17 +110,17 @@ export async function saveEditorTheme(root: FileSystemDirectoryHandle, input: Ed
   } catch (error) {
     try { await writable?.abort(); } catch { /* retain original error */ }
     if (existingRaw === null) try { await directory.removeEntry(filename); } catch { /* retain original error */ }
-    throw new Error(`Editor theme 保存失败：${error instanceof Error ? error.message : String(error)}`);
+    throw new ProductError("editorThemeLibrary.editorThemeSavingFailed", { "cause": productCause(error) });
   }
   return input;
 }
 
 export async function deleteEditorTheme(root: FileSystemDirectoryHandle, id: string): Promise<void> {
   safeId(id);
-  if (id === BASE_EDITOR_THEME.id) throw new Error('基础 Editor theme 不可删除。');
+  if (id === BASE_EDITOR_THEME.id) throw new ProductError("editorThemeLibrary.theBasicEditorThemeCannotBeDeleted");
   const { directory } = await getThemeDirectory(root, 'editor-themes');
   const file = await directory.getFileHandle(`${id}.json`);
   const theme = parseEditorThemeJson(await (await file.getFile()).text());
-  if (theme.id !== id) throw new Error('主题文件与 ID 不一致；没有删除。');
+  if (theme.id !== id) throw new ProductError("editorThemeLibrary.theThemeFileDoesNotMatchItsIdNothingWasDeleted");
   await directory.removeEntry(`${id}.json`);
 }

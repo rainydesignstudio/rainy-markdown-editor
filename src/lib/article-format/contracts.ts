@@ -1,56 +1,57 @@
+import { ProductError, productReference, productText } from "../i18n/productMessages";
 // Capability contracts describe engine inputs. Platform decisions belong to library JSON.
 export type Guard = (value: unknown, path: string) => void;
 export const record = (value: unknown, path: string): Record<string, unknown> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(`${path}必须是对象。`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("contracts.mustBeAnObject", { "path": path });
   return value as Record<string, unknown>;
 };
 export const fail = (path: string, detail: string): never => { throw new Error(`${path}：${detail}。`); };
-export const text: Guard = (value, path) => { if (typeof value !== 'string' || !value.trim()) fail(path, '必须是非空字符串'); };
-export const bool: Guard = (value, path) => { if (typeof value !== 'boolean') fail(path, '必须是布尔值'); };
+export const text: Guard = (value, path) => { if (typeof value !== 'string' || !value.trim()) fail(path, productText("contracts.mustBeANonemptyString")); };
+export const bool: Guard = (value, path) => { if (typeof value !== 'boolean') fail(path, productText("contracts.mustBeABoolean")); };
 export const number = (minimum = 0, maximum = Number.MAX_SAFE_INTEGER, integer = false): Guard => (value, path) => {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum || integer && !Number.isInteger(value)) fail(path, `数值需在${minimum}至${maximum}之间${integer ? '且为整数' : ''}`);
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum || integer && !Number.isInteger(value)) fail(path, productText("contracts.valueMustBeBetweenAnd", { "minimum": minimum, "maximum": maximum, "value": (integer ? productReference("contracts.andMustBeAnInteger") : '') }));
 };
-export const choice = (...values: string[]): Guard => (value, path) => { if (!values.includes(String(value))) fail(path, `仅支持${values.join('／')}`); };
+export const choice = (...values: string[]): Guard => (value, path) => { if (!values.includes(String(value))) fail(path, productText("contracts.supportedValues", { "details": values.join('／') })); };
 export const array = (guard: Guard, minimum = 0): Guard => (value, path) => {
-  if (!Array.isArray(value) || value.length < minimum) fail(path, '数组缺失或长度不足');
+  if (!Array.isArray(value) || value.length < minimum) fail(path, productText("contracts.arrayIsMissingOrTooShort"));
   (value as unknown[]).forEach((item, index) => guard(item, `${path}[${index}]`));
 };
 export const strings = array(text);
 export const mapping = (guard: Guard, keyGuard: Guard = text): Guard => (value, path) => {
-  Object.entries(record(value, path)).forEach(([key, item]) => { keyGuard(key, `${path}键名`); guard(item, `${path}.${key}`); });
+  Object.entries(record(value, path)).forEach(([key, item]) => { keyGuard(key, productText("contracts.keyName", { "path": path })); guard(item, `${path}.${key}`); });
 };
 export const shape = (required: Record<string, Guard>, optional: Record<string, Guard> = {}): Guard => (value, path) => {
   const object = record(value, path);
-  for (const name of Object.keys(object)) if (!Object.hasOwn(required, name) && !Object.hasOwn(optional, name)) fail(`${path}.${name}`, '未知字段');
-  for (const [name, guard] of Object.entries(required)) { if (!Object.hasOwn(object, name)) fail(`${path}.${name}`, '缺少必需字段'); guard(object[name], `${path}.${name}`); }
+  for (const name of Object.keys(object)) if (!Object.hasOwn(required, name) && !Object.hasOwn(optional, name)) fail(`${path}.${name}`, productText("contracts.unknownField"));
+  for (const [name, guard] of Object.entries(required)) { if (!Object.hasOwn(object, name)) fail(`${path}.${name}`, productText("contracts.requiredFieldIsMissing")); guard(object[name], `${path}.${name}`); }
   for (const [name, guard] of Object.entries(optional)) if (Object.hasOwn(object, name)) guard(object[name], `${path}.${name}`);
 };
 export const SOURCE_STRUCTURE_SELECTOR = /^([a-z][a-z0-9-]*)(?:\[([a-z][a-z0-9-]*)\])?$/;
-export const property: Guard = (value, path) => { text(value, path); if (!/^(?:--|-)?[a-z][a-z0-9-]*$/.test(String(value))) fail(path, '无效CSS属性'); };
-export const attribute: Guard = (value, path) => { text(value, path); if (!/^[a-z][a-z0-9-]*$/.test(String(value)) || /^on/i.test(String(value)) || ['srcdoc', 'style', 'class'].includes(String(value))) fail(path, '不可保留此属性'); };
-export const cssValue: Guard = (value, path) => { text(value, path); if (/[;{}<>\\]|url\s*\(|expression\s*\(|javascript:/i.test(String(value))) fail(path, '不是安全CSS值'); };
-export const selector: Guard = (value, path) => { text(value, path); if (typeof document !== 'undefined') { try { document.createDocumentFragment().querySelector(String(value)); } catch { fail(path, '选择器语法无效'); } } if (/[{}<]|@/.test(String(value))) fail(path, '无效选择器'); };
-export const tag: Guard = (value, path) => { text(value, path); if (!/^[a-z][a-z0-9-]*$/.test(String(value)) || ['script', 'style', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'area', 'br', 'col', 'hr', 'img', 'input', 'param', 'source', 'track', 'wbr', 'svg', 'body', 'html'].includes(String(value))) fail(path, '无效或不安全的容器标签'); };
+export const property: Guard = (value, path) => { text(value, path); if (!/^(?:--|-)?[a-z][a-z0-9-]*$/.test(String(value))) fail(path, productText("contracts.invalidCssProperty")); };
+export const attribute: Guard = (value, path) => { text(value, path); if (!/^[a-z][a-z0-9-]*$/.test(String(value)) || /^on/i.test(String(value)) || ['srcdoc', 'style', 'class'].includes(String(value))) fail(path, productText("contracts.thisAttributeCannotBeRetained")); };
+export const cssValue: Guard = (value, path) => { text(value, path); if (/[;{}<>\\]|url\s*\(|expression\s*\(|javascript:/i.test(String(value))) fail(path, productText("contracts.notASafeCssValue")); };
+export const selector: Guard = (value, path) => { text(value, path); if (typeof document !== 'undefined') { try { document.createDocumentFragment().querySelector(String(value)); } catch { fail(path, productText("contracts.selectorSyntaxIsInvalid")); } } if (/[{}<]|@/.test(String(value))) fail(path, productText("contracts.invalidSelector")); };
+export const tag: Guard = (value, path) => { text(value, path); if (!/^[a-z][a-z0-9-]*$/.test(String(value)) || ['script', 'style', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'area', 'br', 'col', 'hr', 'img', 'input', 'param', 'source', 'track', 'wbr', 'svg', 'body', 'html'].includes(String(value))) fail(path, productText("contracts.invalidOrUnsafeContainerTag")); };
 export const boundedString = (maximum: number): Guard => (value, path) => {
-  if (typeof value !== 'string' || value.length > maximum) fail(path, '文本类型或长度无效');
+  if (typeof value !== 'string' || value.length > maximum) fail(path, productText("contracts.textTypeOrLengthIsInvalid"));
 };
 export const libraryPath: Guard = (value, path) => {
   text(value, path);
-  if (typeof value !== 'string' || value.startsWith('/') || /[\\\u0000-\u001f?#]/.test(value) || value.split('/').some(part => !part || part === '.' || part === '..') || /^[a-z][a-z\d+.-]*:/i.test(value)) fail(path, '必须是授权资料库内的相对路径');
+  if (typeof value !== 'string' || value.startsWith('/') || /[\\\u0000-\u001f?#]/.test(value) || value.split('/').some(part => !part || part === '.' || part === '..') || /^[a-z][a-z\d+.-]*:/i.test(value)) fail(path, productText("contracts.mustBeARelativePathWithinTheAuthorizedLibrary"));
 };
 const container = shape({ tag, classes: strings }, { id: (value, path) => {
-  text(value, path); if (!/^[a-zA-Z][\w:-]*$/.test(String(value))) fail(path, '无效容器ID');
+  text(value, path); if (!/^[a-zA-Z][\w:-]*$/.test(String(value))) fail(path, productText("contracts.invalidContainerId"));
 } });
 const nullable = (guard: Guard): Guard => (value, path) => { if (value !== null) guard(value, path); };
 const httpBase: Guard = (value, path) => {
   if (value === '') return;
   text(value, path); let parsed: URL;
-  try { parsed = new URL(String(value)); } catch { fail(path, '链接基址无效'); }
-  if (!['https:', 'http:'].includes(parsed!.protocol) || parsed!.username || parsed!.password) fail(path, '链接基址必须是无凭据的HTTP地址');
+  try { parsed = new URL(String(value)); } catch { fail(path, productText("contracts.linkBaseUrlIsInvalid")); }
+  if (!['https:', 'http:'].includes(parsed!.protocol) || parsed!.username || parsed!.password) fail(path, productText("contracts.linkBaseMustBeAnHttpUrlWithoutCredentials"));
 };
 const highlightStyleKey: Guard = (value, path) => {
   text(value, path);
-  if (String(value).length > 512 || /[{};@\u0000-\u001f]/.test(String(value)) || ['__proto__', 'constructor', 'prototype'].includes(String(value))) fail(path, '代码高亮样式键无效');
+  if (String(value).length > 512 || /[{};@\u0000-\u001f]/.test(String(value)) || ['__proto__', 'constructor', 'prototype'].includes(String(value))) fail(path, productText("contracts.codeHighlightingStyleKeyIsInvalid"));
 };
 export const darkOptions = shape({}, {
   mode: choice('dark'), defaultDarkTextColor: cssValue, needJudgeFirstPage: bool, noEmit: bool,
