@@ -21,7 +21,7 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/d4fdc16f-8245-4626-beae-32bc3cb9d0cc" alt="Rainy 文稿台" width="960" /></p>
 
-`v0.3.0`
+`v0.3.0.1`
 
 ## 🚀 安装
 
@@ -30,12 +30,12 @@
 手动：
 
 ```sh
-git clone --branch v0.3.0 --depth 1 https://github.com/rainydesignstudio/rainy-markdown-editor.git && cd rainy-markdown-editor && npm ci && npm run build && npm start
+git clone --branch v0.3.0.1 --depth 1 https://github.com/rainydesignstudio/rainy-markdown-editor.git && cd rainy-markdown-editor && npm ci && npm run build && npm start
 ```
 
 Agent：
 
-> 请从 https://github.com/rainydesignstudio/rainy-markdown-editor 的 v0.3.0 安装 Rainy 文稿台；先读根 README.md、docs/locale/zh-CN/README.md 和 docs/locale/zh-CN/AGENT-GUIDE.md，确认安装目录、端口和权限后克隆、npm ci、构建并启动，引导我授权资料库，并给出以后启动的命令。
+> 请从 https://github.com/rainydesignstudio/rainy-markdown-editor 的 v0.3.0.1 安装 Rainy 文稿台；先读根 README.md、docs/locale/zh-CN/README.md 和 docs/locale/zh-CN/AGENT-GUIDE.md，确认安装目录、端口和权限后克隆、npm ci、构建并启动，引导我授权资料库，并给出以后启动的命令。
 
 ## ✨ 功能与特性
 

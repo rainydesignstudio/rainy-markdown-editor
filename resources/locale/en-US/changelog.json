@@ -772,6 +772,18 @@
           ]
         }
       ]
+    },
+    "v0_3_0_1": {
+      "summary": "Clarify preview refresh after theme adoption, save-only behavior, configuration reloading and saving boundaries.",
+      "sections": [
+        {
+          "title": "Documentation corrections",
+          "items": [
+            "Synchronize the English and Chinese README, theme, format and Agent guides: successfully adopting a different or updated theme refreshes the preview once; subsequent body edits still follow the save-only preference.",
+            "Clarify that theme adoption adds no save operation, external format JSON edits still require reopening the library and explicitly updating styles, and failed or stale compilation does not advance the preview."
+          ]
+        }
+      ]
     }
   }
 }

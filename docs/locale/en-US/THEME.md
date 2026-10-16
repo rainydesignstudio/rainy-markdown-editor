@@ -248,7 +248,7 @@ Semantic body utilities such as `text-article-accent`, `bg-article-tint` and `bo
 
 The sample image uses max-width:100%, height:auto and display:block for ordinary responsive layout; this is a sample choice. Official WeChat width checks inspect multi-screen layout, centering and overflow, using measured widths first and declared/data-w/HTML widths or transparent placeholders as fallbacks. There is no current rule allowing height:auto only in a three-property combination. Formatter configuration determines automatic-dimension output; loading, existence and actual layout are separate checks.
 
-The article editor's [preview controls](README.md#doc-preview-controls) are separate from theme JSON. With save-only refresh enabled, editing or choosing a theme can temporarily retain the earlier display. Verify the theme version and layout after saving successfully, or turn the switch off to resume live display. Theme-library, snippet and starter design previews keep their existing workflows.
+The article editor's [preview controls](README.md#doc-preview-controls) are separate from theme JSON. With save-only refresh enabled, body edits retain the current display. Explicitly adopting a different or updated theme recompiles styles and refreshes the display once after success; subsequent body edits still wait for saving. Adoption adds no save operation; persistence follows the existing save workflow. Failed or stale compilation does not advance the preview. Turning the switch off resumes live display. Theme-library, snippet and starter design previews keep their existing workflows.
 
 <a name="doc-article-theme-example"></a>
 

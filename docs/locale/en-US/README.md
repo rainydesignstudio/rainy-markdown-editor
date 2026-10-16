@@ -16,7 +16,7 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/87578b5d-4015-4255-a0f9-b59367de489f" alt="Your library, your writing rules." width="960" /></p>
 
-`v0.3.0`
+`v0.3.0.1`
 
 Manuscripts, theme snapshots, images and history stay in your authorized local library. The first default format configuration targets WeChat Official Accounts; each library can adapt its own policies for other platforms.
 
@@ -148,7 +148,7 @@ The three icons in the preview header are ordered left to right. Hover or focus 
 |---|---|---|
 | Align preview scrolling | Off | Align the rendered element corresponding to the source top. Only source scrolling drives the preview. |
 | Show format check after manual save | On | Show the report after manual saving. Turning it off only hides the dialog; auto-save never opens it. |
-| Refresh preview only after saving | Off | Retain the visible body, theme and styles until a successful save. The source footer shows “Save to refresh preview” while enabled; turning it off resumes live display. |
+| Refresh preview only after saving | Off | Retain the visible body, theme and styles while editing. A successful save and compilation refreshes the display; explicitly adopting a different or updated theme also refreshes it once after successful compilation. The source footer shows “Save to refresh preview” while enabled; turning it off resumes live display. |
 
 A retained display does not replace current-draft checks, copying or export. Alignment remains available on retained displays: unchanged content keeps its correspondence, edited gaps use the nearest valid node, and no matching node leaves the current position intact. Copying also refreshes the display if the existing workflow first saves an unsaved draft. Source, checking and render-record failures are reported separately; a retained display or incomplete check is not a pass.
 
