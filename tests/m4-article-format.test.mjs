@@ -30,6 +30,7 @@ test('CSS locations remain declaration-based; article locations start in the bod
   const source = '---\ntitle: 测试\n---\n正文\n\n<p style="text-align:start">正文</p>';
   const report = await inspectArticleFormatReport(source, BASIC_THEME, null, undefined, { deep: false });
   assert.equal(report.body.issues.find(i => i.ruleId === 'text-align').line, 3);
+  assert.equal(report.bodyLineOffset, 3, 'the report carries the exact file offset without rewriting internal body locations');
   assert.equal(report.complete, false);
 });
 test('product safety and malformed structure remain separate from platform rules', () => {

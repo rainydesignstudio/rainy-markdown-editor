@@ -34,7 +34,11 @@
     "notStored": "文章尚未保存到资料目录；保存前不会生成文章文件。",
     "lineToggle": "{{action}}（⌘/ / Ctrl+/）",
     "diagnosticsUnavailable": "撰写诊断暂不可用：{{message}}",
-    "saveRefreshPreview": "保存刷新预览"
+    "saveRefreshPreview": "保存刷新预览",
+    "longDocumentWarning": "文稿共 {{count}} 行，即时渲染可能明显变慢；建议开启“仅保存时刷新预览”。",
+    "longDocumentSavedOnly": "文稿共 {{count}} 行，当前已启用“仅保存时刷新预览”。",
+    "metadataLines": "元数据 · 文件第 1–{{count}} 行",
+    "metadataViewOnly": "只读"
   },
   "workspace": {
     "panes": "窄屏编辑与预览切换",

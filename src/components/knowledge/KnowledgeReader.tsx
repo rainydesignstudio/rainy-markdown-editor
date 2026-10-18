@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { useUITranslation } from '../global/UILocaleProvider';
-import { LibraryArticleImage } from '../editor/LibraryArticleImage';
+import { LibraryArticleImage } from '../../lib/article-format/LibraryArticleImage';
 import { knowledgeReferencePath, isMarkdownPath, type KnowledgeManifest } from '../../lib/knowledge/model';
 import type { ReadonlyKnowledgeSource } from '../../lib/knowledge/source';
 

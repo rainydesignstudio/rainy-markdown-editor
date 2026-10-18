@@ -57,13 +57,14 @@ test('English find fields expose English labels while query and replacement stay
 });
 
 test('changing UI language updates iframe title without remounting, replacing the target or changing article language', async () => {
-  const source = await readFile(new URL('../src/hooks/useArticleRenderMount.ts', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../src/lib/article-format/useArticleRenderMount.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  let findCalls = 0; const keyListeners = new Map();
   let cursor = 0, language = 'zh-CN', creations = 0, removals = 0;
   const cells = [], effects = [], frames = [], titles = { 'zh-CN': key => '中文:' + key, 'en-US': key => 'English:' + key };
   const element = () => ({ dataset: {}, style: {}, textContent: '', remove() { removals++; } });
   const head = { styles: [], append(node) { this.styles.push(node); }, querySelector() { return this.styles[0]; } };
-  const doc = { documentElement: { dataset: {}, style: {}, classList: { toggle() {} } }, body: { style: {}, append() {} }, head, open() {}, write() {}, close() {}, createElement: element, addEventListener() {}, removeEventListener() {} };
+  const doc = { documentElement: { dataset: {}, style: {}, classList: { toggle() {} } }, body: { style: {}, append() {} }, head, open() {}, write() {}, close() {}, createElement: element, addEventListener(name, callback) { keyListeners.set(name, callback); }, removeEventListener(name) { keyListeners.delete(name); } };
   doc.createElement = () => ({ ...element(), ownerDocument: doc });
   const host = { addEventListener() {}, removeEventListener() {}, style: {}, clientWidth: 996, clientHeight: 959, append(frame) { frames.push(frame); }, querySelectorAll() { return frames; } }, hostRef = { current: host };
   const effect = (fn, deps) => { const i = cursor++, old = cells[i]; if (old && deps.every((x, j) => Object.is(x, old.deps[j]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { deps, cleanup: fn() }; }); };
@@ -77,11 +78,19 @@ test('changing UI language updates iframe title without remounting, replacing th
     return {};
   } });
   const snapshot = { id: 'same', bundle: { formatter: { document: { language: 'zh-CN', viewport: { width: 1606, height: 959, contentWidth: 996 } }, preview: { light: { background: 'white' }, dark: { transform: 'preserve' }, color: 'black', fontFamily: 'serif' } } } };
-  const render = () => { cursor = 0; const result = module.exports.useArticleRenderMount(hostRef, snapshot, '.unchanged{}', false); while (effects.length) effects.shift()(); return result; };
+  const render = () => { cursor = 0; const result = module.exports.useArticleRenderMount(hostRef, snapshot, '.unchanged{}', false, { onSourceFind: () => findCalls++ }); while (effects.length) effects.shift()(); return result; };
   render(); const before = render(), target = before.target;
   language = 'en-US'; const after = render();
   assert.equal(creations, 1); assert.equal(removals, 0); assert.equal(after.target, target);
   assert.equal(frames[0].title, 'English:preview.frame');
   assert.equal(doc.documentElement.lang, 'zh-CN');
   assert.equal(head.styles[0].textContent, '.unchanged{}');
+  const key = extras => ({ key: 'f', metaKey: true, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...extras });
+  const command = key(); keyListeners.get('keydown')(command);
+  assert.equal(command.defaultPrevented, true); assert.equal(findCalls, 1);
+  keyListeners.get('keydown')(key({ isComposing: true }));
+  keyListeners.get('keydown')(key({ defaultPrevented: true }));
+  keyListeners.get('keydown')(key({ altKey: true }));
+  assert.equal(findCalls, 1, 'IME and already handled shortcuts are left alone');
+
 });

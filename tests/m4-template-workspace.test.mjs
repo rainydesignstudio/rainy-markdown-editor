@@ -25,7 +25,7 @@ const textareaModule = { exports: {} };
 vm.runInNewContext(ts.transpileModule(textareaSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
   exports: textareaModule.exports, module: textareaModule,
   require: withTextInputHistory(function require(id) {
-      if (id.endsWith('/article-format/runtime')) return formatRuntime;
+      if ((id.endsWith('/article-format/runtime') || id === './runtime')) return formatRuntime;
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
@@ -51,7 +51,7 @@ test('article input and its highlight overlay use the same writing font while co
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(textareaSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require: withTextInputHistory(function require(id) {
-      if (id.endsWith('/article-format/runtime')) return formatRuntime;
+      if ((id.endsWith('/article-format/runtime') || id === './runtime')) return formatRuntime;
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
@@ -131,7 +131,7 @@ function workspace() {
     } }) },
     window: { location: { search: '' }, history: { state: {}, replaceState() {} }, addEventListener(name, callback) { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name).add(callback); }, removeEventListener(name, callback) { listeners.get(name)?.delete(callback); } },
     require: withTextInputHistory(function require(id) {
-      if (id.endsWith('/article-format/runtime')) return formatRuntime;
+      if ((id.endsWith('/article-format/runtime') || id === './runtime')) return formatRuntime;
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
@@ -495,7 +495,7 @@ test('new manuscript menu only changes the themed preview until creation is conf
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(templateSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require: withTextInputHistory(function require(id) {
-      if (id.endsWith('/article-format/runtime')) return formatRuntime;
+      if ((id.endsWith('/article-format/runtime') || id === './runtime')) return formatRuntime;
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
@@ -587,7 +587,7 @@ test('template article category tags render values and an explicit empty state',
   const module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require: withTextInputHistory(function require(id) {
-      if (id.endsWith('/article-format/runtime')) return formatRuntime;
+      if ((id.endsWith('/article-format/runtime') || id === './runtime')) return formatRuntime;
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
@@ -822,7 +822,7 @@ test('contextual snippet expansion inserts the newline and content as one revers
       return true;
     } },
     require: withTextInputHistory(function require(id) {
-      if (id.endsWith('/article-format/runtime')) return formatRuntime;
+      if ((id.endsWith('/article-format/runtime') || id === './runtime')) return formatRuntime;
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };

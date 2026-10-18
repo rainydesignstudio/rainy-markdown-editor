@@ -36,7 +36,9 @@
     "evening-snow-accent-200": "#b4c9ea",
     "evening-snow-accent-500": "#557dae",
     "evening-snow-accent-600": "#395f91",
-    "evening-snow-accent-700": "#29456d"
+    "evening-snow-accent-700": "#29456d",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -72,7 +74,8 @@
       "editor-text": "evening-snow-600",
       "editor-syntax": "evening-snow-accent-600",
       "editor-heading": "evening-snow-700",
-      "editor-quote": "evening-snow-500"
+      "editor-quote": "evening-snow-500",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "evening-snow-950",
@@ -107,7 +110,8 @@
       "editor-text": "evening-snow-100",
       "editor-syntax": "evening-snow-accent-200",
       "editor-heading": "evening-snow-0",
-      "editor-quote": "evening-snow-300"
+      "editor-quote": "evening-snow-300",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

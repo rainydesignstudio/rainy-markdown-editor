@@ -21,6 +21,7 @@ import { notifyResourceChanged } from '../lib/resources/state';
 import { resourceReference } from '../lib/resources/types';
 import { activateLibraryFormat, DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, initializeLibraryFormat, type PlatformPresetId } from '../lib/article-format/library';
 import { getFormatSnapshot, invalidateFormatBundle } from '../lib/article-format/runtime';
+import { assertLibraryCapability, type LibraryCapability } from '../lib/article-format/libraryConfiguration';
 import { activateThemePreviewSample, invalidateThemePreviewSample } from '../lib/themePreviewSample';
 
 import { articleFormatPreviewStructure } from '../lib/articleFormat';
@@ -78,16 +79,16 @@ import {
   loadArticleTemplates,
   type ContentLibraryIssue,
 } from '../lib/contentLibraries';
-import { buildClipboardPayload, extractMarkdownClassCandidates } from '../lib/render';
+import { buildClipboardPayload, extractMarkdownClassCandidates } from '../lib/article-format/output';
 import { embedClipboardImages } from '../lib/clipboardImages';
 import { ARTICLE_EXAMPLE_IMAGE } from '../lib/articleExamples';
 import { compiledArticleFormatStatus, inspectArticleFormatReport, type ArticleFormatReport } from '../lib/articleFormatReport';
 import { getPreviewPreferences } from './usePreviewPreferences';
-import { compileArticleStyles } from '../lib/tailwind';
+import { compileArticleStyles } from '../lib/article-format/renderer';
 import { createArticleMutationQueue, type ArticleDocumentToken } from '../lib/articleMutationQueue';
 import { copyArticleImageAs, importArticleImage, insertArticleImageReferences, rewriteArticleImageReferences, type ArticleMediaAsset, type LibraryMediaAsset, type MediaActionOutcome, importSharedImage, inspectArticleImage } from '../lib/articleMedia';
 import { DEFAULT_ARTICLE_SETTINGS, loadArticleSettings, saveArticleSettings, type ArticleSettings } from '../lib/articleSettings';
-import { createArticleSnapshot, listArticleHistory, setArticleSnapshotRetained, type ArticleHistoryIssue, type ArticleHistorySnapshot } from '../lib/articleHistory';
+import { createArticleSnapshot, deleteArticleSnapshot, listArticleHistory, setArticleSnapshotRetained, type ArticleHistoryIssue, type ArticleHistorySnapshot } from '../lib/articleHistory';
 import { BASIC_THEME } from '../lib/themes';
 import { BASE_EDITOR_THEME, parseEditorThemeJson, type EditorTheme } from '../lib/editorThemes';
 import { deleteEditorTheme, loadEditorThemeLibrary, saveEditorTheme, type EditorThemeIssue } from '../lib/editorThemeLibrary';
@@ -120,7 +121,7 @@ import {
   type EditorWorkspaceSaveBase,
 } from '../lib/editorWorkspace';
 import type { ArticleDiagnostic, ArticleSnippet, ArticleTemplate, SnippetCategory, ArticleSummary, ArticleIndexIssue, StoredArticle, ThemeConfig, WorkingArticle } from '../lib/types';
-import type { ArticleMediaContext } from '../components/editor/MarkdownPreview';
+import type { ArticleMediaContext } from '../lib/article-format/MarkdownPreview';
 import type { MediaRenameOutcome } from '../components/media/MediaLibrary';
 
 export type ViewKey = 'articles' | 'assets' | 'themes' | 'template' | 'settings' | 'knowledge';
@@ -294,6 +295,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const [compiledCss, setCompiledCss] = useState('');
   const [savedPreviewRevision, setSavedPreviewRevision] = useState(0);
   const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
+  const capabilityAllowed = useCallback((key: LibraryCapability) => {
+    try { assertLibraryCapability(getFormatSnapshot(), key); return true; }
+    catch (error) { setStatus({ ...productErrorLabel(error), tone: 'warning' }); return false; }
+  }, []);
   const [formatCheck, setFormatCheck] = useState<{ mode: 'copy' | 'save' | 'inspect' | 'export'; report: ArticleFormatReport } | null>(null);
   const [sourceFormatReport, setSourceFormatReport] = useState<{ snapshot: ArticleSnapshotIdentity; report: ArticleFormatReport } | null>(null);
   const [loadInspectionRevision, setLoadInspectionRevision] = useState<number | null>(null);
@@ -903,6 +908,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, []);
 
   const setDefaultArticleTheme = useCallback(async (themeId: string, expectedRoot: FileSystemDirectoryHandle) => {
+    assertLibraryCapability(getFormatSnapshot(), 'articleTheme');
     const root = directoryRef.current;
     if (settingsIssue) throw new ProductError("controller.settingsJsonNeedsRepairTheDefaultThemeWasNotSaved");
     if (!root || root !== expectedRoot || !themeLibrary.some((theme) => theme.id === themeId)) {
@@ -1114,6 +1120,34 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       finishHistoryOperation(lease);
     }
   }, [articleSettings.autoSnapshot.maxCount, beginHistoryOperation, finishHistoryOperation, matchesSnapshot, saveSnapshot, snapshotFor]);
+
+  const deleteHistorySnapshot = useCallback(async (snapshot: ArticleHistorySnapshot): Promise<boolean> => {
+    const current = snapshotFor(), root = current.directory;
+    if (!root || !current.month || !current.folder || current.documentToken.root !== root || historyRefreshPending || getArticleOrganization(editorWorkspaceRef.current, current.articleId).archived) return false;
+    const lease = beginHistoryOperation();
+    if (!lease) return false;
+    const isCurrent = () => directoryRef.current === root && matchesSnapshot(current) && mutationQueueRef.current.canSave(current.documentToken);
+    try {
+      await mutationQueueRef.current.run(() => deleteArticleSnapshot(root, current.month!, current.folder!, snapshot, isCurrent));
+      if (!isCurrent()) return true;
+      const remaining = historySnapshots.filter(item => item.id !== snapshot.id);
+      setHistorySnapshots(remaining);
+      setHistorySelectedId(previous => previous === snapshot.id ? remaining[0]?.id ?? null : previous);
+      setHistoryRefreshPending(true);
+      try {
+        const result = await mutationQueueRef.current.run(() => { if (!isCurrent()) throw new ProductError('articleHistory.deleteStale'); return listArticleHistory(root, current.month!, current.folder!); });
+        if (!isCurrent()) return true;
+        setHistorySnapshots(result.snapshots); setHistoryIssues(result.issues); setHistoryRefreshPending(false);
+        setHistoryNotice({ ...productLabel('controller.historyVersionDeleted'), tone: 'success' });
+      } catch (error) {
+        if (isCurrent()) setHistoryNotice({ ...productLabel('controller.historyDeletedRefreshFailed', { cause: productCause(error) }), tone: 'warning' });
+      }
+      return true;
+    } catch (error) {
+      if (isCurrent()) setHistoryNotice({ ...productLabel('controller.historyDeleteFailed', { cause: productCause(error) }), tone: 'error' });
+      return false;
+    } finally { finishHistoryOperation(lease); }
+  }, [beginHistoryOperation, finishHistoryOperation, historyRefreshPending, historySnapshots, matchesSnapshot, snapshotFor]);
 
   const toggleHistoryRetention = useCallback(async (snapshot: ArticleHistorySnapshot, retained: boolean) => {
     const root = directoryRef.current;
@@ -2345,6 +2379,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, [compileCurrent, matchesSnapshot, publishSourceFormatReport, snapshotFor, confirmFormatCheck]);
 
   const copyRichText = useCallback(async () => {
+    if (!capabilityAllowed('copyRichText')) return;
     if (mediaOperationRef.current) {
       setStatus({ ...productLabel("controller.assetsAreBeingWrittenOrRenamedCompleteThatOperationBeforeCopying"), tone: 'warning' });
       return;
@@ -2409,6 +2444,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         'text/html': new Blob([complete.html], { type: 'text/html' }),
         'text/plain': new Blob([complete.text], { type: 'text/plain' }),
       });
+      assertLibraryCapability(getFormatSnapshot(), 'copyRichText');
       await navigator.clipboard.write([item]);
       if (!current()) return;
       setStatus({
@@ -2420,7 +2456,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     } catch (error) {
       if (current()) setStatus({ ...productLabel("controller.wholeArticleCopyingFailed", { "cause": productCause(error) }), tone: 'error' });
     }
-  }, [compiledRevision, compileCurrent, confirmFormatCheck, isReadyToCopy, matchesSnapshot, publishSourceFormatReport, saveSnapshot, snapshotFor]);
+  }, [capabilityAllowed, compiledRevision, compileCurrent, confirmFormatCheck, isReadyToCopy, matchesSnapshot, publishSourceFormatReport, saveSnapshot, snapshotFor]);
 
   const pasteRichText = useCallback(async () => {
     const receiver = clipboardReceiverRef.current;
@@ -2481,6 +2517,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   );
 
   const changeTheme = useCallback((theme: ThemeConfig) => {
+    if (!capabilityAllowed('articleTheme')) return;
     if (!directoryRef.current) {
       setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeApplyingATheme"), tone: 'warning' });
       return;
@@ -2552,9 +2589,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         setStatus({ ...productLabel("controller.theCheckpointBeforeThemeChangeFailedTheOriginalThemeIsRetained", { "cause": productCause(error) }), tone: 'error' });
       }
     }).finally(() => finishHistoryOperation(lease));
-  }, [articleSettings.autoSnapshot.maxCount, beginHistoryOperation, compileCurrent, finishHistoryOperation, matchesSnapshot, snapshotFor, updateArticle]);
+  }, [capabilityAllowed, articleSettings.autoSnapshot.maxCount, beginHistoryOperation, compileCurrent, finishHistoryOperation, matchesSnapshot, snapshotFor, updateArticle]);
 
   const applyThemeFromLibrary = useCallback((theme: ThemeConfig) => {
+    if (!capabilityAllowed('articleTheme')) return;
     const root = directoryRef.current;
     const current = articleRef.current;
     if (!root || documentTokenRef.current?.root !== root) {
@@ -2583,7 +2621,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     setCopyTarget(stored);
     setCopyTitle(`${stored.parse.metadata.title} Fork`);
     setCopyMonth(stored.month);
-  }, [changeTheme, navigateArticleMode, storedArticles]);
+  }, [capabilityAllowed, changeTheme, navigateArticleMode, storedArticles]);
 
   const createNewArticle = useCallback(() => {
     if (!directoryRef.current) {
@@ -3090,7 +3128,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     settingsNotice, setSettingsNotice, settingsBusy, setSettingsBusy,
     historyDialogOpen, setHistoryDialogOpen, historySnapshots, setHistorySnapshots, historyIssues,
     setHistoryIssues, historySelectedId, setHistorySelectedId, historyBusy, historyRefreshPending,
-    setHistoryRefreshPending, historyNotice, setHistoryNotice,
+    setHistoryRefreshPending, historyNotice, setHistoryNotice, deleteHistorySnapshot,
     revision, compiledRevision, setCompiledRevision, compiledCss, savedPreviewRevision, currentDocumentGeneration, sourceHistoryKey: sourceHistoryKeyRef.current, sourceFormatIssues, status, setStatus,
     mobilePane, setMobilePane, showThemeDialog, setShowThemeDialog, showTemplateDialog,
     setShowTemplateDialog, showUnsavedDialog, setShowUnsavedDialog, pendingActionLabel,

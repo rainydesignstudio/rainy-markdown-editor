@@ -74,3 +74,16 @@ test('bulk confirmation exposes scope, exact query, deletion semantics and count
   f.props.decision = { query: 'Alpha', replacement: '', count: 0, changed: true }; f.render();
   assert.equal(f.nodes().find(node => node.type === 'DialogButton' && node.props.variant === 'primary').props.disabled, true);
 });
+
+
+test('closed floating find stays inert without stealing focus; reopening restores the same query', () => {
+  const f = barFixture({ open: false });
+  const search = () => f.nodes().find(node => node.props.role === 'search');
+  assert.equal(search().props.inert, true); assert.equal(search().props['aria-hidden'], true);
+  f.props.focusQueryRef.current(); assert.equal(f.document.activeElement, null);
+  f.props.open = true; f.render();
+  assert.equal(search().props.inert, false); assert.equal(f.document.activeElement, f.query);
+  assert.equal(f.query.value, 'Alpha');
+  f.props.open = false; f.render(); f.document.activeElement = f.replacement;
+  f.props.focusQueryRef.current(); assert.equal(f.document.activeElement, f.replacement);
+});

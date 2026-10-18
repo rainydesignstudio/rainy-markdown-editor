@@ -16,7 +16,7 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/d4fdc16f-8245-4626-beae-32bc3cb9d0cc" alt="你的资料库，你的写作规则。" width="960" /></p>
 
-`v0.3.0.1`
+`v0.3.1`
 
 文稿、主题快照、图片与历史保存在你授权的本地资料库；首套默认格式配置面向微信公众号，每库也可定制其它平台的写作策略。
 

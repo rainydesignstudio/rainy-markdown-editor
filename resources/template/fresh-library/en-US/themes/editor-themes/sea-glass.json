@@ -56,7 +56,9 @@
     "warning-dark-300": "#80683d",
     "warning-dark-50": "#403722",
     "warning-dark-700": "#e0bc79",
-    "warning-dark-800": "#f0d39d"
+    "warning-dark-800": "#f0d39d",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -92,7 +94,8 @@
       "editor-text": "source-text",
       "editor-syntax": "source-syntax",
       "editor-heading": "source-heading",
-      "editor-quote": "source-quote"
+      "editor-quote": "source-quote",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "sea-glass-dark-100",
@@ -127,7 +130,8 @@
       "editor-text": "sea-glass-dark-700",
       "editor-syntax": "teal-dark-600",
       "editor-heading": "sea-glass-dark-800",
-      "editor-quote": "sea-glass-dark-600"
+      "editor-quote": "sea-glass-dark-600",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

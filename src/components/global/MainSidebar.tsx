@@ -57,7 +57,7 @@ const COLOR_MODES: Array<{ id: EditorColorMode; icon: IconName }> = [
   { id: 'system', icon: 'system' },
 ];
 
-const preferenceOption = 'flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-xs text-popup-text hover:bg-hover hover:text-accent-text focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent aria-checked:bg-accent-soft aria-checked:text-accent-text';
+const preferenceOption = 'flex min-h-9 items-center gap-2 rounded-md px-2 text-left text-xs text-popup-text hover:bg-hover hover:text-accent-text focus-visible:outline-2 focus-visible:outline-accent aria-checked:bg-accent-soft aria-checked:text-accent-text';
 
 export function MainSidebar({ root, view, mediaOperation, collapsed, colorMode, onNavigate, onToggleCollapsed, onSetColorMode, onOpenChangelog }: Props) {
   const drafts = useEditingDrafts();
@@ -75,7 +75,7 @@ export function MainSidebar({ root, view, mediaOperation, collapsed, colorMode, 
     <aside className="sidebar" data-collapsed={collapsed} aria-label={t('shell:navigation.label')}>
       <div className="sidebar-brand">
         <div className="flex min-w-0 items-center gap-2.5">
-          {collapsed ? <button className="brand-mark group rounded-lg border-0 p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" type="button" onClick={onToggleCollapsed} aria-label={t('shell:sidebar.expand')} data-tooltip={t('shell:sidebar.expand')}><Icon name="brand" /></button> : <span className="brand-mark"><Icon name="brand" /></span>}
+          {collapsed ? <button className="brand-mark group rounded-lg border-0 p-0 focus-visible:outline-2 focus-visible:outline-accent" type="button" onClick={onToggleCollapsed} aria-label={t('shell:sidebar.expand')} data-tooltip={t('shell:sidebar.expand')}><Icon name="brand" /></button> : <span className="brand-mark"><Icon name="brand" /></span>}
           <div className="brand-copy"><p className="eyebrow whitespace-nowrap text-3xs font-normal">{t('shell:brand.name')}</p><strong>{t('shell:brand.workspace')}</strong></div>
         </div>
       </div>
@@ -85,7 +85,7 @@ export function MainSidebar({ root, view, mediaOperation, collapsed, colorMode, 
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
-            className="nav-item group relative flex min-h-11 min-w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-transparent px-2 text-center text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-[current=page]:border-accent-line aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent-text disabled:cursor-not-allowed disabled:opacity-50 md:min-w-0 md:flex-row md:px-1 lg:justify-start lg:gap-2.5 lg:px-3 lg:text-left"
+            className="nav-item group relative flex min-h-11 min-w-12 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-transparent px-2 text-center text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-accent aria-[current=page]:border-accent-line aria-[current=page]:bg-accent-soft aria-[current=page]:text-accent-text disabled:cursor-not-allowed disabled:opacity-50 md:min-w-0 md:flex-row md:px-1 lg:justify-start lg:gap-2.5 lg:px-3 lg:text-left"
             type="button"
             data-active={view === item.id}
             aria-current={view === item.id ? 'page' : undefined}

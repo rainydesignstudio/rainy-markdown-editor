@@ -18,8 +18,8 @@ const { parseThemeConfigJson } = await import('../src/lib/themeValidation.ts');
 
 function copy(value) { return JSON.parse(JSON.stringify(value)); }
 
-test('every built-in editor theme supplies the same 33 roles for light and dark', () => {
-  assert.equal(EDITOR_COLOR_ROLES.length, 33);
+test('every built-in editor theme supplies the same 34 roles for light and dark', () => {
+  assert.equal(EDITOR_COLOR_ROLES.length, 34);
   assert.equal(BUILTIN_EDITOR_THEMES.length >= 11, true);
   for (const theme of BUILTIN_EDITOR_THEMES) {
     assert.deepEqual(validateEditorTheme(theme), []);
@@ -27,6 +27,20 @@ test('every built-in editor theme supplies the same 33 roles for light and dark'
     assert.deepEqual(Object.keys(theme.colors.dark), EDITOR_COLOR_ROLES);
     assert.match(resolveEditorThemeColors(theme, 'light').canvas, /^#/);
   }
+});
+
+test('search highlight has independent scheme colors and old theme files inherit fluorescent yellow only in memory', () => {
+  const old = copy(BASE_EDITOR_THEME);
+  for (const mode of ['light', 'dark']) delete old.colors[mode]['search-hit'];
+  const raw = JSON.stringify(old), loaded = parseEditorThemeJson(raw);
+  assert.equal(JSON.stringify(old), raw);
+  assert.notEqual(loaded.colors.light['search-hit'], loaded.colors.dark['search-hit']);
+  for (const mode of ['light', 'dark']) assert.equal(resolveEditorThemeColors(loaded, mode)['search-hit'], '#eeff00');
+  loaded.palette[loaded.colors.light['search-hit']] = '#ff00ff';
+  assert.equal(resolveEditorThemeColors(loaded, 'light')['search-hit'], '#ff00ff');
+  assert.equal(resolveEditorThemeColors(loaded, 'dark')['search-hit'], '#eeff00');
+  assert.deepEqual(validateEditorTheme(loaded), []);
+  assert.deepEqual(parseEditorThemeJson(JSON.stringify(loaded)), loaded);
 });
 
 test('new themes retain readable interface, button and source text in both schemes', () => {
@@ -59,6 +73,7 @@ test('Ink White is monochrome across every role, including feedback colors', () 
   const theme = BUILTIN_EDITOR_THEMES.find((item) => item.id === 'ink-white');
   for (const scheme of ['light', 'dark']) {
     for (const [role, hex] of Object.entries(resolveEditorThemeColors(theme, scheme))) {
+      if (role === 'search-hit') { assert.equal(hex, '#eeff00'); continue; }
       assert.equal(hex.slice(1, 3), hex.slice(3, 5), `${scheme}/${role}`);
       assert.equal(hex.slice(3, 5), hex.slice(5, 7), `${scheme}/${role}`);
     }
@@ -101,8 +116,9 @@ test('v1 theme reads upgrade only in memory, while v2 heading is required and in
   const normalized = parseEditorThemeJson(before);
   assert.equal(normalized.formatVersion, 4);
   assert.equal(normalized.fonts.heading, legacy.fonts.ui);
-  assert.deepEqual(normalized.colors, legacy.colors);
-  assert.deepEqual(normalized.palette, legacy.palette);
+  for (const mode of ['light', 'dark']) for (const [role, value] of Object.entries(legacy.colors[mode])) assert.equal(normalized.colors[mode][role], value);
+  for (const [key, value] of Object.entries(legacy.palette)) assert.equal(normalized.palette[key], value);
+  assert.equal(resolveEditorThemeColors(normalized, 'light')['search-hit'], '#eeff00');
   assert.equal(JSON.stringify(legacy), before);
   assert.deepEqual(parseEditorThemeJson(JSON.stringify(normalized)), normalized);
 
@@ -148,7 +164,7 @@ test('three retained themes match current color/font baselines exactly', () => {
     const { heading, subHeading, eyebrow, articleSource, ...fonts } = theme.fonts;
     assert.equal(heading, fonts.ui);
     assert.equal(eyebrow, fonts.ui);
-    const colors = Object.fromEntries(['light', 'dark'].map((mode) => [mode, Object.values(resolveEditorThemeColors(theme, mode))]));
+    const colors = Object.fromEntries(['light', 'dark'].map((mode) => [mode, Object.entries(resolveEditorThemeColors(theme, mode)).filter(([role]) => role !== 'search-hit').map(([, value]) => value)]));
     const signature = createHash('sha256').update(JSON.stringify({ colors, fonts })).digest('hex');
     assert.equal(signature, baseline, id);
   }
@@ -165,7 +181,8 @@ test('Mist uses neutral grays and serif headings while feedback and other fonts 
     const colors = resolveEditorThemeColors(mist, mode);
     const oldColors = resolveEditorThemeColors(legacy, mode);
     for (const role of EDITOR_COLOR_ROLES) {
-      if (feedback.includes(role)) assert.equal(colors[role], oldColors[role]);
+      if (role === 'search-hit') assert.equal(colors[role], '#eeff00');
+      else if (feedback.includes(role)) assert.equal(colors[role], oldColors[role]);
       else {
         const rgb = colors[role].match(/^#(..)(..)(..)$/).slice(1);
         assert.equal(rgb[0], rgb[1], `${mode}.${role}`);

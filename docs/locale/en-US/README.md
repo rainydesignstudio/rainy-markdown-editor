@@ -16,7 +16,7 @@
 
 <p align="center"><img src="https://github.com/user-attachments/assets/87578b5d-4015-4255-a0f9-b59367de489f" alt="Your library, your writing rules." width="960" /></p>
 
-`v0.3.0.1`
+`v0.3.1`
 
 Manuscripts, theme snapshots, images and history stay in your authorized local library. The first default format configuration targets WeChat Official Accounts; each library can adapt its own policies for other platforms.
 

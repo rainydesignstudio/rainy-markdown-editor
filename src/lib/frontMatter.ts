@@ -161,6 +161,14 @@ export function parseArticle(source: string): ParsedArticle {
   }
 }
 
+/** File coordinates for the body-only editor; keep the original header bytes. */
+export function articleSourceLayout(parsed: ParsedArticle) {
+  const metadataSource = parsed.source.slice(0, parsed.source.length - parsed.body.length);
+  const metadataLines = metadataSource ? metadataSource.split(/\r\n|\r|\n/) : [];
+  if (metadataSource && /(?:\r\n|\r|\n)$/.test(metadataSource)) metadataLines.pop();
+  return { metadataSource, metadataLines, bodyLineOffset: metadataLines.length };
+}
+
 function serializeNewFrontMatter(meta: ArticleMeta, body: string): string {
   const header = [
     '---',
@@ -226,7 +234,10 @@ export function replaceArticleBody(source: string, body: string): string {
   const errors = parsed.diagnostics.filter((item) => item.level === 'error');
   if (errors.length) throw new ProductError("frontMatter.frontMatterIsInvalidTheBodyWasNotWritten", { "details": errors.map((item) => item.message).join('；') });
   const bodyStart = source.length - parsed.body.length;
-  return `${source.slice(0, bodyStart)}${body}`;
+  const prefix = source.slice(0, bodyStart);
+  // A header ending at EOF needs a line boundary before its first body text.
+  const separator = prefix && body && !/[\r\n]$/.test(prefix) ? (prefix.includes('\r\n') ? '\r\n' : '\n') : '';
+  return `${prefix}${separator}${body}`;
 }
 
 export function createArticleSource(title = '未命名技术文稿', themeId = 'basic'): string {

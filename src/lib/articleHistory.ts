@@ -283,6 +283,25 @@ export async function createArticleSnapshot(
   }
 }
 
+export async function deleteArticleSnapshot(
+  root: FileSystemDirectoryHandle, month: string, folder: string,
+  expected: ArticleHistorySnapshot, isCurrent: () => boolean = () => true,
+): Promise<void> {
+  const assertCurrent = () => { if (!isCurrent()) throw new ProductError('articleHistory.deleteStale'); };
+  assertCurrent(); assertArticleTarget(month, folder); assertSnapshotId(expected.id);
+  await ensurePermission(root); assertCurrent();
+  const articleDirectory = await getArticleDirectory(root, month, folder);
+  const historyDirectory = await articleDirectory.getDirectoryHandle('history');
+  const directory = await historyDirectory.getDirectoryHandle(expected.id);
+  const actual = await readSnapshot(directory, expected.id);
+  const identity = (snapshot: ArticleHistorySnapshot) => stableSerialize({ source: snapshot.source, theme: snapshot.theme, createdAt: snapshot.createdAt, kind: snapshot.kind, retained: snapshot.retained, renderRecord: snapshot.renderRecord ?? null });
+  if (identity(actual) !== identity(expected)) throw new ProductError('articleHistory.deleteChanged');
+  assertCurrent();
+  // Protection controls automatic retention only. This explicitly confirmed
+  // operation removes one owned snapshot; shared media and render objects stay.
+  await historyDirectory.removeEntry(expected.id, { recursive: true });
+}
+
 export async function setArticleSnapshotRetained(
   root: FileSystemDirectoryHandle,
   month: string,

@@ -221,6 +221,7 @@
             image.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'%3E%3C/svg%3E";
             image.style.width = '1px'; image.style.height = '1px';
             add(rule, root, '图片未载入且无尺寸；已按1×1占位测量，实际图片布局仍需核对。', 'incomplete');
+            issues[issues.length - 1].resourceDependency = true;
           }
         }
         const findings = [article, ...article.querySelectorAll('*')].map((node, index) => {

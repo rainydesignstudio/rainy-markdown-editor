@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { sourceOffsetRect, createSourceRectReader, revealSourceRect } from '../src/lib/sourceViewport.ts';
+import { sourceOffsetRect, createSourceRectReader, revealSourceRect, visibleSourceGutterDigits } from '../src/lib/sourceViewport.ts';
 
 function layer(parts) {
   const nodes = parts.map(([text, line, padding = false]) => ({
@@ -42,4 +42,44 @@ test('batched geometry reuses one text walk and preserves boundary/padding offse
   assert.equal(read(2).top, 28); assert.equal(read(3).top, 56);
   assert.equal(read(5).left, 2); assert.equal(read(999).left, 3);
   assert.equal(walks, 1);
+});
+
+test('search centering uses the common viewport and clamps to the document boundaries', () => {
+  const viewport = { scrollTop: 300, scrollHeight: 2000, clientHeight: 400, clientTop: 0, getBoundingClientRect: () => ({ top: 100 }) };
+  revealSourceRect(viewport, { top: 430, bottom: 450, height: 20 }, 'center');
+  assert.equal(viewport.scrollTop, 440);
+  viewport.scrollTop = 0;
+  revealSourceRect(viewport, { top: 100, bottom: 120, height: 20 }, 'center');
+  assert.equal(viewport.scrollTop, 0);
+  viewport.scrollTop = 1590;
+  revealSourceRect(viewport, { top: 480, bottom: 500, height: 20 }, 'center');
+  assert.equal(viewport.scrollTop, 1600);
+});
+
+test('visible line numbers expand at 1000 and 10000 with logarithmic reads, including soft-wrapped rows', () => {
+  for (const [last, digits] of [[999, 3], [1000, 4], [1001, 4], [9999, 4], [10000, 5]]) {
+    let reads = 0;
+    const result = visibleSourceGutterDigits(10000, last * 28, i => { reads++; return i * 28; });
+    assert.equal(result, digits); assert.ok(reads < 20);
+  }
+  assert.equal(visibleSourceGutterDigits(10000, 999 * 56, i => i * 56), 3);
+  assert.equal(visibleSourceGutterDigits(10000, 1000 * 56, i => i * 56), 4);
+});
+
+test('visible gutter width includes folded metadata lines and their actual viewport position', () => {
+  assert.equal(visibleSourceGutterDigits(100, 28, i => i * 28, 999), 4);
+  assert.equal(visibleSourceGutterDigits(100, 28, i => i * 28, 9999), 5);
+  assert.equal(visibleSourceGutterDigits(1000, 999 * 28, i => i * 28, 0), 3);
+  assert.equal(visibleSourceGutterDigits(1000, 999 * 28, i => i * 28, 11), 4);
+  assert.equal(visibleSourceGutterDigits(1000, 999 * 28, i => 400 + i * 28, 11), 3, 'expanded metadata moves body rows down in the same viewport');
+});
+
+
+test('floating find does not shift the viewport center but cannot cover a hit in a short viewport', () => {
+  const viewport = { scrollTop: 300, scrollHeight: 2000, clientHeight: 400, clientTop: 0, getBoundingClientRect: () => ({ top: 100 }) };
+  revealSourceRect(viewport, { top: 430, bottom: 450, height: 20 }, 'center', 100);
+  assert.equal(viewport.scrollTop, 440, 'overlay height is not subtracted a second time');
+  viewport.scrollTop = 300; viewport.clientHeight = 150;
+  revealSourceRect(viewport, { top: 430, bottom: 450, height: 20 }, 'center', 100);
+  assert.equal(viewport.scrollTop, 530, 'hit begins below the floating panel');
 });

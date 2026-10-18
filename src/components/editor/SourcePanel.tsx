@@ -22,10 +22,24 @@ import { IconButton } from '../global/IconButton';
 import { FindIcon } from '../content/SourceFindBar';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
-import type { parseArticle } from '../../lib/frontMatter';
+import { articleSourceLayout, type parseArticle } from '../../lib/frontMatter';
 import { usePreviewPreferences } from '../../hooks/usePreviewPreferences';
+import { sourceLinePaddingClass, SOURCE_LINE_NUMBER_CLASS } from '../../lib/sourceViewport';
 
 const EMPTY_FORMAT_ISSUES: readonly ArticleFormatIssue[] = [];
+
+export function SourceMetadataHeader({ lines, showLineNumbers }: { lines: string[]; showLineNumbers: boolean }) {
+  const { t } = useUITranslation('editor');
+  return <details className="group/metadata shrink-0 border-b border-line bg-editor-surface" data-source-metadata="true">
+    <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2 text-xs text-muted focus-visible:outline-2 focus-visible:outline-accent">
+      <svg className="size-3 shrink-0 transition-transform group-open/metadata:rotate-90 motion-reduce:transition-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+      <span>{t('editor:source.metadataLines', { count: lines.length })}</span><span className="ml-auto text-faint">{t('editor:source.metadataViewOnly')}</span>
+    </summary>
+    <div className={`min-w-0 pr-5 pb-3 font-article-source text-editor-source md:pr-8 ${sourceLinePaddingClass(showLineNumbers)}`} aria-label={t('editor:source.metadataViewOnly')}>
+      {lines.map((line, index) => <div className="relative min-w-0 whitespace-pre-wrap wrap-anywhere" key={index}>{showLineNumbers ? <span className={`${SOURCE_LINE_NUMBER_CLASS} select-none`} aria-hidden="true">{index + 1}</span> : null}<code className="font-article-source text-secondary">{line || '\u200b'}</code></div>)}
+    </div>
+  </details>;
+}
 
 type Props = {
   article: WorkingArticle;
@@ -44,6 +58,7 @@ type Props = {
   sourceTextareaRef: MutableRefObject<HTMLTextAreaElement | null>;
   editingLocationRef?: MutableRefObject<RememberedEditingLocation | null>;
   sourceFocusDisabled?: boolean;
+  openFindRef?: MutableRefObject<(() => void) | null>;
   onChangeBody: (value: string) => void;
   onSnippetInserted: () => void;
   onImportFiles: (files: File[], selection: { start: number; end: number }) => void | Promise<void>;
@@ -71,6 +86,7 @@ export function SourcePanel({
   sourceTextareaRef,
   editingLocationRef,
   sourceFocusDisabled = false,
+  openFindRef: suppliedOpenFindRef,
   onChangeBody,
   onSnippetInserted,
   onImportFiles,
@@ -96,7 +112,8 @@ export function SourcePanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceHistoryKey, sourceTextareaRef, editingLocationRef]);
   const formatSnapshot = useFormatSnapshot();
-  const openFindRef = useRef<(() => void) | null>(null);
+  const localOpenFindRef = useRef<(() => void) | null>(null);
+  const openFindRef = suppliedOpenFindRef ?? localOpenFindRef;
   const openPickerRef = useRef<(() => void) | null>(null);
   const insertTextRef = useRef<((text: string, caretOffset: number) => boolean) | null>(null);
   const formatSelectionRef = useRef<((format: InlineFormat) => boolean) | null>(null);
@@ -111,8 +128,11 @@ export function SourcePanel({
   useEffect(() => { const refresh = () => setFileRevision(value => value + 1); window.addEventListener('focus', refresh); return () => window.removeEventListener('focus', refresh); }, []);
   const [lineIssues, setLineIssues] = useState<ArticleFormatIssue[]>([]);
   const [lineValidationError, setLineValidationError] = useState('');
-  const lineCount = useMemo(() => logicalSourceLines(parsed.body).length, [parsed.body]);
-  const lineConcerns = useMemo(() => groupSourceLineIssues(checksEnabled ? [...lineIssues, ...sourceFormatIssues] : [], lineCount), [checksEnabled, lineIssues, sourceFormatIssues, lineCount]);
+  const sourceLayout = useMemo(() => articleSourceLayout(parsed), [parsed.source, parsed.body]);
+  const lineCount = useMemo(() => logicalSourceLines(parsed.source).length, [parsed.source]);
+  const bodyLineCount = useMemo(() => logicalSourceLines(parsed.body).length, [parsed.body]);
+  const lineConcerns = useMemo(() => groupSourceLineIssues(checksEnabled ? [...lineIssues, ...sourceFormatIssues] : [], bodyLineCount), [checksEnabled, lineIssues, sourceFormatIssues, bodyLineCount]);
+  const sourceHeader = useMemo(() => sourceLayout.metadataSource ? <SourceMetadataHeader key={sourceHistoryKey} lines={sourceLayout.metadataLines} showLineNumbers={showLineNumbers} /> : null, [sourceLayout, sourceHistoryKey, showLineNumbers]);
 
   useEffect(() => {
     setLineIssues([]);
@@ -185,8 +205,11 @@ export function SourcePanel({
         onImportFiles={onImportFiles}
         onPasteConflict={onPasteConflict}
         showLineNumbers={showLineNumbers}
+        lineOffset={sourceLayout.bodyLineOffset}
+        sourceHeader={sourceHeader}
         lineConcerns={lineConcerns}
       />
+      {lineCount > 1000 ? <p className="shrink-0 border-t border-warning-line bg-warning-surface px-3 py-2 text-xs text-warning-strong" role="status">{t(preferences.saveOnly ? 'editor:source.longDocumentSavedOnly' : 'editor:source.longDocumentWarning', { count: lineCount })}</p> : null}
       <div className="source-footer">
         <label className="flex shrink-0 items-center gap-1.5 text-2xs text-muted"><input type="checkbox" role="switch" className="size-3 accent-accent" checked={checksEnabled} onChange={event => setChecksEnabled(event.target.checked)} aria-label={checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')} />{checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')}</label>
         <span className="status-copy" data-tone={status.tone} role="status">{formatProductMessage(status, t)}</span>

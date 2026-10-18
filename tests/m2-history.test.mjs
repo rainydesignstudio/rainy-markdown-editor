@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const { createArticleSource } = await import('../src/lib/frontMatter.ts');
-const { changedThemeSnapshotFields, createArticleSnapshot, listArticleHistory, setArticleSnapshotRetained } = await import('../src/lib/articleHistory.ts');
+const { changedThemeSnapshotFields, createArticleSnapshot, deleteArticleSnapshot, listArticleHistory, setArticleSnapshotRetained } = await import('../src/lib/articleHistory.ts');
 const { saveStoredArticle } = await import('../src/lib/fileSystem.ts');
 const { getTheme } = await import('../src/lib/themes.ts');
 
@@ -109,6 +109,41 @@ test('history snapshots round-trip full article source and the matching theme sn
   assert.equal(listed.snapshots[0].createdAt, '2026-09-23T12:00:00.000Z');
   assert.equal(listed.snapshots[0].kind, 'manual');
   assert.equal(listed.snapshots[0].retained, true);
+});
+
+test('explicit manual deletion removes only the confirmed version, including protected checkpoints', async () => {
+  for (const kind of ['automatic', 'manual', 'before-restore', 'before-theme-change']) {
+    const root = createMemoryRoot(), theme = getTheme('basic');
+    const source = `${createArticleSource('Deletion fixture', theme.id)}\nCurrent body\n`;
+    const { article } = await saveStoredArticle(root, source, theme);
+    const first = await createArticleSnapshot(root, article.month, article.folder, source + 'first', theme, { id: 'snapshot-delete-target', kind, retained: true });
+    const second = await createArticleSnapshot(root, article.month, article.folder, source + 'second', theme, { id: 'snapshot-keep-sibling', kind: 'manual' });
+    const articleDir = await (await (await root.getDirectoryHandle('articles')).getDirectoryHandle(article.month)).getDirectoryHandle(article.folder);
+    const media = await articleDir.getDirectoryHandle('media', { create: true });
+    await media.getFileHandle('keep.png', { create: true });
+    await deleteArticleSnapshot(root, article.month, article.folder, first.snapshot);
+    assert.deepEqual((await listArticleHistory(root, article.month, article.folder)).snapshots.map(s => s.id), [second.snapshot.id]);
+    assert.equal(await (await articleDir.getFileHandle('article.md')).getFile().then(f => f.text()), source);
+    assert.ok(await media.getFileHandle('keep.png'));
+  }
+});
+
+test('manual history deletion rejects unsafe IDs, stale sessions and changed selected versions', async () => {
+  const root = createMemoryRoot(), theme = getTheme('basic');
+  const source = createArticleSource('Guarded deletion', theme.id);
+  const { article } = await saveStoredArticle(root, source, theme);
+  const { snapshot } = await createArticleSnapshot(root, article.month, article.folder, source, theme, { id: 'snapshot-guarded-delete', kind: 'manual' });
+  await assert.rejects(deleteArticleSnapshot(root, article.month, article.folder, { ...snapshot, id: '../article.md' }));
+  await assert.rejects(deleteArticleSnapshot(root, article.month, article.folder, snapshot, () => false), /切换/);
+  let calls = 0;
+  await assert.rejects(deleteArticleSnapshot(root, article.month, article.folder, snapshot, () => ++calls < 3), /切换/);
+  await assert.rejects(deleteArticleSnapshot(root, article.month, article.folder, { ...snapshot, source: source + 'different' }), /变化/);
+  assert.equal((await listArticleHistory(root, article.month, article.folder)).snapshots.length, 1);
+  const articleDir = await (await (await root.getDirectoryHandle('articles')).getDirectoryHandle(article.month)).getDirectoryHandle(article.folder);
+  const history = await articleDir.getDirectoryHandle('history');
+  history.removeEntry = async () => { throw new DOMException('injected delete failure', 'NotAllowedError'); };
+  await assert.rejects(deleteArticleSnapshot(root, article.month, article.folder, snapshot), /injected delete failure/);
+  assert.equal((await listArticleHistory(root, article.month, article.folder)).snapshots.length, 1);
 });
 
 test('automatic snapshots do not write duplicates when article and theme are unchanged', async () => {

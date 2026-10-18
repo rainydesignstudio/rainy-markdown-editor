@@ -277,7 +277,7 @@ test('saved global display mode changes update a pending theme preview without l
 });
 
 
-test('custom color cards keep all 33 token slots in order even when values repeat', () => {
+test('custom color cards keep all 34 token slots in order even when values repeat', () => {
   const page = settingsPage();
   page.switch('appearance');
   page.find((node) => node.props['aria-pressed'] === false && node.type === 'button' && node.props.children?.some?.((child) => child?.props?.children === '自定义组合')).props.onClick(); page.render();
@@ -287,7 +287,7 @@ test('custom color cards keep all 33 token slots in order even when values repea
     const [main, remainder] = tree.props.children;
     assert.equal(main.props['data-color-role'], 'accent');
     const rows = remainder.props.children;
-    assert.deepEqual(Array.from(rows, (row) => row.props.children.length), [16, 16]);
+    assert.deepEqual(Array.from(rows, (row) => row.props.children.length), [16, 17]);
     const tokens = Array.from(rows).flatMap((row) => Array.from(row.props.children));
     assert.deepEqual(tokens.map((cell) => cell.props['data-color-role']), editorThemes.EDITOR_COLOR_ROLES.filter((role) => role !== 'accent'));
     const resolved = editorThemes.resolveEditorThemeColors(sample.props.theme, scheme);

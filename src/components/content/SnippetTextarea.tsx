@@ -8,11 +8,11 @@ import { findSourceMatches, replaceAllSourceMatches } from '../../lib/sourceSear
 import { SourceFindBar, FindIcon, type ReplaceAllDecision } from './SourceFindBar';
 import { IconButton } from '../global/IconButton';
 import { insertUndoableText } from '../../lib/nativeTextareaEdit';
-import { sourceOffsetRect, revealSourceRect } from '../../lib/sourceViewport';
+import { sourceOffsetRect, revealSourceRect, visibleSourceGutterDigits, sourceLinePaddingClass, SOURCE_LINE_NUMBER_CLASS } from '../../lib/sourceViewport';
 import { formatInlineSelection, inlineFormatShortcut, type InlineFormat } from '../../lib/editor/inlineFormatting';
 import { useTextInputHistory } from '../../hooks/useTextInputHistory';
 
-import { forwardRef, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type CompositionEvent, type DragEvent, type ForwardedRef, type KeyboardEvent, type MutableRefObject, type ReactNode, type UIEvent } from 'react';
+import { forwardRef, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type ClipboardEvent, type CompositionEvent, type DragEvent, type ForwardedRef, type KeyboardEvent, type MutableRefObject, type ReactNode, type UIEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { findSnippetMenuMatch, findSnippetSpaceExpansion, groupSnippetMatches, snippetTreeRows, prepareSnippetInsertion } from '../../lib/snippetComposer';
 import { tokenizeEditorSource } from '../../lib/editorSourceHighlight';
@@ -39,6 +39,8 @@ type Props = {
   onImportFiles?: (files: File[], selection: Selection) => void | Promise<void>;
   onPasteConflict?: () => void;
   showLineNumbers?: boolean;
+  lineOffset?: number;
+  sourceHeader?: ReactNode;
   lineConcerns?: ReadonlyMap<number, SourceLineConcern>;
 };
 
@@ -66,7 +68,7 @@ export function highlightMarkdownSource(value: string): ReactNode[] {
 }
 
 export const SnippetTextarea = forwardRef(function SnippetTextarea(
-  { value, historyKey, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
+  { value, historyKey, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineOffset = 0, sourceHeader, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
   forwardedRef: ForwardedRef<HTMLTextAreaElement>,
 ) {
   const { t } = useUITranslation('editor');
@@ -94,6 +96,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   const [hoveredConcern, setHoveredConcern] = useState<{ line: number; concern: SourceLineConcern; top: number; left: number } | null>(null);
   const [findOpen, setFindOpen] = useState(false);
   const [focusFindQuery, setFocusFindQuery] = useState(true);
+  const findPanelRef = useRef<HTMLDivElement | null>(null);
   const focusFindRef = useRef<(() => void) | null>(null);
   const [replaceAllDecision, setReplaceAllDecision] = useState<ReplaceAllDecision | null>(null);
   const [findQuery, setFindQuery] = useState('');
@@ -102,6 +105,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   const [findIndex, setFindIndex] = useState(0);
   const found = useMemo(() => findOpen ? findSourceMatches(value, findQuery, findCase) : [], [value, findQuery, findCase, findOpen]);
   const activeFind = Math.min(findIndex, Math.max(0, found.length - 1));
+  const selectedFind = findOpen && !isComposing && found[activeFind]?.start === selection.start && found[activeFind]?.end === selection.end;
   const highlightedSource = useMemo(() => {
     const match = findOpen ? found[activeFind] : null;
     if (!match) return highlightMarkdownSource(value);
@@ -110,11 +114,35 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       const start = offset; const end = start + segment.text.length; offset = end;
       if (end <= match.start || start >= match.end) return [<span key={index} className={segment.tone}>{segment.text || <span data-source-padding="true">{'\u200b'}</span>}</span>];
       const left = Math.max(0, match.start - start), right = Math.min(segment.text.length, match.end - start);
-      return [<span key={index} className={segment.tone}>{segment.text.slice(0, left)}<mark data-source-find="true" className="rounded-sm bg-selection text-editor-text">{segment.text.slice(left, right)}</mark>{segment.text.slice(right)}</span>];
+      return [<span key={index} className={segment.tone}>{segment.text.slice(0, left)}<mark data-source-find="true" className="rounded-sm bg-search-hit text-search-hit-ink">{segment.text.slice(left, right)}</mark>{segment.text.slice(right)}</span>];
     });
   }, [value, findOpen, found, activeFind]);
   const sourceLines = useMemo(() => logicalSourceLines(value), [value]);
-  const sourceBoxClass = `editor-inner ${fontClass} ${showLineNumbers ? 'pl-14 md:pl-18' : ''}`;
+  const [measuredGutterDigits, setGutterDigits] = useState(3);
+  const initialGutterDigits = Math.max(3, String(lineOffset + 1).length);
+  const maxGutterDigits = Math.max(3, String(lineOffset + sourceLines.length).length);
+  const gutterDigits = Math.max(initialGutterDigits, Math.min(measuredGutterDigits, maxGutterDigits));
+  const sourceBoxClass = `editor-inner ${fontClass} ${sourceLinePaddingClass(showLineNumbers)}`;
+  const gutterNumberClass = SOURCE_LINE_NUMBER_CLASS;
+  const measureGutter = () => {
+    const viewport = viewportRef.current, rows = gutterRef.current?.firstElementChild?.children;
+    if (!showLineNumbers || !viewport?.clientHeight || !rows?.length) return;
+    const bottom = viewport.getBoundingClientRect().top + viewport.clientTop + viewport.clientHeight;
+    const digits = visibleSourceGutterDigits(rows.length, bottom, index => (rows[index] as HTMLElement).getBoundingClientRect().top, lineOffset);
+    // Keep the largest encountered width within a document to avoid threshold
+    // oscillation when widening the gutter changes soft wrapping.
+    setGutterDigits(previous => Math.max(Math.min(previous, maxGutterDigits), digits));
+  };
+  useLayoutEffect(() => { setGutterDigits(initialGutterDigits); }, [historyKey, initialGutterDigits]);
+  useLayoutEffect(() => {
+    measureGutter();
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    viewport.addEventListener('toggle', measureGutter, true);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measureGutter);
+    observer?.observe(viewport);
+    return () => { viewport.removeEventListener('toggle', measureGutter, true); observer?.disconnect(); };
+  }, [historyKey, value, showLineNumbers, sourceFont, lineOffset, sourceHeader]);
   const revealCaret = () => {
     const textarea = textareaRef.current, source = sourceRef.current, viewport = viewportRef.current;
     if (!textarea || !source || !viewport) return;
@@ -340,7 +368,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     setFindOpen(true);
     focusFindRef.current?.();
   };
-  const closeFind = () => { setFindOpen(false); if (!disabled) textareaRef.current?.focus({ preventScroll: true }); };
+  const closeFind = () => { setFindOpen(false); setReplaceAllDecision(null); if (!disabled) textareaRef.current?.focus({ preventScroll: true }); };
   const moveFind = (direction: 1 | -1) => {
     if (!findQuery) { openFind(); return; }
     const matches = findOpen ? found : findSourceMatches(value, findQuery, findCase);
@@ -349,7 +377,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     const index = (Math.min(findIndex, matches.length - 1) + direction + matches.length) % matches.length;
     setFindIndex(index);
     const textarea = textareaRef.current;
-    if (textarea) { textarea.setSelectionRange(matches[index].start, matches[index].end); selectionRef.current = matches[index]; }
+    if (textarea) { textarea.setSelectionRange(matches[index].start, matches[index].end); rememberSelection(textarea); }
   };
   const replaceCurrent = () => {
     const item = found[activeFind];
@@ -379,10 +407,20 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
     return () => { openFindRef.current = null; };
   }, [openFindRef, value]);
   useLayoutEffect(() => {
-    if (!findOpen || !found.length || !viewportRef.current || !highlightRef.current) return;
-    const marker = highlightRef.current.querySelector<HTMLElement>('[data-source-find]');
-    if (!marker) return;
-    revealSourceRect(viewportRef.current, marker.getBoundingClientRect());
+    const viewport = viewportRef.current, highlight = highlightRef.current;
+    if (!findOpen || !found.length || !viewport || !highlight) return;
+    const centerHit = () => {
+      const markers = highlight.querySelectorAll<HTMLElement>('[data-source-find]');
+      if (!markers.length) return;
+      const first = markers[0].getBoundingClientRect(), last = markers[markers.length - 1].getBoundingClientRect();
+      const top = Math.min(first.top, last.top), bottom = Math.max(first.bottom, last.bottom);
+      const obscuredTop = Math.max(0, (findPanelRef.current?.getBoundingClientRect().bottom ?? 0) - viewport.getBoundingClientRect().top);
+      revealSourceRect(viewport, { top, bottom, height: bottom - top }, 'center', obscuredTop);
+    };
+    centerHit();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(centerHit);
+    observer?.observe(viewport); observer?.observe(highlight);
+    return () => observer?.disconnect();
   }, [findOpen, found, activeFind]);
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -454,6 +492,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
 
   const handleViewportScroll = () => {
     setHoveredConcern(null);
+    measureGutter();
   };
   const handleTextareaScroll = (event: UIEvent<HTMLTextAreaElement>) => {
     // A focused native control can try to scroll internally while its content grows.
@@ -466,30 +505,32 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   };
 
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-editor-surface data-[drop-active=true]:outline-2 data-[drop-active=true]:outline-offset-2 data-[drop-active=true]:outline-accent" data-drop-active={isDragActive} onKeyDownCapture={event => {
+    <div style={{ '--source-gutter-extra': `${showLineNumbers ? gutterDigits - 3 : 0}ch` } as CSSProperties} data-source-gutter-digits={gutterDigits} className="relative flex min-h-0 min-w-0 flex-1 flex-col bg-editor-surface data-[drop-active=true]:outline-2 data-[drop-active=true]:outline-offset-2 data-[drop-active=true]:outline-accent" data-drop-active={isDragActive} onKeyDownCapture={event => {
         if (event.nativeEvent.isComposing || composingRef.current || replaceAllDecision || event.keyCode === 229) return;
         const key = event.key.toLowerCase();
         if ((event.metaKey || event.ctrlKey) && !event.altKey && key === 'g') { event.preventDefault(); event.stopPropagation(); moveFind(event.shiftKey ? -1 : 1); return; }
         if (findOpen && key === 'escape' && event.target === textareaRef.current) { event.preventDefault(); event.stopPropagation(); closeFind(); return; }
         if ((event.metaKey || event.ctrlKey) && key === 'f' || event.ctrlKey && key === 'h') { event.preventDefault(); event.stopPropagation(); openFind(); }
       }} onDragEnter={handleDragOver} onDragOver={handleDragOver} onDragLeave={() => setIsDragActive(false)} onDrop={handleDrop}>
-      {findOpen ? <SourceFindBar query={findQuery} replacement={findReplacement} matchCase={findCase} count={found.length} index={activeFind} disabled={disabled || readOnly} composing={isComposing} autoFocusQuery={focusFindQuery} focusQueryRef={focusFindRef}
+      <SourceFindBar open={findOpen} panelRef={findPanelRef} query={findQuery} replacement={findReplacement} matchCase={findCase} count={found.length} index={activeFind} disabled={disabled || readOnly} composing={isComposing} autoFocusQuery={findOpen && focusFindQuery} focusQueryRef={focusFindRef}
         decision={replaceAllDecision} scopeLabel={suppliedAriaLabel ? t('editor:find.currentScope', { name: suppliedAriaLabel }) : t('editor:find.scopeBody')} onConfirmAll={confirmReplaceAll} onCancelAll={() => setReplaceAllDecision(null)}
         onQuery={next => { setFindQuery(next); setFindIndex(0); }} onReplacement={setFindReplacement} onCase={() => { setFindCase(current => !current); setFindIndex(0); }} onMove={moveFind}
-        onReplace={replaceCurrent} onReplaceAll={requestReplaceAll} onClose={closeFind} /> : null}
+        onReplace={replaceCurrent} onReplaceAll={requestReplaceAll} onClose={closeFind} />
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       {!openFindRef && !findOpen ? <div className="absolute top-2 right-2 z-30"><IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={openFind} /></div> : null}
       <div ref={viewportRef} data-source-viewport="true" className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto scrollbar-gutter-stable" onScroll={handleViewportScroll}>
-      <div data-source-content="true" className="relative min-h-full w-full">
+      <div className="flex min-h-full min-w-0 flex-col">
+      {sourceHeader}
+      <div data-source-content="true" className="relative min-h-0 w-full flex-1">
       <div ref={highlightRef} className={`pointer-events-none ${isComposing ? 'opacity-0' : ''}`} aria-hidden="true"><pre ref={sourceRef} className={sourceBoxClass}>{highlightedSource}</pre></div>
       {showLineNumbers || lineConcerns.size > 0 ? <div ref={gutterRef} className="pointer-events-none absolute inset-0 z-20 overflow-clip">
         <div className={sourceBoxClass}>
           {sourceLines.map((line, index) => {
-            const number = index + 1;
-            const concern = lineConcerns.get(number);
+            const number = index + 1 + lineOffset;
+            const concern = lineConcerns.get(index + 1);
             return <div key={number} className="relative min-w-0 whitespace-pre-wrap wrap-anywhere">
-              {showLineNumbers ? concern ? <button className="pointer-events-auto absolute top-0 -left-9 w-5 bg-transparent p-0 pr-1 text-right font-article-source text-faint data-[severity=warning]:text-warning data-[severity=error]:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:-left-12 md:w-8" type="button" data-severity={concern.severity} aria-label={t('editor:diagnostics.line', { line: number, severity: t('editor:diagnostics.' + concern.severity), messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={(event) => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={(event) => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{number}</button> : <span className="absolute top-0 -left-9 w-5 pr-1 text-right font-article-source text-faint md:-left-12 md:w-8" aria-hidden="true">{number}</span> : null}
-              {concern && (!showLineNumbers || concern.severities) ? <button type="button" className={`pointer-events-auto absolute top-0 flex h-6 items-center justify-center gap-0.5 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-accent ${showLineNumbers ? '-left-12 w-3 md:-left-16' : '-left-5 w-4 md:-left-6'}`} aria-label={t('editor:diagnostics.lineLabel', { line: number, messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={event => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={event => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{(concern.severities ?? [concern.severity]).map(severity => <span key={severity} data-severity={severity} className="size-1.5 shrink-0 rounded-full data-[severity=warning]:bg-warning data-[severity=error]:bg-danger" aria-hidden="true" />)}</button> : null}
+              {showLineNumbers ? concern ? <button className={`${gutterNumberClass} pointer-events-auto bg-transparent p-0 data-[severity=warning]:text-warning data-[severity=error]:text-danger focus-visible:outline-2 focus-visible:outline-accent`} type="button" data-severity={concern.severity} aria-label={t('editor:diagnostics.line', { line: number, severity: t('editor:diagnostics.' + concern.severity), messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={(event) => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={(event) => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{number}</button> : <span className={gutterNumberClass} aria-hidden="true">{number}</span> : null}
+              {concern && (!showLineNumbers || concern.severities) ? <button type="button" className={`pointer-events-auto absolute top-0 flex h-6 items-center justify-center gap-0.5 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-accent ${showLineNumbers ? '-left-[calc(var(--spacing)*12+var(--source-gutter-extra))] w-3 md:-left-[calc(var(--spacing)*16+var(--source-gutter-extra))]' : '-left-5 w-4 md:-left-6'}`} aria-label={t('editor:diagnostics.lineLabel', { line: number, messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={event => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={event => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{(concern.severities ?? [concern.severity]).map(severity => <span key={severity} data-severity={severity} className="size-1.5 shrink-0 rounded-full data-[severity=warning]:bg-warning data-[severity=error]:bg-danger" aria-hidden="true" />)}</button> : null}
               <span className="invisible" aria-hidden="true">{line || '\u200b'}</span>
             </div>;
           })}
@@ -502,7 +543,8 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
           if (typeof forwardedRef === 'function') forwardedRef(node);
           else if (forwardedRef) forwardedRef.current = node;
         }}
-        className={`absolute inset-0 z-10 min-h-0 min-w-0 size-full resize-none overflow-hidden ${sourceBoxClass} caret-editor-text outline-0 selection:bg-selection/60 selection:text-editor-text focus-visible:outline-none ${isComposing ? 'text-editor-text' : 'text-transparent'}`}
+        className={`absolute inset-0 z-10 min-h-0 min-w-0 size-full resize-none overflow-hidden ${sourceBoxClass} caret-editor-text outline-0 selection:bg-selection/60 selection:text-editor-text data-[find-active=true]:selection:bg-transparent data-[find-active=true]:selection:text-transparent focus-visible:outline-none ${isComposing ? 'text-editor-text' : 'text-transparent'}`}
+        data-find-active={selectedFind}
         value={value}
         disabled={disabled}
         readOnly={readOnly}
@@ -543,6 +585,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
         aria-controls={visibleMatch ? 'snippet-command-list' : undefined}
         aria-activedescendant={activeRow?.id}
       />
+      </div>
       </div>
       </div>
       </div>

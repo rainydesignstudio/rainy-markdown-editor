@@ -1,6 +1,6 @@
 import type { WorkingArticle } from './types';
 import type { ParsedArticle } from './types';
-import type { ArticleMediaContext } from '../components/editor/MarkdownPreview';
+import type { ArticleMediaContext } from './article-format/MarkdownPreview';
 import type { FormatSnapshot } from './article-format/runtime';
 
 export type PreviewInput = {

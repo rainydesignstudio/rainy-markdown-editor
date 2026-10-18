@@ -1,4 +1,5 @@
 import { parseFragment } from 'parse5';
+import { getArticleRenderSnapshot } from './article-format/runtime';
 
 type HtmlNode = {
   nodeName: string;
@@ -19,13 +20,14 @@ export type ArticleStatistics = {
 };
 
 const IGNORED_TAGS = new Set(['script', 'style', 'template']);
+const ignored = (node: HtmlNode) => Boolean(node.tagName && IGNORED_TAGS.has(node.tagName) || node.attrs?.some(attribute => attribute.name === 'data-preview-only'));
 
 function localImagePlaceholder(node: HtmlNode): boolean {
   return node.attrs?.some(attribute => attribute.name === 'data-local-asset-src' || attribute.name === 'data-local-asset-srcset') ?? false;
 }
 
 function visibleText(node: HtmlNode): string {
-  if (node.tagName && IGNORED_TAGS.has(node.tagName)) return '';
+  if (ignored(node)) return '';
   if (localImagePlaceholder(node)) return '';
   if (node.nodeName === '#text') return node.value ?? '';
   return (node.childNodes ?? []).map(visibleText).join('');
@@ -40,7 +42,7 @@ export function articleStatisticsFromHtml(html: string): ArticleStatistics {
   const statistics: ArticleStatistics = { characters: 0, readingMinutes: 0, headings: 0, paragraphs: 0, images: 0, links: 0, codeBlocks: 0 };
   const visit = (node: HtmlNode) => {
     const tag = node.tagName;
-    if (tag && IGNORED_TAGS.has(tag)) return;
+    if (ignored(node)) return;
     if (tag && /^h[1-6]$/.test(tag)) statistics.headings += 1;
     if (tag === 'p' && (visibleText(node).trim() || containsImage(node))) statistics.paragraphs += 1;
     if (tag === 'img' || localImagePlaceholder(node)) statistics.images += 1;
@@ -52,4 +54,11 @@ export function articleStatisticsFromHtml(html: string): ArticleStatistics {
   statistics.characters = Array.from(visibleText(tree)).filter(character => !/\s/u.test(character)).length;
   statistics.readingMinutes = Math.ceil(statistics.characters / 300);
   return statistics;
+}
+
+export function articleStatisticsFromPreview(root: HTMLElement | null, ready: boolean): ArticleStatistics | null {
+  if (!ready || !root?.isConnected) return null;
+  try { getArticleRenderSnapshot(root); } catch { return null; }
+  const body = root.querySelector<HTMLElement>('[data-article-content-body]') ?? root.querySelector<HTMLElement>('.article-body') ?? (root.hasAttribute('data-article-content-root') ? root : null);
+  return body ? articleStatisticsFromHtml(body.innerHTML) : null;
 }

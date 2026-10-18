@@ -13,8 +13,9 @@ export function FindIcon({ name = 'find' }: { name?: 'find' | 'up' | 'down' | 'c
   const paths = { find: 'm21 21-5-5M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0', up: 'm5 15 7-7 7 7', down: 'm5 9 7 7 7-7', close: 'm6 6 12 12M18 6 6 18', case: 'm3 18 5-12 5 12M5 14h6M15 11h6M21 11v7M21 15h-3a3 3 0 0 0 0 6', replace: 'M4 7h13m-4-4 4 4-4 4M20 17H7m4-4-4 4 4 4', all: 'M3 6h13m-4-3 4 3-4 3M3 12h18M3 18h13m-4-3 4 3-4 3' };
   return <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]} /></svg>;
 }
-export function SourceFindBar({ query, replacement, matchCase, count, index, disabled, composing, autoFocusQuery = true, focusQueryRef, decision, scopeLabel, onConfirmAll, onCancelAll, onQuery, onReplacement, onCase, onMove, onReplace, onReplaceAll, onClose }: {
+export function SourceFindBar({ query, replacement, matchCase, count, index, disabled, composing, autoFocusQuery = true, focusQueryRef, open = true, panelRef, decision, scopeLabel, onConfirmAll, onCancelAll, onQuery, onReplacement, onCase, onMove, onReplace, onReplaceAll, onClose }: {
   query: string; replacement: string; matchCase: boolean; count: number; index: number; disabled: boolean; composing: boolean;
+  open?: boolean; panelRef?: MutableRefObject<HTMLDivElement | null>;
   autoFocusQuery?: boolean; focusQueryRef?: MutableRefObject<(() => void) | null>;
   decision: ReplaceAllDecision | null; scopeLabel: string; onConfirmAll: () => void; onCancelAll: () => void;
   onQuery: (value: string) => void; onReplacement: (value: string) => void; onCase: () => void; onMove: (direction: 1 | -1) => void; onReplace: () => void; onReplaceAll: () => void; onClose: () => void;
@@ -28,14 +29,14 @@ export function SourceFindBar({ query, replacement, matchCase, count, index, dis
   const hadDecision = useRef(false);
   const focusReplacement = () => replacementInput.current?.focus({ preventScroll: true });
   useEffect(() => {
-    const focus = () => { input.current?.focus(); input.current?.select(); };
+    const focus = () => { if (open) { input.current?.focus({ preventScroll: true }); input.current?.select(); } };
     if (focusQueryRef) focusQueryRef.current = focus;
     if (autoFocusQuery) focus();
     return () => { if (focusQueryRef?.current === focus) focusQueryRef.current = null; };
-  }, [autoFocusQuery, focusQueryRef]);
+  }, [open, autoFocusQuery, focusQueryRef]);
   useEffect(() => { if (hadDecision.current && !decision) focusReplacement(); hadDecision.current = Boolean(decision); }, [decision]);
   const replaceCurrent = () => { if (!disabled && !composing && !inputComposing && count) { onReplace(); focusReplacement(); } };
-  return <><div className="relative z-30 grid shrink-0 gap-2 border-b border-line bg-panel px-3 py-2" role="search" aria-label={t('editor:find.label')} onCompositionStart={() => setInputComposing(true)} onCompositionEnd={() => setInputComposing(false)} onKeyDown={event => {
+  return <><div ref={panelRef} data-open={open} inert={!open} aria-hidden={!open} className="pointer-events-none absolute inset-x-2 top-2 z-30 grid max-h-full -translate-y-3 gap-2 overflow-x-clip overflow-y-auto rounded-xl border border-line-strong bg-panel px-3 py-2 opacity-0 shadow-lg transition-[opacity,translate] duration-200 ease-out data-[open=true]:pointer-events-auto data-[open=true]:translate-y-0 data-[open=true]:opacity-100 motion-reduce:transition-none" role="search" aria-label={t('editor:find.label')} onCompositionStart={() => setInputComposing(true)} onCompositionEnd={() => setInputComposing(false)} onKeyDown={event => {
     if (event.defaultPrevented || event.nativeEvent.isComposing || inputComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); }
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {

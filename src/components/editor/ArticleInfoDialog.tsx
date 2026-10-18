@@ -10,6 +10,7 @@ import type { WorkingArticle, ArticleSummary } from '../../lib/types';
 import type { parseArticle } from '../../lib/frontMatter';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
+import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 
 type Props = {
   article: WorkingArticle; parsed: ReturnType<typeof parseArticle>; stored: ArticleSummary | null;
@@ -24,6 +25,7 @@ type Props = {
 
 export function ArticleInfoDialog({ article, parsed, stored, workspace, archived, busy, onClose, onChangeField, onOpenTheme, onChangeProject, onOpenHistory, onSave, onDelete, onUnarchive, editingLocationRef, editingKey, folderName, onFolderName, onRenameFolder }: Props) {
   const { t } = useUITranslation('dialogs');
+  const themeCapability = useLibraryCapability('articleTheme');
   const location = useDraftLocation<HTMLFormElement>();
   const dirtyRef = useRef(article.dirty); dirtyRef.current = article.dirty;
   useLayoutEffect(() => {
@@ -66,7 +68,7 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
         <div className="grid min-w-0 content-start gap-4">
           <section className="grid min-w-0 gap-4 rounded-lg border border-line bg-list/50 p-4" aria-labelledby="article-location-heading">
             <h3 id="article-location-heading" className="font-sub-heading text-sm font-semibold text-primary">{t('dialogs:ui.stylingAndOrganization')}</h3>
-            <InformationButton icon={<InformationIcon book />} title={article.theme.name} subtitle={t('dialogs:templates.themeVersionChoice', { version: article.theme.version })} onClick={onOpenTheme} disabled={busy} />
+            <span className="inline-flex min-w-0" title={themeCapability.reason} tabIndex={!themeCapability.enabled ? 0 : undefined} aria-label={themeCapability.reason}><InformationButton icon={<InformationIcon book />} title={article.theme.name} subtitle={t('dialogs:templates.themeVersionChoice', { version: article.theme.version })} onClick={() => { if (themeCapability.enabled) onOpenTheme(); }} disabled={busy || !themeCapability.enabled} /></span>
             <label className="field-stack"><span className="field-label">{t('dialogs:ui.project')}</span><select name="article-project" className="field" value={stored ? workspace.articleOrganization[stored.id]?.projectId ?? '' : ''} onChange={event => onChangeProject(event.target.value || null)} disabled={readOnly || !stored}><option value="">{t('dialogs:ui.ungrouped')}</option>{workspace.projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
           </section>
           <section className="grid min-w-0 gap-3 rounded-lg border border-line bg-list/50 p-4" aria-labelledby="article-manage-heading">

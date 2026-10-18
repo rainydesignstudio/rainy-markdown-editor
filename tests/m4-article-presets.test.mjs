@@ -1,3 +1,4 @@
+import * as previewImages from '../src/lib/article-format/previewImages.ts';
 import * as formatRuntime from '../src/lib/article-format/runtime.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -79,7 +80,7 @@ test('rich-text export keeps intrinsic heading labels without freezing their vie
   const { readFile } = await import('node:fs/promises');
   const { default: ts } = await import('typescript');
   const { default: vm } = await import('node:vm');
-  const source = await readFile(new URL('../src/lib/render.ts', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../src/lib/article-format/output.ts', import.meta.url), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const module = { exports: {} };
   const exported = { styles: '', tagName: 'H2', textContent: '章节标签', attributes: [],
@@ -93,7 +94,7 @@ test('rich-text export keeps intrinsic heading labels without freezing their vie
   };
   vm.runInNewContext(code, { module, exports: module.exports,
     window: { getComputedStyle: () => ({ getPropertyValue: property => ({ display: 'inline-block', 'max-width': '100%', 'box-sizing': 'border-box', width: '280px', margin: '0px 0px 16px', 'background-color': 'rgb(71, 85, 105)', 'border-radius': '24px' })[property] ?? '' }) },
-    require: id => id.endsWith('/article-format/runtime') ? formatRuntime : id.endsWith('/article-format/sanitize') ? { sanitizeHtml: html => html } : id === 'dompurify' ? { sanitize: html => html } : id.endsWith('/articleDarkPreview') ? { createArticleColorNormalizer } : id.endsWith('/articleFormat') ? { articleFormatAllowsCssProperty, articleFormatTierOfValue, articleStyleContext } : { defaultSchema: {} },
+    require: id => (id.endsWith('/article-format/previewImages') || id === './previewImages') ? previewImages : (id.endsWith('/article-format/runtime') || id === './runtime') ? formatRuntime : (id.endsWith('/article-format/sanitize') || id === './sanitize') ? { sanitizeHtml: html => html } : id === 'dompurify' ? { sanitize: html => html } : id.endsWith('/articleDarkPreview') ? { createArticleColorNormalizer } : id.endsWith('/articleFormat') ? { articleFormatAllowsCssProperty, articleFormatTierOfValue, articleStyleContext } : { defaultSchema: {} },
   });
   const payload = module.exports.buildClipboardPayload(heading);
   assert.match(payload.html, /display:inline-block/);
@@ -111,7 +112,7 @@ test('clipboard keeps authored backgrounds and layout but omits generated page p
   const { readFile } = await import('node:fs/promises');
   const { default: ts } = await import('typescript');
   const { default: vm } = await import('node:vm');
-  const code = ts.transpileModule(await readFile(new URL('../src/lib/render.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const code = ts.transpileModule(await readFile(new URL('../src/lib/article-format/output.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const doc = { defaultView: { getComputedStyle: node => ({ getPropertyValue: property => node.computed[property] ?? '' }) }, createElement: tag => element(tag) };
   function element(tag, computed = {}, dimensions = {}, attributes = {}, children = []) {
     const attrs = new Map(Object.entries(attributes));
@@ -147,7 +148,7 @@ test('clipboard keeps authored backgrounds and layout but omits generated page p
   const before = root.outerHTML;
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, window: doc.defaultView,
-    require: id => id.endsWith('/article-format/runtime') ? formatRuntime : id.endsWith('/article-format/sanitize') ? { sanitizeHtml: html => html } : id === 'dompurify' ? { sanitize: html => html } : id.endsWith('/articleDarkPreview') ? { createArticleColorNormalizer } : id.endsWith('/articleFormat') ? { articleFormatAllowsCssProperty, articleFormatTierOfValue, articleStyleContext } : { defaultSchema: {} } });
+    require: id => (id.endsWith('/article-format/previewImages') || id === './previewImages') ? previewImages : (id.endsWith('/article-format/runtime') || id === './runtime') ? formatRuntime : (id.endsWith('/article-format/sanitize') || id === './sanitize') ? { sanitizeHtml: html => html } : id === 'dompurify' ? { sanitize: html => html } : id.endsWith('/articleDarkPreview') ? { createArticleColorNormalizer } : id.endsWith('/articleFormat') ? { articleFormatAllowsCssProperty, articleFormatTierOfValue, articleStyleContext } : { defaultSchema: {} } });
   const payload = module.exports.buildClipboardPayload(root);
   assert.match(payload.html, /^<section\b[^>]*><section\b/, 'editor preview body is exported as a supported section');
   for (const expected of ['<section', 'background-color:rgb(239, 246, 255)', 'box-shadow:', 'gap:16px', 'width:80%', 'flex-shrink:0', 'width:100%', 'object-fit:cover', 'margin:16px 0px', 'border-left:0px none rgb(71, 85, 105)', 'border-right:4px solid rgb(71, 85, 105)', 'border-bottom:1px solid rgb(71, 85, 105)', 'data-w="800"', 'data-h="600"', 'data-src="https://example.test/image.png"']) assert.ok(payload.html.includes(expected), expected);

@@ -343,7 +343,7 @@
     "themeRenamingDidNotCompleteTheAppearanceReferenceWasRestored": "主题改名未完成，外观引用已恢复。",
     "editorAppearanceRestoredToDefaults": "编辑器外观已恢复为默认值。",
     "completeVersionsLoadedDamagedOrIncompleteRecordsExcludedFromRestore": "已载入 {{result_snapshotsCount}} 个完整版本；另有 {{result_issuesCount}} 条损坏/不完整记录未参与恢复。",
-    "historicalVersionsLoaded": "已载入 {{result_snapshotsCount}} 个历史版本。",
+    "historicalVersionsLoaded": "历史版本已载入。",
     "automaticCleanupNotes": "；自动清理提示：{{details}}",
     "importantVersionSaved": "重要版本已保存 · {{result_snapshotId}}{{cleanupNote}}",
     "contentMatchesAnExistingVersionNoDuplicateWasWritten": "内容与已有版本相同，未重复写入 · {{result_snapshotId}}{{cleanupNote}}",
@@ -455,7 +455,10 @@
     "contentIsUnchangedNoDuplicateHistoricalSnapshotWasCreated": "内容未变化，未创建重复历史快照{{cleanupNote}}",
     "archivedArticles": "归档文章",
     "project": "项目",
-    "allArticles": "全部文章"
+    "allArticles": "全部文章",
+    "historyVersionDeleted": "历史版本已删除。",
+    "historyDeletedRefreshFailed": "历史版本已删除，但列表刷新失败；请重试刷新，不必再次删除。{{cause}}",
+    "historyDeleteFailed": "历史版本删除失败：{{cause}}"
   },
   "bootstrap": {
     "theArticlePreviewRootIsMissing": "文章预览根节点缺失。",
@@ -617,7 +620,9 @@
     "nodeTypography": "节点排印",
     "theHistoricalRenderRecordDoesNotMatchTheBodyOrTheme": "历史渲染记录与正文或主题不匹配。",
     "untitledManuscript": "未命名文稿",
-    "automaticSnapshotCouldNotBeCleaned": "无法清理自动快照 {{oldestId}}：{{cause}}"
+    "automaticSnapshotCouldNotBeCleaned": "无法清理自动快照 {{oldestId}}：{{cause}}",
+    "deleteStale": "文稿或资料库已切换，历史版本未删除。",
+    "deleteChanged": "此历史版本已在外部变化，请刷新列表后重新确认删除。"
   },
   "articleMedia": {
     "theLibraryChangedTheImageWasNotImported": "资料库已切换；图片未导入。",
@@ -772,7 +777,7 @@
     "theThemeNameMustContain180Characters": "主题名称须为1–80字符。",
     "theThemeVersionMustContainThreeNumericSegments": "主题版本须为三段数字。",
     "editorThemeFormatversionSupportsOnly123Or4": "Editor theme formatVersion 仅支持1、2、3或4。",
-    "theThemePaletteMustContain1100Colors": "主题调色板须包含1～128个颜色。",
+    "theThemePaletteMustContain1100Colors": "主题调色板须包含1～130个颜色。",
     "paletteEntryAcceptsHexColorsWithoutTransparencyOnly": "色板 {{key}} 只允许不含透明度的十六进制颜色。",
     "themeSurfacesRequireLightAndDarkPaletteReferencesBoundedOpacityAndA": "主题 surfaces 须为明暗两套色板引用、有限透明度及固定数量的渐变色。",
     "themeColorsMustContainLightAndDark": "主题 colors 必须包含 light 和 dark。",
@@ -1074,7 +1079,8 @@
   "locations": {
     "body": "正文第 {{lines}} 行",
     "theme": "主题 CSS 第 {{lines}} 行",
-    "themeNodes": "主题节点样式"
+    "themeNodes": "主题节点样式",
+    "file": "文件第 {{lines}} 行"
   },
   "config": {
     "invalidId": "无效ID",
@@ -1489,5 +1495,27 @@
     "recoveryRequired": "目录修改未完成，原目录及“{{name}}”均已保留，请核对后恢复：{{cause}}",
     "renameAction": "修改文章目录名称",
     "renamed": "目录已修改"
+  },
+  "libraryConfiguration": {
+    "identity": "config.json 与三件套的资料库标识不一致。",
+    "conflict": "资料库配置声明冲突：{{field}}。",
+    "stylesheetsRequired": "库级样式权威需要完整的 css.stylesheets 配置与依赖。",
+    "algorithmRequired": "配置禁用了算法，但渲染或校验仍要求算法；请先统一声明。",
+    "libraryStyles": "此资料库直接使用库级样式，文章主题选择不可用。",
+    "fixedPreview": "资料库固定了预览明暗，此开关不可用。",
+    "disabled": "资料库配置已禁用此选项。",
+    "actionDisabled": "当前资料库不支持{{action}}。{{reason}}",
+    "actions": {
+      "articleTheme": "切换文章主题",
+      "previewMode": "切换预览明暗",
+      "algorithm": "执行渲染算法",
+      "copyRichText": "复制富文本",
+      "exportPackage": "导出文档包",
+      "exportMarkdown": "导出Markdown",
+      "exportBody": "导出Markdown正文",
+      "exportPng": "导出PNG",
+      "exportPdf": "导出PDF"
+    },
+    "styleSource": "资料库样式"
   }
 }

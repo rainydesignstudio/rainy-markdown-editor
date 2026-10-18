@@ -343,7 +343,7 @@
     "themeRenamingDidNotCompleteTheAppearanceReferenceWasRestored": "Theme renaming did not complete. The appearance reference was restored.",
     "editorAppearanceRestoredToDefaults": "Editor appearance restored to defaults.",
     "completeVersionsLoadedDamagedOrIncompleteRecordsExcludedFromRestore": "Complete versions loaded: {{result_snapshotsCount}}. Damaged or incomplete records excluded from restore: {{result_issuesCount}}.",
-    "historicalVersionsLoaded": "Historical versions loaded: {{result_snapshotsCount}}.",
+    "historicalVersionsLoaded": "Historical versions loaded.",
     "automaticCleanupNotes": "; automatic cleanup notes: {{details}}",
     "importantVersionSaved": "Important version saved · {{result_snapshotId}}{{cleanupNote}}",
     "contentMatchesAnExistingVersionNoDuplicateWasWritten": "Content matches an existing version; no duplicate was written · {{result_snapshotId}}{{cleanupNote}}",
@@ -455,7 +455,10 @@
     "contentIsUnchangedNoDuplicateHistoricalSnapshotWasCreated": "Content is unchanged. No duplicate historical snapshot was created{{cleanupNote}}",
     "archivedArticles": "Archived articles",
     "project": "Project",
-    "allArticles": "All articles"
+    "allArticles": "All articles",
+    "historyVersionDeleted": "Historical version deleted.",
+    "historyDeletedRefreshFailed": "The version was deleted, but the list could not refresh. Retry refreshing; do not delete again. {{cause}}",
+    "historyDeleteFailed": "Could not delete the historical version: {{cause}}"
   },
   "bootstrap": {
     "theArticlePreviewRootIsMissing": "The article preview root is missing.",
@@ -617,7 +620,9 @@
     "nodeTypography": "Node typography",
     "theHistoricalRenderRecordDoesNotMatchTheBodyOrTheme": "The historical render record does not match the body or theme.",
     "untitledManuscript": "Untitled manuscript",
-    "automaticSnapshotCouldNotBeCleaned": "Automatic snapshot {{oldestId}} could not be cleaned: {{cause}}"
+    "automaticSnapshotCouldNotBeCleaned": "Automatic snapshot {{oldestId}} could not be cleaned: {{cause}}",
+    "deleteStale": "The article or library changed. The historical version was not deleted.",
+    "deleteChanged": "This historical version changed externally. Refresh the list and confirm deletion again."
   },
   "articleMedia": {
     "theLibraryChangedTheImageWasNotImported": "The library changed. The image was not imported.",
@@ -772,7 +777,7 @@
     "theThemeNameMustContain180Characters": "The theme name must contain 1–80 characters.",
     "theThemeVersionMustContainThreeNumericSegments": "The theme version must contain three numeric segments.",
     "editorThemeFormatversionSupportsOnly123Or4": "Editor theme formatVersion supports only 1, 2, 3 or 4.",
-    "theThemePaletteMustContain1100Colors": "The theme palette must contain 1–128 colors.",
+    "theThemePaletteMustContain1100Colors": "The theme palette must contain 1–130 colors.",
     "paletteEntryAcceptsHexColorsWithoutTransparencyOnly": "Palette entry {{key}} accepts hex colors without transparency only.",
     "themeSurfacesRequireLightAndDarkPaletteReferencesBoundedOpacityAndA": "Theme surfaces require light and dark palette references, bounded opacity and a fixed number of gradient colors.",
     "themeColorsMustContainLightAndDark": "Theme colors must contain light and dark.",
@@ -1074,7 +1079,8 @@
   "locations": {
     "body": "Body line(s) {{lines}}",
     "theme": "Theme CSS line(s) {{lines}}",
-    "themeNodes": "Theme node styles"
+    "themeNodes": "Theme node styles",
+    "file": "File line(s) {{lines}}"
   },
   "config": {
     "invalidId": "Invalid ID",
@@ -1489,5 +1495,27 @@
     "recoveryRequired": "Folder renaming did not finish. The original and “{{name}}” were retained; inspect them before recovering: {{cause}}",
     "renameAction": "Rename the article folder",
     "renamed": "Folder updated"
+  },
+  "libraryConfiguration": {
+    "identity": "config.json and the format trio have different library identities.",
+    "conflict": "Conflicting library declarations: {{field}}.",
+    "stylesheetsRequired": "Library style authority requires a complete css.stylesheets configuration and its dependencies.",
+    "algorithmRequired": "Algorithms are disabled but rendering or validation still requires one. Make the declarations consistent first.",
+    "libraryStyles": "This library uses its own stylesheet. Article theme selection is unavailable.",
+    "fixedPreview": "The library fixes the preview appearance. This switch is unavailable.",
+    "disabled": "This option is disabled by the library configuration.",
+    "actionDisabled": "This library does not support {{action}}. {{reason}}",
+    "actions": {
+      "articleTheme": "changing article themes",
+      "previewMode": "switching preview appearance",
+      "algorithm": "running rendering algorithms",
+      "copyRichText": "copying rich text",
+      "exportPackage": "exporting document packages",
+      "exportMarkdown": "exporting Markdown",
+      "exportBody": "exporting the Markdown body",
+      "exportPng": "exporting PNG",
+      "exportPdf": "exporting PDF"
+    },
+    "styleSource": "Library stylesheet"
   }
 }

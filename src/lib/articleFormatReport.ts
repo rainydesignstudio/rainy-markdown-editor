@@ -2,18 +2,18 @@ import { productMessage, productReference, productText, productLabel, productErr
 import { inspectArticleResources } from './resources/inspection';
 import { localResourceReference, resourceReferences } from './resources/references';
 import type { ThemeConfig } from './types';
-import { parseArticle } from './frontMatter';
+import { articleSourceLayout, parseArticle } from './frontMatter';
 import { themeAuthoredCss } from './themes';
 import { articleFormatSeverity, standardFormatIssue, validateRenderedArticleCss, type ArticleFormatIssue } from './articleFormat';
 import { assertCurrentFormat, getFormatSnapshot } from './article-format/runtime';
 import { inspectRenderedFormat, type RenderedResourceFinding } from './article-format/frame';
 import { articleImageFileNameFromSource } from './articleMedia';
 import { prepareInspectionAssets } from './article-format/inspectionAssets';
-import { compileArticleStyles } from './tailwind';
+import { compileArticleStyles } from './article-format/renderer';
 import { validateArticleAuthoringMarkdown } from './articleAuthoringFormat';
 
 export type FormatCheckSection = { passed: string[]; issues: ArticleFormatIssue[] };
-export type ArticleFormatReport = { theme: FormatCheckSection; body: FormatCheckSection; complete?: boolean; formatId?: string };
+export type ArticleFormatReport = { theme: FormatCheckSection; body: FormatCheckSection; complete?: boolean; formatId?: string; bodyLineOffset?: number };
 
 export function finalizeFormatSection(section: FormatCheckSection, failedRules = new Set(section.issues.flatMap(issue => issue.ruleId ? [issue.ruleId] : []))): FormatCheckSection {
   const seen = new Set<string>();
@@ -29,7 +29,7 @@ export function renderedResourceIssue(resource: RenderedResourceFinding): Articl
   return { kind: 'element', name: productText('image.resourceName'), source: productText('image.resourceScope'),
     tier: resource.reason === 'loading' ? 'conditional' : 'danger', line: resource.line,
     ...productMessage('image.resource.' + resource.reason, resource.reason === 'empty' ? undefined : { source }),
-    domain: 'product', resourceSource: resource.source };
+    domain: 'product', resourceSource: resource.source, resourceDependency: true };
 }
 
 export function articleFormatReportCounts(report: ArticleFormatReport): { pass: number; warning: number; error: number } {
@@ -54,7 +54,8 @@ export function hasFormatConcerns(report: ArticleFormatReport): boolean {
 export async function inspectArticleFormatReport(source: string, theme: ThemeConfig, preview: HTMLElement | null, media?: { root: FileSystemDirectoryHandle | null; month: string | null; folder: string | null }, options: { deep?: boolean; signal?: AbortSignal; purpose?: 'copy' | 'visual' } = {}): Promise<ArticleFormatReport> {
   options.signal?.throwIfAborted();
   const snapshot = getFormatSnapshot();
-  const body = parseArticle(source).body;
+  const parsed = parseArticle(source);
+  const body = parsed.body;
   const bodyPassed = new Set<string>();
   const bodyIssues = await validateArticleAuthoringMarkdown(body, '当前文章正文', bodyPassed, theme);
   if (options.purpose && preview?.querySelector('[data-render-kind="math"]')) bodyIssues.push({ kind: 'engine', name: productText('math.name'), source: '当前文章正文', tier: 'warning', ...productMessage('math.platform'), domain: 'product' });
@@ -80,7 +81,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   let themeIssues: ArticleFormatIssue[] = [];
   // An empty document uses no article formatting. The theme library checks all rules when edited;
   // the article report checks only rules that affect the loaded article.
-  if (body.trim()) {
+  if (body.trim() && snapshot.configuration?.rendering.styleAuthority !== 'library') {
     themeIssues = preview
       ? validateRenderedArticleCss(preview, themeAuthoredCss(theme), themePassed)
       : [{ kind: 'engine', name: '主题预览', source: '当前文章主题', tier: 'unknown', ...productMessage("articleFormatReport.thePreviewIsNotReadyThemeRulesUsedByTheCurrentArticle") }];
@@ -95,7 +96,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   const pendingResources = bodyIssues.some(issue => issue.resourceState === 'pending');
   if (body.trim() && options.deep !== false && (knownResourceFailure || pendingImages || pendingDiagrams)) {
     if (knownResourceFailure || pendingImages) bodyIssues.push({ kind: 'engine', name: productText('image.deferredRenderName'), source: productText('image.resourceScope'),
-      tier: 'unknown', ...productMessage(pendingImages ? 'image.resourcesPendingRender' : 'image.resourcesBlockRender'), domain: 'product' });
+      tier: 'unknown', ...productMessage(pendingImages ? 'image.resourcesPendingRender' : 'image.resourcesBlockRender'), domain: 'product', resourceDependency: true });
   } else if (body.trim() && options.deep !== false && preview) {
     try {
       const shadow = preview.getRootNode();
@@ -119,6 +120,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
         if (finding.outcome === 'incomplete') { issue.kind = 'engine'; issue.tier = 'unknown'; }
         if (finding.outcome === 'review') issue.tier = 'warning';
         if (finding.resourceDependency) {
+          issue.resourceDependency = true;
           issue.domain = 'product'; issue.name = productText('image.deferredRenderName');
           Object.assign(issue, productMessage(checked.resources?.some(resource => resource.reason === 'loading') ? 'image.resourcesPendingRender' : 'image.resourcesBlockRender'));
         }
@@ -139,6 +141,7 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   return {
     theme: finalizeFormatSection({ passed: [...themePassed], issues: themeIssues }, failedRules),
     body: finalizeFormatSection({ passed: [...bodyPassed], issues: bodyIssues }, failedRules),
+    bodyLineOffset: articleSourceLayout(parsed).bodyLineOffset,
     complete: complete && !pendingResources && !pendingDiagrams, formatId: snapshot.id,
   };
 }

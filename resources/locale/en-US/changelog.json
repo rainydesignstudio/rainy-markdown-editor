@@ -784,6 +784,36 @@
           ]
         }
       ]
+    },
+    "v0_3_1": {
+      "summary": "Library capabilities, theme-save policy and renderer modularization; refined history, themed search, long-document gutters, statistics and image previews, with synchronized theme/snippet defaults.",
+      "sections": [
+        {
+          "title": "New features",
+          "items": [
+            "An optional config.json and trio metadata declare stylesheet authority, preview mode and operation capabilities. Theme sample resource failures can remain reviewable while the library policy permits saving.",
+            "History actions are grouped at the top. Metadata and Fork use child dialogs; manual deletion confirms one version, while protection continues to restrict automatic cleanup.",
+            "Document rendering, style compilation, isolated canvases and output conversion live in article-format. Legacy entries forward to the same implementation; workspace workflows and stored library/history protocols are retained."
+          ]
+        },
+        {
+          "title": "Experience improvements",
+          "items": [
+            "Editor themes have independent light/dark search highlights, defaulting to fluorescent yellow. Find floats over the source with entry/exit transitions; matches center in the source viewport, and Cmd/Ctrl+F from the preview opens that same find panel.",
+            "Source numbers match the complete file, including a collapsible read-only metadata view. Body diagnostics use file coordinates; the gutter expands without wrapping, and files over 1000 lines suggest refreshing the preview only after saving.",
+            "Theme and snippet defaults reflect the current wechat edits, including Rainy Design 1.0.58. Localized seed wording is retained and existing article theme snapshots are not migrated.",
+            "Metadata and body share line-number gutters and text insets. A -3px offset places the full 2px button outline inside the edge to prevent clipping.",
+            "History reuses the editor header with information/Fork icon actions. Source/layout switches beside the date, with a fading light/dark switch for both layout previews. Protected versions keep a lock icon; unprotected actions appear on card hover or focus. Directory/snapshot context joins the status line."
+          ]
+        },
+        {
+          "title": "Fixes",
+          "items": [
+            "Statistics recognize standard and website document containers through common body markers, exclude preview decoration and retain readiness/configuration guards.",
+            "Loaded images in normal, library and dark-copy previews open the shared zoom dialog. Static copies retain click handling, and preview interaction attributes are excluded from copied body content."
+          ]
+        }
+      ]
     }
   }
 }

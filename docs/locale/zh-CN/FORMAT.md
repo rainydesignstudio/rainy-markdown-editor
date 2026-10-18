@@ -287,6 +287,50 @@ window.ArticleAlgorithm = {
 
 ## 加载、失败与迁移
 
+### 可选应用配置与能力声明
+
+资料库可增加 `format/config.json`，其 `meta.id` 必须与三件套一致。文件可省略；省略时维持文章主题覆盖、用户选择预览明暗和全部原有操作。已声明但损坏的配置不会回退或与默认文件混用。
+
+以下网站库示例要求三件套的 ID 为 `site-article`，并已配置完整的 `css.stylesheets` 入口：
+
+```json
+{
+  "schemaVersion": 1,
+  "meta": { "id": "site-article" },
+  "rendering": { "styleAuthority": "library", "previewMode": "light" },
+  "capabilities": {
+    "articleTheme": { "enabled": false, "reason": "此库直接采用官网排版" },
+    "exportPdf": { "enabled": false, "reason": "此库仅交付网页正文" }
+  }
+}
+```
+
+三件套的任意 `meta` 也可声明同形的 `capabilities`、`rendering`。合并只收紧能力：任一声明为false即禁用，config.json不能重新放行。rendering的重复声明必须一致，冲突直接拒绝整套。未声明的控件保留原文案；禁用控件保留位置、显示不可用状态并提供原因，执行入口使用同一配置快照守卫，不靠禁用外观保护。
+
+| 能力 | 控制范围 |
+|---|---|
+| articleTheme | 文章主题选择、采用和新稿默认主题设置 |
+| previewMode | 用户切换文章预览明暗 |
+| algorithm | 渲染算法执行；若formatter或启用的深色规则仍需要算法，禁用声明视为配置冲突，不自动删规则 |
+| copyRichText | 富文本复制 |
+| exportPackage / exportMarkdown / exportBody / exportPng / exportPdf | 各种文章导出；每项独立 |
+
+`rendering.styleAuthority`可为theme（原通道）或library。library必须具备库级样式入口；编译只消费库样式，不追加文章主题CSS或token覆盖，同时禁用文章主题选择。它不改原稿或主题快照，也不自动采用新环境。主题资源本身的维护与文章主题选择分开。
+
+`rendering.previewMode`可为user、light或dark。固定明暗时开关不可用，原浏览器偏好仍保留；切回user后继续原偏好。当前权限用于操作入口，旧渲染记录保留其自己的渲染声明；旧记录缺少声明时使用原默认，不继承今天的固定配置。新记录的配置与依赖清单一起校验，打开记录不写迁移。
+
+配置随三件套、算法和样式环境一起读取并参与不可变快照与缓存身份。只改配置也会使旧任务失效；外部改动后重新打开资料库，并显式“更新样式”采用新环境。默认建库仍可省略config.json；自定义声明不会冒充官方默认。
+
+### 主题保存与样本资源
+
+可在当前库validator.json的既有 `product.theme` 中增加：
+
+```json
+{ "savePolicy": { "sampleResources": "review" } }
+```
+
+review只作用于保存文章主题时使用的预览样本：资源失败及其明确关联的未完成检查保留原始诊断并提示待核对，允许保存主题；不是校验通过。block继续阻断，省略为block。CSS语法/安全、主题结构、真实阻断级违规、配置错误与写入失败不降级；片段、模板、实际文章及复制/导出继续原校验。此策略不修改平台规则严重性或formatter，也不代表偶发样本图片故障已修复。
+
 <a name="doc-library-styles"></a>
 
 ### 库级样式与独立画布
@@ -315,6 +359,21 @@ styles/globals.css可导入库内CSS模块及Tailwind内置样式，支持@theme
 viewport设null时按实际预览栏宽响应式排版，使用可用高度滚动，不额外缩放正文。显式viewport对象用于固定排版复现：width/height决定CSS视口，contentWidth决定正文宽度；其显示缩放不改变排版。beforeHtml和afterHtml只参与预览，不写入原稿、Markdown正文或富文本正文；原稿已有内容保留。
 
 自定义CSS类和生成utility共用检查。只作为内容钩子的类，可显式设css.stylesheets.parameters.allowUnknownClasses为true；默认检查未生成样式的类。此选项不关闭源码、安全或平台规则。
+
+### 渲染模块接口与职责
+
+渲染实现集中于 `src/lib/article-format/`，所有平台使用同一套接口；资料库声明仍由可选config.json、三件套及算法快照决定。本次模块迁移不增加可执行插件入口，也不改变历史清单或旧稿。
+
+文章源码框只编辑正文，原始Front Matter在顶部只读折叠显示；正文行号对应完整文件，空行和多行YAML均计入偏移。引擎诊断保留正文坐标，`ArticleFormatReport.bodyLineOffset`携带该次检查对应的文件偏移，界面显示时统一换算；主题CSS继续使用自身行号。折叠查看不改写文件，缺少元数据的源码从第1行开始。
+
+| 入口 | 输入与结果 | 职责 |
+|---|---|---|
+| renderer.ts / compileArticleStyles | Markdown、文章主题、不可变FormatSnapshot、可选样式环境 → CSS、候选类与诊断 | 样式编译、缓存及配置身份保护 |
+| ArticleDocument.tsx / MarkdownPreview.tsx | snapshot、themeId、source、media、children | 正文结构、Markdown/HTML、资源及通用正文标记 |
+| useArticleRenderMount.ts | hostRef、snapshot、CSS、dark、资源/图片回调 → 挂载目标、明暗画布及诊断 | ShadowRoot/iframe隔离、纸面几何、字体与深色转换 |
+| output.ts / buildClipboardPayload | 对应正文根节点、snapshot → 富文本HTML、纯文本及资源信息 | 输出转换，去掉预览外壳及运行期交互装饰 |
+
+分栏、工具栏、草稿、保存/删除流程与资料库权限仍由工作台负责。媒体窗口、翻译和文件来源通过React适配层与现有资源上下文连接；挂载和卸载归渲染适配层，原文与历史文件不因挂载而迁移。旧tailwind/render及编辑器组件路径只转发到同一实现，不维护两套状态或编译缓存。
 
 <a name="doc-render-records"></a>
 

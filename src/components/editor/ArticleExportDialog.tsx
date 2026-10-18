@@ -5,6 +5,7 @@ import { ProductError, formatProductMessage } from "../../lib/i18n/productMessag
 import { useUITranslation } from '../global/UILocaleProvider';
 
 import { getArticleRenderSnapshot } from '../../lib/article-format/runtime';
+import { assertLibraryCapability, libraryCapability, EXPORT_CAPABILITIES } from '../../lib/article-format/libraryConfiguration';
 
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { useRef, useState, type MutableRefObject } from 'react';
@@ -45,13 +46,14 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
 }) {
   const { t } = useUITranslation('dialogs');
   const formatSnapshot = useFormatSnapshot();
-  const [format, setFormat] = useState<Format>('package');
+  const [format, setFormat] = useState<Format>(() => FORMATS.find(item => libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled)?.id ?? 'package');
   const [fileBase, setFileBase] = useState(() => articleExportBaseName(title));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [resourceReview, setResourceReview] = useState<ArticleFormatIssue[] | null>(null);
   const exportingRef = useRef(false);
   const selected = FORMATS.find(item => item.id === format)!;
+  const capability = libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[format]);
   const fileName = `${articleExportBaseName(fileBase)}.${selected.extension}`;
   const exportArticle = async (accepted = false) => {
     if (exportingRef.current || !isCurrent()) return;
@@ -60,6 +62,7 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
     setError('');
     let completed = false;
     try {
+      assertLibraryCapability(formatSnapshot, EXPORT_CAPABILITIES[format]);
       let blob: Blob;
       let mediaFiles: number | undefined;
       if (format === 'markdown' || format === 'body') {
@@ -84,6 +87,7 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
         if (getResourceRevision?.() !== resourceRevision) throw new ProductError('resources.changedDuringOutput');
       }
       if (!isCurrent()) throw new ProductError("articleExportDialog.theArticleOrLibraryChangedDuringExportPreviousContentWasNotDownloaded");
+      assertLibraryCapability(formatSnapshot, EXPORT_CAPABILITIES[format]);
       downloadArticleBlob(blob, fileName);
       onExported(fileName, mediaFiles);
       completed = true;
@@ -102,8 +106,8 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
         <p id="article-export-description" className="text-sm text-muted">{t('dialogs:ui.exportTheCurrentDraft')}{dirty ? t('dialogs:ui.includingUnsavedChanges') : ''}{t('dialogs:ui.thisDoesNotSaveOrModifyTheLibrary')}</p>
         <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.downloadFilename')}</span><input className="field" value={fileBase} maxLength={80} onChange={event => setFileBase(event.target.value)} disabled={busy} /><span className="text-xs text-faint">{t('dialogs:templates.downloadAs', { name: fileName })}</span></label>
         <fieldset className="grid min-w-0 gap-2"><legend className="mb-2 text-sm font-semibold text-primary">{t('dialogs:ui.format')}</legend>
-          {FORMATS.map(item => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-panel p-3 hover:border-accent-line has-checked:border-accent-line has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-50">
-            <input className="mt-1 accent-accent" type="radio" name="article-export-format" value={item.id} checked={format === item.id} onChange={() => { setFormat(item.id); setResourceReview(null); }} disabled={busy || (item.id === 'png' || item.id === 'pdf') && !visualAvailable} />
+          {FORMATS.map(item => <label key={item.id} title={formatProductMessage(libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).reason, t) || undefined} tabIndex={!libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled ? 0 : undefined} className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-panel p-3 hover:border-accent-line has-checked:border-accent-line has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-50">
+            <input className="mt-1 accent-accent" type="radio" name="article-export-format" value={item.id} checked={format === item.id} onChange={() => { if (!libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled) return; setFormat(item.id); setResourceReview(null); }} disabled={busy || !libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled || (item.id === 'png' || item.id === 'pdf') && !visualAvailable} />
             <span className="grid min-w-0 gap-1"><strong className="text-sm font-semibold text-primary">{t('dialogs:exportFormats.' + item.id + '.title')} <span className="font-mono text-xs font-normal text-muted">.{item.extension}</span></strong><span className="text-xs text-muted">{t('dialogs:exportFormats.' + item.id + '.detail')}</span></span>
           </label>)}
         </fieldset>
@@ -112,7 +116,7 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
         {error ? <p className="rounded-lg border border-danger/30 bg-danger-surface p-3 text-sm text-danger" role="alert">{formatProductMessage(error, t)}</p> : null}
         {resourceReview?.length ? <section className="grid gap-2 rounded-lg border border-line bg-list/50 p-3" aria-label={t('messages:resources.packageReview')}><p className="text-sm text-primary">{t('messages:resources.packageReview')}</p><p className="text-xs text-muted">{t('messages:resources.packageReviewHelp')}</p><ul className="grid max-h-40 gap-2 overflow-x-clip overflow-y-auto text-xs text-warning">{resourceReview.map((issue, index) => <li key={index}>{formatDiagnosticMessage(issue, t)}</li>)}</ul></section> : null}
       </div>
-      <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton>{resourceReview?.length ? <DialogButton variant="primary" disabled={busy || !isCurrent()} onClick={() => void exportArticle(true)}>{t('messages:resources.continuePartialPackage')}</DialogButton> : <DialogButton type="submit" variant="primary" disabled={busy || !isCurrent()}>{busy ? t('dialogs:ui.generating') : t('dialogs:templates.export', { name: t('dialogs:exportFormats.' + selected.id + '.title') })}</DialogButton>}</DialogActions></DialogFooter>
+      <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton>{resourceReview?.length ? <DialogButton variant="primary" disabled={busy || !isCurrent() || !capability.enabled} onClick={() => void exportArticle(true)}>{t('messages:resources.continuePartialPackage')}</DialogButton> : <DialogButton type="submit" variant="primary" disabled={busy || !isCurrent() || !capability.enabled}>{busy ? t('dialogs:ui.generating') : t('dialogs:templates.export', { name: t('dialogs:exportFormats.' + selected.id + '.title') })}</DialogButton>}</DialogActions></DialogFooter>
     </form>
   </DialogFrame>;
 }

@@ -1,3 +1,4 @@
+import { DEFAULT_LIBRARY_CONFIGURATION, libraryCapability, assertLibraryCapability } from '../src/lib/article-format/libraryConfiguration.ts';
 import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -66,11 +67,14 @@ const ast=ts.createSourceFile('controller.ts',controller,ts.ScriptTarget.Latest,
 let initializer;
 function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==='copyRichText')initializer=node.initializer;ts.forEachChild(node,visit)}
 visit(ast);
-function copyFixture({ decision=true, getFile=async()=>file(), placeholder=false }={}) {
+function copyFixture({ decision=true, getFile=async()=>file(), placeholder=false, allowCopy=true }={}) {
   const writes=[],statuses=[],reports=[]; let current=true,reads=0;
   let began; const readStarted=new Promise(resolve=>{began=resolve});
   const snapshot={revision:7,source:'body',theme:{},directory:{},month:'2026-10',folder:'test'};
+  const policy = { configuration: structuredClone(DEFAULT_LIBRARY_CONFIGURATION) };
+  policy.configuration.capabilities.copyRichText.enabled = allowCopy;
   const context={Blob,Promise,Error,requestAnimationFrame:callback=>callback(),useCallback:callback=>callback,
+    capabilityAllowed: key => libraryCapability(policy, key).enabled, getFormatSnapshot: () => policy, assertLibraryCapability,
     copyRequestRef:{current:0},mediaRefreshRevisionRef:{current:0},mediaOperationRef:{current:null},articleRef:{current:{dirty:false}},previewRef:{current:{querySelector:selector=>placeholder&&selector.includes('data-local-asset-src')?{}:null}},
     setLoadInspectionRevision(){},isReadyToCopy:true,snapshotFor:()=>snapshot,matchesSnapshot:()=>current,compiledRevision:7,compileCurrent:async()=>true,
     saveSnapshot:async()=>({ok:true,current,savedSnapshot:snapshot}),
@@ -80,7 +84,7 @@ function copyFixture({ decision=true, getFile=async()=>file(), placeholder=false
     setStatus:value=>statuses.push(value),ClipboardItem:class{constructor(types){this.types=types}},navigator:{clipboard:{write:async items=>writes.push(items)}},
   };
   vm.runInNewContext(ts.transpileModule(`globalThis.copy=${initializer.getText(ast)};`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,Object.assign(context, productMessages));
-  return {copy:context.copy,writes,statuses,reports,context,readStarted,stop(){current=false},get reads(){return reads}};
+  return {copy:context.copy,writes,statuses,reports,context,readStarted,stop(){current=false},denyCopy(){policy.configuration.capabilities.copyRichText.enabled=false},get reads(){return reads}};
 }
 
 test('formal copy writes one complete HTML/plain payload after the existing report decision; cancellation performs no image reads', async()=>{
@@ -109,4 +113,10 @@ test('formal copy retains clipboard on unreadable files, unresolved preview imag
 test('a second copy supersedes an older pending image read and only the latest request writes the clipboard', async()=>{
   let finish,calls=0;const f=copyFixture({getFile:()=>++calls===1?new Promise(resolve=>{finish=resolve}):Promise.resolve(file())});
   const first=f.copy();await f.readStarted;await f.copy();finish(file());await first;assert.equal(f.writes.length,1);assert.equal(f.statuses.at(-1).tone,'success');
+});
+
+test('copy capabilities block direct controller calls and a late denial leaves the clipboard untouched', async()=>{
+  const blocked=copyFixture({allowCopy:false});await blocked.copy();assert.equal(blocked.reads,0);assert.equal(blocked.writes.length,0);
+  let finish, reads=0;const pending=copyFixture({getFile:()=>++reads===1?new Promise(resolve=>{finish=resolve}):Promise.resolve(file())});const copying=pending.copy();
+  await pending.readStarted;pending.denyCopy();finish(file());await copying;assert.equal(pending.writes.length,0);assert.match(pending.statuses.at(-1).label,/不支持/);
 });

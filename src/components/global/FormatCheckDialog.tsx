@@ -42,13 +42,13 @@ function issueSource(issue: ArticleFormatIssue): (typeof ISSUE_SOURCES)[number][
   return 'styles';
 }
 
-function issueLocation(issue: ArticleFormatIssue, tab: FormatTab, t: ReturnType<typeof useUITranslation>['t']): string | null {
+export function issueLocation(issue: ArticleFormatIssue, tab: FormatTab, t: ReturnType<typeof useUITranslation>['t'], bodyLineOffset = 0): string | null {
   const lines = issue.lines?.length ? issue.lines : issue.line ? [issue.line] : [];
   if (!lines.length) return issue.source === '主题节点样式' ? t('messages:locations.themeNodes') : null;
-  return t('messages:locations.' + (tab === 'body' ? 'body' : 'theme'), { lines: lines.join('、') });
+  return t('messages:locations.' + (tab === 'body' ? 'file' : 'theme'), { lines: lines.map(line => line + (tab === 'body' ? bodyLineOffset : 0)).join('、') });
 }
 
-function FormatDisclosure({ section, tab, group }: { section: FormatCheckSection; tab: FormatTab; group: (typeof GROUPS)[number] }) {
+function FormatDisclosure({ section, tab, group, bodyLineOffset }: { section: FormatCheckSection; tab: FormatTab; group: (typeof GROUPS)[number]; bodyLineOffset: number }) {
   const { t } = useUITranslation('dialogs');
   const issues = section.issues.filter(issue => articleFormatSeverity(issue.tier) === group.severity);
   const names = group.severity === 'safe' ? section.passed : [];
@@ -59,7 +59,7 @@ function FormatDisclosure({ section, tab, group }: { section: FormatCheckSection
   const tone = count === 0 ? 'text-faint' : group.severity === 'safe' ? 'text-success' : group.severity === 'warning' ? 'text-warning-strong' : 'text-danger';
 
   return <section className="rounded-lg border border-line bg-list/50 p-4">
-    <button type="button" className="group/format flex w-full items-center justify-between gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(value => !value)}>
+    <button type="button" className="group/format flex w-full items-center justify-between gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(value => !value)}>
       <span className={`text-sm font-medium ${tone}`}>{t('dialogs:formatGroups.' + group.severity)}</span>
       <span className="flex items-center gap-2 text-xs text-muted"><span>{t('dialogs:formatSummaries.' + group.severity, { count })}</span><svg className="size-4 shrink-0 text-faint transition-transform duration-200 ease-out motion-reduce:transition-none group-aria-expanded/format:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></span>
     </button>
@@ -71,7 +71,7 @@ function FormatDisclosure({ section, tab, group }: { section: FormatCheckSection
           return entries.length ? <section key={source.id} className="grid gap-2">
             <h3 className="text-xs font-medium text-muted">{t('dialogs:templates.sourceCount', { source: t('dialogs:formatSources.' + source.id), count: entries.length })}</h3>
             <ul className="grid gap-3 text-sm text-secondary">{entries.map((issue, index) => {
-              const location = issueLocation(issue, tab, t);
+              const location = issueLocation(issue, tab, t, bodyLineOffset);
               const provenance = (issue.sourceKind === 'utility' || !issue.sourceKind && issue.source.startsWith('工具类 ')) ? t('dialogs:templates.from', { source: formatDiagnosticSource(issue.source, t) }) : null;
               return <li key={`${issue.kind}:${issue.name}:${issue.line ?? ''}:${index}`} className="break-words">
                 <span className="font-medium text-primary">{formatDiagnosticName(issue, t)}</span>
@@ -106,11 +106,11 @@ export function FormatCheckDialog({ mode, report, onDecision }: { mode: 'save' |
         return <button key={item.id} id={`format-check-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} aria-controls="format-check-panel" aria-label={errorCount ? t('dialogs:templates.tabErrors', { name: t('dialogs:formatTabs.' + item.id), count: errorCount }) : undefined} tabIndex={tab === item.id ? 0 : -1} onClick={() => chooseTab(item.id)} onKeyDown={event => {
         const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + TABS.length - 1) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : null;
         if (next !== null) { event.preventDefault(); chooseTab(TABS[next].id); document.getElementById(`format-check-tab-${TABS[next].id}`)?.focus(); }
-      }} className={`flex min-h-9 items-center justify-center gap-2 rounded-md border border-transparent px-4 py-2 text-sm font-medium hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${errorCount ? 'text-danger aria-selected:border-danger aria-selected:bg-danger/10 aria-selected:text-danger' : 'text-muted aria-selected:border-accent-line aria-selected:bg-accent-soft aria-selected:text-accent-text'}`}><FormatTabIcon tab={item.id} />{t('dialogs:formatTabs.' + item.id)}</button>;
+      }} className={`flex min-h-9 items-center justify-center gap-2 rounded-md border border-transparent px-4 py-2 text-sm font-medium hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent ${errorCount ? 'text-danger aria-selected:border-danger aria-selected:bg-danger/10 aria-selected:text-danger' : 'text-muted aria-selected:border-accent-line aria-selected:bg-accent-soft aria-selected:text-accent-text'}`}><FormatTabIcon tab={item.id} />{t('dialogs:formatTabs.' + item.id)}</button>;
       })}
     </div>
     <div id="format-check-panel" role="tabpanel" aria-labelledby={`format-check-tab-${tab}`} tabIndex={0} className="min-h-0 flex-1 overflow-x-clip overflow-y-auto p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
-      <div className="grid gap-3">{GROUPS.map(group => <FormatDisclosure key={`${tab}:${group.severity}`} section={report[tab]} tab={tab} group={group} />)}</div>
+      <div className="grid gap-3">{GROUPS.map(group => <FormatDisclosure key={`${tab}:${group.severity}`} section={report[tab]} tab={tab} group={group} bodyLineOffset={report.bodyLineOffset ?? 0} />)}</div>
     </div>
     <DialogFooter><DialogActions>
       {mode === 'copy' || mode === 'export' ? <><DialogButton autoFocus onClick={() => onDecision(false)}><FormatActionIcon />{mode === 'export' ? t('dialogs:ui.cancelExport') : t('dialogs:ui.doNotCopy')}</DialogButton><DialogButton variant="primary" onClick={() => onDecision(true)}><FormatActionIcon copy />{mode === 'export' ? (concerns ? t('dialogs:ui.exportAnyway') : t('dialogs:ui.continueExport')) : concerns ? t('dialogs:ui.copyAnyway') : t('dialogs:ui.copyRichText')}</DialogButton></> : <DialogButton autoFocus variant="primary" onClick={() => onDecision(false)}><FormatActionIcon />{t('common:actions.close')}</DialogButton>}

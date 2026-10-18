@@ -11,7 +11,7 @@ import { MainSidebar } from './MainSidebar';
 import { ArticleSidebar } from '../articles/ArticleSidebar';
 import { ArticleHistoryView } from '../history/ArticleHistoryDialog';
 import { ArticleStatisticsDialog } from '../editor/ArticleStatisticsDialog';
-import { articleStatisticsFromHtml } from '../../lib/articleStatistics';
+import { articleStatisticsFromPreview } from '../../lib/articleStatistics';
 import { CreateTemplateFromArticleDialog } from '../content/CreateTemplateFromArticleDialog';
 import { ArticleExportDialog } from '../editor/ArticleExportDialog';
 import { getFormatSnapshot } from '../../lib/article-format/runtime';
@@ -130,6 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               selectedId={controller.historySelectedId}
               busy={controller.historyBusy}
               canRestore={!controller.currentArticleIsArchived && historyArticle.themeValid && controller.documentTokenRef.current?.root === historyRoot && !controller.mediaOperationRef.current}
+              canDelete={!controller.currentArticleIsArchived && controller.documentTokenRef.current?.root === historyRoot && !controller.mediaOperationRef.current}
               canSaveAs={Boolean(controller.articleList.find((item) => item.id === controller.currentArticleId && controller.article.themeValid && !item.parse.diagnostics.some((diagnostic) => diagnostic.level === 'error')))}
               refreshPending={controller.historyRefreshPending}
               notice={controller.historyNotice}
@@ -139,6 +140,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onSelect={controller.setHistorySelectedId}
               onManualSnapshot={() => void controller.createManualHistorySnapshot()}
               onRestore={(target) => void controller.restoreHistorySnapshot(target)}
+              onDelete={controller.deleteHistorySnapshot}
               onSaveAs={(target, title, month) => void controller.saveHistoryAsArticle(target, title, month)}
               onToggleRetention={(target, retained) => void controller.toggleHistoryRetention(target, retained)}
               onRefreshHistory={() => void controller.refreshArticleHistory()}
@@ -146,7 +148,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           ) : null}
         </section>
       </div>
-      {statisticsOpen ? <ArticleStatisticsDialog title={controller.currentTitle} dirty={controller.article.dirty} statistics={controller.parsed.canCopy && controller.article.themeValid && controller.previewRef.current?.querySelector('.article-body') ? articleStatisticsFromHtml(controller.previewRef.current.querySelector('.article-body')!.innerHTML) : null} issue={!controller.parsed.canCopy || !controller.article.themeValid ? t("messages:uiFeedback.repairBeforeStatistics") : undefined} onClose={() => setStatisticsOpen(false)} /> : null}
+      {statisticsOpen ? <ArticleStatisticsDialog title={controller.currentTitle} dirty={controller.article.dirty} statistics={articleStatisticsFromPreview(controller.previewRef.current, controller.parsed.canCopy && controller.article.themeValid && controller.compiledRevision === controller.revision && !format.error)} issue={!controller.parsed.canCopy || !controller.article.themeValid ? t("messages:uiFeedback.repairBeforeStatistics") : undefined} onClose={() => setStatisticsOpen(false)} /> : null}
       {templateSnapshot ? <CreateTemplateFromArticleDialog source={templateSnapshot.source} dirty={templateSnapshot.dirty} root={templateSnapshot.root} categories={controller.templateCategories} templates={controller.templates} isCurrent={() => controller.directoryRef.current === templateSnapshot.root && controller.contentLibraryRootSessionRef.current === templateSnapshot.sessionKey} onCreated={(template, formatIssueCount, hasLocalMedia) => {
         if (controller.directoryRef.current === templateSnapshot.root && controller.contentLibraryRootSessionRef.current === templateSnapshot.sessionKey) {
           controller.setTemplates(previous => [...previous.filter(item => item.id !== template.id), template].sort((left, right) => left.name.localeCompare(right.name, 'zh-CN')));

@@ -2,7 +2,7 @@ import { ProductError, productCause } from "./i18n/productMessages";
 import { parseFragment, serialize, type DefaultTreeAdapterMap } from 'parse5';
 import { articleImageFileNameFromSource, articleImageSourceSetCandidates, inspectArticleImage, replaceArticleImageSourceSetUrls } from './articleMedia';
 import { ARTICLE_EXAMPLE_IMAGE, isApplicationExampleImage } from './articleExamples';
-import type { ClipboardPayload } from './render';
+import type { ClipboardPayload } from './article-format/output';
 
 type Element = DefaultTreeAdapterMap['element'];
 type Node = DefaultTreeAdapterMap['node'];

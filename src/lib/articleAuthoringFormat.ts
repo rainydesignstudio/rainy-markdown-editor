@@ -1,6 +1,6 @@
 import { productCause, productMessage } from "./i18n/productMessages";
 import { inspectArticleFormatMarkdown, type ArticleFormatIssue } from './articleFormat';
-import { validateArticleUtilityClasses } from './tailwind';
+import { validateArticleUtilityClasses } from './article-format/renderer';
 
 export async function validateArticleAuthoringMarkdown(source: string, label = '正文', passed?: Set<string>, theme?: ThemeConfig): Promise<ArticleFormatIssue[]> {
   const inspection = inspectArticleFormatMarkdown(source, label, true, passed);

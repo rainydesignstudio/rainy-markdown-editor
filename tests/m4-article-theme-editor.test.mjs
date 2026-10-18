@@ -9,6 +9,7 @@ import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import * as themes from '../src/lib/themes.ts';
 import * as validation from '../src/lib/themeValidation.ts';
+import * as articleFormat from '../src/lib/articleFormat.ts';
 
 const source = await readFile(new URL('../src/components/themes/ThemeLibrary.tsx', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -26,20 +27,21 @@ function editor(theme = FORMAT_THEME) {
   let persist = async (_, value) => ({ ...value, version: '1.0.1' });
   const module = { exports: {} };
   vm.runInNewContext(`${code}\nexports.Stylebook = ThemeStylebookDialog;`, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, document: { getElementById: () => ({ focus() {} }) }, require: withUILocaleImports(function(id){
+    if (id.endsWith('/articleFormat')) return articleFormat;
     if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
-    if (id.endsWith('/contentValidation')) return { validateContentSource: async (kind, source) => { sampleChecks.push(source); return validateSample(); } };
-    if (id.endsWith('/article-format/runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
+    if (id.endsWith('/contentValidation')) return { validateContentSource: async (kind, source, options) => { sampleChecks.push(source); assert.equal(options.purpose, 'theme'); return validateSample(); } };
+    if ((id.endsWith('/article-format/runtime') || id === './runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/PageHeading')) return { PageHeading: 'page-heading' };
     if (id.endsWith('/useThemePreviewSample')) return { useThemePreviewSample: () => sample };
     if (id.endsWith('/themePreviewSample')) return { getThemePreviewSample: () => sample };
-    if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => formatRuntime.getFormatSnapshot() };
+    if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/article-format/preview')) return formatPreview;
     if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input' };
     if (id.endsWith('/articleExamples')) return { ARTICLE_EXAMPLE_IMAGE: '/images/article-sample.png' };
       if (id.endsWith('/ThemeInspection')) return { useThemeInspection: () => ({ listRef: { current: null }, hovered: null, selected: null, rowProps: () => ({}), clear() {}, locate() {} }), ThemeInspectionPreview: 'inspection-preview', INSPECTION_ROW_CLASSES: '' };
     if (id.endsWith('/themeInspection')) return { uniqueBindings: items => items.filter((item, index) => items.findIndex(other => other.key === item.key) === index) };
-    if (id.endsWith('/tailwind')) return {};
+    if ((id.endsWith('/tailwind') || id.endsWith('/article-format/renderer'))) return {};
     if (id === 'react-dom') return { createPortal: children => children };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/useResizableColumns')) return { useResizableColumns: () => ({ containerRef: { current: null }, wideEnough: true, dragging: false, ratio: 40, style: { '--editor-source-width': '400px' } }) };
@@ -163,6 +165,23 @@ test('saving is locked against double clicks and updates the close guard only af
   assert.equal(view.writes, 1); view.frame().props.onClose(); assert.equal(view.closes, 0);
   release(); await new Promise(resolve => setImmediate(resolve)); view.render();
   assert.equal(view.saves, 1); view.frame().props.onClose(); assert.equal(view.closes, 1);
+});
+
+test('a saved theme retains sample review details without blocking future edits or showing stale diagnostics', async () => {
+  const view = editor();
+  const issue = { kind: 'engine', name: 'sample layout', source: 'themes/preview.md', line: 49, tier: 'unknown', message: 'Image-dependent layout inspection is incomplete', resourceSource: '/images/missing.png', resourceDependency: true };
+  view.setValidation(async () => ({ errors: [], issues: [issue] }));
+  view.fields().props.onToken('color-article-quote-surface', '#fafafa'); view.render();
+  view.button('保存主题').props.onClick(); await new Promise(resolve => setImmediate(resolve)); view.render();
+  assert.equal(view.writes, 1);
+  const details = view.find(node => node.type === 'details');
+  const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : '';
+  assert.match(text(details), /themes\/preview.md.*missing.png.*incomplete/);
+  assert.match(text(details), /49/);
+  assert.equal(issue.tier, 'unknown');
+  view.fields().props.onToken('color-article-quote-surface', '#eeeeee'); view.render();
+  assert.equal(view.button('保存主题').props.disabled, false);
+  assert.throws(() => view.find(node => node.type === 'details'), /control exists/);
 });
 
 test('resetting the last node override restores the original draft without a spurious unsaved dialog', () => {

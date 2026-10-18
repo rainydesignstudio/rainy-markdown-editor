@@ -3,7 +3,7 @@
   "name": "Rainy Design · 摘记",
   "trigger": "//rainy-quote",
   "description": "浅 Slate 底色的摘记，强调一句值得停留的话。",
-  "content": "<blockquote class=\"my-7 border-b-6 border-l-4 bg-article-line/33 border-article-ink/33 p-4\">\n  <p class=\"m-0 font-medium text-article-heading\">▌忘说了，样式你也别亲自设计，让 Agent 代行。</p>\n</blockquote>",
+  "content": "<blockquote class=\"my-7 border-b-6 border-l-4 bg-article-accent/12 border-article-accent/33 p-4\">\n  <p class=\"m-0 font-medium text-article-heading\">▌忘说了，样式你也别亲自设计，让 Agent 代行。</p>\n</blockquote>",
   "icon": "quote",
   "categoryId": "rainy-design"
 }

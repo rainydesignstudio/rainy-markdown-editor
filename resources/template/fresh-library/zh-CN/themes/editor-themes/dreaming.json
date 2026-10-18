@@ -70,7 +70,9 @@
     "dark-editor-text": "#e5e5e5",
     "dark-editor-syntax": "#c7a8e8",
     "dark-editor-heading": "#fafafa",
-    "dark-editor-quote": "#d4d4d4"
+    "dark-editor-quote": "#d4d4d4",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -106,7 +108,8 @@
       "editor-text": "light-editor-text",
       "editor-syntax": "light-editor-syntax",
       "editor-heading": "light-editor-heading",
-      "editor-quote": "light-editor-quote"
+      "editor-quote": "light-editor-quote",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "dark-canvas",
@@ -141,7 +144,8 @@
       "editor-text": "dark-editor-text",
       "editor-syntax": "dark-editor-syntax",
       "editor-heading": "dark-editor-heading",
-      "editor-quote": "dark-editor-quote"
+      "editor-quote": "dark-editor-quote",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

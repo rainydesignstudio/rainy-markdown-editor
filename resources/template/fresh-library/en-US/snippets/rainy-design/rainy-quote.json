@@ -3,7 +3,7 @@
   "name": "Rainy Design · Note",
   "trigger": "//rainy-quote",
   "description": "A soft Slate note that highlights a thought worth keeping.",
-  "content": "<blockquote class=\"my-7 border-b-6 border-l-4 bg-article-line/33 border-article-ink/33 p-4\">\n  <p class=\"m-0 font-medium text-article-heading\">▌One more thing: let an Agent handle the styling, too.</p>\n</blockquote>",
+  "content": "<blockquote class=\"my-7 border-b-6 border-l-4 bg-article-accent/12 border-article-accent/33 p-4\">\n  <p class=\"m-0 font-medium text-article-heading\">▌One more thing: let an Agent handle the styling, too.</p>\n</blockquote>",
   "icon": "quote",
   "categoryId": "rainy-design"
 }

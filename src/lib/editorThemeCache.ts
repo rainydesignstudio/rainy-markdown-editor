@@ -1,4 +1,4 @@
-import { EDITOR_COLOR_ROLES, editorSurfaceTokens, findEditorTheme, resolveEditorThemeColors, resolveEditorThemeSurfaces, validEditorThemeSurfaces, type EditorThemeSurfaces, type EditorTheme, type EditorThemeFontRole, type EditorColorScheme, type EditorColorRole } from './editorThemes';
+import { DEFAULT_EDITOR_SEARCH_COLOR, EDITOR_COLOR_ROLES, editorSurfaceTokens, findEditorTheme, resolveEditorThemeColors, resolveEditorThemeSurfaces, validEditorThemeSurfaces, type EditorThemeSurfaces, type EditorTheme, type EditorThemeFontRole, type EditorColorScheme, type EditorColorRole } from './editorThemes';
 import type { EditorAppearance } from './editorWorkspace';
 
 export const EDITOR_THEME_CACHE_KEY = 'rainy-editor-theme-cache-v1';
@@ -6,7 +6,7 @@ export const EDITOR_THEME_DIRECTORY_KEY = 'rainy-editor-theme-directory-v1';
 export const EDITOR_THEME_STYLE_ID = 'editor-theme-runtime';
 const FONT_ROLES: EditorThemeFontRole[] = ['ui', 'heading', 'subHeading', 'eyebrow', 'serif', 'mono', 'editorSource', 'articleSource'];
 const FONT_TOKENS: Record<EditorThemeFontRole, string> = { ui: '--font-sans', heading: '--font-heading', subHeading: '--font-sub-heading', eyebrow: '--font-eyebrow', serif: '--font-serif', mono: '--font-mono', editorSource: '--font-editor-source', articleSource: '--font-article-source' };
-const CONTRACT = { cacheKey: EDITOR_THEME_CACHE_KEY, directoryKey: EDITOR_THEME_DIRECTORY_KEY, styleId: EDITOR_THEME_STYLE_ID, colorRoles: [...EDITOR_COLOR_ROLES], fontRoles: FONT_ROLES, fontTokens: FONT_TOKENS, codeFont: '"SFMono-Regular", Consolas, "Liberation Mono", monospace' };
+const CONTRACT = { searchDefault: DEFAULT_EDITOR_SEARCH_COLOR, cacheKey: EDITOR_THEME_CACHE_KEY, directoryKey: EDITOR_THEME_DIRECTORY_KEY, styleId: EDITOR_THEME_STYLE_ID, colorRoles: [...EDITOR_COLOR_ROLES], fontRoles: FONT_ROLES, fontTokens: FONT_TOKENS, codeFont: '"SFMono-Regular", Consolas, "Liberation Mono", monospace' };
 
 type CacheContract = typeof CONTRACT;
 export type EditorThemeCache = {
@@ -39,8 +39,10 @@ function validCache(value: unknown, contract: CacheContract, checkSurfaces: type
   if (Object.keys(value.fonts).length !== expectedFonts.length) return false;
   for (const scheme of ['light', 'dark']) {
     const colors = value.colors[scheme];
-    if (!record(colors) || Object.keys(colors).length !== contract.colorRoles.length) return false;
-    for (const role of contract.colorRoles) if (typeof colors[role] !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(colors[role] as string)) return false;
+    if (!record(colors)) return false;
+    const roles = contract.colorRoles.filter(role => role !== 'search-hit' || role in colors);
+    if (Object.keys(colors).length !== roles.length) return false;
+    for (const role of roles) if (typeof colors[role] !== 'string' || !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(colors[role] as string)) return false;
   }
   for (const role of contract.fontRoles) {
     const font = role === 'subHeading' ? value.fonts[role] ?? value.fonts.ui : role === 'articleSource' ? value.fonts[role] ?? value.fonts.editorSource : value.fonts[role];
@@ -133,7 +135,7 @@ function bootstrapCache(contract: CacheContract, validate: typeof validCache, co
     const tokens: Record<string, string> = {};
     for (const role of contract.colorRoles) tokens[`--color-${role}`] = cache.colors[scheme][role];
     for (const role of contract.fontRoles) tokens[contract.fontTokens[role]] = role === 'subHeading' ? cache.fonts[role] ?? cache.fonts.ui : role === 'articleSource' ? cache.fonts[role] ?? cache.fonts.editorSource : role === 'editorSource' && !cache.fonts.articleSource ? codeFont(cache.fonts.mono, contract) : cache.fonts[role];
-    Object.assign(tokens, surfaceTokens(cache.colors[scheme], cache.surfaces?.[scheme]));
+    Object.assign(tokens, surfaceTokens(cache.colors[scheme], cache.surfaces?.[scheme], contract.searchDefault));
     writeStyles(document, tokens, contract.styleId);
     root.dataset.colorMode = cache.appearance.colorMode;
     root.dataset.editorColorScheme = scheme;

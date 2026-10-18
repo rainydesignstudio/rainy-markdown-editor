@@ -329,14 +329,14 @@
     "historyList": "历史版本列表",
     "untitledManuscript": "未命名文稿",
     "protected": " · 已保护",
-    "unprotect": "取消保护",
+    "unprotect": "解除保护",
     "protectVersion": "保护此版",
     "noCompleteHistoryYetSaveAnImportantVersion": "还没有完整历史版本。手动保存重要版本，或等待自动快照间隔。",
     "compareHistoryWithCurrentManuscript": "历史版本与当前稿对比",
     "currentManuscriptHasUnsavedChanges": " · 当前稿有未保存修改",
     "historicalFrontMatterDoesNotMatchTheTheme": "此历史版本的 Front Matter 与主题快照不一致。恢复和另存已停用，以免绑定错误主题。",
     "comparisonMode": "版本对比方式",
-    "sourceAndMetadata": "源码与信息",
+    "sourceAndMetadata": "源码对比",
     "renderedLayout": "排版效果",
     "sourceSideBySide": "源码双栏对比",
     "historicalVersion": "历史版本",
@@ -404,7 +404,8 @@
     "articleFolderName": "文章目录名称",
     "applyFolderName": "应用目录名",
     "folderRenameImmediate": "输入目录名后按 Enter 或点击应用，立即更新索引并重新读取文稿；article.md 文件名保持。",
-    "imageZoomToggle": "切换放大与适应宽度"
+    "imageZoomToggle": "切换放大与适应宽度",
+    "searchHitSample": "搜索命中"
   },
   "templates": {
     "from": "来自{{source}}",
@@ -490,7 +491,8 @@
     "editor-text": "源码正文",
     "editor-syntax": "语法标记",
     "editor-heading": "源码标题",
-    "editor-quote": "源码引用"
+    "editor-quote": "源码引用",
+    "search-hit": "搜索高亮色"
   },
   "articleColors": {
     "color-article-ink": "正文文字",
@@ -677,7 +679,15 @@
     "loading": "正在载入此版本自己的主题与样式…",
     "forkTitle": "{{title}} 历史 Fork",
     "savedSnapshot": "历史快照",
-    "changedFields": "变化字段：{{fields}}"
+    "changedFields": "变化字段：{{fields}}",
+    "versionCount": "共 {{count}} 个历史版本",
+    "versionActions": "历史版本操作",
+    "deleteVersion": "删除此版本",
+    "saveCurrent": "将当前编辑稿保存为重要版本",
+    "deleteExplanation": "只删除选中的这一份历史记录；无法撤销。当前稿、其他历史、文章素材与共享渲染资源均保留。",
+    "deleteProtectedExplanation": "此版本已受保护，自动清理不会删除它；本次为你明确确认的手动删除。",
+    "confirmDelete": "确认删除此版本",
+    "contextStatus": "{{path}} 的正文与主题按快照成对保存；{{status}}"
   },
   "imageRename": {
     "viewAndRename": "查看与改名",

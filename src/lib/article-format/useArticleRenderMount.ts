@@ -1,0 +1,187 @@
+'use client';
+
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useUITranslation } from '../../components/global/UILocaleProvider';
+import { isProductCancellation } from '../i18n/productMessages';
+import { nativeDarkRendition } from './nativeDark';
+import { articlePreviewMarkup, observeArticlePreview } from '../articleDarkPreview';
+import { sanitizeHtml } from './sanitize';
+import type { FormatSnapshot } from './runtime';
+import { forwardPreviewWheel } from '../editor/previewScrolling';
+import { articleDarkMode } from './styleTypes';
+import type { ThemeConfig } from '../types';
+import { bindPreviewImages, type RenderedPreviewImage } from './previewImages';
+export type ArticleDarkColors = { status: 'pending' | 'ready' | 'error'; values: Record<string, string[]> };
+const PENDING_DARK_COLORS: ArticleDarkColors = { status: 'pending', values: {} };
+function relayPreviewShortcut(event: KeyboardEvent) {
+  if ((event.metaKey || event.ctrlKey) && ['s', 'f', 'g', '/'].includes(event.key.toLowerCase())) {
+    event.preventDefault();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: event.key, code: event.code, ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, bubbles: true, cancelable: true }));
+  }
+}
+
+export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>, snapshot: FormatSnapshot, css: string, dark = false, options: { retained?: boolean; colorTheme?: ThemeConfig; onImageOpen?: (image: RenderedPreviewImage) => void; onSourceFind?: () => void } = {}) {
+  const { t } = useUITranslation('editor');
+  const frameTitles = useRef({ light: '', dark: '' });
+  const visibleFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const darkFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const [colorResult, setColorResult] = useState<{ snapshot: FormatSnapshot; css: string; theme?: ThemeConfig; colors: ArticleDarkColors } | null>(null);
+  const darkColors = colorResult?.snapshot === snapshot && colorResult.css === css && colorResult.theme === options.colorTheme ? colorResult.colors : PENDING_DARK_COLORS;
+  frameTitles.current = { light: t('preview.frame'), dark: t('preview.nativeDarkFrame') };
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  const sourceFindRef = useRef(options.onSourceFind); sourceFindRef.current = options.onSourceFind;
+  const relayShortcut = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || event.altKey) return;
+    if (sourceFindRef.current && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+      event.preventDefault(); event.stopPropagation(); sourceFindRef.current();
+    } else relayPreviewShortcut(event);
+  };
+  const imageOpenRef = useRef(options.onImageOpen); imageOpenRef.current = options.onImageOpen;
+  useEffect(() => {
+    if (!target || !imageOpenRef.current) return;
+    return bindPreviewImages(target, image => imageOpenRef.current?.(image), () => Boolean(imageOpenRef.current));
+  }, [target, Boolean(options.onImageOpen)]);
+  const [darkIssue, setDarkIssue] = useState('');
+  const native = Boolean(snapshot.bundle.formatter.stylesheets || snapshot.bundle.formatter.document);
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    if (!native) {
+      const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+      let mount = shadow.querySelector<HTMLElement>('[data-article-preview]');
+      if (!mount) { mount = document.createElement('div'); mount.dataset.articlePreview = ''; shadow.append(mount); }
+      setTarget(mount);
+      return;
+    }
+    const frame = document.createElement('iframe');
+    frame.title = frameTitles.current.light;
+    frame.setAttribute('sandbox', 'allow-same-origin');
+    frame.setAttribute('allow', 'clipboard-write');
+    frame.dataset.articleFrame = 'light';
+    visibleFrameRef.current = frame;
+    frame.style.cssText = 'position:absolute;top:0;border:0;transform-origin:top left';
+    host.style.position = 'relative'; host.style.height = '100%'; host.style.overflow = 'hidden';
+    host.append(frame);
+    const doc = frame.contentDocument;
+    if (!doc) { frame.remove(); return; }
+    // about:blank otherwise uses quirks mode, which resets inherited table line-height.
+    doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close();
+    doc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
+    // Reserve no scrollbar gutter inside the fixed CSS viewport; the host owns its crop.
+    doc.documentElement.style.scrollbarWidth = 'none';
+    doc.documentElement.style.overflowX = 'clip';
+    doc.body.style.margin = '0';
+    const style = doc.createElement('style'); style.dataset.articleStyle = ''; doc.head.append(style);
+    const mount = doc.createElement('div'); mount.dataset.articlePreview = ''; doc.body.append(mount);
+    const size = () => {
+      const availableWidth = host.clientWidth || host.parentElement?.clientWidth || 750;
+      const availableHeight = host.clientHeight || host.parentElement?.clientHeight || 800;
+      const viewport = snapshot.bundle.formatter.document?.viewport ?? { width: availableWidth, height: availableHeight, contentWidth: availableWidth };
+      const scale = Math.min(availableWidth / viewport.contentWidth, availableHeight / viewport.height, 1);
+      frame.style.width = viewport.width + 'px'; frame.style.height = viewport.height + 'px';
+      frame.style.left = -Math.max(0, viewport.width - viewport.contentWidth) * scale + 'px';
+      frame.style.transform = 'scale(' + scale + ')';
+      mount.style.width = viewport.contentWidth + 'px';
+      // A scrollbar must not change the virtual body origin and crop the first glyphs.
+      mount.style.marginLeft = Math.max(0, viewport.width - viewport.contentWidth) + 'px';
+      frame.dataset.renderScale = String(scale);
+    };
+    const observer = new ResizeObserver(size);
+    observer.observe(host);
+    const relayWheel = (event: WheelEvent) => {
+      if (!host.closest('[data-dragging="true"]')) forwardPreviewWheel(event, visibleFrameRef.current);
+    };
+    host.addEventListener('wheel', relayWheel, { passive: false });
+    doc.addEventListener('keydown', relayShortcut);
+    size(); setTarget(mount);
+    return () => { observer.disconnect(); host.removeEventListener('wheel', relayWheel); doc.removeEventListener('keydown', relayShortcut); setTarget(null); frame.remove(); if (visibleFrameRef.current === frame) visibleFrameRef.current = null; host.style.position = ''; host.style.height = ''; host.style.overflow = ''; };
+  }, [hostRef, native, snapshot.bundle.formatter.document]);
+  useLayoutEffect(() => {
+    if (!native) return;
+    hostRef.current?.querySelectorAll<HTMLIFrameElement>('iframe[data-article-frame]').forEach(frame => {
+      frame.title = frame.dataset.articleFrame === 'dark' ? frameTitles.current.dark : frameTitles.current.light;
+    });
+  }, [hostRef, native, target, t]);
+  useLayoutEffect(() => {
+    if (!native || !target) return;
+    const doc = target.ownerDocument;
+    const preview = snapshot.bundle.formatter.preview;
+    // This document stays canonical light even when a manual-dark overlay is shown.
+    doc.documentElement.dataset.previewMode = 'light';
+    doc.documentElement.classList.toggle('dark', false);
+    doc.body.style.background = preview.light.background;
+    doc.body.style.color = preview.color;
+    doc.body.style.fontFamily = preview.fontFamily;
+    const style = doc.head.querySelector<HTMLStyleElement>('[data-article-style]');
+    if (style) style.textContent = css;
+  }, [native, target, css, dark, snapshot.id, snapshot.bundle.formatter.preview]);
+  useEffect(() => {
+    const host = hostRef.current;
+    setDarkIssue('');
+    setColorResult(null);
+    if ((!dark && !options.colorTheme) || !css || !host || !target) return;
+    let active = true, controller: AbortController | undefined, overlay: HTMLIFrameElement | undefined, observer: ResizeObserver | undefined, canonicalFrame: HTMLIFrameElement | null = null, stopImages: (() => void) | undefined;
+    const render = () => {
+      const root = target.querySelector<HTMLElement>('[data-article-content-root]');
+      if (!root) return;
+      controller?.abort(); controller = new AbortController();
+      const request = controller;
+      const markup = articlePreviewMarkup(root);
+      const context = { snapshot, css, theme: options.colorTheme };
+      setColorResult(null);
+      void nativeDarkRendition(root, css, snapshot, request.signal, { ...options, width: host.clientWidth }).then(result => {
+        if (!active || request.signal.aborted || articlePreviewMarkup(root) !== markup) return;
+        setColorResult({ ...context, colors: { status: 'ready', values: result.colors ?? {} } });
+        if (!dark) return;
+        stopImages?.(); overlay?.remove(); observer?.disconnect();
+        overlay = document.createElement('iframe'); overlay.title = frameTitles.current.dark; overlay.dataset.articleFrame = 'dark';
+        overlay.setAttribute('sandbox', 'allow-same-origin');
+        overlay.style.cssText = native ? 'position:absolute;top:0;border:0;transform-origin:top left' : 'display:block;width:100%;height:100%;border:0';
+        if (!native) { target.hidden = true; host.style.height = '100%'; }
+        (native ? host : host.shadowRoot ?? host).append(overlay);
+        if (native) {
+          canonicalFrame = host.querySelector<HTMLIFrameElement>('iframe[data-article-frame="light"]');
+          canonicalFrame?.setAttribute('aria-hidden', 'true');
+          if (canonicalFrame) canonicalFrame.inert = true;
+        }
+        darkFrameRef.current = overlay;
+        visibleFrameRef.current = overlay;
+        const doc = overlay.contentDocument!;
+        doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close();
+        doc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
+        doc.documentElement.dataset.previewMode = 'dark';
+        doc.documentElement.classList.toggle('dark', articleDarkMode(snapshot.bundle.formatter) === 'tokens');
+        doc.body.style.margin = '0';
+        if (native) doc.documentElement.style.scrollbarWidth = 'none';
+        doc.documentElement.style.overflowX = 'clip';
+        doc.addEventListener('keydown', relayShortcut);
+        const style = doc.createElement('style'); style.textContent = result.css; doc.head.append(style);
+        const mount = doc.createElement('div'); mount.innerHTML = sanitizeHtml(result.html, snapshot); doc.body.append(mount);
+        if (imageOpenRef.current) stopImages = bindPreviewImages(mount, image => imageOpenRef.current?.(image), () => active && !request.signal.aborted);
+        const size = () => {
+          if (!native) return;
+          const viewport = snapshot.bundle.formatter.document?.viewport ?? { width: host.clientWidth, height: host.clientHeight, contentWidth: host.clientWidth };
+          const scale = Math.min(host.clientWidth / viewport.contentWidth, host.clientHeight / viewport.height, 1);
+          overlay!.style.width = viewport.width + 'px'; overlay!.style.height = viewport.height + 'px';
+          overlay!.style.left = -(viewport.width - viewport.contentWidth) * scale + 'px';
+          overlay!.style.transform = 'scale(' + scale + ')';
+          mount.style.width = viewport.contentWidth + 'px'; mount.style.marginLeft = (viewport.width - viewport.contentWidth) + 'px';
+        };
+        observer = new ResizeObserver(size); observer.observe(host); size();
+      }).catch(error => { if (active && !request.signal.aborted && error?.name !== 'AbortError' && !isProductCancellation(error)) {
+        setColorResult({ ...context, colors: { status: 'error', values: {} } });
+        setDarkIssue(error instanceof Error ? error.message : String(error));
+      } });
+    };
+    const stop = observeArticlePreview(target, render);
+    return () => {
+      active = false; stop(); controller?.abort(); stopImages?.(); observer?.disconnect(); overlay?.remove();
+      darkFrameRef.current = null;
+      canonicalFrame?.removeAttribute('aria-hidden');
+      if (canonicalFrame) canonicalFrame.inert = false;
+      if (!native) { target.hidden = false; host.style.height = ''; }
+      if (visibleFrameRef.current === overlay) visibleFrameRef.current = host.querySelector<HTMLIFrameElement>('iframe[data-article-frame="light"]');
+    };
+  }, [hostRef, native, target, dark, css, snapshot, options.retained, options.colorTheme]);
+  return { target, native, darkIssue, darkFrameRef, darkColors };
+}

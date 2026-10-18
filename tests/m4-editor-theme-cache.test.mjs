@@ -43,7 +43,9 @@ test('pre-hydration script restores all colors and fonts with custom combination
     assert.equal(root.dataset.editorColorScheme, dark ? 'dark' : 'light');
     assert.equal(root.dataset.editorTheme, 'custom');
     assert.equal(boot(store, dark).style.id, cache.EDITOR_THEME_STYLE_ID);
-    assert.equal(writes.length, 57);
+    assert.equal(new Set(writes.map(([key]) => key)).size, writes.length);
+    assert.deepEqual(writes.find(([key]) => key === '--color-search-hit'), ['--color-search-hit', '#eeff00']);
+    assert.deepEqual(writes.find(([key]) => key === '--color-search-hit-ink'), ['--color-search-hit-ink', '#000000']);
     assert.deepEqual(writes.find(([key]) => key === '--color-accent'), ['--color-accent', snapshot.colors[dark ? 'dark' : 'light'].accent]);
     assert.deepEqual(writes.find(([key]) => key === '--font-eyebrow'), ['--font-eyebrow', snapshot.fonts.eyebrow]);
   }

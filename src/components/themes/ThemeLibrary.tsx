@@ -3,13 +3,15 @@
 import { ProductError, formatDiagnosticMessage, formatProductMessage, productCause, productDiagnosticReference, productJoin, productReference, productText, productErrorMessage, type ProductMessageInfo, type ProductMessageValue } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
-import { useArticleRenderMount, type ArticleDarkColors } from '../../hooks/useArticleRenderMount';
-import { ArticleDocument } from '../editor/ArticleDocument';
+import { useArticleRenderMount, type ArticleDarkColors } from '../../lib/article-format/useArticleRenderMount';
+import { ArticleDocument } from '../../lib/article-format/ArticleDocument';
 
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
+import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 import { articlePreviewStyle, previewSurfaceStyle } from '../../lib/article-format/preview';
 import { SnippetTextarea } from '../content/SnippetTextarea';
 import { validateContentSource } from '../../lib/contentValidation';
+import { articleFormatMessageReference, type ArticleFormatIssue } from '../../lib/articleFormat';
 import { getFormatSnapshot } from '../../lib/article-format/runtime';
 import { PageHeading } from '../global/PageHeading';
 
@@ -40,12 +42,12 @@ import { refreshRootSession } from '../../lib/rootSession';
 import { BASIC_THEME, resolveDefaultArticleTheme } from '../../lib/themes';
 import { parseThemeConfigJson, inspectThemeConfig, inspectThemeCss, inspectThemeFormat } from '../../lib/themeValidation';
 import type { ThemeConfig, ThemeNodeKey } from '../../lib/types';
-import { MarkdownPreview } from '../editor/MarkdownPreview';
+import { MarkdownPreview } from '../../lib/article-format/MarkdownPreview';
 import { useThemePreviewSample } from '../../hooks/useThemePreviewSample';
 import { getThemePreviewSample } from '../../lib/themePreviewSample';
 import { getArticleNodeSelectors, createArticleColorInspection, type ColorBinding } from '../../lib/themeInspection';
 import { ThemeInspectionPreview, useThemeInspection, type ThemeInspection } from '../global/ThemeInspection';
-import { compileArticleStyles, compileThemeInspectionUtilities } from '../../lib/tailwind';
+import { compileArticleStyles, compileThemeInspectionUtilities } from '../../lib/article-format/renderer';
 
 type ThemeLibraryProps = {
   root: FileSystemDirectoryHandle | null;
@@ -188,8 +190,10 @@ export function ThemePreview({ theme, source: explicitSource, className = 'theme
   }}>{content}</ThemeInspectionPreview> : content;
 }
 
-export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], issues, currentTheme, defaultThemeId, currentArticleSaved, canApply, isRootCurrent, onLibraryChange, onApply, onSetDefault }: ThemeLibraryProps) {
+export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], issues, currentTheme, defaultThemeId, currentArticleSaved, canApply: canApplyInput, isRootCurrent, onLibraryChange, onApply, onSetDefault }: ThemeLibraryProps) {
   const { t } = useUITranslation('themes');
+  const themeCapability = useLibraryCapability('articleTheme');
+  const canApply = canApplyInput && themeCapability.enabled;
   const editingDrafts = useEditingDrafts();
   const themes = storedThemes;
   const defaultTheme = resolveDefaultArticleTheme(themes, defaultThemeId);
@@ -459,7 +463,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
           <aside className="flex min-h-0 shrink-0 flex-col border-b border-line bg-list/50 lg:w-72 lg:border-b-0 lg:border-r" aria-label={t('themes:ui.themeList')}>
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4"><h3 className="text-sm font-semibold text-primary">{t('themes:ui.articleThemes')}</h3><span className="font-mono text-xs text-faint">{t('themes:templates.themeCount', { count: themes.length })}</span></div>
             <div className="grid max-h-56 min-h-0 content-start gap-2 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:max-h-none lg:flex-1">
-              {themes.map((theme) => <button key={theme.id} className="group flex min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-line hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft" type="button" aria-label={t('themes:templates.previewTheme', { name: theme.name })} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
+              {themes.map((theme) => <button key={theme.id} className="group flex min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-line hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft" type="button" aria-label={t('themes:templates.previewTheme', { name: theme.name })} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-muted group-aria-pressed:border-accent-line group-aria-pressed:text-accent-text"><ThemeIcon name="book" /></span>
                 <span className="grid min-w-0 flex-1 gap-1"><span className="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text">{theme.name}{hasEditingDraft(editingDrafts, root, 'themes', theme.id) ? <UnsavedMark className="ml-2 inline-block" /> : null}</span><span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />{t('themes:ui.defaultForNewArticles')}</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />{t('themes:ui.usedByCurrentArticle')}</span> : null}</span>
               </button>)}
@@ -474,7 +478,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
             <ThemePreview key={`${browsedTheme.id}-${browsedTheme.version}`} theme={browsedTheme} dark={dark} framed className="h-120 min-h-0 min-w-0 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:h-auto lg:flex-1" />
             <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4 md:px-6">
               <p className="text-xs text-muted">{currentArticleSaved ? t('themes:ui.applyingCreatesANewArticleCopyAndRetains') : t('themes:ui.previewLeavesTheArticleUnchangedContinueEditingAfter')}</p>
-              <ButtonBar label={t('themes:ui.themeApplicationActions')}><button className="button button-quiet" type="button" onClick={() => void setDefault(browsedTheme)} disabled={!root || working || browsedTheme.id === defaultTheme.id}><ThemeIcon name="check" />{browsedTheme.id === defaultTheme.id ? t('themes:ui.currentDefault') : t('themes:ui.setAsDefaultForNewArticles')}</button><button className="button button-primary" type="button" onClick={() => applyTheme(browsedTheme)} disabled={!canApply || working}><ThemeIcon name="apply" />{canApply ? currentArticleSaved ? t('themes:ui.copyAndApply') : t('themes:ui.applyToCurrentArticle') : !root ? t('themes:ui.connectALibraryToApply') : t('themes:ui.articleBelongsToAnotherLibrary')}</button></ButtonBar>
+              <ButtonBar label={t('themes:ui.themeApplicationActions')} title={themeCapability.reason} tabIndex={!themeCapability.enabled ? 0 : undefined}><button className="button button-quiet" type="button" onClick={() => void setDefault(browsedTheme)} disabled={!root || working || !themeCapability.enabled || browsedTheme.id === defaultTheme.id}><ThemeIcon name="check" />{browsedTheme.id === defaultTheme.id ? t('themes:ui.currentDefault') : t('themes:ui.setAsDefaultForNewArticles')}</button><button className="button button-primary" type="button" onClick={() => applyTheme(browsedTheme)} disabled={!canApply || working}><ThemeIcon name="apply" />{canApplyInput ? currentArticleSaved ? t('themes:ui.copyAndApply') : t('themes:ui.applyToCurrentArticle') : !root ? t('themes:ui.connectALibraryToApply') : t('themes:ui.articleBelongsToAnotherLibrary')}</button></ButtonBar>
             </footer>
           </section>
         </div>
@@ -587,6 +591,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
 }) {
   const { t } = useUITranslation('dialogs');
   const previewSample = useThemePreviewSample();
+  const formatSnapshot = useFormatSnapshot();
   const { dark, toggle } = useArticlePreviewMode();
   const layout = useResizableColumns(100 / 3, '(width >= 48rem)');
   const [picker, setPicker] = useState<{ label: string; token: string; value: string; select: (color: string) => void; scheme?: 'light' | 'dark' } | null>(null);
@@ -629,6 +634,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   }, [inspection.selected, editorTab]);
   const [error, setError] = useState<ProductMessageValue>('');
   const [savedMessage, setSavedMessage] = useState('');
+  const [sampleReport, setSampleReport] = useState<{ theme: ThemeConfig; formatId: string; sample: ReturnType<typeof getThemePreviewSample>; issues: ArticleFormatIssue[] } | null>(null);
   const [writeFailed, setWriteFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const readOnly = !root;
@@ -708,8 +714,9 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setError('');
     setSavedMessage(productText("themeLibrary.saving"));
     try {
-      const measured = await validateContentSource('snippets', sample.markdown, { theme: target });
+      const measured = await validateContentSource('snippets', sample.markdown, { theme: target, purpose: 'theme' });
       if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId || getThemePreviewSample() !== sample) return false;
+      setSampleReport({ theme: target, formatId, sample, issues: measured.issues });
       if (measured.errors.length) { setError(measured.errorMessage ?? measured.errors.join('；')); setSavedMessage(productText("themeLibrary.layoutValidationDidNotPassTheThemeFileWasNotWritten")); return false; }
       const saved = await saveThemeLibraryTheme(operationRoot, target);
       if (!isRootCurrent(operationRoot) || getFormatSnapshot().id !== formatId || getThemePreviewSample() !== sample) return false;
@@ -719,6 +726,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
       setPreviewTheme(saved);
       setCssText(saved.css);
       setJsonText(JSON.stringify(saved, null, 2));
+      setSampleReport({ theme: saved, formatId, sample, issues: measured.issues });
       setError('');
       setSavedMessage(productText("themeLibrary.savedVExistingArticleSnapshotsAreUnchanged", { "savedVersion": saved.version, "value": (measured.issues.length ? productReference("themeLibrary.concernsRequiringReview", { "measured_issuesCount": measured.issues.length }) : '') }));
       onSaved(operationRoot, saved);
@@ -745,6 +753,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const jsonNeedsValidation = jsonText !== JSON.stringify(draft, null, 2);
   const unappliedChanges = cssNeedsValidation || jsonNeedsValidation;
   const dirty = JSON.stringify(draft) !== savedBaseline.current || unappliedChanges;
+  const reviewIssues = !unappliedChanges && sampleReport?.theme === draft && sampleReport.formatId === formatSnapshot.id && sampleReport.sample === previewSample ? sampleReport.issues : [];
   const resumeTheme = () => { setDeparture(false); setApplyAfter(false); setEditorTab(editOrigin.current); location.restore(); };
   useEditingDraft(dirty ? { kind: 'article-theme', root, objectId: theme.id, resume: resumeTheme } : null);
   const resetChanges = () => {
@@ -806,7 +815,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
         <ColumnSplitter layout={layout} label={t('dialogs:ui.resizeTheme')} controls="article-theme-editor-panel" />
         <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-5 group-data-[wide=true]/theme-columns:min-h-0"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">{t('dialogs:ui.liveTypography')}</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={previewTheme} dark={dark} inspection={inspection} onLocate={locateInspection} onNodeColors={setNodeColors} onDarkColors={receiveDarkColors} /></div>
       </div>
-      {error || savedMessage ? <footer className="shrink-0 border-t border-line px-5 py-3">{error ? <p className="text-xs text-danger" role="alert">{formatProductMessage(error, t)}</p> : <p className="text-xs text-success" role="status">{formatProductMessage(savedMessage, t)}</p>}</footer> : null}
+      {error || savedMessage ? <footer className="shrink-0 border-t border-line p-4">{error ? <p className="text-xs text-danger" role="alert">{formatProductMessage(error, t)}</p> : <p className="text-xs text-success" role="status">{formatProductMessage(savedMessage, t)}</p>}{reviewIssues.length ? <details className="mt-2 text-xs text-warning"><summary className="cursor-pointer">{formatProductMessage(productReference('themeLibrary.concernsRequiringReview', { measured_issuesCount: reviewIssues.length }), t)}</summary><ul className="mt-2 grid max-h-32 gap-2 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{reviewIssues.map((issue, index) => <li key={index}><p>{formatProductMessage(articleFormatMessageReference([issue]), t)}</p><p className="break-words text-muted">{issue.source}{issue.resourceSource ? ` · ${issue.resourceSource}` : ''} · {formatDiagnosticMessage(issue, t)}</p></li>)}</ul></details> : null}</footer> : null}
     </DialogFrame>
     {departure ? <UnsavedChangesDialog entries={[{ label: draft.name, detail: unappliedChanges ? t('dialogs:ui.unvalidatedCode') : t('dialogs:ui.themeChangesUnsaved') }]} description={t('dialogs:ui.themeUnsavedDescription')} saveLabel={applyAfter ? t('dialogs:ui.saveApply') : t('dialogs:ui.saveClose')} saveDisabled={Boolean(error) && !writeFailed || unappliedChanges || readOnly} onCancel={() => { setDeparture(false); setApplyAfter(false); }} onContinue={resumeTheme} onDiscard={onClose} onSave={async () => { if (!await save()) return false; if (applyAfter) { setApplyAfter(false); onApply(); } else onClose(); return true; }} /> : null}
     {picker ? <EditorColorPicker label={picker.label} token={picker.token} modeLabel={t(picker.scheme ? `dialogs:ui.${picker.scheme}` : 'dialogs:ui.articleTheme')} value={picker.value} onClose={() => setPicker(null)} onSelect={picker.select} /> : null}

@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import * as articleFormat from '../src/lib/articleFormat.ts';
 const themes = await import('../src/lib/themes.ts');
 const rootSession = await import('../src/lib/rootSession.ts');
 const source = await readFile(new URL('../src/components/themes/ThemeLibrary.tsx', import.meta.url), 'utf8');
@@ -18,10 +19,11 @@ function page(fileSystem = {}) {
   const props = { root, themes: [...themes.THEMES], issues: [], currentTheme: themes.BASIC_THEME, defaultThemeId: null, currentArticleSaved: false, canApply: true, isRootCurrent: value => value === props.root, onLibraryChange: (...values) => writes.push(values), onApply: value => applied.push(value), async onSetDefault(id, selectedRoot) { defaults.push([id, selectedRoot]); props.defaultThemeId = id; } };
   const module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, require: withUILocaleImports(function(id){
+    if (id.endsWith('/articleFormat')) return articleFormat;
     if (id.endsWith('/useArticleRenderMount')) return { useArticleRenderMount: () => ({ target: null, native: false }) };
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
-    if (id.endsWith('/article-format/runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
+    if ((id.endsWith('/article-format/runtime') || id === './runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/useThemePreviewSample')) return { useThemePreviewSample: () => ({ status: 'ready', markdown: '# Sample', origin: 'library' }) };
     if (id.endsWith('/themePreviewSample')) return {};
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
@@ -30,7 +32,7 @@ function page(fileSystem = {}) {
     if (id.endsWith('/articleExamples')) return { ARTICLE_EXAMPLE_IMAGE: '/images/article-sample.png' };
       if (id.endsWith('/ThemeInspection')) return { useThemeInspection: () => ({ listRef: { current: null }, hovered: null, selected: null, rowProps: () => ({}), clear() {}, locate() {} }), ThemeInspectionPreview: 'inspection-preview', INSPECTION_ROW_CLASSES: '' };
     if (id.endsWith('/themeInspection')) return { uniqueBindings: items => items.filter((item, index) => items.findIndex(other => other.key === item.key) === index) };
-    if (id.endsWith('/tailwind')) return {};
+    if ((id.endsWith('/tailwind') || id.endsWith('/article-format/renderer'))) return {};
     if (id === 'react-dom') return { createPortal: children => children };
     if (id.endsWith('/PageHeading')) return { PageHeading: 'header' };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };

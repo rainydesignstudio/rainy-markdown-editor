@@ -34,7 +34,11 @@
     "notStored": "This article is not saved in a library yet. No article file is created before saving.",
     "lineToggle": "{{action}} (⌘/ / Ctrl+/)",
     "diagnosticsUnavailable": "Authoring diagnostics unavailable: {{message}}",
-    "saveRefreshPreview": "Save to refresh preview"
+    "saveRefreshPreview": "Save to refresh preview",
+    "longDocumentWarning": "This manuscript has {{count}} lines. Live rendering may become slow; consider refreshing the preview only after saving.",
+    "longDocumentSavedOnly": "This manuscript has {{count}} lines. The preview currently refreshes only after saving.",
+    "metadataLines": "Metadata · file lines 1–{{count}}",
+    "metadataViewOnly": "Read only"
   },
   "workspace": {
     "panes": "Switch between source and preview",

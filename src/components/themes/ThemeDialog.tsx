@@ -5,18 +5,22 @@ import { formatUINumber } from '../../lib/i18n/formatters';
 
 import { useState } from 'react';
 import type { ThemeConfig } from '../../lib/types';
-import type { ArticleMediaContext } from '../editor/MarkdownPreview';
+import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { InformationIcon } from '../global/InformationButton';
 import { ContentRenderPreview } from '../content/ContentRenderPreview';
 import { availableArticleThemeUpdate } from '../../lib/articleThemeUpdate';
 import { ThemeUpdateTag } from './ThemeUpdateTag';
+import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 
-export function ThemeDialog({ current, themes, source, media, busy = false, blockedReason = '', issue = '', onClose, onSelect }: {
+export function ThemeDialog({ current, themes, source, media, busy = false, blockedReason: suppliedBlockedReason = '', issue = '', onClose, onSelect: selectTheme }: {
   current: ThemeConfig; themes: ThemeConfig[]; source: string; media?: ArticleMediaContext | null;
   busy?: boolean; blockedReason?: string; issue?: string; onClose: () => void; onSelect: (theme: ThemeConfig) => void;
 }) {
   const { t } = useUITranslation('dialogs');
+  const capability = useLibraryCapability('articleTheme');
+  const blockedReason = capability.reason ?? suppliedBlockedReason;
+  const onSelect = (theme: ThemeConfig) => { if (capability.enabled) selectTheme(theme); };
   const { locale } = useUILocale();
   const [selectedKey, setSelectedKey] = useState('current');
   const [query, setQuery] = useState('');
@@ -32,7 +36,7 @@ export function ThemeDialog({ current, themes, source, media, busy = false, bloc
         <div className="shrink-0 border-b border-line p-4"><label className="field-stack"><span className="field-label">{t('dialogs:ui.findTheme')} {formatUINumber(options.length, locale)}</span><input className="field" name="theme-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder={t('dialogs:ui.themeName')} disabled={busy} /></label></div>
         <div className="min-h-0 overflow-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent md:flex-1">
           <div className="grid auto-cols-40 grid-flow-col gap-2 md:auto-cols-auto md:grid-flow-row">{visible.map(({ key, theme }) => <div key={key} className="relative min-w-0">
-            <button type="button" aria-pressed={selected.key === key} onClick={() => setSelectedKey(key)} disabled={busy} className="flex h-full w-full min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50">
+            <button type="button" aria-pressed={selected.key === key} onClick={() => setSelectedKey(key)} disabled={busy} className="flex h-full w-full min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50">
               <span className="information-badge mt-0.5"><InformationIcon book /></span><span className="flex min-w-0 flex-1 flex-col gap-1"><strong className="truncate font-sub-heading text-sm font-semibold text-primary">{theme.name}</strong><small className="flex flex-wrap items-center gap-1 text-xs text-muted">v{theme.version}{key === 'current' && latestTheme ? <ThemeUpdateTag /> : null}</small>{key === 'current' ? <span className="text-2xs text-accent-text">{t('dialogs:ui.currentArticle')}</span> : null}</span>
             </button>
             {key === 'current' && latestTheme ? <button type="button" className="button button-quiet absolute right-2 bottom-2 min-h-7 gap-1 px-2 py-1 text-2xs" onClick={() => onSelect(latestTheme)} disabled={busy || Boolean(blockedReason)} aria-label={t('dialogs:templates.updateTheme', { name: theme.name, version: latestTheme.version })}><svg className="size-3.5" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9a7 7 0 0 1 12-2L20 12M4 12l2.5 5a7 7 0 0 0 12-2" /></svg>{t('dialogs:ui.updateTheme')}</button> : null}

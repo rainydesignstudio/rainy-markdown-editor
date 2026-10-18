@@ -4,6 +4,7 @@ import { activateFormatBundle, invalidateFormatBundle, type FormatSnapshot } fro
 import { loadStylesheetEnvironment, type StylesheetEnvironment } from './styles';
 import { DEFAULT_ALGORITHMS, initializeLibraryAlgorithms, readLibraryAlgorithms } from './algorithms';
 import type { AlgorithmPackage } from './algorithmTypes';
+import { validateLibraryConfiguration, resolveLibraryConfiguration, assertConfigurationCompatible, type LibraryConfiguration } from './libraryConfiguration';
 
 export const FORMAT_FILES = ['format-support.json', 'validator.json', 'formatter.json'] as const;
 // Explicit public catalog: private sibling presets are never discovered or bundled.
@@ -16,17 +17,26 @@ export function getPublicPlatformPreset(id: string) {
   return preset;
 }
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
-export type FormatLibraryResult = { bundle: RawFormatBundle | null; source: 'built-in' | 'library' | 'invalid'; message: string | null };
+export type FormatLibraryResult = { bundle: RawFormatBundle | null; source: 'built-in' | 'library' | 'invalid'; message: string | null; configuration?: LibraryConfiguration };
 export async function readLibraryFormat(root: FileSystemDirectoryHandle): Promise<FormatLibraryResult> {
   let directory: FileSystemDirectoryHandle;
   try { directory = await root.getDirectoryHandle('format'); }
   catch (error) { if (missing(error)) return { bundle: DEFAULT_FORMAT_BUNDLE, source: 'built-in', ...productMessage("library.theLibraryHasNoFormatDirectoryTheBuiltInDefaultConfigurationIs") }; throw error; }
+  let configuration: LibraryConfiguration | undefined;
+  try {
+    const file = await (await directory.getFileHandle('config.json')).getFile();
+    if (file.size > 1_000_000) throw new ProductError('library.exceedsTheSizeLimit', { name: 'config.json' });
+    configuration = validateLibraryConfiguration(JSON.parse(await file.text()));
+  } catch (error) {
+    if (!missing(error)) return { bundle: null, source: 'invalid', ...productMessage('library.theLibraryFormatConfigurationIsUnavailable', { cause: productCause(error) }) };
+  }
   const texts: (string | null)[] = [];
   for (const name of FORMAT_FILES) {
     try { const file = await (await directory.getFileHandle(name)).getFile(); if (file.size > 1_000_000) throw new ProductError("library.exceedsTheSizeLimit", { "name": name }); texts.push(await file.text()); }
     catch (error) { if (missing(error)) texts.push(null); else throw error; }
   }
   if (texts.every(value => value === null)) {
+    if (configuration) return { bundle: null, source: 'invalid', ...productMessage('library.theFormatTrioIsIncompleteMissingRepairOrMigrateItFirstDefault', { details: FORMAT_FILES.join('、') }) };
     try {
       await directory.getDirectoryHandle('algorithms');
       return { bundle: null, source: 'invalid', ...productMessage("library.theFormatTrioIsIncompleteMissingRepairOrMigrateItFirstDefault", { details: FORMAT_FILES.join('、') }) };
@@ -36,7 +46,10 @@ export async function readLibraryFormat(root: FileSystemDirectoryHandle): Promis
   if (texts.some(value => value === null)) return { bundle: null, source: 'invalid', ...productMessage("library.theFormatTrioIsIncompleteMissingRepairOrMigrateItFirstDefault", { "details": FORMAT_FILES.filter((_, i) => texts[i] === null).join('、') }) };
   try {
     const [support, validator, formatter] = texts.map(value => JSON.parse(value!));
-    return { bundle: validateFormatBundle({ support, validator, formatter }), source: 'library', message: null };
+    const bundle = validateFormatBundle({ support, validator, formatter });
+    const resolved = resolveLibraryConfiguration(bundle, configuration);
+    assertConfigurationCompatible({ bundle: compileFormatBundle(bundle), configuration: resolved });
+    return { bundle, source: 'library', message: null, ...(configuration ? { configuration } : {}) };
   } catch (error) { return { bundle: null, source: 'invalid', ...productMessage("library.theLibraryFormatConfigurationIsUnavailable", { "cause": productCause(error) }) }; }
 }
 export async function activateLibraryFormat(root: FileSystemDirectoryHandle, isCurrent: () => boolean): Promise<{ snapshot: FormatSnapshot | null; message: string | null }> {
@@ -64,7 +77,7 @@ export async function activateLibraryFormat(root: FileSystemDirectoryHandle, isC
     }
   }
   if (!isCurrent()) { environment?.dispose(); return { snapshot: null, message: null }; }
-  const snapshot = result.bundle ? activateFormatBundle(result.bundle, root.name, result.source === 'library' ? 'library' : 'built-in', environment, algorithms, algorithmSource) : invalidateFormatBundle(root.name, result.message!);
+  const snapshot = result.bundle ? activateFormatBundle(result.bundle, root.name, result.source === 'library' ? 'library' : 'built-in', environment, algorithms, algorithmSource, result.configuration) : invalidateFormatBundle(root.name, result.message!);
   return { snapshot, message };
 }
 export async function initializeLibraryFormat(root: FileSystemDirectoryHandle, presetId: string = DEFAULT_PLATFORM_PRESET_ID): Promise<void> {

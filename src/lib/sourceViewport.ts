@@ -1,3 +1,16 @@
+/** Shared source gutter geometry for editable and read-only source rows. */
+export const SOURCE_LINE_NUMBER_CLASS = 'absolute top-0 -left-[calc(var(--spacing)*9+var(--source-gutter-extra))] w-[calc(var(--spacing)*5+var(--source-gutter-extra))] whitespace-nowrap pr-1 text-right font-article-source text-faint md:-left-[calc(var(--spacing)*12+var(--source-gutter-extra))] md:w-[calc(var(--spacing)*8+var(--source-gutter-extra))]';
+export function sourceLinePaddingClass(showLineNumbers: boolean): string {
+  return showLineNumbers ? 'pl-[calc(var(--spacing)*14+var(--source-gutter-extra))] md:pl-[calc(var(--spacing)*18+var(--source-gutter-extra))]' : 'pl-5 md:pl-8';
+}
+
+/** Find the last visible logical line without measuring every row. */
+export function visibleSourceGutterDigits(total: number, bottom: number, lineTop: (index: number) => number, lineOffset = 0): number {
+  let low = 0, high = total;
+  while (low < high) { const middle = (low + high) >>> 1; if (lineTop(middle) < bottom) low = middle + 1; else high = middle; }
+  return Math.max(3, String(lineOffset + Math.max(1, low)).length);
+}
+
 /** Index the existing highlight text once for a batch of source measurements. */
 export function createSourceRectReader(layer: HTMLElement): (offset: number) => DOMRect | null {
   const doc = layer.ownerDocument;
@@ -32,10 +45,17 @@ export function sourceOffsetRect(layer: HTMLElement, offset: number): DOMRect | 
 }
 
 /** Change only the common viewport; never scroll the textarea or a passive text layer. */
-export function revealSourceRect(viewport: HTMLElement, rect: Pick<DOMRect, 'top' | 'bottom' | 'height'>): void {
+export function revealSourceRect(viewport: HTMLElement, rect: Pick<DOMRect, 'top' | 'bottom' | 'height'>, alignment: 'nearest' | 'center' = 'nearest', obscuredTop = 0): void {
   if (!rect.height || !viewport.clientHeight) return;
   const top = viewport.getBoundingClientRect().top + viewport.clientTop;
   const bottom = top + viewport.clientHeight;
+  if (alignment === 'center') {
+    // The floating search does not shrink the source viewport. Center in that
+    // viewport, only moving the target lower if the overlay would cover it.
+    const center = Math.min(bottom - rect.height / 2, Math.max((top + bottom) / 2, top + obscuredTop + rect.height / 2));
+    viewport.scrollTop = Math.max(0, Math.min(viewport.scrollHeight - viewport.clientHeight, viewport.scrollTop + (rect.top + rect.bottom) / 2 - center));
+    return;
+  }
   if (rect.top < top) viewport.scrollTop += rect.top - top;
   else if (rect.bottom > bottom) viewport.scrollTop += rect.bottom - bottom;
 }

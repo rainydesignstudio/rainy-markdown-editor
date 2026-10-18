@@ -300,6 +300,50 @@ Component files, license, parameters and fingerprints participate in snapshots a
 
 ## Loading, failures and migration
 
+### Optional application configuration and capabilities
+
+A library may add `format/config.json`. Its `meta.id` must match the format trio. Omitting the file preserves theme overrides, user-selected preview appearance and all existing actions. A present but malformed file is rejected instead of falling back or mixing defaults.
+
+This website-library example requires the trio ID `site-article` and a complete `css.stylesheets` entry:
+
+```json
+{
+  "schemaVersion": 1,
+  "meta": { "id": "site-article" },
+  "rendering": { "styleAuthority": "library", "previewMode": "light" },
+  "capabilities": {
+    "articleTheme": { "enabled": false, "reason": "This library uses the website stylesheet" },
+    "exportPdf": { "enabled": false, "reason": "This library delivers website content only" }
+  }
+}
+```
+
+Any trio `meta` may declare the same `capabilities` and `rendering` objects. Restrictions intersect: any false declaration disables the capability; config.json cannot enable it again. Repeated rendering declarations must agree or the whole configuration is rejected. Undeclared controls keep their existing labels. Disabled controls remain visible with a reason, and action handlers enforce the same immutable configuration as the UI.
+
+| Capability | Scope |
+|---|---|
+| articleTheme | Selecting/applying article themes and setting the default for new articles |
+| previewMode | User switching of article preview appearance |
+| algorithm | Rendering algorithm execution; disabling it conflicts with any formatter or enabled dark rule that still requires an algorithm. Rules are never removed automatically |
+| copyRichText | Rich-text copying |
+| exportPackage / exportMarkdown / exportBody / exportPng / exportPdf | Each article export format independently |
+
+`rendering.styleAuthority` accepts theme (the legacy path) or library. Library authority requires a library stylesheet entry and compiles that stylesheet without appending article-theme CSS or token overrides. Article theme selection is disabled. Sources and theme snapshots remain unchanged; adopting a new environment is explicit. Maintaining theme resources is separate from selecting a theme for an article.
+
+`rendering.previewMode` accepts user, light or dark. A fixed mode disables the switch without overwriting the browser preference; switching back to user restores that preference. Current capabilities govern actions, while retained render records keep their own rendering declarations. Legacy records without declarations use legacy defaults rather than today's fixed policy. New records bind the configuration to their dependency manifest; opening a record never migrates it.
+
+The optional file loads with the trio, algorithms and styles and participates in immutable snapshot/cache identity. Configuration changes invalidate older work. Reopen the library after external edits, then explicitly update styles to adopt the new environment. New libraries may still omit config.json. Custom declarations are not labeled official defaults.
+
+### Theme saves and sample resources
+
+Add this optional field to the existing `product.theme` object in the current library's validator.json:
+
+```json
+{ "savePolicy": { "sampleResources": "review" } }
+```
+
+Review applies only to the preview sample used while saving an article theme. Resource failures and explicitly dependent incomplete checks retain their original diagnostics and require review, but do not block the theme save. They are not passes. Block retains the old behavior and is the default when omitted. CSS syntax/safety, theme structure, genuine blocking violations, invalid configuration and write failures remain blocking. Snippets, templates, articles, copying and exports retain their existing validation. This policy changes neither platform-rule severity nor formatter behavior and does not mean the intermittent sample-image failure is fixed.
+
 <a name="doc-library-styles"></a>
 
 ### Library styles and isolated canvases
@@ -350,6 +394,21 @@ Escaping the library, cycles, remote CSS assets, JS plugins and missing files ar
 A null viewport lays out content responsively at the actual preview-column width, uses the available height for scrolling, and adds no display scaling. An explicit viewport object reproduces a fixed layout: width/height set the CSS viewport, contentWidth sets body width, and display scaling does not change that layout. beforeHtml/afterHtml affect preview only, without entering source, Markdown-body output or copied body; existing source content remains.
 
 Custom classes and generated utilities share checks. For classes used solely as content hooks, explicitly set `css.stylesheets.parameters.allowUnknownClasses` to true; by default, classes without generated styles are checked. This does not disable source, safety or platform rules.
+
+### Renderer interfaces and ownership
+
+The article source field edits only the body. Original Front Matter appears in a read-only disclosure above it, while body numbers refer to the complete file, including blank lines and multiline YAML. Engine findings retain body coordinates; `ArticleFormatReport.bodyLineOffset` carries the corresponding file offset for display. Theme CSS keeps its own coordinates. Expanding the disclosure never rewrites the file; sources without metadata start at line 1.
+
+Rendering implementations live in `src/lib/article-format/` and use the same interfaces across platforms. The optional config.json, format trio and immutable algorithm snapshot retain authority. This extraction adds no executable-plugin entry and changes neither historical manifests nor old manuscripts.
+
+| Entry | Inputs and results | Responsibility |
+|---|---|---|
+| renderer.ts / compileArticleStyles | Markdown, article theme, immutable FormatSnapshot and optional stylesheet environment → CSS, candidates and diagnostics | Style compilation, cache and configuration identity |
+| ArticleDocument.tsx / MarkdownPreview.tsx | snapshot, themeId, source, media and children | Document structure, Markdown/HTML, resources and common body markers |
+| useArticleRenderMount.ts | hostRef, snapshot, CSS, dark and resource/image callbacks → mount target, canvases and diagnostics | ShadowRoot/iframe isolation, paper geometry, fonts and dark conversion |
+| output.ts / buildClipboardPayload | Matching document root and snapshot → rich HTML, plain text and resource information | Output conversion without preview shells or temporary interaction decoration |
+
+Pane layout, toolbars, drafts, save/delete workflows and library permissions stay in the workspace. React adapters connect media dialogs, translation and file sources through the existing resource context. Adapters own mounting and cleanup; mounting does not migrate source or history. Legacy compiler/output and editor component paths only forward to the same implementation and cache.
 
 <a name="doc-render-records"></a>
 

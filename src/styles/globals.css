@@ -11,5 +11,7 @@
 
 @source "../app/**/*.{ts,tsx}";
 @source "../components/**/*.{ts,tsx}";
+@source "../lib/article-format/*.tsx";
+@source "../lib/sourceViewport.ts";
 @source not "../../*.md";
 @source not "../../data/**";

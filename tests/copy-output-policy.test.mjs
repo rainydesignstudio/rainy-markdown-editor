@@ -1,3 +1,4 @@
+import * as previewImages from '../src/lib/article-format/previewImages.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -9,7 +10,7 @@ import parseInlineStyle from 'inline-style-parser';
 import { DEFAULT_FORMAT_BUNDLE, compileFormatBundle } from '../src/lib/article-format/config.ts';
 import * as runtime from '../src/lib/article-format/runtime.ts';
 
-const code = ts.transpileModule(await readFile(new URL('../src/lib/render.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+const code = ts.transpileModule(await readFile(new URL('../src/lib/article-format/output.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
 // JSDOM's CSSStyleDeclaration rotates repeated padding longhands. Inspect the emitted
 // declarations here; actual computed geometry is checked separately in native Chrome.
 const declaration = (element, property) => parseInlineStyle(element.getAttribute('style') ?? '').findLast(item => item.type === 'declaration' && item.property === property)?.value ?? '';
@@ -29,8 +30,8 @@ function harness(raw = DEFAULT_FORMAT_BUNDLE, html = markup) {
   const snapshot = { ...runtime.getFormatSnapshot(), bundle: compileFormatBundle(raw) };
   const purifier = createDOMPurify(dom.window), module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, window: dom.window,
-    require: id => id.endsWith('/article-format/runtime') ? { getFormatSnapshot: () => snapshot, assertFormatReady: runtime.assertFormatReady }
-      : id.endsWith('/article-format/sanitize') ? { sanitizeHtml: html => purifier.sanitize(html) }
+    require: id => (id.endsWith('/article-format/previewImages') || id === './previewImages') ? previewImages : (id.endsWith('/article-format/runtime') || id === './runtime') ? { getFormatSnapshot: () => snapshot, assertFormatReady: runtime.assertFormatReady }
+      : (id.endsWith('/article-format/sanitize') || id === './sanitize') ? { sanitizeHtml: html => purifier.sanitize(html) }
         : id.endsWith('/articleDarkPreview') ? { createArticleColorNormalizer: () => ({ normalizePaint: value => value }) }
           : id.endsWith('/articleFormat') ? { articleFormatAllowsCssProperty: property => !snapshot.bundle.formatter.output.dropCssProperties.includes(property) }
             : (() => { throw new Error(id); })(),

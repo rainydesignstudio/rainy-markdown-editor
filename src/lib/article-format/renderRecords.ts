@@ -8,6 +8,7 @@ import type { ThemeConfig } from '../types';
 import { TAILWIND_COMPILER_VERSION } from '../tailwind-assets';
 import { ALGORITHM_LIMITS, DEFAULT_ALGORITHMS, validateAlgorithmPackage } from './algorithms';
 import type { AlgorithmPackage } from './algorithmTypes';
+import { DEFAULT_LIBRARY_CONFIGURATION, validateResolvedLibraryConfiguration, assertConfigurationCompatible, type ResolvedLibraryConfiguration } from './libraryConfiguration';
 
 const OWNER = 'wechat-article-editor-render';
 const HASH = /^[a-f0-9]{64}$/;
@@ -19,6 +20,7 @@ export type RenderRecord = {
   html: string; css: string;
   assets: RenderAssetReference[];
   algorithmHash?: string;
+  configuration?: ResolvedLibraryConfiguration;
 };
 type RenderManifest = {
   owner: typeof OWNER; schemaVersion: 1; rawFormatter: RawFormatter;
@@ -26,6 +28,7 @@ type RenderManifest = {
   candidates: string[]; assets: RenderAssetReference[];
   compilerVersion: string;
   algorithms?: AlgorithmPackage;
+  configuration?: ResolvedLibraryConfiguration;
 };
 export type PreparedRenderRecord = { record: RenderRecord; assets: readonly CssAsset[]; manifest: RenderManifest };
 async function directory(root: FileSystemDirectoryHandle, path: string, create = false) {
@@ -61,6 +64,10 @@ export function validateRenderRecord(value: unknown): RenderRecord {
     delete formatter.preview.dark.mode;
   }
   if (canonicalFormatJson(formatter) !== canonicalFormatJson(record.formatter)) throw new ProductError("renderRecords.theRenderConfigurationDoesNotMatchTheValidatedSteps");
+  if (record.configuration !== undefined) {
+    const configuration = validateResolvedLibraryConfiguration(record.configuration);
+    assertConfigurationCompatible({ configuration, bundle: { formatter, validator: { meta: { enabled: false }, rules: [] } } });
+  }
   assertPortableStyles(record.css);
   for (const asset of record.assets) {
     if (!HASH.test(asset.hash) || typeof asset.path !== 'string' || !/^(image|font)\//.test(asset.mime) || normalizeLibraryPath(asset.path) !== asset.path) throw new ProductError("renderRecords.theRenderResourceReferenceIsInvalid");
@@ -118,9 +125,10 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
   const formatter = checkedFormatter(rawFormatter);
   const refs = assets.map(({ path, hash, mime }) => ({ path, hash, mime }));
   const algorithms = await validateAlgorithmPackage(snapshot.algorithms);
-  const manifest: RenderManifest = { owner: OWNER, schemaVersion: 1, rawFormatter, rawFiles: { ...(environment?.rawFiles ?? {}) }, policy: environment?.policy ?? null, candidates: [...(environment?.candidates ?? [])], assets: refs, compilerVersion: TAILWIND_COMPILER_VERSION, algorithms };
+  const configuration = snapshot.configuration && canonicalFormatJson(snapshot.configuration) !== canonicalFormatJson(DEFAULT_LIBRARY_CONFIGURATION) ? snapshot.configuration : undefined;
+  const manifest: RenderManifest = { owner: OWNER, schemaVersion: 1, rawFormatter, rawFiles: { ...(environment?.rawFiles ?? {}) }, policy: environment?.policy ?? null, candidates: [...(environment?.candidates ?? [])], assets: refs, compilerVersion: TAILWIND_COMPILER_VERSION, algorithms, ...(configuration ? { configuration } : {}) };
   const environmentHash = await contentHash(canonicalFormatJson(manifest));
-  return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, algorithmHash: algorithms.fingerprint, html, css: storedCss, assets: refs }, assets, manifest };
+  return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, algorithmHash: algorithms.fingerprint, html, css: storedCss, assets: refs, ...(configuration ? { configuration } : {}) }, assets, manifest };
 }
 export async function persistRenderRecord(root: FileSystemDirectoryHandle, target: FileSystemDirectoryHandle, prepared: PreparedRenderRecord) {
   const record = validateRenderRecord(prepared.record);
@@ -161,6 +169,7 @@ async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecor
   if (await contentHash(text) !== record.environmentHash) throw new ProductError("renderRecords.theHistoricalRenderVersionIsMissingOrFailedVerification");
   const manifest = JSON.parse(text) as RenderManifest;
   if (manifest.owner !== OWNER || manifest.schemaVersion !== 1 || canonicalFormatJson(manifest.rawFormatter) !== canonicalFormatJson(record.rawFormatter) ||
+      canonicalFormatJson(manifest.configuration ?? DEFAULT_LIBRARY_CONFIGURATION) !== canonicalFormatJson(record.configuration ?? DEFAULT_LIBRARY_CONFIGURATION) ||
       canonicalFormatJson(manifest.assets) !== canonicalFormatJson(record.assets) || !manifest.rawFiles || !Array.isArray(manifest.candidates) || manifest.candidates.some(value => typeof value !== 'string' || value.length > 256)) throw new ProductError("renderRecords.theHistoricalDependencyManifestIsInvalid");
   return manifest;
 }
@@ -205,7 +214,7 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
     css = css.replaceAll('article-asset:' + asset.hash, url);
   }
   const dispose = () => { environment?.dispose(); urls.forEach(url => URL.revokeObjectURL(url)); };
-  const snapshot: FormatSnapshot = { ...live, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter }, algorithms, algorithmSource: manifest.algorithms ? 'library' : 'legacy', officialDefault: live.officialDefault && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint && canonicalFormatJson(record.rawFormatter) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE.formatter),
+  const snapshot: FormatSnapshot = { ...live, configuration: record.configuration ?? DEFAULT_LIBRARY_CONFIGURATION, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter }, algorithms, algorithmSource: manifest.algorithms ? 'library' : 'legacy', officialDefault: live.officialDefault && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint && canonicalFormatJson(record.rawFormatter) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE.formatter),
     ...(environment ? { environment: { ...environment, get assets() { return [...environment.assets, ...extraAssets]; }, rawFiles: manifest.rawFiles, candidates: manifest.candidates, fingerprint: record.environmentHash } } : { environment: undefined }) };
   return { snapshot, html, css, dispose };
 }

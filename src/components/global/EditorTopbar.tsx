@@ -1,12 +1,14 @@
 'use client';
 
 import { useUITranslation } from './UILocaleProvider';
+import { useLibraryCapabilities } from '../../hooks/useLibraryCapability';
+import { EXPORT_CAPABILITIES } from '../../lib/article-format/libraryConfiguration';
 
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import type { ArticleMode, ViewKey } from '../../hooks/useEditorController';
 import type { WorkingArticle } from '../../lib/types';
 
-type IconName = 'menu' | 'back' | 'edit' | 'statistics' | 'history' | 'template' | 'export' | 'check' | 'save' | 'copy' | 'refresh';
+type IconName = 'menu' | 'back' | 'edit' | 'statistics' | 'history' | 'template' | 'export' | 'check' | 'save' | 'copy' | 'refresh' | 'delete' | 'lock' | 'unlock';
 
 function Icon({ name, className }: { name: IconName; className?: string }) {
   const common = { className, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -20,6 +22,8 @@ function Icon({ name, className }: { name: IconName; className?: string }) {
   if (name === 'check') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M5 3h14v7M5 3v18h8M8 7h7M8 11h4m2 6 3 3 5-6" /></svg>;
   if (name === 'save') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M4 4h13l3 3v13H4V4Z" /><path d="M8 4v6h8V4M8 20v-6h8v6" /></svg>;
   if (name === 'copy') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg>;
+  if (name === 'lock' || name === 'unlock') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="5" y="10" width="14" height="11" rx="2" /><path d={name === 'lock' ? 'M8 10V7a4 4 0 0 1 8 0v3' : 'M8 10V7a4 4 0 0 1 7.5-2M12 14v3'} /></svg>;
+  if (name === 'delete') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7" /></svg>;
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9a7 7 0 0 1 12-2L20 12M4 12l2.5 5a7 7 0 0 0 12-2" /></svg>;
 }
 
@@ -81,6 +85,11 @@ export function EditorTopbar({
   onCheckFormat,
 }: Props) {
   const { t } = useUITranslation('shell');
+  const capabilities = useLibraryCapabilities();
+  const copyCapability = capabilities.get('copyRichText');
+  const exportCapabilities = Object.values(EXPORT_CAPABILITIES).map(key => capabilities.get(key));
+  const canExport = exportCapabilities.some(state => state.enabled);
+  const exportReason = canExport ? undefined : exportCapabilities[0].reason;
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(currentTitle);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
@@ -153,12 +162,12 @@ export function EditorTopbar({
             <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.statistics')} data-tooltip={t('editor:toolbar.statistics')} onClick={onShowStatistics}><Icon name="statistics" /><span className="toolbar-action-copy">{t('editor:toolbar.statistics')}</span></button>
             <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.history')} data-tooltip={t('editor:toolbar.history')} data-history-trigger="true" disabled={disabled || !directory || !article.folder} onClick={onOpenHistory}><Icon name="history" /><span className="toolbar-action-copy">{t('editor:toolbar.historyShort')}</span></button>
             <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.createTemplate')} data-tooltip={t('editor:toolbar.template')} disabled={!directory || mediaOperation !== null || historyBusy} onClick={onCreateTemplate}><Icon name="template" /><span className="toolbar-action-copy">{t('editor:toolbar.templateShort')}</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.export')} data-tooltip={t('editor:toolbar.export')} disabled={!directory || mediaOperation !== null || historyBusy} onClick={onExport}><Icon name="export" /><span className="toolbar-action-copy">{t('common:actions.export')}</span></button>
+            <span className="inline-flex" title={exportReason} tabIndex={!canExport ? 0 : undefined} aria-label={exportReason}><button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.export')} data-tooltip={t('editor:toolbar.export')} disabled={!directory || mediaOperation !== null || historyBusy || !canExport} onClick={() => { if (canExport) onExport(); }}><Icon name="export" /><span className="toolbar-action-copy">{t('common:actions.export')}</span></button></span>
             <span className="toolbar-divider" aria-hidden="true" />
             <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.updateStyles')} data-tooltip={isCompiling ? t('editor:toolbar.generating') : t('editor:toolbar.updateStyles')} disabled={disabled || isCompiling || !directory} onClick={onCompile}><Icon name="refresh" /><span className="toolbar-action-copy">{isCompiling ? t('editor:toolbar.generatingShort') : t('editor:toolbar.updateStyles')}</span></button>
             <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.check')} data-tooltip={t('editor:toolbar.check')} disabled={!directory || mediaOperation !== null || historyBusy || isCompiling || !article.themeValid} onClick={onCheckFormat}><Icon name="check" /><span className="toolbar-action-copy">{t('editor:toolbar.check')}</span></button>
             <button className="toolbar-icon-button toolbar-icon-button--primary" type="button" aria-label={t('editor:toolbar.save')} data-tooltip={t('editor:toolbar.save')} disabled={!article.dirty || !directory || disabled} onClick={onSave}><Icon name="save" /><span className="toolbar-action-copy">{t('common:actions.save')}</span></button>
-            <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.copy')} data-tooltip={t('editor:toolbar.copy')} disabled={!isReadyToCopy || isCompiling || disabled} onClick={onCopy}><Icon name="copy" /><span className="toolbar-action-copy">{t('common:actions.copy')}</span></button>
+            <span className="inline-flex" title={copyCapability.reason} tabIndex={!copyCapability.enabled ? 0 : undefined} aria-label={copyCapability.reason}><button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.copy')} data-tooltip={t('editor:toolbar.copy')} disabled={!isReadyToCopy || isCompiling || disabled || !copyCapability.enabled} onClick={() => { if (copyCapability.enabled) onCopy(); }}><Icon name="copy" /><span className="toolbar-action-copy">{t('common:actions.copy')}</span></button></span>
           </>
         ) : null}
       </div>

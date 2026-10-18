@@ -12,7 +12,7 @@ import { withUILocaleImports } from './ui-locale-fixture.mjs';
 
 const code = ts.transpileModule(await readFile(new URL('../src/components/content/ContentRenderPreview.tsx', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 } }).outputText;
 
-const mountCode = ts.transpileModule(await readFile(new URL('../src/hooks/useArticleRenderMount.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+const mountCode = ts.transpileModule(await readFile(new URL('../src/lib/article-format/useArticleRenderMount.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 
 function preview() {
   let cursor = 0, tree, timerId = 0, shadows = 0;
@@ -45,7 +45,7 @@ function preview() {
       if (id.endsWith('/MarkdownPreview')) return { MarkdownPreview: 'markdown' };
       if (id.endsWith('/articleDarkPreview')) return { observeArticlePreview() {}, cloneArticleForDarkPreview() {}, articleDarkPreviewDocument() {} };
       if (id.endsWith('/localFonts')) return { shareLocalFontsWithPreview: () => () => {} };
-      if (id.endsWith('/tailwind')) return { compileArticleStyles(source, theme) { return new Promise((resolve, reject) => calls.push({ source, theme, resolve, reject })); } };
+      if ((id.endsWith('/tailwind') || id.endsWith('/article-format/renderer'))) return { compileArticleStyles(source, theme) { return new Promise((resolve, reject) => calls.push({ source, theme, resolve, reject })); } };
       throw new Error(id);
     }),
   });

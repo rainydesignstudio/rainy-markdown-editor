@@ -22,7 +22,7 @@ function designer(editing = false, appearanceScheme = 'light') {
   vm.runInNewContext(code, { module, exports: module.exports, window: { addEventListener() {}, removeEventListener() {} }, require: withUILocaleImports(function(id){
     if (id.endsWith('/ThemeInspection')) return { useThemeInspection: () => ({ listRef: { current: null }, hovered: null, selected: null, rowProps: () => ({}), clear() {}, locate() {} }), ThemeInspectionPreview: 'inspection-preview', INSPECTION_ROW_CLASSES: '' };
     if (id.endsWith('/themeInspection')) return { uniqueBindings: items => items.filter((item, index) => items.findIndex(other => other.key === item.key) === index) };
-    if (id.endsWith('/tailwind')) return {};
+    if ((id.endsWith('/tailwind') || id.endsWith('/article-format/renderer'))) return {};
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
     if (id.endsWith('/editorThemes')) return themes;
     if (id.endsWith('/fontCatalog')) return fontCatalog;
@@ -63,9 +63,9 @@ test('designer starts in the workspace scheme and permits temporary mode inspect
   assert.equal(view.button('保存主题').props.disabled, true);
 });
 
-test('designer independently edits 33 colors per mode and eight fonts without mutating a preset or adding size controls', () => {
+test('designer independently edits 34 colors per mode and eight fonts without mutating a preset or adding size controls', () => {
   const view = designer(); const original = JSON.stringify(themes.BASE_EDITOR_THEME);
-  assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 66);
+  assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 68);
   assert.equal(view.nodes().filter(node => node.type === 'button' && 'aria-expanded' in node.props).length, 2);
   assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 8);
   assert.equal(view.fontNodes().some(node => node.type === 'input' && ['number', 'range'].includes(node.props.type)), false);
@@ -82,7 +82,7 @@ test('designer independently edits 33 colors per mode and eight fonts without mu
   assert.equal(JSON.stringify(themes.BASE_EDITOR_THEME), original);
   assert.deepEqual(themes.validateEditorTheme(JSON.parse(JSON.stringify(after))), []);
   view.button('深色').props.onClick(); view.render();
-  assert.equal(view.nodes().filter(node => node.props['aria-label']?.startsWith('dark.')).length, 33);
+  assert.equal(view.nodes().filter(node => node.props['aria-label']?.startsWith('dark.')).length, 34);
 });
 
 test('designer keeps collapsible group headings outside independently scrolling color and font lists', () => {
@@ -98,7 +98,7 @@ test('designer keeps collapsible group headings outside independently scrolling 
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 0);
   assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 8);
   colors().props.onClick(); fonts().props.onClick(); view.render();
-  assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 66);
+  assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 68);
   assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 0);
 });
 

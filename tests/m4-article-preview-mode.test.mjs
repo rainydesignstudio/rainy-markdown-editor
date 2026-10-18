@@ -3,6 +3,10 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
+import { getFormatSnapshot, activateFormatBundle } from '../src/lib/article-format/runtime.ts';
+import { DEFAULT_FORMAT_BUNDLE } from '../src/lib/article-format/config.ts';
+import { DEFAULT_ALGORITHMS } from '../src/lib/article-format/algorithms.ts';
+import { libraryCapability } from '../src/lib/article-format/libraryConfiguration.ts';
 
 const source = await readFile(new URL('../src/hooks/useArticlePreviewMode.ts', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
@@ -16,7 +20,11 @@ function environment(saved, denied = false) {
     matchMedia: () => query,
     localStorage: { getItem: key => { if (denied) throw new Error('denied'); return values.get(key) ?? null; }, setItem: (key, value) => { if (denied) throw new Error('denied'); values.set(key, value); } },
     addEventListener: (name, callback) => { if (!events.has(name)) events.set(name, new Set()); events.get(name).add(callback); }, removeEventListener: (name, callback) => events.get(name)?.delete(callback), dispatchEvent: event => events.get(event.type)?.forEach(callback => callback(event)),
-  }, require(id) { if (id === 'react') return {
+  }, require(id) {
+    if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => getFormatSnapshot() };
+    if ((id.endsWith('/article-format/runtime') || id === './runtime')) return { getFormatSnapshot };
+    if (id.endsWith('/article-format/libraryConfiguration')) return { libraryCapability };
+    if (id === 'react') return {
     useState(initial) { const instance = active, index = instance.cursor++; if (!(index in instance.cells)) instance.cells[index] = initial; return [instance.cells[index], value => { instance.cells[index] = value; }]; },
     useLayoutEffect(effect, dependencies) { const instance = active, index = instance.cursor++; if (!(index in instance.cells)) { instance.cells[index] = true; effect(); } },
   }; throw new Error(id); } });
@@ -44,4 +52,16 @@ test('blocked storage still permits toggling and synchronizing previews for the 
   left.state.toggle(); left.render(); right.render();
   assert.equal(left.state.dark, false); assert.equal(right.state.dark, false);
   env.systemChange(true); assert.equal(right.render().dark, false);
+});
+
+test('a fixed library preview preserves global preferences and blocks programmatic toggles', () => {
+  const raw = structuredClone(DEFAULT_FORMAT_BUNDLE);
+  activateFormatBundle(raw, 'fixed-preview', 'library', undefined, DEFAULT_ALGORITHMS, 'library', { schemaVersion: 1, meta: { id: raw.support.meta.id }, rendering: { previewMode: 'light' } });
+  const env = environment('dark'), preview = env.view();
+  assert.equal(preview.state.dark, false);
+  preview.state.toggle();
+  assert.equal(preview.render().dark, false);
+  assert.equal(env.values.get('rainy-article-preview-mode-v1'), 'dark');
+  activateFormatBundle(raw, 'normal', 'library');
+  assert.equal(preview.render().dark, true);
 });

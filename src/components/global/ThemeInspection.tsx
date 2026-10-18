@@ -35,7 +35,7 @@ export function useThemeInspection() {
   return { listRef, listProps, hovered, selected, locate: setSelected, rowProps, clear };
 }
 export type ThemeInspection = ReturnType<typeof useThemeInspection>;
-export const INSPECTION_ROW_CLASSES = 'transition-opacity duration-300 data-[inspection-dim=true]:opacity-50 focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+export const INSPECTION_ROW_CLASSES = 'transition-opacity duration-300 data-[inspection-dim=true]:opacity-50 focus-visible:rounded-md focus-visible:outline-2 focus-visible:-outline-offset-3 focus-visible:outline-accent';
 
 type Popup = { element: HTMLElement; bindings: ColorBinding[]; left: number; top: number; bottom: number };
 type Props = {

@@ -336,7 +336,7 @@
     "currentManuscriptHasUnsavedChanges": " · current manuscript has unsaved changes",
     "historicalFrontMatterDoesNotMatchTheTheme": "Historical Front Matter does not match the theme snapshot. Restore and save-as are disabled to avoid binding the wrong theme.",
     "comparisonMode": "Comparison mode",
-    "sourceAndMetadata": "Source and metadata",
+    "sourceAndMetadata": "Source comparison",
     "renderedLayout": "Rendered layout",
     "sourceSideBySide": "Source side-by-side",
     "historicalVersion": "Historical version",
@@ -404,7 +404,8 @@
     "articleFolderName": "Article folder name",
     "applyFolderName": "Apply folder name",
     "folderRenameImmediate": "Press Enter or Apply to update the index and reload the manuscript immediately. The filename remains article.md.",
-    "imageZoomToggle": "Toggle zoom and fit width"
+    "imageZoomToggle": "Toggle zoom and fit width",
+    "searchHitSample": "Search result"
   },
   "templates": {
     "from": "From {{source}}",
@@ -490,7 +491,8 @@
     "editor-text": "Source text",
     "editor-syntax": "Syntax marks",
     "editor-heading": "Source headings",
-    "editor-quote": "Source quotes"
+    "editor-quote": "Source quotes",
+    "search-hit": "Search highlight"
   },
   "articleColors": {
     "color-article-ink": "Body text",
@@ -677,7 +679,15 @@
     "loading": "Loading this version’s theme and styles…",
     "forkTitle": "{{title}} history fork",
     "savedSnapshot": "Saved snapshot",
-    "changedFields": "Changed fields: {{fields}}"
+    "changedFields": "Changed fields: {{fields}}",
+    "versionCount": "{{count}} historical versions",
+    "versionActions": "Version actions",
+    "deleteVersion": "Delete this version",
+    "saveCurrent": "Save the current editor draft as an important version",
+    "deleteExplanation": "Delete only this selected version. This cannot be undone. The current draft, other versions, article media and shared rendering resources are retained.",
+    "deleteProtectedExplanation": "This version is protected from automatic cleanup. This is an explicitly confirmed manual deletion.",
+    "confirmDelete": "Confirm version deletion",
+    "contextStatus": "{{path}} stores article and theme together in each snapshot; {{status}}"
   },
   "imageRename": {
     "viewAndRename": "View and rename",

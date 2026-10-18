@@ -11,6 +11,7 @@ import { contentFormatBlockingIssues } from '../src/lib/contentValidation.ts';
 import { loadArticleSnippets, loadArticleTemplates, saveArticleSnippet, saveArticleTemplate } from '../src/lib/contentLibraries.ts';
 
 import { DEFAULT_FORMAT_BUNDLE, compileFormatBundle } from '../src/lib/article-format/config.ts';
+import { validateLibraryConfiguration } from '../src/lib/article-format/libraryConfiguration.ts';
 import { createUII18n } from '../src/lib/i18n/runtime.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -120,6 +121,10 @@ for (const locale of locales) test(`${locale}: format MVP objects compile throug
   const support = records.find(record => record.validator === validator.id);
   const origin = records.find(record => record[support.source]);
   const bundle = structuredClone(DEFAULT_FORMAT_BUNDLE);
+  const application = records.find(record => record.schemaVersion === 1 && record.capabilities);
+  assert.equal(validateLibraryConfiguration(application).rendering.styleAuthority, 'library');
+  const themePolicy = records.find(record => record.savePolicy);
+  bundle.validator.product.theme.savePolicy = themePolicy.savePolicy;
   bundle.support.meta.sources[support.source] = origin[support.source];
   bundle.support.rules.push(support); bundle.validator.rules.push(validator);
   for (const step of records.filter(record => record.operator && record.operator !== 'style.values').concat(records.filter(Array.isArray).flat())) {
@@ -132,6 +137,7 @@ for (const locale of locales) test(`${locale}: format MVP objects compile throug
   assert.equal(result.formatter.stylesheets.entry, 'styles/globals.css');
   assert.equal(result.formatter.document.viewport, null);
   assert.equal(result.validator.rules.at(-1).id, 'custom-alignment');
+  assert.equal(result.validator.product.theme.savePolicy.sampleResources, 'review');
 });
 
 test('both installation guides reference repository npm scripts and runtime repair hints target existing localized files', async () => {

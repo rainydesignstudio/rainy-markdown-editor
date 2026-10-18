@@ -58,7 +58,7 @@ function memoryLibrary() {
   return { root: dir(), files, writes, put, fail: suffix => { fail = suffix; } };
 }
 const element = { outerHTML: '<article class="article-preview"><div class="article-body"><p class="card">body</p></div></article>', cloneNode() { return { outerHTML: this.outerHTML }; } };
-async function fixture(darkParameters) {
+async function fixture(darkParameters, configuration) {
   const library = memoryLibrary();
   library.put('styles/globals.css', '@import "tailwindcss"; .card{color:red;background-image:url("/image/mark.svg")}');
   library.put('assets/image/mark.svg', '<svg xmlns="http://www.w3.org/2000/svg"></svg>');
@@ -66,7 +66,7 @@ async function fixture(darkParameters) {
   if (darkParameters) raw.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters = darkParameters;
   raw.formatter.steps.push({ id: 'library-css', operator: 'css.stylesheets', enabled: true, parameters: { entry: 'styles/globals.css', publicRoot: 'assets' } });
   const environment = await loadStylesheetEnvironment(library.root, { entry: 'styles/globals.css', publicRoot: 'assets' });
-  const snapshot = activateFormatBundle(raw, 'render-test', 'library', environment);
+  const snapshot = activateFormatBundle(raw, 'render-test', 'library', environment, DEFAULT_ALGORITHMS, 'library', configuration);
   const source = createArticleSource('render-test', BASIC_THEME.id) + '\n<p class="card">body</p>\n';
   const saved = await saveStoredArticle(library.root, source, BASIC_THEME);
   const directory = await getStoredArticleDirectory(library.root, saved.article.month, saved.article.folder);
@@ -256,6 +256,44 @@ test('an expired rendition is distinguished from broken dependencies and rebuild
       assert.ok(compiled.css.includes('.p-6'), JSON.stringify({ candidates: compiled.candidates, end: compiled.css.slice(-1600) }));
       assert.equal(await renderRecordMatches(stored.renderRecord, changed, BASIC_THEME), false);
       assert.equal(f.writes.length, before, 'opening and rebuilding preview must not migrate user files');
+    } finally { restored.dispose(); }
+  } finally { f.environment.dispose(); }
+});
+
+test('a retained library configuration is immutable, hash-bound and independent of the current library policy', async () => {
+  const f = await fixture(undefined, { schemaVersion: 1, meta: { id: DEFAULT_FORMAT_BUNDLE.support.meta.id }, rendering: { styleAuthority: 'library', previewMode: 'light' }, capabilities: { copyRichText: { enabled: false } } });
+  try {
+    assert.equal(f.prepared.record.configuration.rendering.styleAuthority, 'library');
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const record = await readRenderRecord(f.directory);
+    const live = activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), 'another-library');
+    const writes = f.writes.length;
+    const restored = await restoreRenderEnvironment(f.root, record, live);
+    try {
+      assert.equal(restored.snapshot.configuration.rendering.styleAuthority, 'library');
+      assert.equal(restored.snapshot.configuration.rendering.previewMode, 'light');
+      assert.equal(restored.snapshot.configuration.capabilities.copyRichText.enabled, false);
+      assert.equal(f.writes.length, writes);
+    } finally { restored.dispose(); }
+    const altered = structuredClone(record);
+    altered.configuration.capabilities.copyRichText.enabled = true;
+    await assert.rejects(restoreRenderEnvironment(f.root, altered, live));
+  } finally { f.environment.dispose(); }
+});
+
+test('legacy render records without configuration retain legacy defaults instead of inheriting a new fixed preview', async () => {
+  const f = await fixture();
+  try {
+    assert.equal(Object.hasOwn(f.prepared.record, 'configuration'), false);
+    await persistRenderRecord(f.root, f.directory, f.prepared);
+    const raw = structuredClone(DEFAULT_FORMAT_BUNDLE);
+    const live = activateFormatBundle(raw, 'fixed-live', 'library', undefined, DEFAULT_ALGORITHMS, 'library', { schemaVersion: 1, meta: { id: raw.support.meta.id }, rendering: { previewMode: 'light' } });
+    const writes = f.writes.length;
+    const restored = await restoreRenderEnvironment(f.root, f.prepared.record, live);
+    try {
+      assert.equal(restored.snapshot.configuration.rendering.previewMode, 'user');
+      assert.equal(restored.snapshot.configuration.capabilities.previewMode.enabled, true);
+      assert.equal(f.writes.length, writes);
     } finally { restored.dispose(); }
   } finally { f.environment.dispose(); }
 });

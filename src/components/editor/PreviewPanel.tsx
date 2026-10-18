@@ -4,11 +4,12 @@ import { useUITranslation } from '../global/UILocaleProvider';
 
 import { previewSurfaceStyle } from '../../lib/article-format/preview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
+import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 
 import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react';
 import { parseArticle } from '../../lib/frontMatter';
 import type { WorkingArticle } from '../../lib/types';
-import type { ArticleMediaContext } from './MarkdownPreview';
+import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
 import { PreviewModeSwitch } from './PreviewModeSwitch';
 import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
@@ -39,6 +40,7 @@ type Props = {
   mediaBusy: boolean;
   readOnly: boolean;
   onOpenTheme: () => void;
+  onOpenSourceFind?: () => void;
 };
 
 export function PreviewPanel({
@@ -58,6 +60,7 @@ export function PreviewPanel({
   mediaBusy,
   readOnly,
   onOpenTheme,
+  onOpenSourceFind,
 }: Props) {
   const { t } = useUITranslation('editor');
   const { preferences, toggle: togglePreference } = usePreviewPreferences();
@@ -66,6 +69,7 @@ export function PreviewPanel({
   const frozenRootRef = useRef<HTMLElement | null>(null);
   const sourceTextRef = useRef(parsed.body); sourceTextRef.current = parsed.body;
   const liveFormatSnapshot = useFormatSnapshot();
+  const themeCapability = useLibraryCapability('articleTheme');
   const formatSnapshot = article.renderSnapshot?.id === liveFormatSnapshot.id ? article.renderSnapshot : liveFormatSnapshot;
   const input: PreviewInput = { article, parsed, compiledCss, media, snapshot: formatSnapshot };
   const [frozen, setFrozen] = useState<ReturnType<typeof retainPreviewInput> | null>(null);
@@ -137,10 +141,19 @@ export function PreviewPanel({
     return () => observer.disconnect();
   }, [clipboardReceiverRef]);
     return (
-    <section ref={panelRef} className="panel preview-panel" data-mobile-hidden={mobilePane === 'source'}>
+    <section ref={panelRef} tabIndex={-1} aria-label={t('editor:workspace.preview')} onPointerDownCapture={event => {
+      // Static preview text has no native focus target. Keep subsequent shortcuts
+      // scoped to this pane without stealing focus from its interactive controls.
+      const interactive = event.nativeEvent.composedPath().some(node => node !== event.currentTarget && node instanceof Element && node.matches('a,button,input,textarea,select,[tabindex],[contenteditable="true"]'));
+      if (!interactive) event.currentTarget.focus({ preventScroll: true });
+    }} className="panel preview-panel" data-mobile-hidden={mobilePane === 'source'} onKeyDownCapture={event => {
+      if (!onOpenSourceFind || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'f'
+        || !event.nativeEvent.composedPath().includes(event.currentTarget)) return;
+      event.preventDefault(); event.stopPropagation(); onOpenSourceFind();
+    }}>
       <div className="panel-header h-18 min-h-18 bg-list px-3 md:px-7.5">
         <div className="flex min-w-0 items-center gap-2 md:gap-6">
-          <InformationButton icon={<InformationIcon book />} title={article.theme.name} subtitle={<span className="flex items-center gap-1.5">v{article.theme.version}{themeUpdateAvailable ? <ThemeUpdateTag /> : null}</span>} onClick={onOpenTheme} disabled={mediaBusy} aria-label={t('editor:preview.themeLabel', { name: article.theme.name, version: article.theme.version, update: themeUpdateAvailable ? t('editor:preview.updateSuffix') : '' })} />
+          <span className="inline-flex min-w-0" title={themeCapability.reason} tabIndex={!themeCapability.enabled ? 0 : undefined} aria-label={themeCapability.reason}><InformationButton icon={<InformationIcon book />} title={liveFormatSnapshot.configuration?.rendering.styleAuthority === 'library' ? liveFormatSnapshot.bundle.support.meta.name : article.theme.name} subtitle={liveFormatSnapshot.configuration?.rendering.styleAuthority === 'library' ? t('messages:libraryConfiguration.styleSource') : <span className="flex items-center gap-1.5">v{article.theme.version}{themeUpdateAvailable ? <ThemeUpdateTag /> : null}</span>} onClick={() => { if (themeCapability.enabled) onOpenTheme(); }} disabled={mediaBusy || !themeCapability.enabled} aria-label={t('editor:preview.themeLabel', { name: article.theme.name, version: article.theme.version, update: themeUpdateAvailable ? t('editor:preview.updateSuffix') : '' })} /></span>
           <PreviewModeSwitch dark={dark} onToggle={toggle} />
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -153,9 +166,9 @@ export function PreviewPanel({
       </div>
       <div className="relative min-h-0 flex-1">
         <div className="h-full data-[hidden=true]:pointer-events-none data-[hidden=true]:absolute data-[hidden=true]:inset-0 data-[hidden=true]:opacity-0" data-hidden={frozenVisible} aria-hidden={frozenVisible || undefined} inert={frozenVisible}>
-          <ArticlePreviewCanvas input={input} dark={frozenVisible ? false : dark} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
+          <ArticlePreviewCanvas input={input} dark={frozenVisible ? false : dark} onOpenSourceFind={onOpenSourceFind} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
         </div>
-        {frozenVisible ? <ArticlePreviewCanvas input={frozen.input} dark={dark} canonical={false} rootRef={frozenRootRef} viewportRef={frozenViewportRef} /> : null}
+        {frozenVisible ? <ArticlePreviewCanvas input={frozen.input} dark={dark} onOpenSourceFind={onOpenSourceFind} canonical={false} rootRef={frozenRootRef} viewportRef={frozenViewportRef} /> : null}
       </div>
       <div className="panel-body">
         <section className="clipboard-dock">

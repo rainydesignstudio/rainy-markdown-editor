@@ -3,7 +3,7 @@
   "name": "Rainy Design · 开场 · 贰",
   "trigger": "//rainy-opening-ii",
   "description": "克制的英文眉题、标题与导语，使用 Rainy Design 的文字与分隔色。",
-  "content": "<section class=\"mt-0 mb-8 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest\">RAINY DESIGN / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 p-0 text-3xl font-bold\">▌我不装了我真摊牌了</h1>\n  <p class=\"mt-4 mb-0 text-base\">其实写文章都不该你自己写的。你可以试试好用的 ghost-writer，如果不太懂的话有 eli5 和 teach skill 可以用。</p>\n</section>\n",
+  "content": "<section class=\"mt-0 mb-8 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">RAINY DESIGN / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 p-0 text-3xl font-bold\">▌我不装了我真摊牌了</h1>\n  <p class=\"mt-4 mb-0 text-base\">其实写文章都不该你自己写的。你可以试试好用的 ghost-writer，如果不太懂的话有 eli5 和 teach skill 可以用。</p>\n</section>\n",
   "icon": "snippet",
   "categoryId": "rainy-design"
 }

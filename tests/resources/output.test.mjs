@@ -119,7 +119,7 @@ test('the exact sample URI prefers authorized source bytes and never substitutes
 });
 
 test('unchanged Markdown and stable media scopes bypass reparsing; actual source, snapshot or authority changes do not', async () => {
-  const source = await readFile(new URL('../../src/components/editor/MarkdownPreview.tsx', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../../src/lib/article-format/MarkdownPreview.tsx', import.meta.url), 'utf8');
   const start = source.indexOf('export function sameMarkdownPreviewInput'), end = source.indexOf('function MarkdownPreviewContent', start), context = {};
   vm.runInNewContext(ts.transpileModule(source.slice(start, end).replace('export function', 'function') + '\nglobalThis.compare=sameMarkdownPreviewInput;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
   const original = { source: '# Body', snapshot: {}, media: { root: {}, article: { id: 'one' }, articleTitle: 'One', sessionKey: 'base', onOpen() {} } };

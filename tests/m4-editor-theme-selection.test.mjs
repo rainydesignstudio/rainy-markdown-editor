@@ -67,13 +67,14 @@ test('picker keeps missing current snapshot, supports search, and prevents adopt
 
 const controllerSource = await readFile(new URL('../src/hooks/useEditorController.ts', import.meta.url), 'utf8');
 const start = controllerSource.indexOf('  const changeTheme = useCallback(');
-const end = controllerSource.indexOf('\n\n', controllerSource.indexOf('  }, [articleSettings.autoSnapshot.maxCount', start));
+const end = controllerSource.indexOf('  const applyThemeFromLibrary = useCallback(', start);
 function themeChange({ fail = false, draft = false } = {}) {
   const root = {}, current = { source: '---\ntitle: 原稿\n---\n# 原稿正文', theme: BASIC_THEME, themeValid: true, folder: 'original', month: '2026-09' };
   if (draft) { current.folder = null; current.month = null; }
   const updates = [], statuses = []; let checkpoints = 0, finishes = 0, hidden = false;
   const compiles = []; let previewRefreshes = 0;
   const context = {
+    capabilityAllowed: () => true,
     useCallback: fn => fn, directoryRef: { current: root }, articleRef: { current }, articleId: () => 'original', editorWorkspaceRef: { current: {} }, getArticleOrganization: () => ({ archived: false }),
     parseArticle, updateFrontMatter, setStatus: v => statuses.push(v), setShowThemeDialog: () => { hidden = true; },
     updateArticle(source, theme) { updates.push([source, theme]); context.articleRef.current = { ...context.articleRef.current, source, theme, dirty: true }; },
@@ -162,12 +163,13 @@ test('an immediately failing compile keeps its error visible after theme adoptio
 test('theme library forks a saved article with its current source and the selected theme', async () => {
   const source = controllerSource;
   const start = source.indexOf('  const applyThemeFromLibrary = useCallback(');
-  const end = source.indexOf('\n\n', source.indexOf('  }, [changeTheme, navigateArticleMode, storedArticles]);', start));
+  const end = source.indexOf('  const createNewArticle = useCallback(', start);
   const stored = { id: 'saved-id', month: '2026-09', folder: 'saved', parse: { metadata: { title: '原稿' } } };
   const current = { source: '# 尚未保存的修改', month: stored.month, folder: stored.folder };
   const root = {};
   const updates = [], navigation = [];
   const context = {
+    capabilityAllowed: () => true,
     useCallback: fn => fn,
     directoryRef: { current: root }, documentTokenRef: { current: { root } }, articleRef: { current },
     copyOpenerRef: { current: null },

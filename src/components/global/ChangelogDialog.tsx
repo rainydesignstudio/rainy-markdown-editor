@@ -43,7 +43,7 @@ function ReleaseBlock({ release, open, onToggle }: { release: Release; open: boo
   const status = RELEASE_STATUS[release.status] ?? RELEASE_STATUS['in-progress'];
 
   return <section className="grid gap-3 rounded-lg border border-line bg-list/50 p-4" aria-label={t('changelog:release', { version: release.version })}>
-    <button type="button" aria-expanded={collapsible ? open : undefined} aria-controls={collapsible ? bodyId : undefined} disabled={!collapsible} onClick={onToggle} className="group/release flex w-full items-center justify-between gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-default">
+    <button type="button" aria-expanded={collapsible ? open : undefined} aria-controls={collapsible ? bodyId : undefined} disabled={!collapsible} onClick={onToggle} className="group/release flex w-full items-center justify-between gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default">
       <span className="font-mono text-sm font-semibold text-primary">{release.version}</span>
       <span className="flex items-center gap-2">
         <span className={`rounded-md px-2 py-1 text-xs ${status.className}`}>{t('changelog:status.' + (RELEASE_STATUS[release.status] ? release.status : 'in-progress'))}</span>

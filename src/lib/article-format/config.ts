@@ -4,13 +4,14 @@ import validatorDefaults from '../../../resources/presets/platform/wechat-articl
 import formatterDefaults from '../../../resources/presets/platform/wechat-article/format/formatter.json' with { type: 'json' };
 import { VALIDATOR_CAPABILITIES, FORMATTER_CAPABILITIES, SOURCE_STRUCTURE_SELECTOR, record, shape, text, bool, number, strings, array, mapping, property, selector, choice, fail, type Guard } from './contracts';
 import type { StylesheetsPolicy, RenderDocumentPolicy, RenderNodePolicy, CodeLayoutPolicy, PrismStylePolicy } from './styleTypes';
+import { configurationMetadataGuards, type ConfigurationMetadata } from './libraryConfiguration';
 
 export type RuleParameters = Record<string, unknown>;
 export type FormatRule = { id: string; operator: string; enabled: boolean; stages: string[]; parameters: RuleParameters };
 export type SupportRule = { id: string; section: string; title: string; severity: 'warning' | 'error'; source: string; validator: string; description?: string; anchor?: string };
 export type FormatSupport = {
   schemaVersion: number;
-  meta: { id: string; name: string; sources: Record<string, { url: string; version?: string; commit?: string }> };
+  meta: { id: string; name: string; sources: Record<string, { url: string; version?: string; commit?: string }> } & ConfigurationMetadata;
   rules: SupportRule[];
   manualReview: { id: string; section: string; title: string; selector: string; description?: string; anchor?: string; source: string }[];
 };
@@ -21,10 +22,11 @@ export type ProductThemeDefinition = {
   limits: { id: number; name: number; value: number; css: number; json: number };
   formatVersion: number; kind: string; idPattern: string; versionPattern: string; valuePattern: string;
   darkTokens?: { allowPartial: boolean; fallback: 'light' };
+  savePolicy?: { sampleResources: 'block' | 'review' };
 };
-export type FormatValidator = { schemaVersion: number; meta: { id: string; enabled?: boolean }; product: { theme: ProductThemeDefinition }; rules: FormatRule[] };
+export type FormatValidator = { schemaVersion: number; meta: { id: string; enabled?: boolean } & ConfigurationMetadata; product: { theme: ProductThemeDefinition }; rules: FormatRule[] };
 export type FormatFormatter = {
-  schemaVersion: number; meta: { id: string };
+  schemaVersion: number; meta: { id: string } & ConfigurationMetadata;
   markdown: { softBreaks: 'space' | 'line-break'; preserveExtraBlankLines: boolean; betweenBlocks: number; atEdges: number };
   preview: {
     light: { background: string }; dark: { background: string; mode?: 'algorithm' | 'tokens'; transform: string; options: Record<string, unknown> };
@@ -52,7 +54,7 @@ export type FormatBundle = { support: FormatSupport; validator: FormatValidator;
 
 // A raw formatter is editable JSON; the resolved policy is an immutable engine input.
 export type FormatterStep = { id: string; operator: string; enabled: boolean; parameters: RuleParameters };
-export type RawFormatter = { schemaVersion: number; meta: { id: string }; steps: FormatterStep[] };
+export type RawFormatter = { schemaVersion: number; meta: { id: string } & ConfigurationMetadata; steps: FormatterStep[] };
 export type RawFormatBundle = { support: FormatSupport; validator: FormatValidator; formatter: RawFormatter };
 export const DEFAULT_FORMAT_BUNDLE = { support: supportDefaults, validator: validatorDefaults, formatter: formatterDefaults } as unknown as RawFormatBundle;
 export const FORMAT_OPERATORS = new Set(Object.keys(VALIDATOR_CAPABILITIES));
@@ -70,14 +72,17 @@ const themeGuard = shape({
   nodeProperties: mapping(property, identifier), wrapperProperties: strings, allowUnknownCssProperties: bool,
   allowedDisplayValues: strings, limits: shape({ id: number(1, 10000, true), name: number(1, 10000, true), value: number(1, 100000, true), css: number(1, 10000000, true), json: number(1, 10000000, true) }),
   formatVersion: number(1, 1, true), kind: choice('article-theme'), idPattern: pattern, versionPattern: pattern, valuePattern: pattern,
-}, { darkTokens: shape({ allowPartial: bool, fallback: choice('light') }) });
+}, {
+  darkTokens: shape({ allowPartial: bool, fallback: choice('light') }),
+  savePolicy: shape({ sampleResources: choice('block', 'review') }),
+});
 export function validateFormatBundle(input: unknown): RawFormatBundle {
-  shape({ support: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier, name: text, sources: mapping(sourceGuard, identifier) }),
+  shape({ support: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier, name: text, sources: mapping(sourceGuard, identifier) }, configurationMetadataGuards),
     rules: array(shape({ id: identifier, section: text, title: text, severity: choice('warning', 'error'), source: identifier, validator: identifier }, { description: text, anchor: text })),
     manualReview: array(shape({ id: identifier, section: text, title: text, selector, source: identifier }, { description: text, anchor: text })),
-  }), validator: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }, { enabled: bool }), product: shape({ theme: themeGuard }),
+  }), validator: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }, { enabled: bool, ...configurationMetadataGuards }), product: shape({ theme: themeGuard }),
     rules: array(shape({ id: identifier, operator: text, enabled: bool, stages: array(choice('authoring', 'rendered'), 1), parameters: (value, path) => { record(value, path); } })),
-  }), formatter: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }), steps: array(shape({ id: identifier, operator: text, enabled: bool, parameters: (value, path) => { record(value, path); } })) }),
+  }), formatter: shape({ schemaVersion: number(1, 1, true), meta: shape({ id: identifier }, configurationMetadataGuards), steps: array(shape({ id: identifier, operator: text, enabled: bool, parameters: (value, path) => { record(value, path); } })) }),
   })(input, productText("config.formatTrio"));
   const bundle = input as RawFormatBundle;
   if (new Set([bundle.support.meta.id, bundle.validator.meta.id, bundle.formatter.meta.id]).size !== 1) fail('meta.id', productText("config.theThreeConfigurationsDoNotAgreeAndCannotBeMixed"));

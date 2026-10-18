@@ -30,8 +30,8 @@ Save under `themes/editor-themes/<id>.json`. Import through **Settings → Appea
 | id / name | Safe ID; name 1–80 characters |
 | version | Three numeric components, such as 1.0.0 |
 | formatVersion | Use 4 for new themes; the app normalizes supported older formats |
-| palette | 1–128 entries with safe names and 3/6-digit HEX values without alpha |
-| colors | Only light/dark; each includes all 33 roles below, referencing palette keys |
+| palette | 1–130 entries with safe names and 3/6-digit HEX values without alpha |
+| colors | Only light/dark; each includes all 34 roles below, referencing palette keys |
 | fonts | All 8 roles below, each a nonempty safe font stack |
 | surfaces | Optional; use defined fields/structure, or omit it entirely |
 
@@ -41,7 +41,7 @@ Color roles:
 canvas rail list panel hover popup-bg
 primary secondary muted faint popup-text
 line line-strong
-accent accent-strong accent-text accent-soft accent-line selection on-accent
+accent accent-strong accent-text accent-soft accent-line selection search-hit on-accent
 success success-surface
 warning warning-strong warning-surface warning-line
 danger on-danger
@@ -61,6 +61,8 @@ Design the palette first, then map semantic roles. Do not put literal colors int
 Optional `surfaces` contains light/dark schemes. Its fields may be omitted to retain existing role fallbacks; the full field list and editor controls are described below. Colors reference palette keys and bounded opacity values. Follow the [production type and validator](../../../src/lib/editorThemes.ts); this field cannot inject arbitrary CSS.
 
 <a name="doc-editor-theme-example"></a>
+
+`search-hit` controls the search-result background, with independent palette references for light and dark. Every built-in theme defaults to fluorescent yellow. Text automatically uses black or white for contrast. Older files inherit the missing role in memory without a disk migration; explicit saving persists it. Search navigation centers the result when scroll space permits.
 
 ### Complete editor-theme example
 
@@ -99,7 +101,9 @@ Save as `guide-mist.json` and import. It uses the built-in Mist Gray field/palet
     "warning-dark-300": "#80683d",
     "warning-dark-50": "#403722",
     "warning-dark-700": "#e0bc79",
-    "warning-dark-800": "#f0d39d"
+    "warning-dark-800": "#f0d39d",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -135,7 +139,8 @@ Save as `guide-mist.json` and import. It uses the built-in Mist Gray field/palet
       "editor-text": "neutral-700",
       "editor-syntax": "neutral-600",
       "editor-heading": "neutral-800",
-      "editor-quote": "neutral-600"
+      "editor-quote": "neutral-600",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "neutral-950",
@@ -170,7 +175,8 @@ Save as `guide-mist.json` and import. It uses the built-in Mist Gray field/palet
       "editor-text": "neutral-200",
       "editor-syntax": "neutral-400",
       "editor-heading": "neutral-50",
-      "editor-quote": "neutral-300"
+      "editor-quote": "neutral-300",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

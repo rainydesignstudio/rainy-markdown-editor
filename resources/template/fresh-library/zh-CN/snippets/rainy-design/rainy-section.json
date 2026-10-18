@@ -3,7 +3,7 @@
   "name": "Rainy Design · 小节",
   "trigger": "//rainy-section",
   "description": "小节标题与引言，以细线和文字层级组织内容。",
-  "content": "<section class=\"my-8\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-muted\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">▌你说：我就喜欢 “古法写作”</h2>\n  <p class=\"m-0 text-base text-article-ink\">那还说啥呢？Markdown 语法和 HTML 你总得懂一个。</p>\n</section>\n",
+  "content": "<section class=\"my-8\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">▌你说：我就喜欢 “古法写作”</h2>\n  <p class=\"m-0 text-base text-article-ink\">那还说啥呢？Markdown 语法和 HTML 你总得懂一个。</p>\n</section>\n",
   "icon": "layers",
   "categoryId": "rainy-design"
 }

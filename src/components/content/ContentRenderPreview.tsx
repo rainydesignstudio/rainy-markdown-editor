@@ -8,12 +8,12 @@ import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { compileArticleStyles } from '../../lib/tailwind';
+import { compileArticleStyles } from '../../lib/article-format/renderer';
 import type { ThemeConfig } from '../../lib/types';
-import { MarkdownPreview } from '../editor/MarkdownPreview';
-import type { ArticleMediaContext } from '../editor/MarkdownPreview';
-import { useArticleRenderMount } from '../../hooks/useArticleRenderMount';
-import { ArticleDocument } from '../editor/ArticleDocument';
+import { MarkdownPreview } from '../../lib/article-format/MarkdownPreview';
+import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
+import { useArticleRenderMount } from '../../lib/article-format/useArticleRenderMount';
+import { ArticleDocument } from '../../lib/article-format/ArticleDocument';
 
 export function ContentRenderPreview({ source, theme, blocked = false, media = null, fill = false, bare = false, dark = false }: { source: string; theme: ThemeConfig; blocked?: boolean; media?: ArticleMediaContext | null; fill?: boolean; bare?: boolean; dark?: boolean }) {
   const { t } = useUITranslation('messages');

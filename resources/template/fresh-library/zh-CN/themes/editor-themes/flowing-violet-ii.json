@@ -36,7 +36,9 @@
     "flowing-violet-accent-200": "#c7a8e8",
     "flowing-violet-accent-500": "#8c5db7",
     "flowing-violet-accent-600": "#714496",
-    "flowing-violet-accent-700": "#563576"
+    "flowing-violet-accent-700": "#563576",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -72,7 +74,8 @@
       "editor-text": "flowing-violet-600",
       "editor-syntax": "flowing-violet-accent-600",
       "editor-heading": "flowing-violet-700",
-      "editor-quote": "flowing-violet-500"
+      "editor-quote": "flowing-violet-500",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "flowing-violet-950",
@@ -107,7 +110,8 @@
       "editor-text": "flowing-violet-100",
       "editor-syntax": "flowing-violet-accent-200",
       "editor-heading": "flowing-violet-0",
-      "editor-quote": "flowing-violet-300"
+      "editor-quote": "flowing-violet-300",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

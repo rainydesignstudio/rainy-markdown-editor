@@ -7,7 +7,7 @@
     }
 
     @variant focus-visible {
-      @apply rounded-sm outline-2 outline-offset-2 outline-accent;
+      @apply rounded-sm outline-2 outline-accent;
     }
 
     @variant disabled {
@@ -41,7 +41,7 @@
   }
 
   .panel-heading {
-    @apply flex w-full shrink-0 items-center gap-3 rounded-lg px-4 py-3 text-left font-sub-heading text-sm font-semibold text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+    @apply flex w-full shrink-0 items-center gap-3 rounded-lg px-4 py-3 text-left font-sub-heading text-sm font-semibold text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent;
   }
 
   .collapsible-panel-content {
@@ -68,7 +68,7 @@
     }
 
     @variant focus-visible {
-      @apply outline-2 outline-offset-2 outline-accent;
+      @apply outline-2 outline-accent;
     }
 
     @variant disabled {
@@ -104,6 +104,34 @@
     }
   }
 
+  .icon-button {
+    @apply relative shrink-0 p-0;
+  }
+
+  .icon-button-surface {
+    @apply size-9 min-h-9;
+  }
+
+  .icon-button-toggle {
+    @apply aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-accent-text aria-expanded:border-accent-line aria-expanded:bg-accent-soft aria-expanded:text-accent-text;
+  }
+
+  .icon-button-inline {
+    @apply inline-flex size-6 min-h-6 items-center justify-center rounded-md text-muted transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50;
+  }
+
+  .mode-switch {
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md p-1 text-xs text-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 aria-disabled:opacity-50;
+  }
+
+  .mode-switch-track {
+    @apply flex h-5 w-9 items-center rounded-full border border-line-strong bg-rail p-0.5 group-aria-checked/mode:border-accent-line group-aria-checked/mode:bg-accent-strong;
+  }
+
+  .mode-switch-thumb {
+    @apply size-3.5 rounded-full bg-primary shadow-sm transition-transform group-aria-checked/mode:translate-x-4 group-aria-checked/mode:bg-on-accent motion-reduce:transition-none;
+  }
+
   .status-copy {
     @apply text-xs text-muted;
 
@@ -136,7 +164,7 @@
     }
 
     @variant focus-visible {
-      @apply outline-2 outline-offset-2 outline-accent;
+      @apply outline-2 outline-accent;
     }
   }
 
@@ -181,7 +209,7 @@
     }
 
     @variant focus-visible {
-      @apply outline-2 outline-offset-2 outline-accent;
+      @apply outline-2 outline-accent;
     }
   }
 

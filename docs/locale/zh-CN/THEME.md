@@ -30,8 +30,8 @@
 | id / name | 安全ID；名称1～80字符 |
 | version | 三段数字，例如1.0.0 |
 | formatVersion | 新主题用4；读取旧格式时由应用规范化 |
-| palette | 1～128个色板值；键为安全名称，值为不含alpha的3或6位十六进制颜色 |
-| colors | 只含light和dark；每套完整包含下方33个角色，值引用palette中的键 |
+| palette | 1～130个色板值；键为安全名称，值为不含alpha的3或6位十六进制颜色 |
+| colors | 只含light和dark；每套完整包含下方34个角色，值引用palette中的键 |
 | fonts | 完整包含下方8个字体角色，每个值是非空安全字体栈 |
 | surfaces | 可选；只使用正式字段与固定结构，未使用时整个字段省略 |
 
@@ -41,7 +41,7 @@
 canvas rail list panel hover popup-bg
 primary secondary muted faint popup-text
 line line-strong
-accent accent-strong accent-text accent-soft accent-line selection on-accent
+accent accent-strong accent-text accent-soft accent-line selection search-hit on-accent
 success success-surface
 warning warning-strong warning-surface warning-line
 danger on-danger
@@ -61,6 +61,8 @@ fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题�
 可选surfaces由light／dark两套组成；各项可省略，省略保留既有角色回退。正式字段为primaryButton、primaryText、primaryHover、primaryLine、secondaryButton、eyebrow、dangerSurface、field、shadow、panelShadow、toggleShadow、backdrop和canvasWash。颜色全部引用palette键；primaryHover为一个键或四个渐变键；field／shadow／panelShadow／toggleShadow／backdrop为`{ color, opacity }`，opacity范围0～100；canvasWash为三色键数组与opacity。以[正式类型和校验器](../../../src/lib/editorThemes.ts)为准，不能用该字段注入任意CSS。
 
 <a name="doc-editor-theme-example"></a>
+
+`search-hit`是搜索命中的背景色，在浅色和深色中独立映射调色板键；所有内置主题默认荧光黄。前景字色按背景自动选用黑色或白色。旧主题省略该角色时只在内存中补默认值，不改磁盘文件；显式保存后才写入。搜索定位在滚动余量允许时居中。
 
 ### 完整 editor-theme 示例
 
@@ -99,7 +101,9 @@ fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题�
     "warning-dark-300": "#80683d",
     "warning-dark-50": "#403722",
     "warning-dark-700": "#e0bc79",
-    "warning-dark-800": "#f0d39d"
+    "warning-dark-800": "#f0d39d",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -135,7 +139,8 @@ fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题�
       "editor-text": "neutral-700",
       "editor-syntax": "neutral-600",
       "editor-heading": "neutral-800",
-      "editor-quote": "neutral-600"
+      "editor-quote": "neutral-600",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "neutral-950",
@@ -170,7 +175,8 @@ fonts中的ui用于界面，heading／subHeading／eyebrow分别服务主标题�
       "editor-text": "neutral-200",
       "editor-syntax": "neutral-400",
       "editor-heading": "neutral-50",
-      "editor-quote": "neutral-300"
+      "editor-quote": "neutral-300",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {
@@ -461,6 +467,6 @@ theme:
 
 ### 编辑器表面色与透明度
 
-设置 → 外观 → 编辑器主题中，所有主题提供相同的33个基础角色与13个表面编辑项；数量统计编辑项，不是不同色值。表面包括主按钮常态/悬停/文字/边线、次按钮、危险按钮、装饰上标、表单、浮层与弹窗阴影、卡片/开关阴影、遮罩和三色工作区点缀。两种模式分别编辑；修改表面色会分离该项的调色板引用，不连带修改原基础角色。
+设置 → 外观 → 编辑器主题中，所有主题提供相同的34个基础角色与13个表面编辑项；数量统计编辑项，不是不同色值。表面包括主按钮常态/悬停/文字/边线、次按钮、危险按钮、装饰上标、表单、浮层与弹窗阴影、卡片/开关阴影、遮罩和三色工作区点缀。两种模式分别编辑；修改表面色会分离该项的调色板引用，不连带修改原基础角色。
 
 未配置的次按钮保持透明，表单和阴影沿用原回退；首次显式设置相应表面后才覆盖。浮层/弹窗共用shadow材质；卡片和开关阴影独立。按钮悬停可选纯色或四段渐变，点缀和半透明材质可调不透明度；不开放任意CSS或布局尺寸。旧主题及缓存继续有效，不自动重写用户文件。

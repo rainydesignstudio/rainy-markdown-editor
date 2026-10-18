@@ -16,7 +16,9 @@
     "neutral-700": "#404040",
     "neutral-800": "#262626",
     "neutral-900": "#171717",
-    "neutral-950": "#0a0a0a"
+    "neutral-950": "#0a0a0a",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -52,7 +54,8 @@
       "editor-text": "neutral-700",
       "editor-syntax": "neutral-600",
       "editor-heading": "neutral-800",
-      "editor-quote": "neutral-600"
+      "editor-quote": "neutral-600",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "neutral-950",
@@ -87,7 +90,8 @@
       "editor-text": "neutral-200",
       "editor-syntax": "neutral-300",
       "editor-heading": "neutral-50",
-      "editor-quote": "neutral-300"
+      "editor-quote": "neutral-300",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

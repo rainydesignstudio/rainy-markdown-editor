@@ -30,7 +30,9 @@
     "warning-dark-300": "#80683d",
     "warning-dark-50": "#403722",
     "warning-dark-700": "#e0bc79",
-    "warning-dark-800": "#f0d39d"
+    "warning-dark-800": "#f0d39d",
+    "search-light": "#eeff00",
+    "search-dark": "#eeff00"
   },
   "colors": {
     "light": {
@@ -66,7 +68,8 @@
       "editor-text": "neutral-700",
       "editor-syntax": "neutral-600",
       "editor-heading": "neutral-800",
-      "editor-quote": "neutral-600"
+      "editor-quote": "neutral-600",
+      "search-hit": "search-light"
     },
     "dark": {
       "canvas": "neutral-950",
@@ -101,7 +104,8 @@
       "editor-text": "neutral-200",
       "editor-syntax": "neutral-400",
       "editor-heading": "neutral-50",
-      "editor-quote": "neutral-300"
+      "editor-quote": "neutral-300",
+      "search-hit": "search-dark"
     }
   },
   "fonts": {

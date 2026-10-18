@@ -4,14 +4,14 @@ import { formatDiagnosticMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
-import type { MutableRefObject, ReactNode } from 'react';
+import { useCallback, useRef, type MutableRefObject, type ReactNode } from 'react';
 import { useResizableColumns } from '../../hooks/useResizableColumns';
 import { ColumnSplitter } from '../global/ColumnSplitter';
 import { parseArticle } from '../../lib/frontMatter';
 import type { ArticleSnippet, SnippetCategory, WorkingArticle } from '../../lib/types';
 import type { ArticleFormatIssue } from '../../lib/articleFormat';
 
-import type { ArticleMediaContext } from './MarkdownPreview';
+import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
 import type { Tone } from '../../hooks/useEditorController';
 import { PreviewPanel } from './PreviewPanel';
 import { SourcePanel } from './SourcePanel';
@@ -95,6 +95,12 @@ export function EditorWorkspace({
   const { t } = useUITranslation('editor');
   const layout = useResizableColumns();
   const { containerRef: gridRef, wideEnough, dragging, style: splitStyle } = layout;
+  const openFindRef = useRef<(() => void) | null>(null);
+  const openSourceFind = useCallback(() => {
+    if (sourceFocusDisabled) return;
+    if (!wideEnough && !readOnly) onSetMobilePane('source');
+    requestAnimationFrame(() => openFindRef.current?.());
+  }, [sourceFocusDisabled, wideEnough, readOnly, onSetMobilePane]);
   const diagnosticErrors = parsed.diagnostics.filter((item) => item.level === 'error');
 
   return (
@@ -125,6 +131,7 @@ export function EditorWorkspace({
             sourceTextareaRef={sourceTextareaRef}
             editingLocationRef={editingLocationRef}
             sourceFocusDisabled={sourceFocusDisabled}
+            openFindRef={openFindRef}
             onChangeBody={onChangeBody}
             onSnippetInserted={onSnippetInserted}
             onImportFiles={onImportFiles}
@@ -138,6 +145,7 @@ export function EditorWorkspace({
         <ColumnSplitter layout={layout} label={t('editor:workspace.resize')} />
         <div className="editor-preview-pane" data-mobile-hidden={!readOnly && mobilePane === 'source'}>
           <PreviewPanel
+            onOpenSourceFind={openSourceFind}
             onOpenTheme={onOpenTheme}
             article={article}
             themeUpdateAvailable={themeUpdateAvailable}

@@ -10,8 +10,6 @@ const sourceExtensions = new Set(['.css', '.js', '.jsx', '.ts', '.tsx']);
 const expectedNumericGeometry = [
   'src/components/settings/EditorThemeDesigner.tsx md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)]',
   'src/styles/components-dialog.css max-h-[min(90dvh,56rem)]',
-  'src/styles/components-dialog.css max-h-[min(42dvh,32rem)]',
-  'src/styles/components-dialog.css max-h-[min(58dvh,44rem)]',
   'src/styles/components-editor.css max-h-[min(32rem,70dvh)]',
   'src/styles/components-shell.css size-[29px]',
 ];

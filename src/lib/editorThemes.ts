@@ -6,12 +6,13 @@ export const EDITOR_COLOR_ROLES = [
   'canvas', 'rail', 'list', 'panel', 'hover', 'popup-bg',
   'primary', 'secondary', 'muted', 'faint', 'popup-text',
   'line', 'line-strong',
-  'accent', 'accent-strong', 'accent-text', 'accent-soft', 'accent-line', 'selection', 'on-accent',
+  'accent', 'accent-strong', 'accent-text', 'accent-soft', 'accent-line', 'selection', 'search-hit', 'on-accent',
   'success', 'success-surface', 'warning', 'warning-strong', 'warning-surface', 'warning-line', 'danger', 'on-danger',
   'editor-surface', 'editor-text', 'editor-syntax', 'editor-heading', 'editor-quote',
 ] as const;
 
 export type EditorColorRole = (typeof EDITOR_COLOR_ROLES)[number];
+export const DEFAULT_EDITOR_SEARCH_COLOR = '#eeff00';
 export type EditorColorScheme = 'light' | 'dark';
 export type EditorThemeFontRole = 'ui' | 'serif' | 'mono' | 'editorSource' | 'articleSource' | 'heading' | 'subHeading' | 'eyebrow';
 
@@ -130,10 +131,16 @@ export function resolveEditorThemeSurfaces(theme: EditorTheme): EditorThemeSurfa
 }
 
 // Only fixed shapes plus validated color data enter CSS; JSON never supplies CSS.
-export function editorSurfaceTokens(colors: Record<EditorColorRole, string>, surface?: EditorThemeSurfaces['light']): Record<string, string> {
+export function editorSurfaceTokens(colors: Record<EditorColorRole, string>, surface?: EditorThemeSurfaces['light'], searchDefault = DEFAULT_EDITOR_SEARCH_COLOR): Record<string, string> {
   const tint = (color: string, opacity: number) => opacity === 100 ? color : `color-mix(in srgb, ${color} ${opacity}%, transparent)`;
   const shadow = surface?.shadow ? tint(surface.shadow.color, surface.shadow.opacity) : '';
+  const search = colors['search-hit'] ?? searchDefault;
+  const full = search.length === 4 ? search.slice(1).split('').map(value => value + value).join('') : search.slice(1);
+  const channels = [0, 2, 4].map(offset => parseInt(full.slice(offset, offset + 2), 16) / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
+  const luminance = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722;
   return {
+    '--color-search-hit': search,
+    '--color-search-hit-ink': luminance > .179 ? '#000000' : '#ffffff',
     '--color-action': surface?.primaryButton ?? colors.accent,
     '--color-action-hover': surface?.primaryHover ? (typeof surface.primaryHover === 'string' ? surface.primaryHover : surface.primaryButton ?? colors.accent) : colors['accent-strong'],
     '--color-action-text': surface?.primaryText ?? colors['on-accent'],
@@ -182,7 +189,7 @@ export function inspectEditorTheme(value: unknown): ProductMessageFields[] {
   if (![1, 2, 3, 4].includes(value.formatVersion as number)) errors.push(productMessage("editorThemes.editorThemeFormatversionSupportsOnly123Or4"));
 
   const palette = value.palette;
-  if (!isRecord(palette) || !Object.keys(palette).length || Object.keys(palette).length > 128) {
+  if (!isRecord(palette) || !Object.keys(palette).length || Object.keys(palette).length > 130) {
     errors.push(productMessage("editorThemes.theThemePaletteMustContain1100Colors"));
   } else {
     for (const [key, color] of Object.entries(palette)) {
@@ -202,7 +209,8 @@ export function inspectEditorTheme(value: unknown): ProductMessageFields[] {
         errors.push(productMessage("editorThemes.theColorRolesMustBeAnObject", { "mode": mode }));
         continue;
       }
-      exactKeys(roles, EDITOR_COLOR_ROLES, productReference("editorThemes.colorRoles", { "mode": mode }), errors);
+      // Existing theme files inherit the added role without a disk migration.
+      exactKeys(roles, EDITOR_COLOR_ROLES.filter(role => role !== 'search-hit' || role in roles), productReference("editorThemes.colorRoles", { "mode": mode }), errors);
       for (const [role, key] of Object.entries(roles)) {
         if (typeof key !== 'string' || !isRecord(palette) || !(key in palette)) errors.push(productMessage("editorThemes.doesNotReferenceAValidPaletteColor", { "mode": mode, "role": role }));
       }
@@ -237,7 +245,17 @@ export function parseEditorThemeJson(source: string): EditorTheme {
   if (errors.length) throw new ProductError('shared.compose', { parts: productJoin(errors, '；') });
   const theme = parsed as EditorTheme;
   const legacy = (parsed as { formatVersion: number }).formatVersion < 4;
-  return { ...theme, formatVersion: 4, fonts: { ...theme.fonts,
+  const palette = { ...theme.palette };
+  const colors = Object.fromEntries((['light', 'dark'] as const).map(mode => {
+    let searchKey = theme.colors[mode]['search-hit'];
+    if (!searchKey) {
+      searchKey = `default-search-${mode}`;
+      while (searchKey in palette) searchKey += '-x';
+      palette[searchKey] = DEFAULT_EDITOR_SEARCH_COLOR;
+    }
+    return [mode, Object.fromEntries(EDITOR_COLOR_ROLES.map(role => [role, role === 'search-hit' ? searchKey : theme.colors[mode][role]]))];
+  })) as EditorTheme['colors'];
+  return { ...theme, palette, colors, formatVersion: 4, fonts: { ...theme.fonts,
     heading: theme.fonts.heading ?? theme.fonts.ui,
     subHeading: theme.fonts.subHeading ?? theme.fonts.ui, eyebrow: theme.fonts.eyebrow ?? theme.fonts.ui,
     articleSource: legacy ? theme.fonts.editorSource : theme.fonts.articleSource,

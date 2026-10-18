@@ -3,7 +3,7 @@
   "name": "Rainy Design · Opening II",
   "trigger": "//rainy-opening-ii",
   "description": "A restrained English eyebrow, title and introduction in Rainy Design colors.",
-  "content": "<section class=\"mt-0 mb-8 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest\">RAINY DESIGN / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 p-0 text-3xl font-bold\">▌All right, here is the truth.</h1>\n  <p class=\"mt-4 mb-0 text-base\">You do not have to write every article yourself. Try ghost-writer; eli5 and teach skills can help when you need an explanation.</p>\n</section>\n",
+  "content": "<section class=\"mt-0 mb-8 border-b-2 border-article-line pb-5\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">RAINY DESIGN / FIELD NOTES</p>\n  <h1 class=\"m-0 border-0 p-0 text-3xl font-bold\">▌All right, here is the truth.</h1>\n  <p class=\"mt-4 mb-0 text-base\">You do not have to write every article yourself. Try ghost-writer; eli5 and teach skills can help when you need an explanation.</p>\n</section>\n",
   "icon": "snippet",
   "categoryId": "rainy-design"
 }

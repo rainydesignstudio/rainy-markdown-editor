@@ -1,5 +1,6 @@
 /* Generated fallback from editor-theme-sea-glass.json; runtime themes override these roles on :root. */
 @theme static {
+  --color-search-fluorescent: #eeff00;
   /* Base editor theme palette values missing from the global supplement. */
   --color-danger-600: #ad4e53;
   --color-danger-dark-600: #f39da2;
@@ -40,6 +41,8 @@
   --color-accent-text: var(--color-teal-600);
   --color-accent-soft: var(--color-teal-100);
   --color-accent-line: var(--color-teal-300);
+  --color-search-hit: var(--color-search-fluorescent);
+  --color-search-hit-ink: var(--color-black);
   --color-selection: var(--color-teal-200);
   --color-on-accent: var(--color-sea-glass-0);
   --color-success: var(--color-moss-500);
