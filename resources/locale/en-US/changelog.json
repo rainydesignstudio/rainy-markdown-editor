@@ -814,6 +814,25 @@
           ]
         }
       ]
+    },
+    "v0_3_1_1": {
+      "summary": "Fix library startup failure recovery, live preview and sidebar selector spacing, and align README release badges.",
+      "sections": [
+        {
+          "title": "Experience improvements",
+          "items": [
+            "Keep the visible preview container and reading position while merging consecutive edits; reduce unnecessary background conversions in save-only mode.",
+            "Restore internal spacing in sidebar appearance and language selectors while preserving light/dark styling and keyboard focus.",
+            "Show the Release badge alongside License and dependency badges in READMEs, linked to the current release."
+          ]
+        },
+        {
+          "title": "Bug fixes",
+          "items": [
+            "Finish the format loading state when library initialization or reading fails, so the workspace does not wait indefinitely."
+          ]
+        }
+      ]
     }
   }
 }

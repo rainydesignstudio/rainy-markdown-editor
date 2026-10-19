@@ -105,11 +105,11 @@
   }
 
   .icon-button {
-    @apply relative shrink-0 p-0;
+    @apply relative shrink-0;
   }
 
   .icon-button-surface {
-    @apply size-9 min-h-9;
+    @apply size-9 min-h-9 p-0;
   }
 
   .icon-button-toggle {

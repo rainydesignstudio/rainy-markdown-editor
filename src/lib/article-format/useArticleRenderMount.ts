@@ -11,6 +11,7 @@ import { forwardPreviewWheel } from '../editor/previewScrolling';
 import { articleDarkMode } from './styleTypes';
 import type { ThemeConfig } from '../types';
 import { bindPreviewImages, type RenderedPreviewImage } from './previewImages';
+import { commitPreviewMarkup } from './previewCommit';
 export type ArticleDarkColors = { status: 'pending' | 'ready' | 'error'; values: Record<string, string[]> };
 const PENDING_DARK_COLORS: ArticleDarkColors = { status: 'pending', values: {} };
 function relayPreviewShortcut(event: KeyboardEvent) {
@@ -121,6 +122,7 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
     setColorResult(null);
     if ((!dark && !options.colorTheme) || !css || !host || !target) return;
     let active = true, controller: AbortController | undefined, overlay: HTMLIFrameElement | undefined, observer: ResizeObserver | undefined, canonicalFrame: HTMLIFrameElement | null = null, stopImages: (() => void) | undefined;
+    let darkMount: HTMLDivElement | undefined, darkStyle: HTMLStyleElement | undefined;
     const render = () => {
       const root = target.querySelector<HTMLElement>('[data-article-content-root]');
       if (!root) return;
@@ -133,47 +135,52 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
         if (!active || request.signal.aborted || articlePreviewMarkup(root) !== markup) return;
         setColorResult({ ...context, colors: { status: 'ready', values: result.colors ?? {} } });
         if (!dark) return;
-        stopImages?.(); overlay?.remove(); observer?.disconnect();
-        overlay = document.createElement('iframe'); overlay.title = frameTitles.current.dark; overlay.dataset.articleFrame = 'dark';
-        overlay.setAttribute('sandbox', 'allow-same-origin');
-        overlay.style.cssText = native ? 'position:absolute;top:0;border:0;transform-origin:top left' : 'display:block;width:100%;height:100%;border:0';
+        stopImages?.();
+        if (!overlay) {
+          overlay = document.createElement('iframe'); overlay.title = frameTitles.current.dark; overlay.dataset.articleFrame = 'dark';
+          overlay.setAttribute('sandbox', 'allow-same-origin');
+          overlay.style.cssText = native ? 'position:absolute;top:0;border:0;transform-origin:top left' : 'display:block;width:100%;height:100%;border:0';
+          (native ? host : host.shadowRoot ?? host).append(overlay);
+          darkFrameRef.current = overlay;
+          visibleFrameRef.current = overlay;
+          const doc = overlay.contentDocument!;
+          doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close();
+          doc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
+          doc.documentElement.dataset.previewMode = 'dark';
+          doc.documentElement.classList.toggle('dark', articleDarkMode(snapshot.bundle.formatter) === 'tokens');
+          doc.body.style.margin = '0';
+          if (native) doc.documentElement.style.scrollbarWidth = 'none';
+          doc.documentElement.style.overflowX = 'clip';
+          doc.addEventListener('keydown', relayShortcut);
+          darkStyle = doc.createElement('style'); doc.head.append(darkStyle);
+          darkMount = doc.createElement('div'); doc.body.append(darkMount);
+          const mount = darkMount;
+          const size = () => {
+            if (!native) return;
+            const viewport = snapshot.bundle.formatter.document?.viewport ?? { width: host.clientWidth, height: host.clientHeight, contentWidth: host.clientWidth };
+            const scale = Math.min(host.clientWidth / viewport.contentWidth, host.clientHeight / viewport.height, 1);
+            overlay!.style.width = viewport.width + 'px'; overlay!.style.height = viewport.height + 'px';
+            overlay!.style.left = -(viewport.width - viewport.contentWidth) * scale + 'px';
+            overlay!.style.transform = 'scale(' + scale + ')';
+            mount.style.width = viewport.contentWidth + 'px'; mount.style.marginLeft = (viewport.width - viewport.contentWidth) + 'px';
+          };
+          observer = new ResizeObserver(size); observer.observe(host); size();
+        }
+        if (darkStyle!.textContent !== result.css) darkStyle!.textContent = result.css;
+        commitPreviewMarkup(darkMount!, sanitizeHtml(result.html, snapshot));
         if (!native) { target.hidden = true; host.style.height = '100%'; }
-        (native ? host : host.shadowRoot ?? host).append(overlay);
-        if (native) {
+        else {
           canonicalFrame = host.querySelector<HTMLIFrameElement>('iframe[data-article-frame="light"]');
           canonicalFrame?.setAttribute('aria-hidden', 'true');
           if (canonicalFrame) canonicalFrame.inert = true;
         }
-        darkFrameRef.current = overlay;
-        visibleFrameRef.current = overlay;
-        const doc = overlay.contentDocument!;
-        doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close();
-        doc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
-        doc.documentElement.dataset.previewMode = 'dark';
-        doc.documentElement.classList.toggle('dark', articleDarkMode(snapshot.bundle.formatter) === 'tokens');
-        doc.body.style.margin = '0';
-        if (native) doc.documentElement.style.scrollbarWidth = 'none';
-        doc.documentElement.style.overflowX = 'clip';
-        doc.addEventListener('keydown', relayShortcut);
-        const style = doc.createElement('style'); style.textContent = result.css; doc.head.append(style);
-        const mount = doc.createElement('div'); mount.innerHTML = sanitizeHtml(result.html, snapshot); doc.body.append(mount);
-        if (imageOpenRef.current) stopImages = bindPreviewImages(mount, image => imageOpenRef.current?.(image), () => active && !request.signal.aborted);
-        const size = () => {
-          if (!native) return;
-          const viewport = snapshot.bundle.formatter.document?.viewport ?? { width: host.clientWidth, height: host.clientHeight, contentWidth: host.clientWidth };
-          const scale = Math.min(host.clientWidth / viewport.contentWidth, host.clientHeight / viewport.height, 1);
-          overlay!.style.width = viewport.width + 'px'; overlay!.style.height = viewport.height + 'px';
-          overlay!.style.left = -(viewport.width - viewport.contentWidth) * scale + 'px';
-          overlay!.style.transform = 'scale(' + scale + ')';
-          mount.style.width = viewport.contentWidth + 'px'; mount.style.marginLeft = (viewport.width - viewport.contentWidth) + 'px';
-        };
-        observer = new ResizeObserver(size); observer.observe(host); size();
+        if (imageOpenRef.current) stopImages = bindPreviewImages(darkMount!, image => imageOpenRef.current?.(image), () => active && !request.signal.aborted && root.isConnected && articlePreviewMarkup(root) === markup);
       }).catch(error => { if (active && !request.signal.aborted && error?.name !== 'AbortError' && !isProductCancellation(error)) {
         setColorResult({ ...context, colors: { status: 'error', values: {} } });
         setDarkIssue(error instanceof Error ? error.message : String(error));
       } });
     };
-    const stop = observeArticlePreview(target, render);
+    const stop = observeArticlePreview(target, render, 120);
     return () => {
       active = false; stop(); controller?.abort(); stopImages?.(); observer?.disconnect(); overlay?.remove();
       darkFrameRef.current = null;

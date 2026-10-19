@@ -8,6 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/releases/tag/v0.3.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.1.1-2563EB?style=for-the-badge" alt="Release v0.3.1.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -15,8 +16,6 @@
 </p>
 
 <p align="center"><img src="https://github.com/user-attachments/assets/d4fdc16f-8245-4626-beae-32bc3cb9d0cc" alt="你的资料库，你的写作规则。" width="960" /></p>
-
-`v0.3.1`
 
 文稿、主题快照、图片与历史保存在你授权的本地资料库；首套默认格式配置面向微信公众号，每库也可定制其它平台的写作策略。
 

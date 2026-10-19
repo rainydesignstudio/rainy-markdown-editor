@@ -2260,7 +2260,11 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           });
     } catch (error) {
       if (!isCurrentSelection()) return;
-      if (!libraryLoadFinished && selectedRoot && directoryRef.current === selectedRoot) setContentLibrariesState('failed');
+      if (!libraryLoadFinished && selectedRoot && directoryRef.current === selectedRoot) {
+        setContentLibrariesState('failed');
+        const pending = getFormatSnapshot();
+        if (pending.loading && pending.library === selectedRoot.name) invalidateFormatBundle(selectedRoot.name, productErrorMessage(error).message);
+      }
       setStatus({ ...productErrorLabel(error), tone: 'error' });
     } finally {
       if (isCurrentSelection() && selectedRoot && directoryRef.current === selectedRoot) setEditorAppearanceLoaded(true);

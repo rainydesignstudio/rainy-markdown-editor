@@ -6,7 +6,7 @@ import { previewSurfaceStyle } from '../../lib/article-format/preview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 
-import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { parseArticle } from '../../lib/frontMatter';
 import type { WorkingArticle } from '../../lib/types';
 import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
@@ -71,7 +71,7 @@ export function PreviewPanel({
   const liveFormatSnapshot = useFormatSnapshot();
   const themeCapability = useLibraryCapability('articleTheme');
   const formatSnapshot = article.renderSnapshot?.id === liveFormatSnapshot.id ? article.renderSnapshot : liveFormatSnapshot;
-  const input: PreviewInput = { article, parsed, compiledCss, media, snapshot: formatSnapshot };
+  const input = useMemo<PreviewInput>(() => ({ article, parsed, compiledCss, media, snapshot: formatSnapshot }), [article, parsed, compiledCss, media, formatSnapshot]);
   const [frozen, setFrozen] = useState<ReturnType<typeof retainPreviewInput> | null>(null);
   const previewReadyRef = useRef<{ document: number; directory: FileSystemDirectoryHandle | null; month: WorkingArticle['month']; folder: WorkingArticle['folder']; format: string } | null>(null);
   const boundaryRef = useRef<{ saved: number; document: number; directory: FileSystemDirectoryHandle | null; month: WorkingArticle['month']; folder: WorkingArticle['folder'] } | null>(null);
@@ -94,6 +94,16 @@ export function PreviewPanel({
   useLayoutEffect(() => { setFrozen(previous => refreshRetainedPreviewMedia(previous, media)); }, [media]);
   useEffect(() => () => frozen?.dispose(), [frozen?.dispose]);
   const frozenVisible = preferences.saveOnly && frozen !== null;
+  const workingInputRef = useRef({ input, document: documentGeneration, directory });
+  const working = workingInputRef.current;
+  if (!frozenVisible || compiledRevision !== null || working.document !== documentGeneration || working.directory !== directory ||
+    working.input.article.month !== article.month || working.input.article.folder !== article.folder ||
+    working.input.snapshot !== formatSnapshot || working.input.media?.sessionKey !== media?.sessionKey) {
+    workingInputRef.current = { input, document: documentGeneration, directory };
+  }
+  // Output operations compile/flush their current revision before consuming this canvas.
+  // Ordinary typing does not keep rendering an invisible copy of the frozen manuscript.
+  const workingInput = workingInputRef.current.input;
   const { dark, toggle } = useArticlePreviewMode();
   useEffect(() => {
     if (!preferences.scrollSync) return;
@@ -166,7 +176,7 @@ export function PreviewPanel({
       </div>
       <div className="relative min-h-0 flex-1">
         <div className="h-full data-[hidden=true]:pointer-events-none data-[hidden=true]:absolute data-[hidden=true]:inset-0 data-[hidden=true]:opacity-0" data-hidden={frozenVisible} aria-hidden={frozenVisible || undefined} inert={frozenVisible}>
-          <ArticlePreviewCanvas input={input} dark={frozenVisible ? false : dark} onOpenSourceFind={onOpenSourceFind} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
+          <ArticlePreviewCanvas input={workingInput} dark={frozenVisible ? false : dark} onOpenSourceFind={onOpenSourceFind} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
         </div>
         {frozenVisible ? <ArticlePreviewCanvas input={frozen.input} dark={dark} onOpenSourceFind={onOpenSourceFind} canonical={false} rootRef={frozenRootRef} viewportRef={frozenViewportRef} /> : null}
       </div>

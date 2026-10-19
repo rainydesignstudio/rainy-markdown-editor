@@ -35,6 +35,22 @@ test('late Markdown hydration and subsequent DOM changes refresh dark previews, 
   stopNext();
 });
 
+test('dark preview merges input bursts and cancels a queued refresh on unmount', async t => {
+  const previous = globalThis.MutationObserver;
+  let changed;
+  globalThis.MutationObserver = class { constructor(callback) { changed = callback; } observe() {} disconnect() {} };
+  const root = { outerHTML: '<article>saved</article>' }, snapshots = [];
+  const stop = observeArticlePreview(root, () => snapshots.push(root.outerHTML), 10);
+  t.after(() => { stop(); if (previous) globalThis.MutationObserver = previous; else delete globalThis.MutationObserver; });
+  for (let index = 0; index < 40; index++) { root.outerHTML = `<article>${index}</article>`; changed(); }
+  assert.equal(snapshots.length, 1);
+  await new Promise(resolve => setTimeout(resolve, 35));
+  assert.deepEqual(snapshots, ['<article>saved</article>', '<article>39</article>']);
+  root.outerHTML = '<article>disposed</article>'; changed(); stop();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(snapshots.length, 2);
+});
+
 function element(computed, children = [], attributes = {}) {
   const properties = new Map();
   const node = {

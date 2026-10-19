@@ -8,10 +8,12 @@ export function articlePreviewMarkup(root: HTMLElement): string {
     .replace(/\sclass="([^"]*)"/g, (_, names: string) => ` class="${names.split(/\s+/).filter(name => !INSPECTION_STATE_CLASSES.has(name)).join(' ')}"`);
 }
 // Configured conversion runs only in a fresh document. The light DOM remains untouched.
-export function observeArticlePreview(root: HTMLElement, refresh: () => void): () => void {
+export function observeArticlePreview(root: HTMLElement, refresh: () => void, delay = 0): () => void {
   let active = true;
   let previous = '';
+  let timer: ReturnType<typeof setTimeout> | undefined, changedAt = 0;
   const sync = () => {
+    timer = undefined; changedAt = 0;
     if (!active) return;
     // React can reapply identical attributes (for example checkbox defaults).
     // A notification alone must never trigger another iframe navigation.
@@ -20,10 +22,17 @@ export function observeArticlePreview(root: HTMLElement, refresh: () => void): (
     previous = content;
     refresh();
   };
-  const observer = new MutationObserver(sync);
+  const schedule = () => {
+    if (!delay) { sync(); return; }
+    changedAt ||= Date.now();
+    clearTimeout(timer);
+    // Merge a typing burst, but keep publishing during sustained input.
+    timer = setTimeout(sync, Math.max(0, Math.min(delay, delay * 3 - (Date.now() - changedAt))));
+  };
+  const observer = new MutationObserver(schedule);
   observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true });
   sync();
-  return () => { active = false; observer.disconnect(); };
+  return () => { active = false; clearTimeout(timer); observer.disconnect(); };
 }
 
 

@@ -85,6 +85,31 @@ test('save-only previews distinguish manuscripts with the same per-article gener
   assert.equal(shown.input.parsed.body, '# unsaved second', 'subsequent typing still follows save-only preference');
 });
 
+test('save-only working canvas pauses hidden typing work and refreshes before output compilation or context changes', async () => {
+  const source = await readFile(new URL('../src/components/editor/PreviewPanel.tsx', import.meta.url), 'utf8');
+  const code = ts.transpileModule(source.slice(source.indexOf('  const workingInputRef = '), source.indexOf('  const { dark, toggle }')), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText + '\nglobalThis.chosen = workingInput;';
+  let ref;
+  const directory = {}, first = input();
+  const render = (next, frozenVisible = true, compiledRevision = null, documentGeneration = 1, root = directory) => {
+    const context = { input: next, article: next.article, formatSnapshot: next.snapshot, media: next.media, frozenVisible, compiledRevision, documentGeneration, directory: root, useRef: value => ref ??= { current: value } };
+    vm.runInNewContext(code, context);
+    return context.chosen;
+  };
+  assert.equal(render(first, false), first);
+  let edited;
+  for (let index = 0; index < 40; index++) {
+    edited = { ...first, parsed: { ...first.parsed, body: `unsaved ${index}` } };
+    assert.equal(render(edited), first, 'invisible Markdown should not be reparsed on typing');
+  }
+  assert.equal(render(edited, true, 42), edited, 'compilation flushes current content before validation and output');
+  const resource = { ...edited, media: { ...edited.media, sessionKey: 2 } };
+  assert.equal(render(resource), resource);
+  const library = { ...resource, snapshot: { ...resource.snapshot, id: 'new-library' } };
+  assert.equal(render(library), library);
+  const reopened = { ...library, parsed: { ...library.parsed, body: 'reopened' } };
+  assert.equal(render(reopened, true, null, 2), reopened);
+});
+
 test('only an explicitly retained display can finish using its old immutable format; current output keeps the stale-format guard', async () => {
   const previous = { document: globalThis.document, window: globalThis.window, observer: globalThis.MutationObserver };
   const removed = [];
