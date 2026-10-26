@@ -21,6 +21,8 @@ import enSeedSnippet17 from '../../resources/template/fresh-library/en-US/snippe
 import enSeedSnippet18 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-quote.json' with { type: 'json' };
 import enSeedSnippet19 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-section.json' with { type: 'json' };
 import enSeedSnippet20 from '../../resources/template/fresh-library/en-US/snippets/default/horizontal-scroll-without-padding.json' with { type: 'json' };
+import enSeedSnippet21 from '../../resources/template/fresh-library/en-US/snippets/default/mac-style-code-block.json' with { type: 'json' };
+import enSeedSnippet22 from '../../resources/template/fresh-library/en-US/snippets/default/mac-style-code-block-nowrap.json' with { type: 'json' };
 import enSeedTemplate0 from '../../resources/template/fresh-library/en-US/templates/default/markdown-guide.md';
 import enSeedTemplate1 from '../../resources/template/fresh-library/en-US/templates/default/project-review.md';
 import enSeedTemplate2 from '../../resources/template/fresh-library/en-US/templates/default/tutorial.md';
@@ -49,12 +51,14 @@ import zhSeedSnippet17 from '../../resources/template/fresh-library/zh-CN/snippe
 import zhSeedSnippet18 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-quote.json' with { type: 'json' };
 import zhSeedSnippet19 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-section.json' with { type: 'json' };
 import zhSeedSnippet20 from '../../resources/template/fresh-library/zh-CN/snippets/default/horizontal-scroll-without-padding.json' with { type: 'json' };
+import zhSeedSnippet21 from '../../resources/template/fresh-library/zh-CN/snippets/default/mac-style-code-block.json' with { type: 'json' };
+import zhSeedSnippet22 from '../../resources/template/fresh-library/zh-CN/snippets/default/mac-style-code-block-nowrap.json' with { type: 'json' };
 import zhSeedTemplate0 from '../../resources/template/fresh-library/zh-CN/templates/default/markdown-guide.md';
 import zhSeedTemplate1 from '../../resources/template/fresh-library/zh-CN/templates/default/project-review.md';
 import zhSeedTemplate2 from '../../resources/template/fresh-library/zh-CN/templates/default/tutorial.md';
 import zhSeedTemplate3 from '../../resources/template/fresh-library/zh-CN/templates/theme-samples/rainy-design-sample-ii.md';
 import zhSeedTemplate4 from '../../resources/template/fresh-library/zh-CN/templates/theme-samples/rainy-design-sample.md';
-import { readLibrarySeedLocale, resolveSeedLocale } from './librarySeeds';
+import { readLibrarySeedRecord, resolveSeedLocale, type ContentSeedProfile } from './librarySeeds';
 import { ProductError, productCause, productDiagnosticReference, productErrorMessage, productJoin, productMessage, productReference, type ProductMessageInfo } from "./i18n/productMessages";
 import { parseArticle } from './frontMatter';
 import { articleFormatMessage, articleFormatMessageReference, type ArticleFormatIssue } from './articleFormat';
@@ -80,7 +84,7 @@ const CURSOR_MARKER = '▌';
 const MAX_SNIPPET_LENGTH = 64_000;
 const MAX_TEMPLATE_LENGTH = 250_000;
 
-const enSnippets: ArticleSnippet[] = ([enSeedSnippet0, enSeedSnippet1, enSeedSnippet2, enSeedSnippet3, enSeedSnippet4, enSeedSnippet5, enSeedSnippet6, enSeedSnippet7, enSeedSnippet8, enSeedSnippet9, enSeedSnippet10, enSeedSnippet11, enSeedSnippet12, enSeedSnippet13, enSeedSnippet14, enSeedSnippet15, enSeedSnippet16, enSeedSnippet17, enSeedSnippet18, enSeedSnippet19, enSeedSnippet20] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+const enSnippets: ArticleSnippet[] = ([enSeedSnippet0, enSeedSnippet1, enSeedSnippet2, enSeedSnippet3, enSeedSnippet4, enSeedSnippet5, enSeedSnippet6, enSeedSnippet7, enSeedSnippet8, enSeedSnippet9, enSeedSnippet10, enSeedSnippet11, enSeedSnippet12, enSeedSnippet13, enSeedSnippet14, enSeedSnippet15, enSeedSnippet16, enSeedSnippet17, enSeedSnippet18, enSeedSnippet19, enSeedSnippet20, enSeedSnippet21, enSeedSnippet22] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
 const enTemplates: ArticleTemplate[] = [
   { id: 'markdown-guide', categoryId: 'default', name: parseArticle(enSeedTemplate0).metadata.title, source: enSeedTemplate0 },
   { id: 'project-review', categoryId: 'default', name: parseArticle(enSeedTemplate1).metadata.title, source: enSeedTemplate1 },
@@ -88,7 +92,7 @@ const enTemplates: ArticleTemplate[] = [
   { id: 'rainy-design-sample-ii', categoryId: 'theme-samples', name: parseArticle(enSeedTemplate3).metadata.title, source: enSeedTemplate3 },
   { id: 'rainy-design-sample', categoryId: 'theme-samples', name: parseArticle(enSeedTemplate4).metadata.title, source: enSeedTemplate4 },
 ];
-const zhSnippets: ArticleSnippet[] = ([zhSeedSnippet0, zhSeedSnippet1, zhSeedSnippet2, zhSeedSnippet3, zhSeedSnippet4, zhSeedSnippet5, zhSeedSnippet6, zhSeedSnippet7, zhSeedSnippet8, zhSeedSnippet9, zhSeedSnippet10, zhSeedSnippet11, zhSeedSnippet12, zhSeedSnippet13, zhSeedSnippet14, zhSeedSnippet15, zhSeedSnippet16, zhSeedSnippet17, zhSeedSnippet18, zhSeedSnippet19, zhSeedSnippet20] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+const zhSnippets: ArticleSnippet[] = ([zhSeedSnippet0, zhSeedSnippet1, zhSeedSnippet2, zhSeedSnippet3, zhSeedSnippet4, zhSeedSnippet5, zhSeedSnippet6, zhSeedSnippet7, zhSeedSnippet8, zhSeedSnippet9, zhSeedSnippet10, zhSeedSnippet11, zhSeedSnippet12, zhSeedSnippet13, zhSeedSnippet14, zhSeedSnippet15, zhSeedSnippet16, zhSeedSnippet17, zhSeedSnippet18, zhSeedSnippet19, zhSeedSnippet20, zhSeedSnippet21, zhSeedSnippet22] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
 const zhTemplates: ArticleTemplate[] = [
   { id: 'markdown-guide', categoryId: 'default', name: parseArticle(zhSeedTemplate0).metadata.title, source: zhSeedTemplate0 },
   { id: 'project-review', categoryId: 'default', name: parseArticle(zhSeedTemplate1).metadata.title, source: zhSeedTemplate1 },
@@ -100,7 +104,13 @@ const contentSeeds = {
   'en-US': { snippets: enSnippets, templates: enTemplates, snippetCategories: enSnippetsIndex.categories as SnippetCategory[], templateCategories: enTemplatesIndex.categories as SnippetCategory[] },
   'zh-CN': { snippets: zhSnippets, templates: zhTemplates, snippetCategories: zhSnippetsIndex.categories as SnippetCategory[], templateCategories: zhTemplatesIndex.categories as SnippetCategory[] },
 };
-export function getDefaultContentLibrary(locale: string = 'en-US') { return contentSeeds[resolveSeedLocale(locale)]; }
+const contentProfiles = { rich: { snippets: null, templates: null }, markdown: { snippets: [], templates: ['markdown-guide', 'project-review', 'tutorial'] } } satisfies Record<ContentSeedProfile, { snippets: string[] | null; templates: string[] | null }>;
+export function getDefaultContentLibrary(locale: string = 'en-US', profile: ContentSeedProfile = 'rich') {
+  const seeds = contentSeeds[resolveSeedLocale(locale)], selection = contentProfiles[profile];
+  const snippets = seeds.snippets.filter(item => selection.snippets === null || (selection.snippets as string[]).includes(item.id));
+  const templates = seeds.templates.filter(item => selection.templates === null || (selection.templates as string[]).includes(item.id));
+  return { snippets, templates, snippetCategories: seeds.snippetCategories.filter(category => snippets.some(item => item.categoryId === category.id)), templateCategories: seeds.templateCategories.filter(category => templates.some(item => item.categoryId === category.id)) };
+}
 export const DEFAULT_ARTICLE_SNIPPETS = enSnippets;
 export const DEFAULT_ARTICLE_TEMPLATES = enTemplates;
 export const DEFAULT_SNIPPET_CATEGORIES = contentSeeds['en-US'].snippetCategories;
@@ -284,22 +294,36 @@ async function saveContentCategory(root: DirectoryHandle, kind: 'snippets' | 'te
   return category;
 }
 
-async function loadSnippetEntries(directory: DirectoryHandle, locale: string): Promise<ArticleSnippetLibrary> {
+async function seedContentEntries(directory: DirectoryHandle, kind: 'snippets' | 'templates', defaults: ReturnType<typeof getDefaultContentLibrary>) {
+  const categories = kind === 'snippets' ? defaults.snippetCategories : defaults.templateCategories;
+  const indexed = await readCategoryIndex(directory);
+  const added = categories.filter(category => !indexed.some(item => item.id === category.id));
+  if (indexed.length + added.length > 128) throw new ProductError('contentLibraries.atMost128CategoriesAreAllowed');
+  const folders = new Map<string, DirectoryHandle>();
+  for (const category of categories) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
+  for (const item of kind === 'snippets' ? defaults.snippets : defaults.templates) {
+    const folder = folders.get(item.categoryId ?? 'default');
+    if (!folder) throw new ProductError('contentLibraries.theDefaultSnippetCategoryDoesNotExist', { categoryId: item.categoryId });
+    const filename = `${item.id}.${kind === 'snippets' ? 'json' : 'md'}`;
+    try { await folder.getFileHandle(filename); continue; } catch (error) { if (!isNotFound(error)) throw error; }
+    const { categoryId, ...content } = item;
+    await writeManagedFile(folder, filename, kind === 'snippets' ? JSON.stringify(content, null, 2) : (item as ArticleTemplate).source, productReference(kind === 'snippets' ? 'contentFileLabels.snippet' : 'contentFileLabels.template'));
+  }
+  let original: { version: number; categories: unknown[]; [key: string]: unknown } | null = null;
+  try { original = JSON.parse(await readText(directory, 'index.json')); } catch (error) { if (!isNotFound(error)) throw error; }
+  if (!original || added.length) await writeManagedFile(directory, 'index.json', JSON.stringify({ ...(original ?? { version: 1 }), categories: [...(original?.categories ?? []), ...added] }, null, 2), productReference('contentFileLabels.categoryIndex'));
+}
+
+export async function initializeContentLibraries(root: DirectoryHandle): Promise<void> {
+  await ensurePermission(root);
+  const record = await readLibrarySeedRecord(root), defaults = getDefaultContentLibrary(resolveSeedLocale(record?.locale), record?.contentSeed ?? 'rich');
+  await seedContentEntries(await root.getDirectoryHandle('snippets', { create: true }), 'snippets', defaults);
+  await seedContentEntries(await root.getDirectoryHandle('templates', { create: true }), 'templates', defaults);
+}
+
+async function loadSnippetEntries(directory: DirectoryHandle): Promise<ArticleSnippetLibrary> {
   const entries: Array<[string, FileSystemFileHandle | FileSystemDirectoryHandle]> = [];
   for await (const entry of directory.entries()) entries.push(entry);
-  if (entries.length === 0) {
-    const defaults = getDefaultContentLibrary(locale);
-    const folders = new Map<string, DirectoryHandle>();
-    for (const category of defaults.snippetCategories) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
-    for (const snippet of defaults.snippets) {
-      const { categoryId, ...content } = snippet;
-      const folder = folders.get(categoryId ?? 'default');
-      if (!folder) throw new ProductError("contentLibraries.theDefaultSnippetCategoryDoesNotExist", { "categoryId": categoryId });
-      await writeManagedFile(folder, `${snippet.id}.json`, JSON.stringify(content, null, 2), productReference('contentFileLabels.snippet'));
-    }
-    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: defaults.snippetCategories }, null, 2), productReference('contentFileLabels.categoryIndex'));
-    for await (const entry of directory.entries()) entries.push(entry);
-  }
   const snippets: ArticleSnippet[] = [];
   const categories: SnippetCategory[] = [];
   const issues: ContentLibraryIssue[] = [];
@@ -347,7 +371,8 @@ async function loadSnippetEntries(directory: DirectoryHandle, locale: string): P
 
 export async function loadArticleSnippets(root: DirectoryHandle): Promise<ArticleSnippetLibrary> {
   await ensurePermission(root);
-  return loadSnippetEntries(await root.getDirectoryHandle('snippets', { create: true }), await readLibrarySeedLocale(root));
+  await readLibrarySeedRecord(root);
+  return loadSnippetEntries(await root.getDirectoryHandle('snippets', { create: true }));
 }
 
 // null creates a new file; a string identifies the saved file being updated or renamed.
@@ -399,21 +424,9 @@ export async function deleteArticleSnippet(root: DirectoryHandle, id: string): P
   await directory.removeEntry(`${id}.json`);
 }
 
-async function loadTemplateEntries(directory: DirectoryHandle, locale: string): Promise<ArticleTemplateLibrary> {
+async function loadTemplateEntries(directory: DirectoryHandle): Promise<ArticleTemplateLibrary> {
   const entries: Array<[string, FileHandle | DirectoryHandle]> = [];
   for await (const entry of directory.entries()) entries.push(entry);
-  if (!entries.length) {
-    const defaults = getDefaultContentLibrary(locale);
-    const folders = new Map<string, DirectoryHandle>();
-    for (const category of defaults.templateCategories) folders.set(category.id, await directory.getDirectoryHandle(category.id, { create: true }));
-    for (const template of defaults.templates) {
-      const folder = folders.get(template.categoryId ?? 'default');
-      if (!folder) throw new ProductError("contentLibraries.theDefaultStarterTemplateCategoryDoesNotExist", { "templateCategoryId": template.categoryId });
-      await writeManagedFile(folder, `${template.id}.md`, template.source, productReference('contentFileLabels.template'));
-    }
-    await writeManagedFile(directory, 'index.json', JSON.stringify({ version: 1, categories: defaults.templateCategories }, null, 2), productReference('contentFileLabels.categoryIndex'));
-    for await (const entry of directory.entries()) entries.push(entry);
-  }
   const templates: ArticleTemplate[] = [], issues: ContentLibraryIssue[] = [], categories: SnippetCategory[] = [];
   let indexed: SnippetCategory[] = [];
   try { indexed = await readCategoryIndex(directory); }
@@ -460,7 +473,8 @@ async function loadTemplateEntries(directory: DirectoryHandle, locale: string): 
 
 export async function loadArticleTemplates(root: DirectoryHandle): Promise<ArticleTemplateLibrary> {
   await ensurePermission(root);
-  return loadTemplateEntries(await root.getDirectoryHandle('templates', { create: true }), await readLibrarySeedLocale(root));
+  await readLibrarySeedRecord(root);
+  return loadTemplateEntries(await root.getDirectoryHandle('templates', { create: true }));
 }
 
 export async function saveArticleTemplate(root: DirectoryHandle, id: string, source: string, originalId?: string | null, categoryId?: string, onFormatIssues?: (issues: ArticleFormatIssue[]) => void): Promise<ArticleTemplate> {

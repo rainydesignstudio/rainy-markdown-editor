@@ -1,4 +1,6 @@
 'use client';
+import { useResizableColumns } from '../../hooks/useResizableColumns';
+import { ColumnSplitter } from '../global/ColumnSplitter';
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
@@ -6,7 +8,7 @@ import { previewSurfaceStyle } from '../../lib/article-format/preview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { parseArticle } from '../../lib/frontMatter';
 import type { WorkingArticle } from '../../lib/types';
 import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
@@ -41,6 +43,8 @@ type Props = {
   readOnly: boolean;
   onOpenTheme: () => void;
   onOpenSourceFind?: () => void;
+  referencePanel?: ReactNode;
+  referenceOpen?: boolean;
 };
 
 export function PreviewPanel({
@@ -61,8 +65,11 @@ export function PreviewPanel({
   readOnly,
   onOpenTheme,
   onOpenSourceFind,
+  referencePanel,
+  referenceOpen = false,
 }: Props) {
   const { t } = useUITranslation('editor');
+  const referenceLayout = useResizableColumns(45, undefined, referenceOpen, 'y');
   const { preferences, toggle: togglePreference } = usePreviewPreferences();
   const liveViewportRef = useRef<HTMLDivElement | null>(null);
   const frozenViewportRef = useRef<HTMLDivElement | null>(null);
@@ -164,21 +171,24 @@ export function PreviewPanel({
       <div className="panel-header h-18 min-h-18 bg-list px-3 md:px-7.5">
         <div className="flex min-w-0 items-center gap-2 md:gap-6">
           <span className="inline-flex min-w-0" title={themeCapability.reason} tabIndex={!themeCapability.enabled ? 0 : undefined} aria-label={themeCapability.reason}><InformationButton icon={<InformationIcon book />} title={liveFormatSnapshot.configuration?.rendering.styleAuthority === 'library' ? liveFormatSnapshot.bundle.support.meta.name : article.theme.name} subtitle={liveFormatSnapshot.configuration?.rendering.styleAuthority === 'library' ? t('messages:libraryConfiguration.styleSource') : <span className="flex items-center gap-1.5">v{article.theme.version}{themeUpdateAvailable ? <ThemeUpdateTag /> : null}</span>} onClick={() => { if (themeCapability.enabled) onOpenTheme(); }} disabled={mediaBusy || !themeCapability.enabled} aria-label={t('editor:preview.themeLabel', { name: article.theme.name, version: article.theme.version, update: themeUpdateAvailable ? t('editor:preview.updateSuffix') : '' })} /></span>
-          <PreviewModeSwitch dark={dark} onToggle={toggle} />
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          <PreviewModeSwitch dark={dark} onToggle={toggle} />
           <ButtonBar label={t('editor:preview.options')}><IconButton tooltip={t('editor:preview.scrollSync')} aria-pressed={preferences.scrollSync} onClick={() => togglePreference('scrollSync')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 4h7M3 9h7M3 14h7M3 19h7M16 5v14m-3-11 3-3 3 3m-6 8 3 3 3-3" /></svg>} />
             <IconButton tooltip={t('editor:preview.saveReport')} aria-pressed={preferences.saveReport} onClick={() => togglePreference('saveReport')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H5v17h14V4h-4M9 3h6v4H9zM8 14l3 3 5-6" /></svg>} />
             <IconButton tooltip={t('editor:preview.saveOnly')} aria-pressed={preferences.saveOnly} onClick={() => togglePreference('saveOnly')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v12H4zM8 21h8m-4-4v4M8 11h8m-3-3 3 3-3 3" /></svg>} />
           </ButtonBar>
-          <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-xs text-faint" role="status"><svg className="size-3.5 text-accent-text" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{article.dirty ? <circle cx="12" cy="12" r="7" /> : <path d="m4 12 5 5L20 6" />}</svg>{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}</span>
         </div>
       </div>
+      <div ref={referenceLayout.containerRef} className="flex min-h-0 flex-1 flex-col" style={referenceLayout.style}>
+      <div data-open={referenceOpen} data-resizable={referenceLayout.wideEnough} className="flex min-h-0 shrink-0 flex-col data-[open=true]:flex-1 data-[open=true]:data-[resizable=true]:h-(--editor-reference-height) data-[open=true]:data-[resizable=true]:flex-none">{referencePanel}</div>
+      {referenceOpen ? <ColumnSplitter layout={referenceLayout} label={t('workspace.resizeReference')} controls="editor-knowledge-content" /> : null}
       <div className="relative min-h-0 flex-1">
         <div className="h-full data-[hidden=true]:pointer-events-none data-[hidden=true]:absolute data-[hidden=true]:inset-0 data-[hidden=true]:opacity-0" data-hidden={frozenVisible} aria-hidden={frozenVisible || undefined} inert={frozenVisible}>
           <ArticlePreviewCanvas input={workingInput} dark={frozenVisible ? false : dark} onOpenSourceFind={onOpenSourceFind} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
         </div>
         {frozenVisible ? <ArticlePreviewCanvas input={frozen.input} dark={dark} onOpenSourceFind={onOpenSourceFind} canonical={false} rootRef={frozenRootRef} viewportRef={frozenViewportRef} /> : null}
+      </div>
       </div>
       <div className="panel-body">
         <section className="clipboard-dock">

@@ -1,5 +1,6 @@
 'use client';
 
+import { OperationFeedback } from '../global/OperationFeedback';
 import { useEffect, useRef, useState } from 'react';
 import { inspectArticleImage, type ArticleImageFormat, type MediaActionOutcome } from '../../lib/articleMedia';
 import { formatProductMessage, productErrorMessage } from '../../lib/i18n/productMessages';
@@ -11,7 +12,8 @@ import { ResourceGlyph } from './ResourceGlyph';
 
 type InspectedFile = { file: File; format: ArticleImageFormat | null; issue: ReturnType<typeof productErrorMessage> | null };
 
-export function MediaImportDialog({ files, libraryName, busy, isCurrent, onImport, onClose, allResources = false }: {
+export function MediaImportDialog({ feedbackId = 'media-import', files, libraryName, busy, isCurrent, onImport, onClose, allResources = false }: {
+  feedbackId?: string;
   files: File[];
   libraryName: string;
   busy: boolean;
@@ -50,7 +52,7 @@ export function MediaImportDialog({ files, libraryName, busy, isCurrent, onImpor
     } finally { workingRef.current = false; setWorking(false); }
   };
   return <DialogFrame titleId="media-import-title" descriptionId="media-import-description" onClose={close} dismissible={!locked}>
-    <DialogHeader titleId="media-import-title" eyebrow={t('media:ui.imageLibrary')} title={t(allResources ? 'messages:resources.confirmImport' : 'media:upload.title')} onClose={close} closeDisabled={locked} />
+    <DialogHeader actions={<OperationFeedback id={feedbackId} notice={notice} tone={notice?.tone} />} titleId="media-import-title" eyebrow={t('media:ui.imageLibrary')} title={t(allResources ? 'messages:resources.confirmImport' : 'media:upload.title')} onClose={close} closeDisabled={locked} />
     <div className="grid min-w-0 gap-4 p-4">
       <p id="media-import-description" className="text-sm text-secondary">{t('media:upload.description')}</p>
       <p className="break-words text-sm text-primary">{t('media:upload.destination', { name: libraryName })}</p>
@@ -61,7 +63,6 @@ export function MediaImportDialog({ files, libraryName, busy, isCurrent, onImpor
         </li>)}
       </ul>
       <p className="text-xs text-muted" role="status">{rows ? t(allResources ? 'messages:resources.importSummary' : 'media:upload.summary', { valid: valid.length, invalid: files.length - valid.length }) : t(allResources ? 'messages:resources.checkingFiles' : 'media:upload.checking')}</p>
-      {notice ? <p className="status-copy" data-tone={notice.tone} role="status">{formatProductMessage(notice, t)}</p> : null}
     </div>
     <DialogFooter><DialogActions>
       <DialogButton disabled={locked} onClick={close}><MediaIcon name="close" />{t('common:actions.cancel')}</DialogButton>

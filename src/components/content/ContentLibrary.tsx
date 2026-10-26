@@ -1,6 +1,7 @@
 'use client';
 
-import { formatDiagnosticMessage, formatProductMessage, productCause, productLabel, productText, productReference, productErrorLabel, type ProductMessageInfo } from "../../lib/i18n/productMessages";
+import { OperationFeedback } from '../global/OperationFeedback';
+import { formatDiagnosticMessage, formatProductMessage, productCause, productLabel, productText, productReference, productJoin, productDiagnosticReference, productErrorLabel, type ProductMessageInfo } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
@@ -8,6 +9,7 @@ import { PageHeading } from '../global/PageHeading';
 import { getFormatSnapshot } from '../../lib/article-format/runtime';
 
 import { ButtonBar } from '../global/ButtonBar';
+import { ContentIcon } from '../global/ContentIcon';
 import { CollapsiblePanel, PanelHeading } from '../global/CollapsiblePanel';
 import { TooltipButton } from '../global/TooltipButton';
 import { CategoryIcon, SnippetCategoryDialog } from './SnippetCategoryDialog';
@@ -105,8 +107,8 @@ export function ContentLibrary(props: Props) {
   const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
   const previewTheme = themes.find((item) => item.id === selectedThemeId) ?? defaultTheme;
   const [notices, setNotices] = useState<Record<TemplateTab, Notice>>({
-    snippets: { ...productLabel("contentLibrary.typeASnippetTriggerInTheBodyThenPressSpaceToExpand"), tone: 'neutral' },
-    templates: { ...productLabel("contentLibrary.chooseAStarterTemplateWhenCreatingAnArticleItsStructureIsRetained"), tone: 'neutral' },
+    snippets: { label: '', tone: 'neutral' },
+    templates: { label: '', tone: 'neutral' },
   });
   const [refreshPending, setRefreshPending] = useState<Record<TemplateTab, boolean>>({ snippets: false, templates: false });
   const [operation, setOperation] = useState<Operation>(null);
@@ -154,7 +156,8 @@ export function ContentLibrary(props: Props) {
   const uiName = t('content:nouns.' + tab);
   const categories = tab === 'snippets' ? snippetCategories : templateCategories;
   const isCurrent = (expectedRoot: FileSystemDirectoryHandle) => isRootCurrent(expectedRoot, sessionKey);
-  const report = (kind: TemplateTab, label: string | ProductMessageInfo, tone: Tone = 'neutral') => setNotices((previous) => ({ ...previous, [kind]: { ...productErrorLabel(label), tone } }));
+  const feedbackEvent = useRef({ snippets: Date.now(), templates: Date.now() });
+  const report = (kind: TemplateTab, label: string | ProductMessageInfo, tone: Tone = 'neutral') => { feedbackEvent.current[kind]++; setNotices((previous) => ({ ...previous, [kind]: { ...productErrorLabel(label), tone } })); };
   const replaceDraft = (kind: TemplateTab, next: Draft | null) => setDrafts((previous) => ({ ...previous, [kind]: next }));
 
   useEffect(() => {
@@ -222,8 +225,24 @@ export function ContentLibrary(props: Props) {
       : { tab, original: null, value: { id, source: `${createArticleSource('新起稿模板', previewTheme.id)}\n# 新起稿模板\n\n[在此补充正文]\n`, ...(templateCategories[0] ? { categoryId: templateCategories[0].id } : {}) } };
     replaceDraft(tab, next);
     setMetadataDialog({ draft: next, baseline: JSON.stringify(next.value) });
-    report(tab, productReference("contentLibrary.editingANewSaveItToReuseIt", { "name": name }));
   });
+
+  const copySnippet = () => {
+    if (tab !== 'snippets' || !selected || !root || !canManage || busy || !isCurrent(root) || draft?.original === null) return;
+    const source = { ...(draft?.tab === 'snippets' ? draft.value : selected as ArticleSnippet) };
+    requestDecision(productText('contentLibrary.copySnippet'), () => {
+      if (!isCurrent(root)) return;
+      let id = '';
+      for (let i = 1; ; i++) {
+        const suffix = i === 1 ? '-copy' : `-copy-${i}`;
+        id = source.id.slice(0, 48 - suffix.length).replace(/-+$/, '') + suffix;
+        if (!snippets.some(item => item.id === id || item.trigger === `//${id}`)) break;
+      }
+      const next: Draft = { tab: 'snippets', original: null, value: { ...source, id, trigger: `//${id}`, name: t('content:ui.snippetCopyName', { name: source.name }) } };
+      replaceDraft('snippets', next);
+      setMetadataDialog({ draft: next, baseline: JSON.stringify(next.value) });
+    });
+  };
 
   const draftFromEntry = (entry: ArticleSnippet | ArticleTemplate): Draft => {
     const value = tab === 'snippets' ? entry as ArticleSnippet : { id: entry.id, source: (entry as ArticleTemplate).source, ...((entry as ArticleTemplate).categoryId ? { categoryId: (entry as ArticleTemplate).categoryId } : {}) };
@@ -264,7 +283,6 @@ export function ContentLibrary(props: Props) {
     setOperation({ tab: target.tab, action: 'validate' });
     validationRef.current = { ...validationRef.current, [target.tab]: null };
     setValidations(validationRef.current);
-    report(target.tab, productReference("contentLibrary.validating"));
     try {
       const formatId = getFormatSnapshot().id;
       const result = await validateContentSource(target.tab, target.tab === 'snippets' ? target.value.content : target.value.source, { theme: previewTheme });
@@ -315,7 +333,6 @@ export function ContentLibrary(props: Props) {
     let formatIssues: ArticleFormatIssue[] = [];
     operationLock.current = true;
     setOperation({ tab: target.tab, action: 'save' });
-    report(target.tab, productReference("contentLibrary.saving"));
     try {
       try {
         if (target.tab === 'snippets') {
@@ -349,7 +366,6 @@ export function ContentLibrary(props: Props) {
     const target = confirmDelete;
     operationLock.current = true;
     setOperation({ tab: target.tab, action: 'delete' });
-    report(target.tab, productReference("contentLibrary.deleting"));
     try {
       try {
         if (target.tab === 'snippets') await deleteArticleSnippet(operationRoot, target.id);
@@ -385,7 +401,6 @@ export function ContentLibrary(props: Props) {
     const next = selectedDraft();
     if (!next) return;
     lastEditedTab.current = tab;
-    report(tab, productReference("contentLibrary.theBodyChangedValidateItBeforeSaving"));
     if (next.tab === 'snippets') replaceDraft('snippets', { ...next, value: { ...next.value, content: body } });
     else {
       try { replaceDraft('templates', { ...next, value: { ...next.value, source: replaceArticleBody(next.value.source, body) } }); }
@@ -478,7 +493,6 @@ export function ContentLibrary(props: Props) {
       if (!infoDraft.value.categoryId) return false;
       replaceDraft(infoDraft.tab, infoDraft);
       setMetadataDialog(null);
-      report(infoDraft.tab, productReference("contentLibrary.informationConfirmedContinueEditingTheBodyThenClickSaveContentToCreate"));
       return true;
     }
     const saved = await save(infoSaveTarget, true, validateFirst);
@@ -524,7 +538,7 @@ export function ContentLibrary(props: Props) {
                 {registered(item.id) ? <UnsavedMark /> : null}
               </button>)}
             </div>
-            <ButtonBar label={t('content:ui.createLibraryContent')}><button className="button button-quiet" type="button" onClick={() => openCategory()} disabled={!canManage || busy}><Icon name="plus" />{t('content:ui.newCategory')}</button><button className="button button-primary" type="button" onClick={beginCreate} disabled={!canManage || busy}><Icon name="plus" />{t('content:templates.newType', { type: t(tab === 'snippets' ? 'messages:snippetCategoryIcons.snippet' : 'messages:contentLibrary.starterTemplate') })}</button></ButtonBar>
+            <ButtonBar label={t('content:ui.createLibraryContent')}><OperationFeedback hideTrigger revision={feedbackEvent.current[tab]} id={`content-operation-${tab}`} notice={notice.label ? notice : null} tone={notice.tone} onRetry={refreshPending[tab] ? retryRefresh : undefined} retryDisabled={!canManage || busy} /><OperationFeedback id={`content-files-${tab}`} label={t('common:feedback.fileProblems', { count: issues.length })} notice={issues.length ? productReference('shared.compose', { parts: productJoin(issues.map(issue => productJoin([issue.file, ' · ', productDiagnosticReference(issue)])), '\n') }) : null} summary={productReference('feedback.filesRepair', { count: issues.length })} tone="warning" /><button className="button button-quiet" type="button" onClick={() => openCategory()} disabled={!canManage || busy}><Icon name="plus" />{t('content:ui.newCategory')}</button>{tab === 'snippets' ? <button className="button button-quiet" type="button" onClick={copySnippet} disabled={!canManage || busy || !selected || draft?.original === null}><ContentIcon name="copy" />{t('messages:contentLibrary.copySnippet')}</button> : null}<button className="button button-primary" type="button" onClick={beginCreate} disabled={!canManage || busy}><Icon name="plus" />{t('content:templates.newType', { type: t(tab === 'snippets' ? 'messages:snippetCategoryIcons.snippet' : 'messages:contentLibrary.starterTemplate') })}</button></ButtonBar>
           </div>
 
           {!root || librariesState !== 'ready' ? <div className="shrink-0 border-b border-line bg-list px-5 py-3 text-xs text-muted" role="status">
@@ -571,26 +585,25 @@ export function ContentLibrary(props: Props) {
                     <div className="editor-preview-pane min-h-64 group-data-[wide=true]/content-preview:min-h-0"><ContentRenderPreview key={`${tab}:${draft?.value.id ?? selected?.id}:${sessionKey}`} source={sourceValue} theme={previewTheme} blocked={invalidMetadata} dark={dark} /></div>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-                      <p id="template-source-help" className="min-w-0 flex-1 text-xs text-muted">{draft && !isContentFileId(draft.value.id) ? t('content:ui.clickEditToEnterAFilenameBeforeSaving') : tab === 'snippets' ? (draft?.tab === 'snippets' && !draft.value.categoryId && !draft.original ? t('content:ui.chooseACategoryInTheInformationDialogBefore') : t('content:ui.triggersStartWithUseOneMarkerToSet')) : invalidMetadata ? t('content:ui.metadataHasErrorsClickEditToRepairIt') : t('content:ui.editTheBodyInSourceUseEditFor')}</p>
-                      <ButtonBar label={t('content:ui.contentSaveActions')} className="justify-end"><button className="button button-quiet" type="button" disabled={!draft || busy} onClick={() => requestDecision(productText("contentLibrary.cancelEditing"), () => { replaceDraft(tab, null); report(tab, productReference("contentLibrary.editingCancelledUnsavedContentWasDiscarded")); })}><Icon name="cancel" />{t('content:ui.cancelEditing')}</button><button className="button button-quiet" type="button" disabled={!canManage || busy || invalidMetadata} onClick={() => validate()}><Icon name="check" />{operation?.action === 'validate' ? t('content:ui.validating') : t('content:ui.validateContent')}</button><button className="button button-primary" type="submit" aria-keyshortcuts="Meta+S Control+S" title={validated(draft) ? t('content:ui.saveContentSCtrlS') : t('content:ui.validateFirstSCtrlSValidatesAndSaves')} disabled={!canManage || busy || !dirty(draft) || !validated(draft) || invalidMetadata || Boolean(draft && !draft.original && !draft.value.categoryId)}><Icon name="save" />{operation?.action === 'save' ? t('content:ui.saving') : t('content:ui.saveContent')}</button></ButtonBar>
+                      <p id="template-source-help" className="min-w-0 flex-1 text-xs text-muted">{draft && !isContentFileId(draft.value.id) ? t('content:ui.clickEditToEnterAFilenameBeforeSaving') : tab === 'snippets' ? (draft?.tab === 'snippets' && !draft.value.categoryId && !draft.original ? t('content:ui.chooseACategoryInTheInformationDialogBefore') : t('content:ui.triggersStartWithUseOneMarkerToSet')) : invalidMetadata ? t('content:ui.metadataHasErrorsClickEditToRepairIt') : t('content:ui.editTheBodyInSourceUseEditFor')}{' '}{t(tab === 'snippets' ? 'messages:contentLibrary.typeASnippetTriggerInTheBodyThenPressSpaceToExpand' : 'messages:contentLibrary.chooseAStarterTemplateWhenCreatingAnArticleItsStructureIsRetained')}</p>
+                      <ButtonBar label={t('content:ui.contentSaveActions')} className="justify-end"><button className="button button-quiet" type="button" disabled={!draft || busy} onClick={() => requestDecision(productText("contentLibrary.cancelEditing"), () => { replaceDraft(tab, null); })}><Icon name="cancel" />{t('content:ui.cancelEditing')}</button><button className="button button-quiet" type="button" disabled={!canManage || busy || invalidMetadata} onClick={() => validate()}><Icon name="check" />{operation?.action === 'validate' ? t('content:ui.validating') : t('content:ui.validateContent')}</button><button className="button button-primary" type="submit" aria-keyshortcuts="Meta+S Control+S" title={validated(draft) ? t('content:ui.saveContentSCtrlS') : t('content:ui.validateFirstSCtrlSValidatesAndSaves')} disabled={!canManage || busy || !dirty(draft) || !validated(draft) || invalidMetadata || Boolean(draft && !draft.original && !draft.value.categoryId)}><Icon name="save" />{operation?.action === 'save' ? t('content:ui.saving') : t('content:ui.saveContent')}</button></ButtonBar>
                     </div>
                     {draftDiagnostics.some((diagnostic) => diagnostic.level === 'error') ? <div className="grid max-h-20 shrink-0 gap-2 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" role="status" aria-label={t('content:ui.templateSourceDiagnostics')}>{draftDiagnostics.filter((diagnostic) => diagnostic.level === 'error').map((diagnostic, index) => <p key={index} className="break-words text-xs text-danger">{formatDiagnosticMessage(diagnostic, t)}</p>)}</div> : null}
                   </form> : <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 text-muted"><Icon name={tab === 'snippets' ? 'snippet' : 'document'} /><h3 className="font-heading text-lg font-semibold text-primary">{t('content:templates.choose', { type: uiName })}</h3><p className="text-sm">{t('content:ui.browseTheListOrCreateYourOwnContent')}</p></div>}
 
                 </div>
               </div>
-              {issues.length ? <div className="grid max-h-24 shrink-0 gap-2 overflow-x-clip overflow-y-auto border-t border-line bg-list px-5 py-4 text-xs text-danger scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" aria-label={t('content:ui.libraryFileDiagnostics')} role="status">{issues.map((issue) => <p key={`${issue.file}:${issue.message}`} className="break-words"><strong>{issue.file}</strong> · {formatDiagnosticMessage(issue, t)}</p>)}</div> : null}
-              <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line px-5 py-4"><p className="status-copy min-w-0 break-words" data-tone={notice.tone} role="status">{formatProductMessage(notice, t)}</p>{refreshPending[tab] ? <button className="button button-quiet" type="button" disabled={!canManage || busy} onClick={() => void retryRefresh()}>{t('content:ui.retryRefreshingList')}</button> : null}</footer>
+
             </> : null}
           </div>)}
         </div>
 
-      {confirmDelete && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="template-delete-title" descriptionId="template-delete-description" role="alertdialog" dismissible={!busy} onClose={() => setConfirmDelete(null)}><DialogHeader titleId="template-delete-title" eyebrow={t('common:eyebrows.deleteTemplate')} title={t('content:templates.deleteType', { type: confirmDelete.tab === 'snippets' ? t('content:ui.snippets') : t('content:ui.starterTemplates') })} closeDisabled={busy} onClose={() => setConfirmDelete(null)} /><div className="dialog-content"><p className="break-words text-sm font-medium text-primary">「{confirmDelete.name}」</p><p id="template-delete-description" className="mt-3 text-sm text-muted">{t('content:ui.deletionCannotBeUndone')}{confirmDelete.tab === 'snippets' ? t('content:ui.contentAlreadyInsertedIntoArticles') : t('content:ui.articlesAlreadyCreated')}{t('content:ui.remainUnaffected')}</p>{notice.tone === 'error' ? <p className="mt-3 text-sm text-danger" role="alert">{formatProductMessage(notice, t)}</p> : null}</div><DialogFooter><DialogActions><DialogButton disabled={busy} onClick={() => setConfirmDelete(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy} onClick={() => void remove()}>{busy ? t('content:ui.deleting') : t('content:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
+      {confirmDelete && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="template-delete-title" descriptionId="template-delete-description" role="alertdialog" dismissible={!busy} onClose={() => setConfirmDelete(null)}><DialogHeader titleId="template-delete-title" eyebrow={t('common:eyebrows.deleteTemplate')} title={t('content:templates.deleteType', { type: confirmDelete.tab === 'snippets' ? t('content:ui.snippets') : t('content:ui.starterTemplates') })} closeDisabled={busy} onClose={() => setConfirmDelete(null)} /><div className="dialog-content"><p className="break-words text-sm font-medium text-primary">「{confirmDelete.name}」</p><p id="template-delete-description" className="mt-3 text-sm text-muted">{t('content:ui.deletionCannotBeUndone')}{confirmDelete.tab === 'snippets' ? t('content:ui.contentAlreadyInsertedIntoArticles') : t('content:ui.articlesAlreadyCreated')}{t('content:ui.remainUnaffected')}</p></div><DialogFooter><DialogActions><DialogButton disabled={busy} onClick={() => setConfirmDelete(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy} onClick={() => void remove()}>{busy ? t('content:ui.deleting') : t('content:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
       {decision && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={pendingDrafts.map((target) => ({ label: target.tab === 'snippets' ? target.value.name : parseArticle(target.value.source).metadata.title || t('content:ui.untitledStarterTemplate'), detail: fileIdentity(target, t('content:ui.unnamed')) }))} description={t('content:templates.leaving', { action: formatProductMessage(decision.label, t) })} saveDisabled={!canManage || busy} saveLabel={decision.scope === 'page' ? t('content:ui.saveAndLeave') : t('content:ui.saveAndContinue')} onCancel={() => setDecision(null)} onContinue={() => resumeContent(decision.scope === 'info' ? infoDraft!.tab : decision.scope === 'tab' ? tab : pendingDrafts.find(target => target.tab === lastEditedTab.current)?.tab ?? pendingDrafts[0]?.tab ?? tab)} onDiscard={() => { const run = decision.run; setDecision(null); run(); }} onSave={async () => { const run = decision.run; if (decision.scope === 'info') { if (!await saveInfo(true)) return false; } else for (const target of pendingDrafts) if (!await save(target, false, true)) return false; setDecision(null); run(); return true; }} />, document.body) : null}
 
       {categoryDraft && typeof document !== 'undefined' ? createPortal(<SnippetCategoryDialog value={categoryDraft.value} existing={categoryDraft.originalId !== null} kind={categoryDraft.tab} count={(categoryDraft.tab === 'snippets' ? snippets : templates).filter(item => item.categoryId === categoryDraft.originalId).length} busy={busy} error={categoryError} onChange={value => setCategoryDraft({ ...categoryDraft, value })} onClose={() => { if (!busy) setCategoryDraft(null); }} onSave={() => void saveCategory()} />, document.body) : null}
 
-      {metadataDialog && infoDraft && !decision && typeof document !== 'undefined' ? createPortal(<ContentMetadataDialog kind={infoDraft.tab} creating={infoDraft.original === null} busy={busy} validating={operation?.action === 'validate'} onValidate={infoDraft.original !== null ? () => validate(infoSaveTarget) : undefined} validationDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError)} saveDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError) || (infoDraft.original !== null && (!validated(infoSaveTarget) || JSON.stringify(infoDraft.value) === metadataDialog.baseline)) || (!infoDraft.original && !infoDraft.value.categoryId)} error={notice.tone === 'error' ? formatProductMessage(notice, t) : undefined} status={notice.tone === 'success' || notice.tone === 'warning' ? formatProductMessage(notice, t) : undefined} statusTone={notice.tone === 'warning' ? 'warning' : 'success'} onClose={() => { if (busy) return; if (infoDirty) { infoLocation.capture(); setDecision({ label: productText("contentLibrary.cancelEditing"), scope: 'info', run: () => setMetadataDialog(null) }); } else setMetadataDialog(null); }} onSave={() => void saveInfo()}>
+      {metadataDialog && infoDraft && !decision && typeof document !== 'undefined' ? createPortal(<ContentMetadataDialog kind={infoDraft.tab} creating={infoDraft.original === null} busy={busy} validating={operation?.action === 'validate'} onValidate={infoDraft.original !== null ? () => validate(infoSaveTarget) : undefined} validationDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError)} saveDisabled={!canManage || infoInvalid || !isContentFileId(infoDraft.value.id) || Boolean(infoFileError) || (infoDraft.original !== null && (!validated(infoSaveTarget) || JSON.stringify(infoDraft.value) === metadataDialog.baseline)) || (!infoDraft.original && !infoDraft.value.categoryId)} onClose={() => { if (busy) return; if (infoDirty) { infoLocation.capture(); setDecision({ label: productText("contentLibrary.cancelEditing"), scope: 'info', run: () => setMetadataDialog(null) }); } else setMetadataDialog(null); }} onSave={() => void saveInfo()}>
         <ContentMetadataEditor fileId={infoDraft.value.id} fileError={infoFileError} creating={infoDraft.original === null} onFileIdChange={updateFileId} snippet={infoDraft.tab === 'snippets' ? infoDraft.value : undefined} metadata={infoParsed?.metadata} inputs={infoDraft.tab === 'templates' ? infoDraft.metadataInputs : undefined} categories={infoDraft.tab === 'snippets' ? snippetCategories : templateCategories} categoryId={infoDraft.value.categoryId} onCategoryChange={categoryId => { if (infoDraft.tab === 'snippets') updateInfoSnippet({ categoryId }); else setMetadataDialog({ ...metadataDialog, draft: { ...infoDraft, value: { ...infoDraft.value, categoryId } } }); }} disabled={busy} invalid={infoInvalid} onSnippetChange={updateInfoSnippet} onMetadataChange={updateTemplateMetadata} onTemplateIconChange={updateTemplateIcon} />
         {infoDraft.tab === 'templates' && infoInvalid ? <section className="mt-4 rounded-lg border border-danger/40 bg-danger/5 p-3"><p className="text-sm font-medium text-danger">{t('content:ui.repairMetadataBeforeSaving')}</p><label className="field-stack mt-3"><span className="field-label">{t('content:ui.metadataSourceIncludingBoundaries')}</span><textarea className="field min-h-32 resize-y font-editor-source text-xs" name="template-metadata-repair" aria-label={t('content:ui.repairStarterTemplateMetadata')} value={infoDraft.value.source.slice(0, infoParsed?.frontMatterRange?.end ?? 0)} onChange={event => setMetadataDialog({ ...metadataDialog, draft: { ...infoDraft, metadataInputs: undefined, value: { ...infoDraft.value, source: event.target.value + (infoParsed?.body ?? '') } } })} disabled={busy} spellCheck={false} /></label></section> : null}
       </ContentMetadataDialog>, document.body) : null}

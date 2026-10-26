@@ -35,12 +35,12 @@ function fixture() {
 
 test('the shared import dialog preselects the library default, permits a theme change and guards missing sources/busy actions', async () => {
   const f = fixture();
-  assert.equal(f.render().find(node => node.type === 'select').props.value, 'alternate');
+  assert.equal(f.render().find(node => node.type === 'select-field').props.value, 'alternate');
   assert.equal(f.button('导入文稿').props.disabled, true);
   await f.button('选择 Markdown 文件').props.onClick(); assert.deepEqual(f.calls, ['file']);
   f.props.source = { origin: { name: 'source.md', size: 100 }, title: 'Original title', directoryName: null, chooseDirectory() {} };
   assert.equal(f.button('导入文稿').props.disabled, false);
-  f.render().find(node => node.type === 'select').props.onChange({ target: { value: BASIC_THEME.id } });
+  f.render().find(node => node.type === 'select-field').props.onChange(BASIC_THEME.id);
   await f.button('导入文稿').props.onClick(); assert.equal(f.calls.at(-1), BASIC_THEME.id);
   await f.button('选择来源目录（只读）').props.onClick(); assert.equal(f.calls.at(-1), 'directory');
   f.props.busy = true;

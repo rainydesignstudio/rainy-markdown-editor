@@ -2,8 +2,10 @@
 
 import { formatProductMessage, productLabel, productReference } from "../../lib/i18n/productMessages";
 
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useEditorControllerContext } from './AppProviders';
+import { useToast } from './Toast';
+import { OperationFeedback } from './OperationFeedback';
 import { AppDialogs } from './AppDialogs';
 import { ChangelogDialog } from './ChangelogDialog';
 import { EditorTopbar } from './EditorTopbar';
@@ -20,11 +22,16 @@ import { parseArticle } from '../../lib/frontMatter';
 import { useUITranslation } from './UILocaleProvider';
 import { articleCollectionLabel } from '../../lib/i18n/articleLabels';
 import { useEditingDraft } from './EditingDrafts';
+import { useSidebarPreferences } from '../../hooks/useSidebarPreferences';
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useUITranslation('articles');
   const format = useFormatSnapshot();
   const controller = useEditorControllerContext();
+  const notify = useToast();
+  useEffect(() => { if (!format.loading && !format.error) notify({ key: 'format-problem', dismiss: true }); }, [format.loading, format.error, notify]);
+  const statusEvent = useRef(0), lastStatus = useRef(controller.status);
+  if (lastStatus.current !== controller.status) { lastStatus.current = controller.status; statusEvent.current++; }
   useEditingDraft(controller.article.dirty ? { kind: controller.articleDraftKind, objectId: controller.currentArticleId, root: controller.directory, resume: controller.resumeCurrentDraft } : null);
   const historyArticle = controller.article;
   const historyRoot = controller.directory;
@@ -32,8 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     controller.historyDialogOpen && controller.view === 'articles' && controller.articleMode === 'editor'
     && historyRoot && historyArticle.month && historyArticle.folder,
   );
-  const [mainCollapsed, setMainCollapsed] = useState(false);
-  const [articleSidebarCollapsed, setArticleSidebarCollapsed] = useState(false);
+  const { preferences: { mainCollapsed, articleCollapsed: articleSidebarCollapsed }, toggle: toggleSidebar } = useSidebarPreferences();
   const [articleSidebarMobileOpen, setArticleSidebarMobileOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [statisticsOpen, setStatisticsOpen] = useState(false);
@@ -49,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       setArticleSidebarMobileOpen((open) => !open);
       return;
     }
-    setArticleSidebarCollapsed((collapsed) => !collapsed);
+    toggleSidebar('articleCollapsed');
   };
 
   const openHistory = (event: MouseEvent<HTMLButtonElement>) => {
@@ -72,7 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           collapsed={mainCollapsed}
           colorMode={controller.displayedEditorAppearance.colorMode}
           onNavigate={controller.navigateView}
-          onToggleCollapsed={() => setMainCollapsed((collapsed) => !collapsed)}
+          onToggleCollapsed={() => toggleSidebar('mainCollapsed')}
           onSetColorMode={controller.setEditorColorMode}
           onOpenChangelog={() => setChangelogOpen(true)}
         />
@@ -80,7 +86,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ArticleSidebar
             collapsed={articleSidebarCollapsed}
             mobileOpen={articleSidebarMobileOpen}
-            onToggleCollapsed={() => setArticleSidebarCollapsed((collapsed) => !collapsed)}
+            onToggleCollapsed={() => toggleSidebar('articleCollapsed')}
             onCloseMobile={() => setArticleSidebarMobileOpen(false)}
           />
         ) : null}
@@ -112,13 +118,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             onCompile={() => void controller.updateCurrentStyles()}
             onCheckFormat={() => void controller.checkCurrentFormat()}
           />
-          {format.library && !format.loading && (format.error || format.source === 'built-in') ? <p className="shrink-0 border-b border-warning-line bg-warning-surface px-4 py-2 text-xs text-warning-strong" role={format.error ? 'alert' : 'status'}>{format.error ? formatProductMessage(format.error, t) : t("messages:uiFeedback.defaultFormat")}{format.error && !format.loading ? t("messages:uiFeedback.repairFormat") : ''}</p> : null}
+          <OperationFeedback hideTrigger id="editor-operation" revision={statusEvent.current} announce={controller.view === 'articles' && controller.articleMode === 'editor' && controller.status.formatRevision === undefined && controller.status.tone !== 'neutral' && controller.status.notify !== false} notice={controller.status} tone={controller.status.tone} />
+          <OperationFeedback hideTrigger id="workflow-settings" announce={controller.settingsNotice.notify !== false} notice={controller.directory ? controller.settingsNotice : null} tone={controller.settingsNotice.tone} lifetime={controller.settingsBusy ? { mode: 'locked' } : undefined} />
+
           <div className="workspace-main" hidden={historyViewOpen}>{children}</div>
           {historyViewOpen && historyRoot && historyArticle.month && historyArticle.folder ? (
             <ArticleHistoryView
               articleTitle={controller.currentTitle}
               currentSource={historyArticle.source}
               currentTheme={historyArticle.theme}
+              currentFormat={historyArticle.renderSnapshot ?? getFormatSnapshot()}
               currentThemeValid={historyArticle.themeValid}
               currentDirty={historyArticle.dirty}
               month={historyArticle.month}
@@ -141,7 +150,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               onManualSnapshot={() => void controller.createManualHistorySnapshot()}
               onRestore={(target) => void controller.restoreHistorySnapshot(target)}
               onDelete={controller.deleteHistorySnapshot}
-              onSaveAs={(target, title, month) => void controller.saveHistoryAsArticle(target, title, month)}
+              onSaveAs={controller.saveHistoryAsArticle}
               onToggleRetention={(target, retained) => void controller.toggleHistoryRetention(target, retained)}
               onRefreshHistory={() => void controller.refreshArticleHistory()}
             />
@@ -156,12 +165,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         }
         setTemplateSnapshot(null);
       }} onClose={() => setTemplateSnapshot(null)} /> : null}
-      {exportSnapshot ? <ArticleExportDialog getResourceRevision={() => controller.mediaRefreshRevisionRef.current} focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
+      {exportSnapshot ? <ArticleExportDialog theme={controller.article.theme} onTransform={controller.updateArticle} getResourceRevision={() => controller.mediaRefreshRevisionRef.current} focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
         const current = controller.articleRef.current;
         return getFormatSnapshot().id === exportSnapshot.formatId && controller.directoryRef.current === exportSnapshot.root && controller.contentLibraryRootSessionRef.current === exportSnapshot.sessionKey
           && current.month === exportSnapshot.month && current.folder === exportSnapshot.folder
           && current.theme.id === exportSnapshot.themeId && current.theme.version === exportSnapshot.themeVersion
-          && parseArticle(current.source).body === exportSnapshot.body;
+          && current.source === exportSnapshot.source;
       }} prepareVisual={controller.prepareVisualExport} onExported={(fileName, mediaFiles) => controller.setStatus({ ...productLabel("appShell.exported", { "fileName": fileName, "value": (mediaFiles === undefined ? '' : productReference("appShell.includedMediaFiles", { "mediaFiles": mediaFiles })) }), tone: 'success' })} onClose={() => setExportSnapshot(null)} /> : null}
       {changelogOpen ? <ChangelogDialog onClose={() => setChangelogOpen(false)} /> : null}
       <AppDialogs />

@@ -1,5 +1,5 @@
 /** Shared source gutter geometry for editable and read-only source rows. */
-export const SOURCE_LINE_NUMBER_CLASS = 'absolute top-0 -left-[calc(var(--spacing)*9+var(--source-gutter-extra))] w-[calc(var(--spacing)*5+var(--source-gutter-extra))] whitespace-nowrap pr-1 text-right font-article-source text-faint md:-left-[calc(var(--spacing)*12+var(--source-gutter-extra))] md:w-[calc(var(--spacing)*8+var(--source-gutter-extra))]';
+export const SOURCE_LINE_NUMBER_CLASS = 'absolute -left-[calc(var(--spacing)*9+var(--source-gutter-extra))] w-[calc(var(--spacing)*5+var(--source-gutter-extra))] whitespace-nowrap pr-1 text-right font-article-source text-faint md:-left-[calc(var(--spacing)*12+var(--source-gutter-extra))] md:w-[calc(var(--spacing)*8+var(--source-gutter-extra))]';
 export function sourceLinePaddingClass(showLineNumbers: boolean): string {
   return showLineNumbers ? 'pl-[calc(var(--spacing)*14+var(--source-gutter-extra))] md:pl-[calc(var(--spacing)*18+var(--source-gutter-extra))]' : 'pl-5 md:pl-8';
 }

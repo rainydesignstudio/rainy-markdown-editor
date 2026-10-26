@@ -61,7 +61,7 @@ test('shared attachment renames retain originals needed by saved or draft refere
   const root = saved(), pdf = await importResourceFile(root, shared, new File(['PDF'], 'guide.pdf'));
   const article = await (await (await root.getDirectoryHandle('articles')).getDirectoryHandle('2026-10')).getDirectoryHandle('one'); article.seed('article.md', '[Guide](/shared/file/guide.pdf)');
   const result = await renameSharedMedia(pdf, 'renamed', current);
-  assert.equal(result.ok, true); assert.equal(result.tone, 'warning');
+  assert.equal(result.ok, true); assert.equal(result.tone, 'success');
   const directory = await (await root.getDirectoryHandle('shared')).getDirectoryHandle('file'); assert.ok(directory.children.has('guide.pdf')); assert.ok(directory.children.has('renamed.pdf'));
   article.children.get('article.md').value = '# One';
   const moved = await renameSharedMedia(pdf, 'moved', current); assert.equal(moved.ok, true); assert.equal(directory.children.has('guide.pdf'), false);

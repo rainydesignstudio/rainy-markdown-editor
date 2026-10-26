@@ -1,4 +1,5 @@
 'use client';
+import { SelectField } from '../global/SelectField';
 import { useState } from 'react';
 import { useUITranslation, useUILocale } from '../global/UILocaleProvider';
 import { formatUINumber } from '../../lib/i18n/formatters';
@@ -27,7 +28,7 @@ export function MarkdownImportDialog({ source, mode, themes, defaultTheme, busy,
         {mode === 'local' ? <ButtonBar label={t('imports.sourceLabel')}><DialogButton disabled={busy} onClick={() => void onChooseFile()}>{t('imports.chooseFile')}</DialogButton></ButtonBar> : null}
       </section>
       <label className="field-stack" htmlFor="markdown-import-theme"><span className="field-label">{t('imports.themeLabel')}</span>
-        <select id="markdown-import-theme" className="field" value={themeId} disabled={busy} onChange={event => setThemeId(event.target.value)}>{themes.map(theme => <option key={theme.id} value={theme.id}>{theme.name} · v{theme.version}</option>)}</select>
+        <SelectField label={t('imports.themeLabel')} id="markdown-import-theme" value={themeId} disabled={busy} onChange={nextValue => setThemeId(nextValue)} options={[...(themes.map(theme => ({ value: theme.id, label: [theme.name, " · v", theme.version].join('') })) ?? [])]} />
         <span className="text-xs text-faint">{t('imports.themeHelp')}</span>
       </label>
       {source?.chooseDirectory ? <section className="field-stack" aria-label={t('imports.directoryLabel')}><p className="field-label">{t('imports.directoryLabel')}</p><p className="break-all text-xs text-secondary">{source.directoryName ?? t('imports.noDirectory')}</p><ButtonBar label={t('imports.directoryLabel')}><DialogButton disabled={busy} onClick={() => void onChooseDirectory()}>{t('imports.chooseDirectory')}</DialogButton></ButtonBar><p className="text-xs text-faint">{t('imports.directoryHelp')}</p></section> : null}

@@ -12,6 +12,7 @@ export type ArticleSettings = {
     intervalMinutes: number;
     maxCount: number;
   };
+  trash: { enabled: boolean };
 };
 
 export type ArticleSettingsLoadResult = {
@@ -23,8 +24,9 @@ export type ArticleSettingsLoadResult = {
 export const DEFAULT_ARTICLE_SETTINGS: ArticleSettings = Object.freeze({
   version: 1,
   defaultArticleThemeId: null,
-  autoSave: Object.freeze({ enabled: true, intervalSeconds: 60 }),
+  autoSave: Object.freeze({ enabled: false, intervalSeconds: 60 }),
   autoSnapshot: Object.freeze({ enabled: true, intervalMinutes: 30, maxCount: 20 }),
+  trash: Object.freeze({ enabled: true }),
 }) as ArticleSettings;
 
 function defaultSettings(): ArticleSettings {
@@ -33,6 +35,7 @@ function defaultSettings(): ArticleSettings {
     defaultArticleThemeId: DEFAULT_ARTICLE_SETTINGS.defaultArticleThemeId,
     autoSave: { ...DEFAULT_ARTICLE_SETTINGS.autoSave },
     autoSnapshot: { ...DEFAULT_ARTICLE_SETTINGS.autoSnapshot },
+    trash: { ...DEFAULT_ARTICLE_SETTINGS.trash },
   };
 }
 
@@ -53,7 +56,7 @@ function assertInterval(value: unknown, label: string, minimum: number, maximum:
 
 export function validateArticleSettings(value: unknown): ArticleSettings {
   if (!isRecord(value)) throw new ProductError("articleSettings.theTopLevelOfSettingsJsonMustBeAnObject");
-  assertOnlyKeys(value, ['version', 'defaultArticleThemeId', 'autoSave', 'autoSnapshot'], 'settings.json');
+  assertOnlyKeys(value, ['version', 'defaultArticleThemeId', 'autoSave', 'autoSnapshot', 'trash'], 'settings.json');
   if (value.version !== 1) throw new ProductError("articleSettings.theSettingsJsonVersionIsUnsupportedTheFileWasNotRewrittenAutomatically");
   if (value.defaultArticleThemeId !== undefined && value.defaultArticleThemeId !== null &&
       (typeof value.defaultArticleThemeId !== 'string' || !/^[a-z0-9][a-z0-9-]{0,47}$/.test(value.defaultArticleThemeId))) {
@@ -68,6 +71,8 @@ export function validateArticleSettings(value: unknown): ArticleSettings {
   assertInterval(value.autoSave.intervalSeconds, productText("articleSettings.autoSaveInterval"), 1, 86_400);
   assertInterval(value.autoSnapshot.intervalMinutes, productText("articleSettings.automaticSnapshotInterval"), 1, 10_080);
   assertInterval(value.autoSnapshot.maxCount, productText("articleSettings.automaticSnapshotRetention"), 1, 100);
+  if (value.trash !== undefined && (!isRecord(value.trash) || typeof value.trash.enabled !== 'boolean')) throw new ProductError('trash.invalidSetting');
+  if (isRecord(value.trash)) assertOnlyKeys(value.trash, ['enabled'], 'trash');
   return {
     version: 1,
     defaultArticleThemeId: value.defaultArticleThemeId ?? null,
@@ -77,6 +82,7 @@ export function validateArticleSettings(value: unknown): ArticleSettings {
       intervalMinutes: value.autoSnapshot.intervalMinutes,
       maxCount: value.autoSnapshot.maxCount,
     },
+    trash: { enabled: value.trash === undefined ? true : (value.trash as { enabled: boolean }).enabled },
   };
 }
 

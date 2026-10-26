@@ -12,6 +12,7 @@ import { articleDarkMode } from './styleTypes';
 import type { ThemeConfig } from '../types';
 import { bindPreviewImages, type RenderedPreviewImage } from './previewImages';
 import { commitPreviewMarkup } from './previewCommit';
+import { packageDisplayDocument, sanitizePackageHtml } from './packageRendering';
 export type ArticleDarkColors = { status: 'pending' | 'ready' | 'error'; values: Record<string, string[]> };
 const PENDING_DARK_COLORS: ArticleDarkColors = { status: 'pending', values: {} };
 function relayPreviewShortcut(event: KeyboardEvent) {
@@ -19,6 +20,15 @@ function relayPreviewShortcut(event: KeyboardEvent) {
     event.preventDefault();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: event.key, code: event.code, ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey, altKey: event.altKey, bubbles: true, cancelable: true }));
   }
+}
+
+function bindPreviewCitations(target: HTMLElement, host: HTMLElement) {
+  const click = (event: MouseEvent) => {
+    const link = (event.target as Element)?.closest?.('a[href]'), href = link?.getAttribute('href') ?? '';
+    const id = /^#(?:user-content-)?(rme-cite-[a-f0-9-]+)$/.exec(href)?.[1];
+    if (id) { event.preventDefault(); host.dispatchEvent(new CustomEvent('rainy-citation-open', { detail: id, bubbles: true })); }
+  };
+  target.addEventListener('click', click); return () => target.removeEventListener('click', click);
 }
 
 export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>, snapshot: FormatSnapshot, css: string, dark = false, options: { retained?: boolean; colorTheme?: ThemeConfig; onImageOpen?: (image: RenderedPreviewImage) => void; onSourceFind?: () => void } = {}) {
@@ -42,11 +52,22 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
     if (!target || !imageOpenRef.current) return;
     return bindPreviewImages(target, image => imageOpenRef.current?.(image), () => Boolean(imageOpenRef.current));
   }, [target, Boolean(options.onImageOpen)]);
+  useEffect(() => { const host = hostRef.current; if (target && host) return bindPreviewCitations(target, host); }, [target, hostRef]);
   const [darkIssue, setDarkIssue] = useState('');
-  const native = Boolean(snapshot.bundle.formatter.stylesheets || snapshot.bundle.formatter.document);
+  const native = Boolean(snapshot.renderer || snapshot.bundle.formatter.stylesheets || snapshot.bundle.formatter.document);
   useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host) return;
+    if (snapshot.renderer) {
+      let active = true;
+      const frame = document.createElement('iframe'); frame.title = frameTitles.current.light;
+      frame.setAttribute('sandbox', 'allow-same-origin'); frame.dataset.articleFrame = 'light';
+      frame.style.cssText = 'display:block;width:100%;height:100%;border:0';
+      host.style.position = 'relative'; host.style.height = '100%'; host.style.overflow = 'hidden'; visibleFrameRef.current = frame;
+      const ready = packageDisplayDocument(frame, snapshot); host.append(frame);
+      void ready.then(mount => { if (!active) return; mount.ownerDocument.addEventListener('keydown', relayShortcut); setTarget(mount); }).catch(error => { if (active) setDarkIssue(String(error)); });
+      return () => { active = false; frame.contentDocument?.removeEventListener('keydown', relayShortcut); frame.remove(); setTarget(null); host.style.position = ''; host.style.height = ''; host.style.overflow = ''; };
+    }
     if (!native) {
       const shadow = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
       let mount = shadow.querySelector<HTMLElement>('[data-article-preview]');
@@ -96,7 +117,7 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
     doc.addEventListener('keydown', relayShortcut);
     size(); setTarget(mount);
     return () => { observer.disconnect(); host.removeEventListener('wheel', relayWheel); doc.removeEventListener('keydown', relayShortcut); setTarget(null); frame.remove(); if (visibleFrameRef.current === frame) visibleFrameRef.current = null; host.style.position = ''; host.style.height = ''; host.style.overflow = ''; };
-  }, [hostRef, native, snapshot.bundle.formatter.document]);
+  }, [hostRef, native, snapshot.bundle.formatter.document, snapshot.renderer?.fingerprint]);
   useLayoutEffect(() => {
     if (!native) return;
     hostRef.current?.querySelectorAll<HTMLIFrameElement>('iframe[data-article-frame]').forEach(frame => {
@@ -106,6 +127,7 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
   useLayoutEffect(() => {
     if (!native || !target) return;
     const doc = target.ownerDocument;
+    if (snapshot.renderer) { const style = doc.head.querySelector<HTMLStyleElement>('[data-article-style]'); if (style) style.textContent = css; return; }
     const preview = snapshot.bundle.formatter.preview;
     // This document stays canonical light even when a manual-dark overlay is shown.
     doc.documentElement.dataset.previewMode = 'light';
@@ -121,7 +143,8 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
     setDarkIssue('');
     setColorResult(null);
     if ((!dark && !options.colorTheme) || !css || !host || !target) return;
-    let active = true, controller: AbortController | undefined, overlay: HTMLIFrameElement | undefined, observer: ResizeObserver | undefined, canonicalFrame: HTMLIFrameElement | null = null, stopImages: (() => void) | undefined;
+    let active = true, controller: AbortController | undefined, overlay: HTMLIFrameElement | undefined, observer: ResizeObserver | undefined, canonicalFrame: HTMLIFrameElement | null = null, stopImages: (() => void) | undefined, stopCitations: (() => void) | undefined;
+    let overlayReady: Promise<void> | undefined;
     let darkMount: HTMLDivElement | undefined, darkStyle: HTMLStyleElement | undefined;
     const render = () => {
       const root = target.querySelector<HTMLElement>('[data-article-content-root]');
@@ -131,8 +154,8 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
       const markup = articlePreviewMarkup(root);
       const context = { snapshot, css, theme: options.colorTheme };
       setColorResult(null);
-      void nativeDarkRendition(root, css, snapshot, request.signal, { ...options, width: host.clientWidth }).then(result => {
-        if (!active || request.signal.aborted || articlePreviewMarkup(root) !== markup) return;
+      void nativeDarkRendition(root, css, snapshot, request.signal, { ...options, width: host.clientWidth }).then(async result => {
+        if (!active || request.signal.aborted || !root.isConnected || target.querySelector('[data-article-content-root]') !== root || articlePreviewMarkup(root) !== markup) return;
         setColorResult({ ...context, colors: { status: 'ready', values: result.colors ?? {} } });
         if (!dark) return;
         stopImages?.();
@@ -143,17 +166,23 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
           (native ? host : host.shadowRoot ?? host).append(overlay);
           darkFrameRef.current = overlay;
           visibleFrameRef.current = overlay;
-          const doc = overlay.contentDocument!;
-          doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close();
-          doc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
-          doc.documentElement.dataset.previewMode = 'dark';
-          doc.documentElement.classList.toggle('dark', articleDarkMode(snapshot.bundle.formatter) === 'tokens');
-          doc.body.style.margin = '0';
-          if (native) doc.documentElement.style.scrollbarWidth = 'none';
-          doc.documentElement.style.overflowX = 'clip';
-          doc.addEventListener('keydown', relayShortcut);
-          darkStyle = doc.createElement('style'); doc.head.append(darkStyle);
-          darkMount = doc.createElement('div'); doc.body.append(darkMount);
+          overlayReady = (async () => {
+          const doc = overlay!.contentDocument!;
+          if (snapshot.renderer) {
+            const mount = await packageDisplayDocument(overlay!, snapshot);
+            if (!active) return;
+            darkMount = mount as HTMLDivElement;
+          } else { doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close(); }
+          const actualDoc = snapshot.renderer ? darkMount!.ownerDocument : doc;
+          actualDoc.documentElement.lang = snapshot.bundle.formatter.document?.language ?? 'zh-CN';
+          actualDoc.documentElement.dataset.previewMode = 'dark';
+          actualDoc.documentElement.classList.toggle('dark', articleDarkMode(snapshot.bundle.formatter) === 'tokens');
+          actualDoc.body.style.margin = '0';
+          if (native) actualDoc.documentElement.style.scrollbarWidth = 'none';
+          actualDoc.documentElement.style.overflowX = 'clip';
+          actualDoc.addEventListener('keydown', relayShortcut);
+          darkStyle = actualDoc.createElement('style'); actualDoc.head.append(darkStyle);
+          if (!darkMount) { darkMount = actualDoc.createElement('div'); actualDoc.body.append(darkMount); } stopCitations = bindPreviewCitations(darkMount, host);
           const mount = darkMount;
           const size = () => {
             if (!native) return;
@@ -165,14 +194,17 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
             mount.style.width = viewport.contentWidth + 'px'; mount.style.marginLeft = (viewport.width - viewport.contentWidth) + 'px';
           };
           observer = new ResizeObserver(size); observer.observe(host); size();
+          })();
         }
+        await overlayReady;
+        if (!active || request.signal.aborted || !root.isConnected || articlePreviewMarkup(root) !== markup) return;
         if (darkStyle!.textContent !== result.css) darkStyle!.textContent = result.css;
-        commitPreviewMarkup(darkMount!, sanitizeHtml(result.html, snapshot));
+        commitPreviewMarkup(darkMount!, snapshot.renderer ? sanitizePackageHtml(result.html, snapshot) : sanitizeHtml(result.html, snapshot));
         if (!native) { target.hidden = true; host.style.height = '100%'; }
         else {
           canonicalFrame = host.querySelector<HTMLIFrameElement>('iframe[data-article-frame="light"]');
           canonicalFrame?.setAttribute('aria-hidden', 'true');
-          if (canonicalFrame) canonicalFrame.inert = true;
+          if (canonicalFrame) { canonicalFrame.inert = true; if (snapshot.renderer) canonicalFrame.style.opacity = '0'; }
         }
         if (imageOpenRef.current) stopImages = bindPreviewImages(darkMount!, image => imageOpenRef.current?.(image), () => active && !request.signal.aborted && root.isConnected && articlePreviewMarkup(root) === markup);
       }).catch(error => { if (active && !request.signal.aborted && error?.name !== 'AbortError' && !isProductCancellation(error)) {
@@ -182,10 +214,10 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
     };
     const stop = observeArticlePreview(target, render, 120);
     return () => {
-      active = false; stop(); controller?.abort(); stopImages?.(); observer?.disconnect(); overlay?.remove();
+      active = false; stop(); controller?.abort(); stopImages?.(); observer?.disconnect(); stopCitations?.(); overlay?.remove();
       darkFrameRef.current = null;
       canonicalFrame?.removeAttribute('aria-hidden');
-      if (canonicalFrame) canonicalFrame.inert = false;
+      if (canonicalFrame) { canonicalFrame.inert = false; canonicalFrame.style.opacity = ''; }
       if (!native) { target.hidden = false; host.style.height = ''; }
       if (visibleFrameRef.current === overlay) visibleFrameRef.current = host.querySelector<HTMLIFrameElement>('iframe[data-article-frame="light"]');
     };

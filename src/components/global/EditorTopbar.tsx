@@ -156,7 +156,7 @@ export function EditorTopbar({
         )}
       </div>
 
-      <div className="toolbar-actions">
+      <div className="toolbar-actions" id={view === 'knowledge' ? 'knowledge-toolbar-actions' : undefined}>
         {isEditor ? (
           <>
             <button className="toolbar-icon-button" type="button" aria-label={t('editor:toolbar.statistics')} data-tooltip={t('editor:toolbar.statistics')} onClick={onShowStatistics}><Icon name="statistics" /><span className="toolbar-action-copy">{t('editor:toolbar.statistics')}</span></button>

@@ -8,10 +8,12 @@ import { parseThemeConfigJson, validateThemeFormat } from '../src/lib/themeValid
 import { parseArticle, instantiateArticleTemplate } from '../src/lib/frontMatter.ts';
 import { validateArticleAuthoringMarkdown } from '../src/lib/articleAuthoringFormat.ts';
 import { contentFormatBlockingIssues } from '../src/lib/contentValidation.ts';
-import { loadArticleSnippets, loadArticleTemplates, saveArticleSnippet, saveArticleTemplate } from '../src/lib/contentLibraries.ts';
+import { initializeContentLibraries, loadArticleSnippets, loadArticleTemplates, saveArticleSnippet, saveArticleTemplate } from '../src/lib/contentLibraries.ts';
 
 import { DEFAULT_FORMAT_BUNDLE, compileFormatBundle } from '../src/lib/article-format/config.ts';
 import { validateLibraryConfiguration } from '../src/lib/article-format/libraryConfiguration.ts';
+import { validateResourcePolicy, resolveLibraryResource } from '../src/lib/article-format/resourcePaths.ts';
+import { validateRendererDeclaration } from '../src/lib/article-format/packageContract.ts';
 import { createUII18n } from '../src/lib/i18n/runtime.ts';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -76,6 +78,11 @@ for (const { locale, editor, article, snippet, markdown } of examples) {
     assert.deepEqual(Object.keys(parsedEditor.colors.light).sort(), [...EDITOR_COLOR_ROLES].sort());
     assert.deepEqual(Object.keys(parsedEditor.colors.dark).sort(), [...EDITOR_COLOR_ROLES].sort());
     assert.equal(Object.keys(parsedEditor.fonts).length, 8);
+    const document = documents.find(doc => doc.file === `docs/locale/${locale}/THEME.md`).source;
+    const surfaces = [...document.matchAll(/^```json\r?\n([\s\S]*?)^```\s*$/gm)]
+      .map(match => JSON.parse(match[1])).find(record => record.light?.field && record.dark?.field);
+    assert.ok(surfaces, 'the surfaces fragment is not a standalone theme');
+    assert.equal(parseEditorThemeJson(JSON.stringify({ ...editor, surfaces })).surfaces.light.field.opacity, 80);
     assert.equal(parseThemeConfigJson(JSON.stringify(article)).id, article.id);
     assert.deepEqual(validateThemeFormat(article), []);
   });
@@ -103,6 +110,7 @@ for (const { locale, editor, article, snippet, markdown } of examples) {
 
   test(`${locale}: documentation snippet and starter save/reload through production library functions`, async () => {
     const directory = new MemoryDirectory('documentation-' + locale);
+    await initializeContentLibraries(directory);
     await loadArticleSnippets(directory); await loadArticleTemplates(directory);
     await saveArticleSnippet(directory, { ...snippet, categoryId: 'default' }, null);
     await saveArticleTemplate(directory, 'guide-starter', markdown[0].source, null, 'default');
@@ -117,6 +125,18 @@ for (const { locale, editor, article, snippet, markdown } of examples) {
 for (const locale of locales) test(`${locale}: format MVP objects compile through registered capability contracts`, () => {
   const source = documents.find(doc => doc.file === `docs/locale/${locale}/FORMAT.md`).source;
   const records = [...source.matchAll(/^```json\r?\n([\s\S]*?)^```\s*$/gm)].map(match => JSON.parse(match[1]));
+  const policy = records.find(record => record.validation && record.resources);
+  assert.equal(validateResourcePolicy(policy).validation.verifySha256, true);
+  assert.equal(resolveLibraryResource('@styles/a/b/theme.css', policy.resources), 'styles/a/b/theme.css');
+  const markdown = records.find(record => record.id === 'markdown' && record.kind === 'export');
+  assert.ok(markdown, 'the mandatory /2 source action is documented');
+  validateRendererDeclaration({
+    protocol: 'rainy-format/2', id: 'documentation', version: '1.0.0', entry: 'format/renderer.js',
+    files: ['format/renderer.js', 'format/format-support.json', 'format/validator.json', 'format/formatter.json']
+      .map(path => ({ path, sha256: '0'.repeat(64) })),
+    actions: [{ id: 'render', label: 'Render', kind: 'render' }, { id: 'validate', label: 'Validate', kind: 'validate' }, markdown],
+    settings: [], values: {}, permissions: { images: [] },
+  }, 'documentation.renderer', policy);
   const validator = records.find(record => record.operator === 'style.values');
   const support = records.find(record => record.validator === validator.id);
   const origin = records.find(record => record[support.source]);
@@ -147,7 +167,7 @@ test('both installation guides reference repository npm scripts and runtime repa
     for (const name of ['README.md', 'AGENT-GUIDE.md']) {
       const source = documents.find(doc => doc.file === `docs/locale/${locale}/${name}`).source;
       for (const block of source.matchAll(/^```sh\r?\n([\s\S]*?)^```\s*$/gm)) for (const line of block[1].trim().split('\n')) {
-        if (line === 'npm install') continue;
+        if (line === 'npm install' || line === 'npm ci') continue;
         if (line.startsWith('npm run ')) assert.ok(manifest.scripts[line.slice(8)], line);
         else assert.ok(manifest.scripts[line.slice(4)], line);
       }

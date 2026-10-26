@@ -46,6 +46,7 @@ function page(collection = 'all', options = {}) {
       useEffect() { cursor++; },
     };
     if (id === 'react-dom') return { createPortal: node => node };
+    if (id.endsWith('/IconPopover')) return { IconPopover: 'icon-popover' };
     if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
     if (id.endsWith('/DialogFrame')) return { DialogFrame: 'dialog-frame', DialogHeader: 'dialog-header', DialogActions: 'dialog-actions', DialogButton: 'dialog-button' };
     if (id.endsWith('/articleListChecks')) return { summarizeArticleListChecks };
@@ -193,31 +194,28 @@ test('bulk classification keeps the selected list order when moving into a proje
 });
 
 
-test('categories use only the current collection and category removal snapshots the filtered target rows', async () => {
+test('tags filter only the current collection and the header shows at most five truncated tags plus More', () => {
   const members = [article('alpha', '甲文稿'), article('beta', '乙文稿')];
-  members[0].parse.metadata.categories = ['当前标签'];
-  members[1].parse.metadata.categories = ['保留标签'];
+  members[0].parse.metadata.categories = ['A', 'B', 'C', 'D', 'E', 'F']; members[1].parse.metadata.categories = ['G'];
   const other = article('other', '其他组'); other.parse.metadata.categories = ['其他组标签'];
-  const removed = [];
-  const view = page('all', { articles: members, allArticles: [...members, other], onRemoveCategories: async (rows, labels) => { removed.push({ rows, labels }); return true; } });
+  const view = page('all', { articles: members, allArticles: [...members, other] });
   assert.equal(view.render().some(node => node.type === 'button' && view.text(node) === '其他组标签'), false);
-  view.render().find(node => node.type === 'icon-button').props.onClick();
-  view.control('当前标签').props.onClick();
-  // Picking labels to remove does not filter away unrelated rows before confirmation.
+  assert.equal(view.render().some(node => node.props.tooltip === '选择标签'), false, 'the obsolete tag-management toggle is removed');
+  const group = view.render().find(node => node.props.role === 'group' && node.props['aria-label'] === '分类');
+  const visible = group.props.children[0]; assert.equal(visible.length, 5); assert.ok(visible.every(node => node.props.className.includes('truncate')));
+  const more = view.render().find(node => node.type === 'icon-popover'); more.props.onToggle();
+  assert.equal(view.render().find(node => node.type === 'icon-popover').props.open, true);
+  view.control('G').props.onClick();
+  assert.deepEqual(view.render().filter(node => node.type === 'article').map(node => node.props['data-current']), [false]);
+  view.render().find(node => node.props.tooltip === '清除筛选').props.onClick();
   assert.equal(view.render().filter(node => node.type === 'article').length, 2);
-  view.control('移除所选标签').props.onClick();
-  assert.ok(view.render().some(node => view.text(node).includes('共影响 1 篇文章')));
-  view.control('确认移除').props.onClick();
-  await Promise.resolve();
-  assert.equal(removed.length, 1);
-  assert.deepEqual([...removed[0].rows].map(item => item.id), [members[0].id]);
-  assert.deepEqual([...removed[0].labels], ['当前标签']);
 });
 
-test('archived category management is disabled and empty collection cannot leak a previous editor result', () => {
+test('archived tags remain filters and empty collection cannot leak a previous editor result', () => {
   const archived = article('archive', '归档稿'); archived.parse.metadata.categories = ['归档标签'];
   const view = page('archived', { articles: [archived] });
-  assert.equal(view.render().find(node => node.type === 'icon-button').props.disabled, true);
+  view.control('归档标签').props.onClick();
+  assert.equal(view.render().filter(node => node.type === 'article').length, 1);
   const empty = page('all', { articles: [], checks: { 'old-article': { state: 'checked', warning: 0, error: 12 } } });
   assert.ok(empty.render().some(node => empty.text(node) === '当前范围无文章需检查'));
   assert.equal(empty.render().some(node => empty.text(node).includes('revision')), false);

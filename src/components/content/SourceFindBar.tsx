@@ -36,12 +36,18 @@ export function SourceFindBar({ query, replacement, matchCase, count, index, dis
   }, [open, autoFocusQuery, focusQueryRef]);
   useEffect(() => { if (hadDecision.current && !decision) focusReplacement(); hadDecision.current = Boolean(decision); }, [decision]);
   const replaceCurrent = () => { if (!disabled && !composing && !inputComposing && count) { onReplace(); focusReplacement(); } };
+  const replaceAll = () => { if (!disabled && !composing && !inputComposing && count) onReplaceAll(); };
   return <><div ref={panelRef} data-open={open} inert={!open} aria-hidden={!open} className="pointer-events-none absolute inset-x-2 top-2 z-30 grid max-h-full -translate-y-3 gap-2 overflow-x-clip overflow-y-auto rounded-xl border border-line-strong bg-panel px-3 py-2 opacity-0 shadow-lg transition-[opacity,translate] duration-200 ease-out data-[open=true]:pointer-events-auto data-[open=true]:translate-y-0 data-[open=true]:opacity-100 motion-reduce:transition-none" role="search" aria-label={t('editor:find.label')} onCompositionStart={() => setInputComposing(true)} onCompositionEnd={() => setInputComposing(false)} onKeyDown={event => {
-    if (event.defaultPrevented || event.nativeEvent.isComposing || inputComposing || event.keyCode === 229) return;
+    if (event.defaultPrevented || event.nativeEvent.isComposing || composing || inputComposing || event.keyCode === 229) return;
     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); }
+    if (event.key === 'Enter' && event.target === replacementInput.current) {
+      if (event.altKey) return;
+      event.preventDefault(); event.stopPropagation();
+      if (event.metaKey || event.ctrlKey) replaceAll(); else replaceCurrent();
+      return;
+    }
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
       event.preventDefault(); event.stopPropagation();
-      if (event.target === replacementInput.current) replaceCurrent();
       return;
     }
     if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); onMove(event.shiftKey ? -1 : 1); }
@@ -57,7 +63,7 @@ export function SourceFindBar({ query, replacement, matchCase, count, index, dis
     <div className="flex min-w-0 items-center gap-1">
       <input ref={replacementInput} {...replacementHistory.events} className="form-input min-h-9 min-w-0 flex-1 px-2 text-xs" type="text" value={replacement} placeholder={t('editor:find.replacementPlaceholder')} aria-label={t('editor:find.replacement')} />
       <IconButton tooltip={disabled ? t('editor:find.readOnly') : t('editor:find.replace')} icon={<FindIcon name="replace" />} disabled={disabled || composing || inputComposing || !count} onClick={replaceCurrent} />
-      <IconButton tooltip={disabled ? t('editor:find.readOnly') : t('editor:find.replaceAll')} icon={<FindIcon name="all" />} disabled={disabled || composing || inputComposing || !count} onClick={onReplaceAll} />
+      <IconButton tooltip={disabled ? t('editor:find.readOnly') : t('editor:find.replaceAll')} icon={<FindIcon name="all" />} disabled={disabled || composing || inputComposing || !count} onClick={replaceAll} />
     </div>
   </div>{decision && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="source-replace-all-title" descriptionId="source-replace-all-description" onClose={onCancelAll}>
     <DialogHeader titleId="source-replace-all-title" eyebrow={t('editor:find.eyebrow')} title={t('editor:find.allTitle')} onClose={onCancelAll} />

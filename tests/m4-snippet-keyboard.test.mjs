@@ -57,6 +57,7 @@ function inputFixture(value, snippets, synchronousCommit = true, extras = {}) {
     require: withTextInputHistory(function require(id) {
       if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
       if (id.endsWith('/frontMatter')) return frontMatter;
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'scroll-viewport' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
       if (id.endsWith('/sourceSearch')) return sourceSearch;
@@ -99,7 +100,8 @@ test('body-only editing displays file line numbers and diagnostic labels without
   assert.ok(nodes.some(n => n.type === 'span' && n.props.children === 14));
   assert.ok(nodes.some(n => n.type === 'button' && n.props.children === 13 && n.props['aria-label'].includes('13')));
   const viewport = nodes.find(n => n.props['data-source-viewport']);
-  assert.ok(walk(viewport).some(n => n.type === 'details'), 'metadata shares the source viewport');
+  assert.equal(walk(viewport).some(n => n.type === 'details'), false, 'metadata spans the full panel outside the source scrollbar gutter');
+  assert.ok(nodes.findIndex(n => n.type === 'details') < nodes.indexOf(viewport));
   assert.equal(f.props.value, original);
 });
 
@@ -163,7 +165,7 @@ test('Cmd/Ctrl+G cycles matches in both directions, reopens the bar without clai
 test('input and highlight share one scrolling ancestor, with no independently scrolling text mirrors', () => {
   const f = inputFixture('甲\n\n乙', []);
   const viewport = f.nodes().find(n => n.props['data-source-viewport']);
-  assert.ok(viewport.props.className.includes('overflow-y-auto'));
+  assert.equal(viewport.type, 'scroll-viewport', 'the shared viewport owns source scrolling');
   const content = walk(viewport).find(n => n.props['data-source-content']);
   assert.ok(walk(content).some(n => n.type === 'pre'));
   assert.ok(walk(content).includes(f.input()));
@@ -279,8 +281,10 @@ test('the source toolbar uses the same undoable insert ref as the input', async 
   vm.runInNewContext(code, {
     module, exports: module.exports, require: withTextInputHistory(function require(id) {
       if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
+      if (id.endsWith('/CollapsiblePanel')) return { PanelHeading: 'panel-heading' };
       if (id.endsWith('/frontMatter')) return frontMatter;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'scroll-viewport' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
       if (id.endsWith('/usePreviewPreferences')) return { usePreviewPreferences: () => ({ preferences: { saveOnly: false } }) };
@@ -300,7 +304,7 @@ test('the source toolbar uses the same undoable insert ref as the input', async 
     }),
   });
   const parsed = frontMatter.parseArticle('---\ntitle: Test\n---\nKept source\nCard two\nCard three');
-  const tree = module.exports.SourcePanel({ article: {}, parsed, sourceFormatIssues: [{ kind: 'element', name: 'width', source: '当前正文实际渲染', tier: 'error', line: 2, message: '横向溢出' }], sourceTextareaRef: { current: {} }, status: {}, onChangeBody() { throw new Error('Toolbar must not replace controlled source directly'); } });
+  const tree = module.exports.SourcePanel({ article: {}, parsed, sourceFormatIssues: [{ kind: 'element', name: 'width', source: '当前正文实际渲染', tier: 'error', line: 2, message: '横向溢出' }], sourceTextareaRef: { current: {} }, status: {}, citationTools: jsx('citation-tools', {}), onChangeBody() { throw new Error('Toolbar must not replace controlled source directly'); } });
   const nodes = walk(tree), input = nodes.find(n => n.type === 'snippet-input'), menu = nodes.find(n => n.type === 'insert-menu'), calls = [];
   assert.equal(input.props.lineConcerns.get(2).severity, 'error', 'the existing gutter receives rendered body findings');
   assert.equal(input.props.lineOffset, 3);
@@ -308,6 +312,9 @@ test('the source toolbar uses the same undoable insert ref as the input', async 
   const metadata = module.exports.SourceMetadataHeader(input.props.sourceHeader.props);
   assert.equal(metadata.type, 'details');
   assert.equal(metadata.props.open, undefined, 'metadata starts collapsed');
+  assert.equal(walk(metadata).find(node => node.type === 'panel-heading').props.compact, true);
+  assert.ok(nodes.findIndex(node => node.type === 'icon-button' && node.props.icon?.type === 'find-icon') < nodes.findIndex(node => node.type === 'citation-tools'));
+  assert.ok(nodes.findIndex(node => node.type === 'citation-tools') < nodes.findIndex(node => node.type === 'insert-menu'));
   assert.equal(walk(metadata).some(node => ['input', 'textarea'].includes(node.type) || node.props.contentEditable), false);
   assert.equal(parsed.source, '---\ntitle: Test\n---\nKept source\nCard two\nCard three');
   input.props.insertTextRef.current = (...args) => calls.push(args);
@@ -446,6 +453,7 @@ test('insert menu labels expose B/I/U and formatting routes through the shared s
     module, exports: module.exports, require: withTextInputHistory(id => {
       if (id === 'react') return { useRef: value => ({ current: value }), useEffect() {} };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'scroll-viewport' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       throw new Error(id);
     }),
@@ -459,4 +467,23 @@ test('insert menu labels expose B/I/U and formatting routes through the shared s
     assert.ok(button); button.props.onClick({ currentTarget: { closest: () => ({ open: true }) } });
   }
   assert.deepEqual(calls, ['bold', 'italic', 'underline']);
+});
+
+test('keyboard snippet scrolling does not let a stationary pointer reselect an earlier visible row', () => {
+  const snippets = Array.from({ length: 12 }, (_, index) => ({ ...opening, id: 'item-' + index, name: 'Item ' + index, trigger: '//item-' + index }));
+  const f = inputFixture('//', snippets), options = () => f.nodes().filter(node => node.props.role === 'treeitem');
+  f.key('ArrowRight');
+  for (let index = 0; index < 9; index++) f.key('ArrowDown');
+  const selected = options().find(node => node.props['aria-selected']).props.id;
+  assert.ok(f.menu.scrollTop > 0);
+  const earlier = options()[3];
+  earlier.props.onMouseEnter?.();
+  earlier.props.onMouseMove?.({ movementX: 0, movementY: 0 }); f.render();
+  assert.equal(options().find(node => node.props['aria-selected']).props.id, selected);
+  f.key('ArrowDown');
+  assert.notEqual(options().find(node => node.props['aria-selected']).props.id, selected);
+  earlier.props.onMouseMove({ movementX: 1, movementY: 0 }); f.render();
+  assert.equal(options().find(node => node.props['aria-selected']).props.id, earlier.props.id);
+  assert.equal(f.document.activeElement, f.element);
+  assert.equal(f.props.value, '//');
 });

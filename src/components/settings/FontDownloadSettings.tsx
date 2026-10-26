@@ -1,8 +1,9 @@
 'use client';
 
+import { OperationFeedback } from '../global/OperationFeedback';
 import { useState, useSyncExternalStore } from 'react';
 import { useUITranslation } from '../global/UILocaleProvider';
-import { formatProductMessage } from '../../lib/i18n/productMessages';
+import { productReference } from '../../lib/i18n/productMessages';
 import { DEFAULT_FONT_SOURCE, getFontSource, setFontSource, subscribeFontSource, type FontSourceId } from '../../lib/fontSources';
 import { cancelLocalFontDownload, getInitialLocalFontStatus, getLocalFontStatus, subscribeLocalFontStatus } from '../../lib/localFonts';
 
@@ -19,9 +20,9 @@ export function FontDownloadSettings({ root, onRetry }: { root: FileSystemDirect
   return <section className="flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-list/50 p-5" aria-labelledby="font-settings-title">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
       <div><h3 id="font-settings-title" className="font-heading text-lg font-semibold text-primary">{t('fontDownloads.heading')}</h3><p className="mt-1 text-xs text-muted">{t('fontDownloads.scope')}</p></div>
-      <span className="rounded-md bg-panel px-2.5 py-1 text-xs text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning-strong" data-tone={ready ? 'success' : failed ? 'warning' : 'neutral'} role="status">
-        {t(ready ? 'fontDownloads.ready' : downloading ? 'fontDownloads.downloading' : failed ? 'fontDownloads.incomplete' : root ? 'fontDownloads.unchecked' : 'ui.notConnected')}
-      </span>
+      <div className="flex items-center gap-2"><OperationFeedback label={t('common:feedback.fileProblems', { count: 1 })} id="font-download" notice={unsaved ? productReference('feedback.fontPreferenceFailed') : failed ? status.notice : null} tone={unsaved || failed ? 'warning' : 'info'} summary={unsaved ? productReference('feedback.fontPreferenceFailed') : downloading ? productReference('feedback.fontsLoading', { completed: status.completed, total: status.total }) : productReference('feedback.fontsIncomplete')} /><span className="rounded-md bg-panel px-2.5 py-1 text-xs text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning-strong" data-tone={ready ? 'success' : failed ? 'warning' : 'neutral'} role="status">
+        {downloading ? t('messages:feedback.fontsLoading', { completed: status.completed, total: status.total }) : t(ready ? 'fontDownloads.ready' : failed ? 'fontDownloads.incomplete' : root ? 'fontDownloads.unchecked' : 'ui.notConnected')}
+      </span></div>
     </header>
     <fieldset className="min-w-0">
       <legend className="mb-2 text-sm font-medium text-primary">{t('fontDownloads.title')}</legend>
@@ -34,10 +35,6 @@ export function FontDownloadSettings({ root, onRetry }: { root: FileSystemDirect
     </fieldset>
     <p className="mt-auto text-xs text-muted">{t('fontDownloads.description')}</p>
     {!root ? <p className="text-xs text-faint">{t('fontDownloads.connectFirst')}</p> : null}
-    {unsaved ? <p className="status-copy" data-tone="warning" role="status">{t('fontDownloads.unsaved')}</p> : null}
-    {current && !ready && (downloading || status.notice) ? <p className="status-copy" data-tone={failed ? 'warning' : 'neutral'} role="status">
-      {downloading ? t('fontDownloads.progress', { completed: status.completed, total: status.total }) : status.notice ? formatProductMessage(status.notice, t) : ''}
-    </p> : null}
     {root && !ready && (downloading || onRetry) ? <div className="flex flex-wrap items-center gap-3">
       {!downloading && onRetry ? <button type="button" className="button button-quiet" disabled={retrying} onClick={async () => {
         setRetrying(true);

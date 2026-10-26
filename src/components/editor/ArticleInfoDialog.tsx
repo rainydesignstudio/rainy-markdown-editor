@@ -1,5 +1,6 @@
 'use client';
 
+import { SelectField } from '../global/SelectField';
 import { useUITranslation } from '../global/UILocaleProvider';
 
 import { useLayoutEffect, useRef, type FormEvent, type MutableRefObject } from 'react';
@@ -20,10 +21,10 @@ type Props = {
   onOpenTheme: () => void; onChangeProject: (projectId: string | null) => void;
   onOpenHistory: () => void;
   onSave: () => void; onDelete: () => void; onUnarchive: () => void;
-  folderName: string; onFolderName: (name: string) => void; onRenameFolder: () => void;
+  folderName: string; onFolderName: (name: string) => void;
 };
 
-export function ArticleInfoDialog({ article, parsed, stored, workspace, archived, busy, onClose, onChangeField, onOpenTheme, onChangeProject, onOpenHistory, onSave, onDelete, onUnarchive, editingLocationRef, editingKey, folderName, onFolderName, onRenameFolder }: Props) {
+export function ArticleInfoDialog({ article, parsed, stored, workspace, archived, busy, onClose, onChangeField, onOpenTheme, onChangeProject, onOpenHistory, onSave, onDelete, onUnarchive, editingLocationRef, editingKey, folderName, onFolderName }: Props) {
   const { t } = useUITranslation('dialogs');
   const themeCapability = useLibraryCapability('articleTheme');
   const location = useDraftLocation<HTMLFormElement>();
@@ -38,7 +39,7 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
   const invalid = parsed.diagnostics.some(item => item.level === 'error');
   const readOnly = archived || busy;
   const disabled = readOnly || invalid;
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onClose(); };
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); if (!disabled && article.dirty) onSave(); };
   return <DialogFrame className="flex min-h-0 max-w-5xl flex-col overflow-hidden" titleId="article-info-title" descriptionId="article-info-description" onClose={onClose} dismissible={!busy}>
     <DialogHeader titleId="article-info-title" eyebrow={t('common:eyebrows.manuscriptDetails')} title={t('dialogs:ui.manuscriptInformation')} onClose={onClose} closeDisabled={busy} />
     <form {...location.props} id="article-info-form" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onSubmit={handleSubmit}>
@@ -47,13 +48,12 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
         <div className="flex min-w-0 flex-1 items-center gap-3"><span className="information-badge"><InformationIcon /></span><div className="min-w-0 flex-1">
           {article.month && article.folder ? <div className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-xs text-muted">
             <span>{`articles/${article.month}/`}</span>
-            <label className="min-w-0 basis-full md:flex-1 md:basis-0"><span className="sr-only">{t('dialogs:ui.articleFolderName')}</span><input className="field min-w-0 font-mono text-xs" name="article-folder" value={folderName} maxLength={80} disabled={readOnly} onChange={event => onFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); if (!readOnly && folderName.trim() && folderName !== article.folder) onRenameFolder(); } }} /></label>
-            <span>/article.md</span><button className="button button-quiet min-h-9 px-2 py-1 text-xs" type="button" disabled={readOnly || !folderName.trim() || folderName === article.folder} onClick={onRenameFolder}>{t('dialogs:ui.applyFolderName')}</button>
+            <label className="min-w-0 basis-full md:flex-1 md:basis-0"><span className="sr-only">{t('dialogs:ui.articleFolderName')}</span><input className="field min-w-0 font-mono text-xs" name="article-folder" value={folderName} maxLength={80} disabled={readOnly} onChange={event => onFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (!event.nativeEvent.isComposing && !disabled && article.dirty) onSave(); } }} /></label>
+            <span>/article.md</span>
           </div> : <p className="mt-1 break-all font-mono text-xs text-muted">{t('dialogs:ui.writtenToTheLibraryAfterSaving')}</p>}
         </div></div>
-        <span className="shrink-0 rounded-md bg-panel px-2.5 py-1.5 text-xs text-muted" role="status">{archived ? t('dialogs:ui.archived') : article.dirty ? t('dialogs:ui.unsavedChangesAlternative') : t('dialogs:ui.saved')}</span>
       </div>
-      <p id="article-info-description" className="mb-4 shrink-0 text-xs text-muted">{article.folder ? <>{t('dialogs:ui.folderRenameImmediate')}{' '}</> : null}{t('dialogs:ui.informationEditsUpdateTheCurrentDraftAndAre')}</p>
+      <p id="article-info-description" className="mb-4 shrink-0 text-xs text-muted">{t('dialogs:ui.informationEditsUpdateTheCurrentDraftAndAre')}</p>
       {archived || invalid || !article.themeValid ? <p className="mb-4 shrink-0 rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="status">{archived ? t('dialogs:ui.thisArticleIsArchivedUnarchiveItToEdit') : invalid ? t('dialogs:ui.resolveMetadataDiagnosticsBeforeChangingFields') : t('dialogs:ui.theThemeSnapshotNeedsRepairSourceRemainsUnchanged')}</p> : null}
       <div className="grid min-w-0 shrink-0 items-start gap-5 md:grid-cols-3">
         <section className="min-w-0 rounded-lg border border-line bg-list/50 p-4 md:col-span-2" aria-labelledby="article-fields-heading">
@@ -69,7 +69,7 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
           <section className="grid min-w-0 gap-4 rounded-lg border border-line bg-list/50 p-4" aria-labelledby="article-location-heading">
             <h3 id="article-location-heading" className="font-sub-heading text-sm font-semibold text-primary">{t('dialogs:ui.stylingAndOrganization')}</h3>
             <span className="inline-flex min-w-0" title={themeCapability.reason} tabIndex={!themeCapability.enabled ? 0 : undefined} aria-label={themeCapability.reason}><InformationButton icon={<InformationIcon book />} title={article.theme.name} subtitle={t('dialogs:templates.themeVersionChoice', { version: article.theme.version })} onClick={() => { if (themeCapability.enabled) onOpenTheme(); }} disabled={busy || !themeCapability.enabled} /></span>
-            <label className="field-stack"><span className="field-label">{t('dialogs:ui.project')}</span><select name="article-project" className="field" value={stored ? workspace.articleOrganization[stored.id]?.projectId ?? '' : ''} onChange={event => onChangeProject(event.target.value || null)} disabled={readOnly || !stored}><option value="">{t('dialogs:ui.ungrouped')}</option>{workspace.projects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
+            <label className="field-stack"><span className="field-label">{t('dialogs:ui.project')}</span><SelectField label={t('dialogs:ui.project')} name="article-project" value={stored ? workspace.articleOrganization[stored.id]?.projectId ?? '' : ''} onChange={nextValue => onChangeProject(nextValue || null)} disabled={readOnly || !stored} options={[{ value: "", label: t('dialogs:ui.ungrouped') }, ...(workspace.projects.map(project => ({ value: project.id, label: project.name })) ?? [])]} /></label>
           </section>
           <section className="grid min-w-0 gap-3 rounded-lg border border-line bg-list/50 p-4" aria-labelledby="article-manage-heading">
             <h3 id="article-manage-heading" className="font-sub-heading text-sm font-semibold text-primary">{t('dialogs:ui.manuscriptManagement')}</h3>

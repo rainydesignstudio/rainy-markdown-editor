@@ -8,6 +8,8 @@ import type { EditorAppearance } from '../../lib/editorWorkspace';
 import { applyEditorThemeCache, cacheSavedEditorTheme, readEditorThemeCache, writeEditorThemeStyles, type EditorThemeCache } from '../../lib/editorThemeCache';
 import { useUILocale, useUITranslation } from './UILocaleProvider';
 import { EditingDraftsProvider } from './EditingDrafts';
+import { ToastReadiness } from './Toast';
+import { formatProductMessage } from '../../lib/i18n/productMessages';
 
 type EditorController = ReturnType<typeof useEditorController> & {
   editorAppearancePreview: EditorAppearance | null;
@@ -23,6 +25,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const [editorAppearancePreview, previewEditorAppearance] = useState<EditorAppearance | null>(null);
   const [startupCache, setStartupCache] = useState<EditorThemeCache | null>(null);
   const [hasLoadedAppearance, setHasLoadedAppearance] = useState(false);
+  const [notificationsReady, setNotificationsReady] = useState(false);
   useLayoutEffect(() => { setStartupCache(readEditorThemeCache()); }, []);
   useLayoutEffect(() => {
     if (controller.editorAppearanceReady) {
@@ -83,31 +86,34 @@ export function AppProviders({ children }: { children: ReactNode }) {
     cacheSavedEditorTheme(controller.editorDirectoryId, controller.editorWorkspace.appearance, editorThemes);
   }, [controller.editorAppearanceReady, controller.editorAppearanceVerified, controller.editorDirectoryId, controller.editorWorkspace.appearance, editorThemes]);
   const visible = controller.editorAppearanceReady || Boolean(startupCache) || hasLoadedAppearance;
-  const loading = !locale.ready || !controller.editorAppearanceReady || controller.contentLibrariesState === 'loading' || format.loading === true;
+  const loading = !locale.ready || !controller.editorAppearanceReady || controller.contentLibrariesState === 'loading' || (!hasLoadedAppearance && format.loading === true);
   return (
     <EditorContext.Provider value={{ ...controller, editorAppearancePreview, previewEditorAppearance, displayedEditorAppearance: appearance }}>
+      <ToastReadiness ready={notificationsReady && !loading} />
       <EditingDraftsProvider><div className={visible ? 'h-full' : 'hidden h-full group-data-[editor-theme-state=cached]/theme:block'} inert={loading} aria-busy={loading}>{children}</div></EditingDraftsProvider>
-      <StartupLoading loading={loading} />
+      <StartupLoading loading={loading} issue={controller.libraryLoadIssue} onReady={setNotificationsReady} onRetry={controller.rememberedDirectoryName ? controller.reopenRememberedDirectory : undefined} onChoose={controller.authorizeDirectory} />
     </EditorContext.Provider>
   );
 }
 
-function StartupLoading({ loading }: { loading: boolean }) {
+function StartupLoading({ loading, issue, onReady, onRetry, onChoose }: { loading: boolean; issue?: unknown; onReady: (ready: boolean) => void; onRetry?: () => void; onChoose: () => void }) {
   const { t } = useUITranslation();
   const { ready } = useUILocale();
   const [present, setPresent] = useState(true);
   const [fading, setFading] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const failure = formatProductMessage(issue, t);
   useEffect(() => {
-    if (loading) { setPresent(true); setFading(false); return; }
+    if (loading) { onReady(false); setDismissed(false); setPresent(true); setFading(false); return; }
+    if (failure && !dismissed) { onReady(false); setPresent(true); setFading(false); return; }
     setFading(true);
-    const timer = window.setTimeout(() => setPresent(false), 300);
+    const timer = window.setTimeout(() => { setPresent(false); onReady(true); }, 300);
     return () => window.clearTimeout(timer);
-  }, [loading]);
+  }, [loading, failure, dismissed, onReady]);
   if (!present && !loading) return null;
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas font-loading text-primary opacity-100 transition-opacity duration-300 ease-out data-[fading=true]:opacity-0 motion-reduce:transition-none" data-fading={!loading && fading} role="status" aria-live="polite" aria-label={ready ? t('loading.label') : undefined}>
     <div className="flex flex-col items-center gap-4 p-4">
-      <svg className="size-8 animate-spin text-accent motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3a9 9 0 0 1 9 9" /></svg>
-      <p className="text-sm text-muted" hidden={!ready}>{t('loading.message')}</p>
+      {failure && !loading ? <><p className="text-sm font-medium text-danger">{t('loading.failed')}</p><p className="max-h-48 max-w-xl overflow-x-clip overflow-y-auto whitespace-pre-wrap break-words text-sm text-muted">{failure}</p><div className="flex flex-wrap justify-center gap-2">{onRetry ? <button className="button button-primary" onClick={onRetry}>{t('loading.retry')}</button> : null}<button className="button button-quiet" onClick={onChoose}>{t('loading.choose')}</button><button className="button button-quiet" onClick={() => setDismissed(true)}>{t('loading.continue')}</button></div></> : <><svg className="size-8 animate-spin text-accent motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3a9 9 0 0 1 9 9" /></svg><p className="text-sm text-muted" hidden={!ready}>{t('loading.message')}</p></>}
     </div>
   </div>;
 }

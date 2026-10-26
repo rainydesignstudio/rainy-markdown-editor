@@ -77,6 +77,14 @@
     @apply relative z-10 grid w-3 shrink-0 cursor-col-resize touch-none place-items-center border-0 bg-canvas p-0 text-faint;
   }
 
+  .editor-splitter[data-axis="y"] {
+    @apply h-3 w-full cursor-row-resize;
+  }
+
+  .editor-splitter[data-axis="y"]::before {
+    @apply h-1 w-12;
+  }
+
   .editor-splitter::before {
     @apply content-[''] h-12 w-1 rounded-full bg-line-strong transition-colors;
   }

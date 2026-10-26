@@ -1,6 +1,6 @@
 import { createArticleMutationQueue } from '../articleMutationQueue';
 import { ProductError } from '../i18n/productMessages';
-import { KNOWLEDGE_LIMITS, fileTitle, isMarkdownPath, knowledgePath, type KnowledgeDocument, type KnowledgeManifest, type KnowledgeShard, type KnowledgeSearchHit } from './model';
+import { KNOWLEDGE_LIMITS, fileTitle, isMarkdownPath, knowledgePath, type KnowledgeDocument, type KnowledgeManifest, type KnowledgeShard, type KnowledgeSearchHit, type KnowledgeSearchQuery } from './model';
 import type { ReadonlyKnowledgeSource } from './source';
 import { createKnowledgeWorker, type KnowledgeWorkerClient } from './workerClient';
 import type { FlushedKnowledgeShard } from './engine';
@@ -85,11 +85,11 @@ export function rebuildKnowledgeIndex(library: FileSystemDirectoryHandle, source
   });
 }
 
-export async function searchKnowledgeIndex(library: FileSystemDirectoryHandle, source: ReadonlyKnowledgeSource, manifest: KnowledgeManifest, query: string, worker: KnowledgeWorkerClient, signal?: AbortSignal): Promise<{ hits: KnowledgeSearchHit[]; total: number; truncated: boolean }> {
+export async function searchKnowledgeIndex(library: FileSystemDirectoryHandle, source: ReadonlyKnowledgeSource, manifest: KnowledgeManifest, query: string | KnowledgeSearchQuery, worker: KnowledgeWorkerClient, signal?: AbortSignal): Promise<{ hits: KnowledgeSearchHit[]; total: number; truncated: boolean }> {
   await assertKnowledgeIndexTarget(library, source, signal);
   if (manifest.sourceId !== source.binding.sourceId) throw new ProductError('knowledge.indexSourceChanged');
   let hits: KnowledgeSearchHit[] = [], total = 0;
-  if (!query.trim()) return { hits, total, truncated: false };
+  if (typeof query === 'string' && !query.trim()) return { hits, total, truncated: false };
   for (const shard of manifest.shards) {
     const result = await worker.request('search', [await readKnowledgeShard(library, source, shard.id, signal), shard.id, shard.hash, manifest, query], signal);
     total += result.total; hits = await worker.request('rank', [[...hits, ...result.hits]], signal);

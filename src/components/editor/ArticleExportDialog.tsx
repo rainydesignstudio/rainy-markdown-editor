@@ -8,7 +8,9 @@ import { getArticleRenderSnapshot } from '../../lib/article-format/runtime';
 import { assertLibraryCapability, libraryCapability, EXPORT_CAPABILITIES } from '../../lib/article-format/libraryConfiguration';
 
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
-import { useRef, useState, type MutableRefObject } from 'react';
+import { useRef, useState, type MutableRefObject, type ComponentProps } from 'react';
+import { PackageOutputDialog } from './PackageOutputDialog';
+import type { ThemeConfig } from '../../lib/types';
 import { articleExportBaseName, articleMarkdownBody, createArticleDocumentPackage, downloadArticleBlob } from '../../lib/articleExport';
 import { articleCanvasToPdf, articleCanvasToPng, renderArticleExportCanvas } from '../../lib/articleVisualExport';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
@@ -28,7 +30,7 @@ const FORMATS: { id: Format; extension: string }[] = [
   { id: 'pdf', extension: 'pdf' },
 ];
 
-export function ArticleExportDialog({ source, title, dirty, root, month, folder, visualAvailable, previewRef, isCurrent, prepareVisual, onExported, onClose, focusActive = true, getResourceRevision }: {
+function LegacyArticleExportDialog({ source, title, dirty, root, month, folder, visualAvailable, previewRef, isCurrent, prepareVisual, onExported, onClose, focusActive = true, getResourceRevision }: {
   source: string;
   title: string;
   dirty: boolean;
@@ -121,3 +123,12 @@ export function ArticleExportDialog({ source, title, dirty, root, month, folder,
   </DialogFrame>;
 }
 function parseBody(source: string) { return articleMarkdownBody(source); }
+
+export function ArticleExportDialog(props: ComponentProps<typeof LegacyArticleExportDialog> & { theme: ThemeConfig; onTransform: (source: string) => void }) {
+  const active = useFormatSnapshot();
+  let snapshot = active;
+  if (!active.error && props.previewRef.current) {
+    try { snapshot = getArticleRenderSnapshot(props.previewRef.current); } catch { /* The current source remains downloadable while the preview is stale. */ }
+  }
+  return snapshot.renderer ? <PackageOutputDialog getResourceRevision={props.getResourceRevision} root={props.root} month={props.month} folder={props.folder} previewRef={props.previewRef} prepareVisual={props.prepareVisual} focusActive={props.focusActive} snapshot={snapshot} source={props.source} theme={props.theme} title={props.title} isCurrent={props.isCurrent} onTransform={props.onTransform} onExported={props.onExported} onClose={props.onClose} /> : <LegacyArticleExportDialog {...props} />;
+}

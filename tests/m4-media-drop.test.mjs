@@ -71,7 +71,7 @@ test('unsupported-only and stale targets cannot import; duplicate confirmations 
   const click = pending.confirm().props.onClick; click(); click(); pending.cancel().props.onClick();
   assert.equal(pending.imported.length, 1); assert.equal(pending.closes, 0);
   finish({ ok: false, tone: 'error', message: 'permission revoked' }); await pending.settle();
-  assert.match(pending.text(), /permission revoked/); assert.equal(pending.confirm().props.disabled, false);
+  assert.match(JSON.stringify(pending.find(node => node.type === 'header').props.actions.props.notice), /permission revoked/); assert.equal(pending.confirm().props.disabled, false);
   pending.stale(); click(); await pending.settle(); assert.equal(pending.imported.length, 1); pending.unmount();
 });
 

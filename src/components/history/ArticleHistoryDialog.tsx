@@ -1,4 +1,7 @@
 'use client';
+import { OperationFeedback } from '../global/OperationFeedback';
+import { SelectField } from '../global/SelectField';
+import { diffLines } from '../../lib/textDiff';
 
 import { formatDiagnosticMessage, formatProductMessage } from "../../lib/i18n/productMessages";
 
@@ -12,6 +15,8 @@ import { changedThemeSnapshotFields, type ArticleHistoryIssue, type ArticleHisto
 import type { StoredArticle, ThemeConfig } from '../../lib/types';
 import { parseArticle } from '../../lib/frontMatter';
 import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from '../global/DialogFrame';
+import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
+import type { FormatSnapshot } from '../../lib/article-format/runtime';
 import { HistorySnapshotPreview } from './HistorySnapshotPreview';
 import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
 import { PreviewModeSwitch } from '../editor/PreviewModeSwitch';
@@ -24,6 +29,7 @@ type Props = {
   articleTitle: string;
   currentSource: string;
   currentTheme: ThemeConfig;
+  currentFormat?: FormatSnapshot;
   currentThemeValid: boolean;
   currentDirty: boolean;
   month: string;
@@ -38,7 +44,7 @@ type Props = {
   canDelete: boolean;
   canSaveAs: boolean;
   refreshPending: boolean;
-  notice: { label: string; tone: 'neutral' | 'success' | 'warning' | 'error' };
+  notice: { notify?: boolean; label: string; tone: 'neutral' | 'success' | 'warning' | 'error' };
   months: string[];
   onClose: () => void;
   getReturnFocus: () => HTMLElement | null;
@@ -46,61 +52,15 @@ type Props = {
   onManualSnapshot: () => void;
   onRestore: (snapshot: ArticleHistorySnapshot) => void;
   onDelete: (snapshot: ArticleHistorySnapshot) => Promise<boolean>;
-  onSaveAs: (snapshot: ArticleHistorySnapshot, title: string, month: string) => void;
+  onSaveAs: (snapshot: ArticleHistorySnapshot, title: string, month: string) => Promise<boolean>;
   onToggleRetention: (snapshot: ArticleHistorySnapshot, retained: boolean) => void;
   onRefreshHistory: () => void;
 };
-
-type DiffRow = { left: string | null; right: string | null; kind: 'same' | 'removed' | 'added' };
 
 function formatSnapshotTime(value: string, locale: UILocale, invalid: string): string {
   return formatUIDate(value, locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }, invalid);
 }
 
-function diffLines(previous: string, current: string): DiffRow[] {
-  const left = previous.split('\n');
-  const right = current.split('\n');
-  if (left.length * right.length > 300_000) {
-    let prefix = 0;
-    while (prefix < left.length && prefix < right.length && left[prefix] === right[prefix]) prefix += 1;
-    let suffix = 0;
-    while (suffix < left.length - prefix && suffix < right.length - prefix && left[left.length - 1 - suffix] === right[right.length - 1 - suffix]) suffix += 1;
-    return [
-      ...left.slice(0, prefix).map((line) => ({ left: line, right: line, kind: 'same' as const })),
-      ...left.slice(prefix, left.length - suffix).map((line) => ({ left: line, right: null, kind: 'removed' as const })),
-      ...right.slice(prefix, right.length - suffix).map((line) => ({ left: null, right: line, kind: 'added' as const })),
-      ...left.slice(left.length - suffix).map((line, index) => ({ left: line, right: right[right.length - suffix + index] ?? '', kind: 'same' as const })),
-    ];
-  }
-  const width = right.length + 1;
-  const table = new Uint32Array((left.length + 1) * width);
-  for (let i = left.length - 1; i >= 0; i -= 1) {
-    for (let j = right.length - 1; j >= 0; j -= 1) {
-      table[i * width + j] = left[i] === right[j]
-        ? table[(i + 1) * width + j + 1] + 1
-        : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
-    }
-  }
-  const rows: DiffRow[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < left.length && j < right.length) {
-    if (left[i] === right[j]) {
-      rows.push({ left: left[i], right: right[j], kind: 'same' });
-      i += 1;
-      j += 1;
-    } else if (table[(i + 1) * width + j] >= table[i * width + j + 1]) {
-      rows.push({ left: left[i], right: null, kind: 'removed' });
-      i += 1;
-    } else {
-      rows.push({ left: null, right: right[j], kind: 'added' });
-      j += 1;
-    }
-  }
-  while (i < left.length) rows.push({ left: left[i++], right: null, kind: 'removed' });
-  while (j < right.length) rows.push({ left: null, right: right[j++], kind: 'added' });
-  return rows;
-}
 
 function metadataPairs(previous: ArticleHistorySnapshot, currentSource: string, currentTheme: ThemeConfig) {
   const current = parseArticle(currentSource).metadata;
@@ -147,7 +107,7 @@ export function ArticleHistoryView(props: Props) {
   const { t } = useUITranslation('dialogs');
   const { locale } = useUILocale();
   const {
-    articleTitle, currentSource, currentTheme, currentThemeValid, currentDirty, month, folder, root, mediaArticle,
+    articleTitle, currentSource, currentTheme, currentFormat, currentThemeValid, currentDirty, month, folder, root, mediaArticle,
     snapshots, issues, selectedId, busy, canRestore, canDelete, canSaveAs, refreshPending, notice, months, onClose,
     getReturnFocus, onSelect, onManualSnapshot, onRestore, onDelete, onSaveAs, onToggleRetention, onRefreshHistory,
   } = props;
@@ -156,6 +116,7 @@ export function ArticleHistoryView(props: Props) {
   const [copyMonth, setCopyMonth] = useState(month);
   const [modal, setModal] = useState<'info' | 'fork' | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ArticleHistorySnapshot | null>(null);
+  const liveFormat = useFormatSnapshot();
   const { dark, toggle: toggleDark } = useArticlePreviewMode();
   const [previewMode, setPreviewMode] = useState<'source' | 'render'>('source');
   const [restoreTarget, setRestoreTarget] = useState<ArticleHistorySnapshot | null>(null);
@@ -212,15 +173,18 @@ export function ArticleHistoryView(props: Props) {
           </button>
           <h1 className="font-heading max-w-full truncate text-base font-semibold text-primary" id="history-view-title">{t('dialogs:templates.historyTitle', { title: articleTitle })}</h1>
         </div></div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <ButtonBar className="ml-auto flex-nowrap" label={t('dialogs:history.versionActions')}>
           <IconButton tooltip={t('dialogs:ui.articleInformationAndTheme')} icon={<EditorActionIcon name="edit" className="size-4" />} onClick={() => setModal('info')} disabled={!selected || busy} />
-          <IconButton tooltip={t('dialogs:ui.forkFromHistory')} icon={<EditorActionIcon name="copy" className="size-4" />} onClick={() => setModal('fork')} disabled={!selected || busy || !canSaveAs || !selected.themeMatches} />
-        </div>
+          <IconButton data-history-fork-trigger="true" tooltip={t('dialogs:ui.forkFromHistory')} icon={<EditorActionIcon name="copy" className="size-4" />} onClick={() => setModal('fork')} disabled={!selected || busy || !canSaveAs || !selected.themeMatches} />
+          <IconButton tooltip={t('dialogs:ui.saveImportantVersion')} icon={<EditorActionIcon name="save" className="size-4" />} onClick={onManualSnapshot} disabled={busy || !canRestore} title={t('dialogs:history.saveCurrent')} />
+          <IconButton tooltip={t('dialogs:ui.restoreThisVersionAlternative')} icon={<EditorActionIcon name="history" className="size-4" />} onClick={() => setRestoreTarget(selected)} disabled={!selected || busy || !canRestore || !selected.themeMatches} />
+          <IconButton tone="danger" tooltip={t('dialogs:history.deleteVersion')} icon={<EditorActionIcon name="delete" className="size-4" />} onClick={() => setDeleteTarget(selected)} disabled={!selected || busy || !canDelete || refreshPending} />
+        </ButtonBar>
       </header>
       <div className="history-view-content">
           {issues.length ? <div className="content-library-issues" role="status">{issues.map((item) => <p className="break-words" key={`${item.snapshotId}:${item.message}`}><strong>{item.snapshotId}</strong> · {formatDiagnosticMessage(item, t)}</p>)}</div> : null}
           <div className="flex flex-wrap items-center gap-2">
-            <p className="status-copy m-0" data-tone={notice.tone} role="status">{t('dialogs:history.contextStatus', { path: `${month}/${folder}`, status: formatProductMessage(notice, t) })}</p>
+            <p className="status-copy m-0">{t('dialogs:history.context', { path: `${month}/${folder}` })}</p><OperationFeedback hideTrigger id={`history-operation-${month}/${folder}`} announce={notice.notify !== false} notice={notice} tone={notice.tone} onRetry={refreshPending ? onRefreshHistory : undefined} retryDisabled={busy} />
             {refreshPending ? <button className="button button-quiet" type="button" onClick={onRefreshHistory} disabled={busy}>{t('dialogs:ui.retryRefreshingHistory')}</button> : null}
           </div>
           <div className="history-grid">
@@ -242,16 +206,10 @@ export function ArticleHistoryView(props: Props) {
               {!snapshots.length ? <p className="status-copy">{t('dialogs:ui.noCompleteHistoryYetSaveAnImportantVersion')}</p> : null}
             </nav><p className="shrink-0 border-t border-line py-3 text-xs text-muted">{t('dialogs:history.versionCount', { count: snapshots.length })}</p></aside>
             <section className="history-detail" aria-label={t('dialogs:ui.compareHistoryWithCurrentManuscript')}>
-              <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
-                {selected ? <div className="history-detail-heading min-w-0 grow basis-80"><h3 className="font-heading truncate" title={selected.title}>{selected.title || t('dialogs:ui.untitledManuscript')}</h3><div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1"><p>{formatSnapshotTime(selected.createdAt, locale, t('common:dates.invalid'))} · {t(`dialogs:historyKinds.${selected.kind}`)}{currentDirty ? t('dialogs:ui.currentManuscriptHasUnsavedChanges') : ''}</p>
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+                {selected ? <><div className="history-detail-heading min-w-0 grow basis-48"><h3 className="font-heading truncate" title={selected.title}>{selected.title || t('dialogs:ui.untitledManuscript')}</h3></div><div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-muted"><p>{formatSnapshotTime(selected.createdAt, locale, t('common:dates.invalid'))} · {t(`dialogs:historyKinds.${selected.kind}`)}{currentDirty ? t('dialogs:ui.currentManuscriptHasUnsavedChanges') : ''}</p>
                   <ModeSwitch checked={previewMode === 'render'} onToggle={() => setPreviewMode(value => value === 'source' ? 'render' : 'source')} label={t('dialogs:ui.comparisonMode')} start={t('dialogs:ui.sourceAndMetadata')} end={t('dialogs:ui.renderedLayout')} disabled={!selected.parsed.canCopy || !currentParsed.canCopy || !currentThemeValid} />
-                  <span data-visible={previewMode === 'render'} inert={previewMode !== 'render'} aria-hidden={previewMode !== 'render'} className="invisible -translate-x-2 opacity-0 transition-[opacity,translate,visibility] duration-200 data-[visible=true]:visible data-[visible=true]:translate-x-0 data-[visible=true]:opacity-100 motion-reduce:transition-none"><PreviewModeSwitch dark={dark} onToggle={toggleDark} /></span>
-                </div></div> : null}
-                <ButtonBar className="ml-auto min-w-0 max-w-full shrink" label={t('dialogs:history.versionActions')}>
-                  <button className="button button-danger" type="button" onClick={() => setDeleteTarget(selected)} disabled={!selected || busy || !canDelete || refreshPending}><EditorActionIcon name="delete" className="size-4 shrink-0" />{t('dialogs:history.deleteVersion')}</button>
-                  <button className="button button-quiet" type="button" onClick={onManualSnapshot} disabled={busy || !canRestore} title={t('dialogs:history.saveCurrent')}><EditorActionIcon name="save" className="size-4 shrink-0" />{t('dialogs:ui.saveImportantVersion')}</button>
-                  <button className="button button-quiet" type="button" onClick={() => setRestoreTarget(selected)} disabled={!selected || busy || !canRestore || !selected.themeMatches}><EditorActionIcon name="history" className="size-4 shrink-0" />{t('dialogs:ui.restoreThisVersionAlternative')}</button>
-                </ButtonBar>
+                  <PreviewModeSwitch dark={dark} onToggle={toggleDark} disabled={previewMode === 'source'} reason={t('common:feedback.optionUnavailable')} /></div></> : null}
               </div>
               {selected ? <>
                 {!selected.themeMatches ? <div className="content-library-note" data-tone="warning">{t('dialogs:ui.historicalFrontMatterDoesNotMatchTheTheme')}</div> : null}
@@ -263,7 +221,7 @@ export function ArticleHistoryView(props: Props) {
                 ) : (
                   <div className="history-render-comparison">
                     {selected.parsed.canCopy ? <section><h4 className="font-heading">{t('dialogs:ui.historicalVersion')}</h4><HistorySnapshotPreview key={`old-${selected.id}`} snapshot={selected} dark={dark} root={root} article={mediaArticle} articleTitle={selected.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">{t('dialogs:ui.historyCouldNotBeParsedOnlySourceIs')}</div>}
-                    {currentParsed.canCopy && currentThemeValid ? <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><HistorySnapshotPreview key="current-editor-revision" snapshot={currentSnapshot} dark={dark} root={root} article={mediaArticle} articleTitle={currentParsed.metadata.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">{t('dialogs:ui.currentManuscriptCannotRenderSafelyRepairArticleMetadata')}</div>}
+                    {currentParsed.canCopy && currentThemeValid ? <section><h4 className="font-heading">{t('dialogs:ui.currentManuscriptAlternative')}</h4><HistorySnapshotPreview key="current-editor-revision" reference={currentFormat ?? liveFormat} snapshot={currentSnapshot} dark={dark} root={root} article={mediaArticle} articleTitle={currentParsed.metadata.title || articleTitle} /></section> : <div className="content-library-note" data-tone="error">{t('dialogs:ui.currentManuscriptCannotRenderSafelyRepairArticleMetadata')}</div>}
                   </div>
                 )}
               </> : <div className="empty-state"><strong>{t('dialogs:ui.chooseAHistoricalVersion')}</strong><p>{t('dialogs:ui.historyAndCurrentManuscriptWillBeComparedHere')}</p></div>}
@@ -279,10 +237,19 @@ export function ArticleHistoryView(props: Props) {
     </DialogFrame> : null}
     {modal === 'fork' && selected ? <DialogFrame titleId="history-fork-title" onClose={() => setModal(null)} dismissible={!busy}>
       <DialogHeader titleId="history-fork-title" eyebrow={t('dialogs:ui.versionHistory')} title={t('dialogs:ui.forkFromHistory')} onClose={() => setModal(null)} closeDisabled={busy} />
-      <form id="history-fork-form" className="grid min-w-0 gap-4 p-4" onSubmit={event => { event.preventDefault(); if (!busy && canSaveAs && selected.themeMatches && copyTitle.trim()) onSaveAs(selected, copyTitle, copyMonth); }}>
+      <form id="history-fork-form" className="grid min-w-0 gap-4 p-4" onSubmit={async event => {
+        event.preventDefault();
+        if (!busy && canSaveAs && selected.themeMatches && copyTitle.trim() && await onSaveAs(selected, copyTitle, copyMonth)) {
+          setModal(value => value === 'fork' ? null : value);
+          // Busy icon buttons remount; restore focus to the current trigger after commit.
+          window.requestAnimationFrame(() => {
+            if (!childOpenRef.current) backButtonRef.current?.closest('header')?.querySelector<HTMLButtonElement>('[data-history-fork-trigger="true"]')?.focus();
+          });
+        }
+      }}>
                     <div className="history-copy-fields">
                       <label className="field-stack"><span className="field-label">{t('dialogs:ui.newManuscriptTitle')}</span><input className="field" value={copyTitle} onChange={(event) => setCopyTitle(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches} /></label>
-                      <label className="field-stack"><span className="field-label">{t('dialogs:ui.savedMonth')}</span><select className="field" value={copyMonth} onChange={(event) => setCopyMonth(event.target.value)} disabled={busy || !canSaveAs || !selected.themeMatches}>{monthOptions.map((value) => <option key={value} value={value}>{formatUIMonth(value, locale)}</option>)}</select></label>
+                      <label className="field-stack"><span className="field-label">{t('dialogs:ui.savedMonth')}</span><SelectField label={t('dialogs:ui.savedMonth')} value={copyMonth} onChange={nextValue => setCopyMonth(nextValue)} disabled={busy || !canSaveAs || !selected.themeMatches} options={[...(monthOptions.map((value) => ({ value: value, label: formatUIMonth(value, locale) })) ?? [])]} /></label>
                     </div>
                     <p className="status-copy">{t('dialogs:ui.copyArticleAssetsAndTheSelectedThemeSnapshot')}</p>
         {notice.tone === 'error' ? <p className="text-sm text-danger" role="alert">{formatProductMessage(notice, t)}</p> : null}

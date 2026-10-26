@@ -39,9 +39,10 @@ test('disabled theme and preview controls expose the configured reason and do no
   button.props.onClick();
   const picker = ArticleThemeSelect({ themes: [{ id: 'one', name: 'One' }], value: 'one', onChange: () => changes++ });
   assert.equal(picker.props.title, reason);
-  const select = nodes(picker).find(node => node.type === 'select');
+  const select = nodes(picker).find(node => node.type === 'select-field');
   assert.equal(select.props.disabled, true);
-  select.props.onChange({ target: { value: 'another' } });
+  assert.equal(select.props.title, reason);
+  select.props.onChange('another');
   assert.equal(changes, 0);
 });
 
@@ -52,7 +53,7 @@ test('undeclared capabilities keep the original controls, labels and dispatch be
   assert.equal(button.props.disabled, false); assert.equal(button.props['aria-checked'], true);
   button.props.onClick();
   const picker = ArticleThemeSelect({ themes: [{ id: 'one', name: 'One' }], value: 'one', onChange: () => changes++ });
-  nodes(picker).find(node => node.type === 'select').props.onChange({ target: { value: 'another' } });
+  nodes(picker).find(node => node.type === 'select-field').props.onChange('another');
   assert.equal(changes, 2);
   assert.equal(preview.props.reason, undefined);
 });

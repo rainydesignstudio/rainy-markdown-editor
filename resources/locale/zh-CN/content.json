@@ -63,7 +63,8 @@
     "localLibrary": "本地资料库",
     "loading": "读取中",
     "editingUnavailable": "暂不可编辑",
-    "unnamed": "尚未命名"
+    "unnamed": "尚未命名",
+    "snippetCopyName": "{{name}} 副本"
   },
   "templates": {
     "articleCategories": "文章分类：{{categories}}",

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ButtonHTMLAttributes } from 'react';
+import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { tailwindColorInformation, type TailwindColorInformation } from '../../lib/tailwindPalette';
 import { TooltipButton } from './TooltipButton';
 
@@ -12,12 +12,13 @@ export function useTailwindColorInformation(color: string, preferredName?: strin
   return resolved?.color === color && resolved.preferredName === preferredName ? resolved.info : tailwindColorInformation(color);
 }
 
-export function ColorSwatchButton({ color, colorName, children, style, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { color: string; colorName?: string }) {
+export function ColorSwatchButton({ color, colorName, description, children, style, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { color: string; colorName?: string; description?: ReactNode }) {
   const info = useTailwindColorInformation(color, colorName);
   return <TooltipButton {...props} title={undefined} style={{ ...style, backgroundColor: children ? style?.backgroundColor : color }} tooltip={
     <span className="grid gap-0.5 font-mono">
       {info.name ? <span className="text-xs font-medium" data-tailwind-color-name="true">{info.name}</span> : null}
       <span className="text-2xs" data-color-hex="true">{info.hex.toUpperCase()}</span>
+      {description ? <span className="max-w-64 whitespace-normal font-sans text-xs">{description}</span> : null}
     </span>
   }>{children}</TooltipButton>;
 }

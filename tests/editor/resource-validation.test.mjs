@@ -8,14 +8,14 @@ import { BASIC_THEME } from '../../src/lib/themes.ts';
 import { formatDiagnosticMessage, formatDiagnosticName, formatDiagnosticSource } from '../../src/lib/i18n/productMessages.ts';
 import { createUII18n } from '../../src/lib/i18n/runtime.ts';
 const engine = await readFile(new URL('../../public/format/article-format-engine.js', import.meta.url), 'utf8');
-function fixture(source = '/missing.png', complete = true, naturalWidth = 0, widthRule = true) {
+function fixture(source = '/missing.png', complete = true, naturalWidth = 0, widthRule = true, layouts = null) {
   let timers = 0, cleared = 0, frames = 0, removed = 0, dark = 0;
   const handlers = new Map(), timeouts = new Map();
   const style = { width: '100px', height: '', getPropertyValue(name) { return this[name] || ''; } };
   const attrs = { src: source, 'data-source-line': '7' };
   const image = { tagName: 'IMG', complete, naturalWidth, style, currentSrc: '', parentElement: null,
     getAttribute: key => attrs[key] ?? null, closest: selector => selector === '[data-source-line]' ? image : null,
-    matches: selector => selector === 'img', querySelectorAll: () => [], getBoundingClientRect: () => ({ left: 0, right: 100, top: 0, bottom: 100, width: 100, height: 100 }),
+    matches: selector => selector === 'img', querySelectorAll: () => [], getBoundingClientRect: () => layouts?.[Math.max(0, frames - 1)].image ?? ({ left: 0, right: 100, top: 0, bottom: 100, width: 100, height: 100 }),
     addEventListener: (name, fn) => handlers.set(name, fn), removeEventListener: name => handlers.delete(name) };
   const doc = { baseURI: 'http://127.0.0.1:3501/', styleSheets: [], createTreeWalker: () => ({ nextNode: () => null }), defaultView: { getComputedStyle: () => ({ getPropertyValue: () => '' }) } };
   const root = { tagName: 'ARTICLE', ownerDocument: doc, style: { getPropertyValue: () => '' }, getAttribute: () => null,
@@ -23,6 +23,7 @@ function fixture(source = '/missing.png', complete = true, naturalWidth = 0, wid
     querySelectorAll: selector => selector === 'img' || selector === '*' ? [image] : [],
     getBoundingClientRect: () => ({ left: 0, right: 300, top: 0, bottom: 300, width: 300, height: 300 }), outerHTML: '<article class="article-preview"><img></article>' };
   image.ownerDocument = doc; image.parentElement = root; doc.querySelector = () => root;
+  if (layouts) image.parentElement = { getBoundingClientRect: () => layouts[Math.max(0, frames - 1)].parent };
   const window = { ArticleAlgorithmHost: { run: async () => { dark++; return []; } } };
   const context = { window, URL, NodeFilter: { SHOW_TEXT: 4 }, WeakMap, setTimeout(fn) { timers++; timeouts.set(timers, fn); return timers; }, clearTimeout(id) { cleared++; timeouts.delete(id); },
     document: { createElement() { frames++; return { style: {}, contentDocument: doc, remove() { removed++; } }; }, body: { append(frame) { queueMicrotask(() => frame.onload()); } } } };
@@ -35,6 +36,24 @@ function fixture(source = '/missing.png', complete = true, naturalWidth = 0, wid
   const bundle = { validator: { rules }, support: { manualReview: [] }, formatter: { preview: { dark: { transform: 'test' } } } };
   return { image, root, handlers, bundle, timeout() { [...timeouts.values()].forEach(fn => fn()); }, run: () => window.ArticleFormatEngine.inspect(root, bundle, ''), counts: () => ({ timers, cleared, frames, removed, dark }) };
 }
+
+test('responsive fill is not a centering change; true alignment changes and overflow remain errors', async () => {
+  const rect = (left, width) => ({ left, right: left + width, top: 0, bottom: 100, width, height: 100 });
+  const layout = (parent, width, left = 20) => ({ parent: rect(20, parent), image: rect(left, width) });
+  for (const [layouts, expected] of [
+    [[layout(545, 425), layout(637, 425), layout(335, 335)], null],
+    [[layout(545, 200, 192.5), layout(637, 200), layout(335, 335)], '居中布局不一致'],
+    [[layout(545, 545), layout(637, 637), layout(335, 335)], null],
+    [[layout(545, 600), layout(637, 637), layout(335, 335)], '横向溢出'],
+  ]) {
+    const f = fixture('/valid.gif', true, 425, true, layouts);
+    f.bundle.validator.rules[0].parameters.widths = [585, 677, 375];
+    const result = await f.run(), issues = result.issues.filter(issue => issue.ruleId === 'width');
+    if (expected) assert.ok(issues.some(issue => JSON.stringify(issue).includes(expected)));
+    else assert.equal(issues.length, 0);
+    assert.equal(f.counts().frames, f.counts().removed);
+  }
+});
 test('already failed images return a product error with zero dead-event timers across all width copies', async () => {
   const f = fixture(), result = await f.run();
   assert.equal(result.resources[0].reason, 'failed'); assert.equal(result.resources[0].line, 7);

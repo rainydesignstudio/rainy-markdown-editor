@@ -31,7 +31,7 @@ test('project name navigates to its article list while the chevron only collapse
   const selected = [], collapsed = []; let mobileClosed = 0;
   const archivedArticle = { id: 'archived-article', parse: { metadata: { title: '归档文稿' } } };
   workspace.articleOrganization[archivedArticle.id] = { archived: true, projectId: null };
-  const controller = { article: { dirty: false }, directory: {}, editorWorkspace: workspace, editorProjectsInDisplayOrder: [project], articleList: [unclassifiedArticle, archivedArticle],
+  const controller = { trash: { available: [] }, article: { dirty: false }, directory: {}, editorWorkspace: workspace, editorProjectsInDisplayOrder: [project], articleList: [unclassifiedArticle, archivedArticle],
     orderedArchivedArticles: [archivedArticle], orderedUnclassifiedArticles: [unclassifiedArticle], selectedArticleCollection: 'all',
     editorWorkspaceBusy: false, mediaOperation: null, historyBusy: false,
     setArticleCollection: collection => { selected.push(collection); controller.selectedArticleCollection = collection; },

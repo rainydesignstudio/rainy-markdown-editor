@@ -59,6 +59,17 @@ export type RawFormatBundle = { support: FormatSupport; validator: FormatValidat
 export const DEFAULT_FORMAT_BUNDLE = { support: supportDefaults, validator: validatorDefaults, formatter: formatterDefaults } as unknown as RawFormatBundle;
 export const FORMAT_OPERATORS = new Set(Object.keys(VALIDATOR_CAPABILITIES));
 
+/** Opaque package policies never enter the legacy operator interpreter. */
+export function packageHostBundle(raw: RawFormatBundle): RawFormatBundle {
+  const id = raw?.support?.meta?.id;
+  if (typeof id !== 'string' || !id || raw?.validator?.meta?.id !== id || raw?.formatter?.meta?.id !== id) throw new Error('Format package policy identities disagree');
+  return validateFormatBundle({
+    support: { schemaVersion: 1, meta: { id, name: typeof raw.support.meta.name === 'string' ? raw.support.meta.name : id, sources: {} }, rules: [], manualReview: [] },
+    validator: { schemaVersion: 1, meta: { id, enabled: false }, product: raw.validator.product, rules: [] },
+    formatter: { schemaVersion: 1, meta: { id }, steps: [] },
+  });
+}
+
 // This only gates platform standards. Product syntax, safety and resources stay active.
 export function enabledFormatRules(bundle: Pick<FormatBundle, 'validator'>): FormatRule[] {
   return bundle.validator.meta.enabled === false ? [] : bundle.validator.rules.filter(rule => rule.enabled);

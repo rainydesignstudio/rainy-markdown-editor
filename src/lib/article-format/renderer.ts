@@ -12,6 +12,10 @@ import { validateThemeConfig } from '../themeValidation';
 import { validateArticleFormatCss, type ArticleFormatIssue } from '../articleFormat';
 import type { ThemeConfig } from '../types';
 import { TAILWIND_THEME_CSS, TAILWIND_UTILITIES_CSS, TAILWIND_PREFLIGHT_CSS, TAILWIND_INDEX_CSS, TAILWIND_COMPILER_VERSION } from '../tailwind-assets';
+import { renderPackage } from './package';
+import { assertPackageCss } from './packageRendering';
+import { parseArticle } from '../frontMatter';
+import { resolveLibraryResource } from './resourcePaths';
 
 type Compiler = Awaited<ReturnType<typeof compile>>;
 const cache = new Map<string, Promise<{ css: string; candidates: string[] }>>();
@@ -31,7 +35,7 @@ function libraryStylesheetLoader(environment: StylesheetEnvironment, id: string,
     if (!Object.hasOwn(BUILTINS, builtin)) throw new Error('不支持的Tailwind内置样式：' + id);
     return { path: '/@tailwind/' + builtin, base: '/@tailwind', content: BUILTINS[builtin] };
   }
-  const path = normalizeLibraryPath(id, base.replace(/^\//, ''));
+  const path = environment.resolution ? resolveLibraryResource(id, environment.resolution) : normalizeLibraryPath(id, base.replace(/^\//, ''));
   if (!Object.hasOwn(environment.files, path)) throw new Error('CSS依赖未加载：' + path);
   return { path: '/' + path, base: '/' + path.split('/').slice(0, -1).join('/'), content: environment.files[path] };
 }
@@ -86,6 +90,11 @@ function generatedClasses(snapshot: FormatSnapshot): string[] {
 }
 export async function compileArticleStyles(markdown: string, theme: ThemeConfig, options?: { snapshot?: FormatSnapshot; environment?: StylesheetEnvironment }) {
   const snapshot = options?.snapshot ?? getFormatSnapshot(); assertFormatReady(snapshot);
+  if (snapshot.renderer) {
+    const result = await renderPackage(parseArticle(markdown).body, theme, snapshot);
+    assertCurrentFormat(snapshot); assertPackageCss(result.css!, snapshot.renderer?.declaration.permissions);
+    return { css: result.css!, candidates: extractMarkdownClassCandidates(markdown) };
+  }
   const environment = options?.environment ?? snapshot.environment;
   const candidates = [...new Set([...extractMarkdownClassCandidates(markdown), ...generatedClasses(snapshot)])].sort();
   const key = TAILWIND_COMPILER_VERSION + ':' + snapshot.id + ':' + snapshot.algorithms.fingerprint + ':' + (environment?.fingerprint ?? 'legacy') + ':' + canonicalFormatJson(theme) + ':' + JSON.stringify(candidates);

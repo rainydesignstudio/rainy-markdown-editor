@@ -1,6 +1,7 @@
 'use client';
 
-import { formatProductMessage, productText } from "../../lib/i18n/productMessages";
+import { OperationFeedback } from '../global/OperationFeedback';
+import { productReference, productJoin, formatProductMessage, productText } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
@@ -8,12 +9,14 @@ import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { PageHeading } from '../global/PageHeading';
 
 import { ButtonBar } from '../global/ButtonBar';
+import { ModeSwitch } from '../global/ModeSwitch';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
 import { useDraftLocation, useEditingDraft, useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
 import { hasEditingDraft } from '../../lib/editingDrafts';
+import { FormatPackageControls } from './FormatPackageControls';
 import { FontDownloadSettings } from './FontDownloadSettings';
 import { EditorThemeDesigner } from './EditorThemeDesigner';
 import type { NavigationGuard } from '../../hooks/useRouteNavigation';
@@ -30,16 +33,19 @@ import {
 
 type Props = {
   root: FileSystemDirectoryHandle | null;
+  libraryReady?: boolean;
   directoryName: string | null;
   rememberedDirectoryName: string | null;
   directoryRestoreState: 'checking' | 'idle' | 'permission-needed';
   directoryBookmarkIssue: string | null;
-  directoryStatus: { label: string; tone: 'neutral' | 'success' | 'warning' | 'error' };
   fileSystemReady: boolean;
   settings: ArticleSettings;
   issue: string | null;
   notice: { label: string; tone: 'neutral' | 'success' | 'warning' | 'error' };
   busy: boolean;
+  trashCount?: number;
+  trashBusy?: boolean;
+  onClearTrash?: () => void;
   workspace: EditorWorkspace;
   workspaceIssue: string | null;
   workspaceBusy: boolean;
@@ -146,8 +152,8 @@ function ThemeSample({ theme, kind = 'both', scheme = 'light' }: { theme: Editor
   if (kind === 'fonts') return <span className="grid gap-1" style={fonts}><span className="font-heading text-lg text-primary">{t('settings:ui.manuscriptAa')}</span><span className="font-sans text-xs text-muted">{t('settings:ui.keepIdeasInWords')}</span></span>;
   // The ring is drawn in the theme's own `line-strong`, so a swatch that matches the card surface
   // still reads as a distinct dot instead of disappearing into it.
-  return <span className="flex min-w-0 items-center justify-between gap-4 rounded-lg border p-4" aria-hidden="true" style={{ ...tokens, ...fonts, background: colors.canvas, borderColor: colors.line }}>
-    <span className="grid min-w-0 gap-3"><span className="font-heading text-lg font-semibold" style={{ color: colors.primary }}>{t('settings:ui.manuscriptAa')}</span><span className="font-sans text-xs" style={{ color: colors.secondary }}>{t('settings:ui.wordsForAFreshStart')}</span></span>
+  return <span className="flex min-w-0 items-center justify-between gap-4 rounded-lg border border-line bg-canvas p-4" aria-hidden="true" style={{ ...tokens, ...fonts }}>
+    <span className="grid min-w-0 gap-3"><span className="font-heading text-lg font-semibold text-primary">{t('settings:ui.manuscriptAa')}</span><span className="font-sans text-xs text-secondary">{t('settings:ui.wordsForAFreshStart')}</span></span>
     <span className="grid w-fit shrink-0 grid-cols-4 gap-1.5">{THEME_PALETTE_ROLES.map((role) => <i key={role} className={`size-3 rounded-full ring-1 ring-line-strong ${COLOR_SWATCH_BACKGROUNDS[role]}`} data-color-role={role} />)}</span>
   </span>;
 }
@@ -161,16 +167,19 @@ type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
 
 export function SettingsPanel({
   root,
+  libraryReady = true,
   directoryName,
   rememberedDirectoryName,
   directoryRestoreState,
   directoryBookmarkIssue,
-  directoryStatus,
   fileSystemReady,
   settings,
   issue,
   notice,
   busy,
+  trashCount = 0,
+  trashBusy = false,
+  onClearTrash,
   workspace,
   workspaceIssue,
   workspaceBusy,
@@ -193,7 +202,6 @@ export function SettingsPanel({
   const transform = format.bundle.formatter.preview.dark.transform;
   const algorithm = format.algorithms.manifest.components.find(component => component.id === transform);
   const [tab, setTab] = useState<SettingsTab>('library');
-  const [directoryActionRequested, setDirectoryActionRequested] = useState(false);
   const [draft, setDraft] = useState(settings);
   const [appearanceDraft, setAppearanceDraft] = useState(workspace.appearance);
   const [appearanceEdited, setAppearanceEdited] = useState(false);
@@ -210,7 +218,7 @@ export function SettingsPanel({
   const resumeAppearance = () => { setDeparture(null); setTab('appearance'); appearanceLocation.restore(); };
   useEditingDraft(appearanceDirty ? { kind: 'appearance', root, objectId: 'appearance', resume: resumeAppearance } : null);
   appearanceGuardRef.current = { dirty: appearanceDirty, busy: busy || workspaceBusy || appearanceSaving };
-  const [appearanceNotice, setAppearanceNotice] = useState(productText("settingsPanel.appearancePreferencesAreSavedSeparatelyInEachLibraryDirectory"));
+  const [appearanceNotice, setAppearanceNotice] = useState('');
   const savedColorModeRef = useRef(workspace.appearance.colorMode);
   const [designerSource, setDesignerSource] = useState<EditorTheme | null>(null);
   const [designerEditing, setDesignerEditing] = useState(false);
@@ -289,7 +297,7 @@ export function SettingsPanel({
     setAppearanceDraft(next);
     setAppearanceEdited(true);
     setAppearanceSaved(false);
-    setAppearanceNotice(productText("settingsPanel.previewingChangesAreWrittenToTheLibraryOnlyWhenSaved"));
+    setAppearanceNotice('');
   };
 
   const selectColorMode = (mode: EditorColorMode) => changeAppearance({ ...appearanceDraft, colorMode: mode });
@@ -300,7 +308,7 @@ export function SettingsPanel({
     setAppearanceEdited(false);
     setAppearanceSaved(false);
     onPreviewAppearance(null);
-    setAppearanceNotice(productText("settingsPanel.changesCancelledSavedAppearanceRestored"));
+    setAppearanceNotice('');
   };
 
   const saveAppearance = async () => {
@@ -328,7 +336,7 @@ export function SettingsPanel({
 
   const resetAppearance = () => {
     changeAppearance({ ...DEFAULT_EDITOR_APPEARANCE });
-    setAppearanceNotice(sameAppearance(DEFAULT_EDITOR_APPEARANCE, workspace.appearance) ? productText("uiFeedback.appearanceDefault") : productText("uiFeedback.appearancePreviewDefault"));
+    setAppearanceNotice('');
   };
 
   const openThemeDesigner = () => {
@@ -353,12 +361,14 @@ export function SettingsPanel({
       </PageHeading>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-line bg-panel">
-        <div className="shrink-0 overflow-x-auto border-b border-line px-4 py-3 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent md:px-6">
+        <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-3 md:px-6">
           <div className="flex w-max gap-1 rounded-lg bg-list p-1" role="tablist" aria-label={t('settings:ui.settingsCategories')}>
             {SETTINGS_TABS.map((item) => <button key={item.id} id={`settings-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} aria-controls={`settings-panel-${item.id}`} tabIndex={tab === item.id ? 0 : -1} disabled={tabBusy} onClick={() => setTab(item.id)} onKeyDown={(event) => onTabKeyDown(event, item.id)} className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-selected:bg-panel aria-selected:text-accent-text">
               <SettingsIcon name={item.icon} />{t('settings:tabs.' + item.id)}{item.id === 'appearance' && appearanceDirty ? <UnsavedMark /> : null}
             </button>)}
           </div>
+          <OperationFeedback hideTrigger id="settings-operation" notice={tab === 'appearance' ? appearanceNotice : null} />
+          <OperationFeedback id="settings-diagnostics" hideTrigger={!libraryReady} announce={libraryReady} label={t('common:feedback.libraryDiagnostics')} notice={directoryBookmarkIssue || workspaceIssue || issue ? productReference('shared.compose', { parts: productJoin([directoryBookmarkIssue, workspaceIssue, issue].filter(Boolean), '\n') }) : editorThemeIssues.length || missingThemeIds.length ? productReference('feedback.filesRepair', { count: editorThemeIssues.length + missingThemeIds.length }) : null} tone="warning">{editorThemeIssues.length || missingThemeIds.length ? <ul className="grid gap-2">{editorThemeIssues.map(item => <li className="break-words" key={item.file}>{item.file} · {formatProductMessage(item, t)}</li>)}{missingThemeIds.map(id => <li key={id}>{t('settings:templates.missingThemes', { names: id })}</li>)}</ul> : null}{workspaceIssue ? <p>{t('settings:ui.appearanceRemainsReadOnly')}</p> : null}{issue ? <p>{t('settings:ui.repairSettingsJsonThenReopenTheLibrary')}</p> : null}</OperationFeedback>
         </div>
 
         <section id="settings-panel-library" role="tabpanel" aria-labelledby="settings-tab-library" hidden={tab !== 'library'} tabIndex={0} className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">
@@ -375,8 +385,8 @@ export function SettingsPanel({
                     </div>
                   </div>
                   <ButtonBar label={t('settings:ui.libraryDirectoryActions')}>
-                    {!root && rememberedDirectoryName ? <button className="button button-primary" type="button" disabled={!fileSystemReady || tabBusy} onClick={() => { setDirectoryActionRequested(true); onReopenRememberedDirectory(); }}><SettingsIcon name="folder" />{t('settings:ui.authorizeAndOpen')}</button> : null}
-                    <button className={!root && !rememberedDirectoryName ? 'button button-primary' : 'button button-quiet'} type="button" disabled={!fileSystemReady || tabBusy} onClick={() => { setDirectoryActionRequested(true); onAuthorizeDirectory(); }}><SettingsIcon name="export" />{t(root ? 'settings:ui.switchLibrary' : rememberedDirectoryName ? 'settings:ui.chooseAnotherLibrary' : 'settings:ui.openExistingLibrary')}</button>
+                    {!root && rememberedDirectoryName ? <button className="button button-primary" type="button" disabled={!fileSystemReady || tabBusy} onClick={onReopenRememberedDirectory}><SettingsIcon name="folder" />{t('settings:ui.authorizeAndOpen')}</button> : null}
+                    <button className={!root && !rememberedDirectoryName ? 'button button-primary' : 'button button-quiet'} type="button" disabled={!fileSystemReady || tabBusy} onClick={onAuthorizeDirectory}><SettingsIcon name="export" />{t(root ? 'settings:ui.switchLibrary' : rememberedDirectoryName ? 'settings:ui.chooseAnotherLibrary' : 'settings:ui.openExistingLibrary')}</button>
                     <button className="button button-quiet" type="button" disabled={!fileSystemReady || tabBusy} aria-haspopup="dialog" onClick={() => {
                       const proceed = () => onCreateDirectory();
                       if (appearanceGuardRef.current.dirty) setDeparture({ proceed }); else proceed();
@@ -384,27 +394,25 @@ export function SettingsPanel({
                   </ButtonBar>
                 </div>
                 <p className="border-t border-line pt-4 text-xs text-muted">{root ? t('settings:ui.thisDirectoryIsRememberedContinueAfterRefreshingWhile') : rememberedDirectoryName ? t('settings:ui.thePreviousDirectoryIsRememberedAuthorizeItTo') : t('settings:ui.theAppRemembersYourSelectionAndReopensIt')} <span className="text-faint">{t('settings:ui.switchLibraryKeepsFiles')}</span></p>
-                {directoryActionRequested && directoryStatus.tone !== 'neutral' ? <p className="status-copy" data-tone={directoryStatus.tone} role="status">{formatProductMessage(directoryStatus, t)}</p> : null}
                 {!fileSystemReady ? <p className="text-xs text-warning-strong" role="status">{t('settings:ui.thisBrowserDoesNotSupportLocalDirectoryAccess')}</p> : null}
-                {directoryBookmarkIssue ? <p className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="alert">{formatProductMessage(directoryBookmarkIssue, t)}</p> : null}
               </section>
-              {workspaceIssue ? <p className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="alert">{formatProductMessage(workspaceIssue, t)} {t('settings:ui.projectOrganizationAndAppearanceAreReadOnlyTo')}</p> : null}
               <div className="grid min-w-0 gap-4 xl:grid-cols-2">
                 <FontDownloadSettings root={root} onRetry={onRetryFonts} />
                 <section className="flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-list/50 p-5" aria-label={t('settings:ui.validationAndAlgorithms')}>
                   <header className="border-b border-line pb-4">
-                    <h3 className="font-heading text-lg font-semibold text-primary">{t('settings:ui.validationAndAlgorithms')}</h3>
+                    <div className="flex items-center justify-between gap-2"><h3 className="font-heading text-lg font-semibold text-primary">{t('settings:ui.validationAndAlgorithms')}</h3><OperationFeedback id="format-status" label={t('common:feedback.configProblems')} announce={false} notice={format.issue ?? format.error} summary={productReference('feedback.formatUnavailable')} tone="error">{format.issue || format.error ? <p>{t('messages:uiFeedback.repairFormat')}</p> : null}</OperationFeedback></div>
                     <p className="mt-1 text-xs text-muted">{t('settings:ui.currentLibraryConfiguration')}</p>
                   </header>
                   {!root ? <p className="text-sm text-muted">{t('settings:ui.notConnected')}</p>
                     : format.loading ? <p className="text-sm text-muted" role="status">{t('settings:ui.loadingFormatConfiguration')}</p>
-                    : format.error ? <p className="break-words text-sm text-danger" role="alert">{t('settings:ui.formatUnavailable')} · {formatProductMessage(format.error, t)}</p>
-                    : <dl className="grid gap-3 text-sm text-secondary">
-                      <div className="flex min-w-0 gap-3"><dt className="w-24 shrink-0 text-muted md:w-40">{t('settings:ui.validationPolicy')}</dt><dd className="min-w-0 break-words">{format.bundle.support.meta.name}{format.bundle.validator.meta.enabled === false ? t('dialogs:ui.platformValidationDisabled') : ''}</dd></div>
+                    : format.error ? <p className="text-sm text-danger">{t('settings:ui.formatUnavailable')}</p>
+                    : format.renderer ? <p className="text-sm text-secondary">{t('messages:formatPackage.policy')}</p> : <dl className="grid gap-3 text-sm text-secondary">
+                      <div className="flex min-w-0 gap-3"><dt className="w-24 shrink-0 text-muted md:w-40">{t('settings:ui.validationPolicy')}</dt><dd className="min-w-0 break-words">{format.bundle.support.meta.name}{!format.renderer && format.bundle.validator.meta.enabled === false ? t('dialogs:ui.platformValidationDisabled') : ''}</dd></div>
                       <div className="flex min-w-0 gap-3"><dt className="w-24 shrink-0 text-muted md:w-40">{t('settings:ui.configurationSource')}</dt><dd className="min-w-0 break-words">{t(format.source === 'built-in' ? 'settings:ui.builtInConfiguration' : format.officialDefault ? 'settings:ui.officialConfiguration' : 'settings:ui.customConfiguration')}</dd></div>
                       <div className="flex min-w-0 gap-3"><dt className="w-24 shrink-0 text-muted md:w-40">{t('settings:ui.darkAlgorithm')}</dt><dd className="min-w-0 break-words font-mono">{transform === 'preserve' ? t('settings:ui.noColorConversion') : algorithm?.id ?? transform}</dd></div>
                       <div className="flex min-w-0 gap-3"><dt className="w-24 shrink-0 text-muted md:w-40">{t('settings:ui.algorithmDetails')}</dt><dd className="min-w-0 break-words">{transform !== 'preserve' && algorithm ? <><span className="font-mono">v{algorithm.version}</span> · </> : null}{t('settings:algorithmSources.' + format.algorithmSource)}</dd></div>
                     </dl>}
+                  {root ? <FormatPackageControls root={root} /> : null}
                 </section>
               </div>
               <div className="grid gap-5 border-t border-line pt-5 md:grid-cols-2">
@@ -416,16 +424,11 @@ export function SettingsPanel({
         </section>
 
         <section id="settings-panel-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance" hidden={tab !== 'appearance'} tabIndex={0} className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">
-          <header className="flex shrink-0 flex-wrap items-start justify-between gap-4">
+          <header className="flex shrink-0 flex-wrap items-end justify-between gap-4">
             <div className="min-w-0"><p className="eyebrow">{t('settings:ui.editorAppearance')}</p><h3 id="appearance-title" className="mt-1 font-heading text-xl font-semibold text-primary">{t('settings:ui.chooseAnEditorTheme')}</h3><p className="mt-3 text-sm text-muted">{t('settings:ui.clickAThemeToPreviewItSaveTo')}</p></div>
             <ButtonBar label={t('settings:ui.editorThemeActions')}><button className="button button-quiet" type="button" disabled={appearanceDisabled} onClick={() => themeImportRef.current?.click()}><SettingsIcon name="upload" />{t('settings:ui.importJson')}</button><input ref={themeImportRef} className="sr-only" type="file" accept=".json,application/json" aria-label={t('settings:ui.importEditorThemeJson')} disabled={appearanceDisabled} onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void file.text().then(raw => JSON.parse(raw) as EditorTheme).then(theme => root ? onCreateEditorTheme(theme, undefined, root) : false).then(saved => setAppearanceNotice(saved ? productText("uiFeedback.themeImported") : productText("uiFeedback.themeImportFailed"))).catch(error => setAppearanceNotice(String(error))); }} /><button className="button button-quiet" type="button" disabled={appearanceDisabled} onClick={() => void onLoadDefaultEditorThemes().then(saved => setAppearanceNotice(saved ? productText("uiFeedback.themesAdded") : productText("uiFeedback.themesFailed")))}><SettingsIcon name="download" />{t('settings:ui.loadDefaultThemes')}</button><button className="button button-primary" type="button" disabled={appearanceDisabled} onClick={openThemeDesigner}><SettingsIcon name="plus" />{t('settings:ui.newEditorTheme')}</button></ButtonBar>
           </header>
-          {!root || workspaceIssue || missingThemeIds.length || editorThemeIssues.length ? <div className="grid max-h-24 shrink-0 gap-2 overflow-y-auto rounded-lg bg-list px-4 py-3 text-xs text-muted" role="status">
-            {!root ? <p>{t('settings:ui.connectALibraryToChooseAndSaveEditor')}</p> : null}
-            {workspaceIssue ? <p className="text-warning-strong" role="alert">{formatProductMessage(workspaceIssue, t)} {t('settings:ui.appearanceRemainsReadOnly')}</p> : null}
-            {missingThemeIds.length ? <p className="text-warning-strong" role="alert">{t('settings:templates.missingThemes', { names: missingThemeIds.join('、') })}</p> : null}
-            {editorThemeIssues.length ? <p className="text-warning-strong" role="alert">{editorThemeIssues.map((item) => `${item.file}: ${formatProductMessage(item, t)}`).join('; ')}</p> : null}
-          </div> : null}
+          {!root ? <p className="text-xs text-muted">{t('settings:ui.connectALibraryToChooseAndSaveEditor')}</p> : null}
           <fieldset className="min-w-0 shrink-0"><legend className="mb-2 text-sm font-medium text-primary">{t('settings:ui.displayMode')}</legend><div className="flex flex-wrap gap-2">{EDITOR_COLOR_MODES.map((mode) => <button key={mode.id} className="min-h-9 rounded-lg border border-line bg-panel px-4 py-2 text-sm text-muted transition-colors hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-accent-text" type="button" aria-pressed={appearanceDraft.colorMode === mode.id} disabled={appearanceDisabled} onClick={() => selectColorMode(mode.id)}>{t('settings:colorModes.' + mode.id)}</button>)}</div></fieldset>
           <fieldset className="flex min-h-0 min-w-0 flex-1 flex-col">
             <legend className="mb-3 text-sm font-medium text-primary">{t('settings:ui.editorThemes')}</legend>
@@ -445,38 +448,42 @@ export function SettingsPanel({
             </div>
           </fieldset>
           <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <div className="flex flex-wrap items-center gap-3"><button className="button button-quiet" type="button" disabled={appearanceActionsDisabled} onClick={resetAppearance}><SettingsIcon name="reset" />{t('settings:ui.resetAppearance')}</button><p className="status-copy text-xs" role="status">{formatProductMessage(appearanceNotice, t)}</p></div>
+            <div className="flex flex-wrap items-center gap-3"><button className="button button-quiet" type="button" disabled={appearanceActionsDisabled} onClick={resetAppearance}><SettingsIcon name="reset" />{t('settings:ui.resetAppearance')}</button></div>
             <ButtonBar label={t('settings:ui.appearanceSaveActions')}><button className="button button-quiet" type="button" disabled={appearanceActionsDisabled} onClick={cancelAppearance}><SettingsIcon name="undo" />{t('settings:ui.cancelChanges')}</button><button className="button button-primary" type="button" aria-label={appearanceSaved ? t('settings:ui.saved') : t('settings:ui.saveAppearance')} disabled={appearanceActionsDisabled || Boolean(missingThemeIds.length)} onClick={() => void saveAppearance()}><SettingsIcon name={appearanceSaved ? 'check' : 'save'} />{appearanceSaving ? t('settings:ui.saving') : appearanceSaved ? t('settings:ui.saved') : t('settings:ui.saveAppearance')}</button></ButtonBar>
           </footer>
         </section>
 
         <section id="settings-panel-workflow" role="tabpanel" aria-labelledby="settings-tab-workflow" hidden={tab !== 'workflow'} tabIndex={0} className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">
           <div className="grid gap-6">
-            <div><p className="eyebrow">{t('settings:ui.savingHistory')}</p><h3 id="workflow-title" className="mt-1 font-heading text-xl font-semibold text-primary">{t('settings:ui.makeSavingPartOfWriting')}</h3><p className="mt-3 text-sm text-muted">{t('settings:ui.timersActOnlyOnTheCurrentArticleAnd')}</p></div>
+            <header className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0"><p className="eyebrow">{t('settings:ui.savingHistory')}</p><h3 id="workflow-title" className="mt-1 font-heading text-xl font-semibold text-primary">{t('settings:ui.makeSavingPartOfWriting')}</h3><p className="mt-3 text-sm text-muted">{t('settings:ui.timersActOnlyOnTheCurrentArticleAnd')}</p></div><ButtonBar label={t('settings:ui.autoSaveSettingsActions')}><button className="button button-primary" type="submit" form="settings-workflow-form" disabled={!root || busy}><SettingsIcon name="save" />{t('settings:ui.saveSettings')}</button></ButtonBar></header>
             {!root ? <p className="rounded-lg bg-list px-4 py-3 text-xs text-muted">{t('settings:ui.connectALibraryToChangeAndSaveAutomation')}</p> : null}
-            {issue ? <p className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="alert">{formatProductMessage(issue, t)} {t('settings:ui.repairSettingsJsonThenReopenTheLibrary')}</p> : null}
-            <form className="grid gap-6" onSubmit={handleSettingsSubmit}>
-              <div className="grid items-start gap-4 lg:grid-cols-2">
-                <div className="grid gap-5 rounded-xl border border-line bg-list/50 p-5 md:p-6">
-                  <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">{t('settings:ui.autoSave')}</p><h4 className="mt-1 font-heading text-lg font-semibold text-primary">{t('settings:ui.autoSaveAlternative')}</h4></div><label className="flex shrink-0 items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-secondary"><input className="size-4 accent-accent" type="checkbox" role="switch" aria-label={t('settings:ui.enableAutoSave')} checked={draft.autoSave.enabled} onChange={(event) => setDraft({ ...draft, autoSave: { ...draft.autoSave, enabled: event.target.checked } })} disabled={!root || busy} />{t('settings:ui.enable')}</label></div>
+            <form id="settings-workflow-form" className="grid gap-6" onSubmit={handleSettingsSubmit}>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="grid min-w-0 gap-5 rounded-xl border border-line bg-list/50 p-5 md:p-6 lg:row-span-4 lg:grid-rows-subgrid">
+                  <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">{t('settings:ui.autoSave')}</p><h4 className="mt-1 font-heading text-lg font-semibold text-primary">{t('settings:ui.autoSaveAlternative')}</h4></div><ModeSwitch label={t('settings:ui.enableAutoSave')} checked={draft.autoSave.enabled} onToggle={() => setDraft({ ...draft, autoSave: { ...draft.autoSave, enabled: !draft.autoSave.enabled } })} disabled={!root || busy} start={null} end={null} /></div>
                   <p className="text-sm text-muted">{t('settings:ui.unsavedChangesAreWrittenToTheArticleBody')}</p>
                   <label className="field-stack"><span className="field-label">{t('settings:ui.saveIntervalSeconds')}</span><input className="field" type="number" min="1" max="86400" step="1" value={draft.autoSave.intervalSeconds} onChange={(event) => setDraft({ ...draft, autoSave: { ...draft.autoSave, intervalSeconds: Number(event.target.value) } })} disabled={!root || busy || !draft.autoSave.enabled} /></label>
                   <p className="border-t border-line pt-4 text-xs text-faint">{t('settings:ui.saveTheCurrentManuscriptToKeepFilesAnd')}</p>
                 </div>
-                <div className="grid gap-5 rounded-xl border border-line bg-list/50 p-5 md:p-6">
-                  <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">{t('settings:ui.historySnapshots')}</p><h4 className="mt-1 font-heading text-lg font-semibold text-primary">{t('settings:ui.historySnapshotsAlternative')}</h4></div><label className="flex shrink-0 items-center gap-2 rounded-lg border border-line bg-panel px-3 py-2 text-xs text-secondary"><input className="size-4 accent-accent" type="checkbox" role="switch" aria-label={t('settings:ui.enableAutomaticHistorySnapshots')} checked={draft.autoSnapshot.enabled} onChange={(event) => setDraft({ ...draft, autoSnapshot: { ...draft.autoSnapshot, enabled: event.target.checked } })} disabled={!root || busy} />{t('settings:ui.enable')}</label></div>
+                <div className="grid min-w-0 gap-5 rounded-xl border border-line bg-list/50 p-5 md:p-6 lg:row-span-4 lg:grid-rows-subgrid">
+                  <div className="flex items-start justify-between gap-3"><div><p className="eyebrow">{t('settings:ui.historySnapshots')}</p><h4 className="mt-1 font-heading text-lg font-semibold text-primary">{t('settings:ui.historySnapshotsAlternative')}</h4></div><ModeSwitch label={t('settings:ui.enableAutomaticHistorySnapshots')} checked={draft.autoSnapshot.enabled} onToggle={() => setDraft({ ...draft, autoSnapshot: { ...draft.autoSnapshot, enabled: !draft.autoSnapshot.enabled } })} disabled={!root || busy} start={null} end={null} /></div>
                   <p className="text-sm text-muted">{t('settings:ui.retainTheFullBodyAndItsThemeFor')}</p>
                   <div className="grid gap-4 md:grid-cols-2"><label className="field-stack"><span className="field-label">{t('settings:ui.snapshotIntervalMinutes')}</span><input className="field" type="number" min="1" max="10080" step="1" value={draft.autoSnapshot.intervalMinutes} onChange={(event) => setDraft({ ...draft, autoSnapshot: { ...draft.autoSnapshot, intervalMinutes: Number(event.target.value) } })} disabled={!root || busy || !draft.autoSnapshot.enabled} /></label><label className="field-stack"><span className="field-label">{t('settings:ui.automaticSnapshotRetention')}</span><input className="field" type="number" min="1" max="100" step="1" value={draft.autoSnapshot.maxCount} onChange={(event) => setDraft({ ...draft, autoSnapshot: { ...draft.autoSnapshot, maxCount: Number(event.target.value) } })} disabled={!root || busy || !draft.autoSnapshot.enabled} /></label></div>
                   <p className="border-t border-line pt-4 text-xs text-faint">{t('settings:ui.identicalContentIsNotWrittenAgainKeepThe')}</p>
                 </div>
+                <div className="grid min-w-0 gap-5 rounded-xl border border-line bg-list/50 p-5 md:p-6 lg:row-span-4 lg:grid-rows-subgrid">
+                  <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="eyebrow">{t('messages:trash.eyebrow')}</p><h4 className="mt-1 font-heading text-lg font-semibold text-primary">{t('messages:trash.title')}</h4></div><ModeSwitch label={t('messages:trash.enable')} checked={draft.trash?.enabled ?? true} onToggle={() => setDraft({ ...draft, trash: { enabled: !(draft.trash?.enabled ?? true) } })} disabled={!root || busy || trashBusy} start={null} end={null} /></div>
+                  <p className="text-sm text-muted">{t(draft.trash?.enabled === false ? 'messages:trash.offDescription' : 'messages:trash.description')}</p>
+                  <div className="grid min-w-0 grid-cols-2 items-end gap-4"><div className="grid min-w-0 gap-2"><span className="field-label">{t('messages:trash.directory')}</span><code className="grid min-h-10 content-center break-all rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">{directoryName ?? '…'}/_trash/</code></div><button className="button button-quiet justify-self-end" type="button" disabled={!root || busy || trashBusy || Boolean(issue) || draft.trash?.enabled === false || settings.trash?.enabled === false || !trashCount || !onClearTrash} onClick={onClearTrash} data-tooltip={draft.trash?.enabled === false || settings.trash?.enabled === false ? t('messages:trash.saveFirst') : !trashCount ? t('messages:trash.empty') : t('messages:trash.clear')}><SettingsIcon name="delete" />{t('messages:trash.clear')}</button></div>
+                  <p className="border-t border-line pt-4 text-xs text-faint">{t('messages:trash.clearDescription')}</p>
+                </div>
               </div>
-              <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5"><p className="status-copy" data-tone={notice.tone} role="status">{formatProductMessage(notice, t)}</p><ButtonBar label={t('settings:ui.autoSaveSettingsActions')}><button className="button button-primary" type="submit" disabled={!root || busy}><SettingsIcon name="save" />{t('settings:ui.saveSettings')}</button></ButtonBar></footer>
             </form>
           </div>
         </section>
       </div>
       {designerSource && typeof document !== 'undefined' ? createPortal(<EditorThemeDesigner root={root} editing={designerEditing} appearanceScheme={previewScheme} source={designerSource} themes={editorThemes} navigationGuardRef={designerGuardRef} onClose={() => { designerGuardRef.current = null; setDesignerSource(null); }} onSave={async theme => { if (!await onCreateEditorTheme(theme, designerEditing ? designerSource : undefined, root ?? undefined)) return false; changeAppearance({ themeId: theme.id, colorMode: appearanceDraft.colorMode, custom: null }); return true; }} />, document.body) : null}
-      {deleteThemeTarget && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="editor-theme-delete-title" role="alertdialog" onClose={() => setDeleteThemeTarget(null)} dismissible={!workspaceBusy}><DialogHeader titleId="editor-theme-delete-title" eyebrow={t('common:eyebrows.deleteEditorTheme')} title={t('settings:ui.deleteEditorTheme')} onClose={() => setDeleteThemeTarget(null)} closeDisabled={workspaceBusy} /><div className="dialog-content"><p className="text-sm text-primary">「{deleteThemeTarget.name}」</p><p className="mt-3 text-sm text-muted">{t('settings:ui.removeThisThemeFromTheCurrentLibraryDefaults')}</p><p className="mt-3 text-xs text-faint" role="status">{formatProductMessage(appearanceNotice, t)}</p></div><DialogFooter><DialogActions><DialogButton disabled={workspaceBusy} onClick={() => setDeleteThemeTarget(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={workspaceBusy} onClick={() => void onDeleteEditorTheme(deleteThemeTarget.id, deleteThemeRootRef.current ?? undefined).then(removed => { if (removed) { setDeleteThemeTarget(null); setAppearanceNotice(productText("settingsPanel.themeDeleted")); } else setAppearanceNotice(productText("settingsPanel.deletionFailedTheThemeIsRetained")); })}>{t('settings:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
+      {deleteThemeTarget && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="editor-theme-delete-title" role="alertdialog" onClose={() => setDeleteThemeTarget(null)} dismissible={!workspaceBusy}><DialogHeader titleId="editor-theme-delete-title" eyebrow={t('common:eyebrows.deleteEditorTheme')} title={t('settings:ui.deleteEditorTheme')} onClose={() => setDeleteThemeTarget(null)} closeDisabled={workspaceBusy} /><div className="dialog-content"><p className="text-sm text-primary">「{deleteThemeTarget.name}」</p><p className="mt-3 text-sm text-muted">{t('settings:ui.removeThisThemeFromTheCurrentLibraryDefaults')}</p></div><DialogFooter><DialogActions><DialogButton disabled={workspaceBusy} onClick={() => setDeleteThemeTarget(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={workspaceBusy} onClick={() => void onDeleteEditorTheme(deleteThemeTarget.id, deleteThemeRootRef.current ?? undefined).then(removed => { if (removed) { setDeleteThemeTarget(null); setAppearanceNotice(productText("settingsPanel.themeDeleted")); } else setAppearanceNotice(productText("settingsPanel.deletionFailedTheThemeIsRetained")); })}>{t('settings:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
       {departure && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={[{ label: t('settings:ui.appearanceSettings'), detail: t('settings:templates.combination', { colors: findEditorTheme(editorThemes, appearanceDraft.custom?.colorThemeId ?? appearanceDraft.themeId)?.name ?? appearanceDraft.themeId, fonts: findEditorTheme(editorThemes, appearanceDraft.custom?.fontThemeId ?? appearanceDraft.themeId)?.name ?? appearanceDraft.themeId }) }]} description={t('settings:ui.appearancePreviewIsUnsavedLeavingRestoresSavedColors')} saveDisabled={appearanceDisabled || Boolean(missingThemeIds.length)} onCancel={() => setDeparture(null)} onContinue={resumeAppearance} onDiscard={() => { const proceed = departure.proceed; cancelAppearance(); setDeparture(null); proceed(); }} onSave={async () => { const proceed = departure.proceed; if (!await saveAppearance()) return false; setDeparture(null); proceed(); return true; }} />, document.body) : null}
       {combination && typeof document !== 'undefined' ? createPortal(<DialogFrame wide titleId="appearance-combination-title" descriptionId="appearance-combination-description" onClose={() => setCombination(null)}><DialogHeader titleId="appearance-combination-title" eyebrow={t('common:eyebrows.customEditorTheme')} title={t('settings:ui.combineColorsAndFonts')} onClose={() => setCombination(null)} /><div className="dialog-content"><p id="appearance-combination-description" className="text-sm text-muted">{t('settings:ui.chooseColorsAndFontsSeparatelyForALive')}</p><div className="grid min-w-0 gap-4 md:grid-cols-2">
         <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.colors')}</legend><div className="grid max-h-80 gap-2 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseColors', { name: theme.name })} aria-pressed={combination.colorThemeId === theme.id} onClick={() => setCombination({ ...combination, colorThemeId: theme.id })}><ThemeSample theme={theme} kind="colors" scheme={previewScheme} /><span>{theme.name}</span></button>)}</div></fieldset>

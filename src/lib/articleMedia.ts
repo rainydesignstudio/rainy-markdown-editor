@@ -43,7 +43,7 @@ export type LibraryMediaAsset = (ArticleMediaAsset & { kind: 'article' }) | (Art
   kind: 'shared';
   root: FileSystemDirectoryHandle;
 });
-export type MediaActionOutcome = { ok: boolean; message: string; tone: 'success' | 'warning' | 'error'; failedKeys?: string[] };
+export type MediaActionOutcome = { ok: boolean; message: string; tone: 'success' | 'warning' | 'error'; failedKeys?: string[]; changed?: boolean };
 export const libraryMediaAssetKey = (asset: LibraryMediaAsset) => `${asset.kind}:${asset.kind === 'article' ? asset.articleId : 'shared'}:${asset.storage === 'file' ? 'file:' : ''}${asset.fileName}`;
 
 export async function getSharedImageDirectory(root: FileSystemDirectoryHandle, create = false): Promise<FileSystemDirectoryHandle | null> {

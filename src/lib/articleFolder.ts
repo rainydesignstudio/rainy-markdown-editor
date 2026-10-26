@@ -1,3 +1,4 @@
+import { articleIdentityRename } from './articleIdentity';
 import { ProductError, productCause, productText } from './i18n/productMessages';
 import { getStoredArticleDirectory, indexEntry, readStoredArticleById, sanitizeFolderName } from './fileSystem';
 import { contentHash } from './article-format/styles';
@@ -45,6 +46,8 @@ function sameTree(left: Tree, right: Tree, modified = false) {
     });
 }
 
+export { tree as readArticleDirectoryTree, sameTree as sameArticleDirectoryTree };
+
 export function replaceArticleFolderIdentity(value: unknown, previous: string, next: string): unknown {
   if (!object(value)) throw new ProductError('articleFolder.invalidMetadata', { file: 'settings.json' });
   const result = structuredClone(value);
@@ -79,7 +82,7 @@ export async function renameStoredArticleDirectory(root: FileSystemDirectoryHand
   const before = await tree(source, check);
   const previousId = `${month}/${folder}`, nextId = `${month}/${nextFolder}`;
   const article = { ...stored, id: nextId, folder: nextFolder, filePath: `articles/${month}/${nextFolder}/article.md` };
-  const changes: TextChange[] = [];
+  const changes: TextChange[] = [await articleIdentityRename(root, previousId, nextId)];
   const indexRaw = await readText(parent, 'index.json'), index = indexRaw === null ? {} : json(indexRaw, `articles/${month}/index.json`);
   if (!object(index) || !Object.hasOwn(index, folder)) throw new ProductError('articleFolder.invalidMetadata', { file: `articles/${month}/index.json` });
   if (Object.hasOwn(index, nextFolder)) throw new ProductError('articleFolder.identityConflict');

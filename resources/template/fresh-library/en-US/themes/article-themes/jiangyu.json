@@ -2,7 +2,7 @@
   "kind": "article-theme",
   "id": "jiangyu",
   "name": "Garnet",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "formatVersion": 1,
   "tokens": {
     "color-article-ink": "#3c3c3c",

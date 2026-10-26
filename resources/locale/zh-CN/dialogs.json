@@ -209,15 +209,13 @@
     "nextImageRightArrow": "下一张图片 · 右方向键",
     "nextImage": "下一张图片",
     "newLibrary": "新建资料库",
-    "nameYourLibraryThenChooseItsParentDirectory": "为资料库取个名字，再选择保存它的父目录。",
     "libraryName": "资料库名称",
     "exampleMyManuscripts": "例如：我的文稿",
     "usedAsTheNewFolderNameUpTo": "用作新文件夹名称，最多 80 个字符。",
     "libraryLocationPreview": "资料库保存位置预览",
     "creationLocation": "创建位置",
     "chosenParentDirectory": "所选父目录 /",
-    "chooseTheParentInTheSystemDialogNext": "接下来在系统窗口选择父目录。资料库会建在这个新文件夹内；已有同名文件夹不会覆盖。",
-    "afterSelectingAParentTheLibraryWillBe": "选择父目录后，将创建并打开资料库…",
+    "chooseTheParentInTheSystemDialogNext": "资料库会建在上面显示的新文件夹内；已有同名文件夹不会覆盖。",
     "creating": "创建中…",
     "chooseParentAndCreate": "选择父目录并创建",
     "currentColor": "当前颜色",
@@ -391,7 +389,7 @@
     "aboutToDelete": "即将删除",
     "none": "无",
     "validationAndAlgorithmTemplate": "校验与算法模板",
-    "newLibraryPresetHelp": "设置新资料库的格式检查与预览处理；创建后可在库内调整。",
+    "newLibraryPresetHelp": "设置新资料库的格式检查与预览处理；空校验器不含平台规则或处理算法，创建后可在库内调整。",
     "opacity": "不透明度",
     "solidColor": "纯色",
     "gradientColor": "渐变",
@@ -402,8 +400,6 @@
     "imageZoomHelp": "Ctrl/⌘＋滚轮缩放；点击倍率切换放大与适应宽度",
     "fitToWidth": "适应宽度",
     "articleFolderName": "文章目录名称",
-    "applyFolderName": "应用目录名",
-    "folderRenameImmediate": "输入目录名后按 Enter 或点击应用，立即更新索引并重新读取文稿；article.md 文件名保持。",
     "imageZoomToggle": "切换放大与适应宽度",
     "searchHitSample": "搜索命中"
   },
@@ -687,7 +683,9 @@
     "deleteExplanation": "只删除选中的这一份历史记录；无法撤销。当前稿、其他历史、文章素材与共享渲染资源均保留。",
     "deleteProtectedExplanation": "此版本已受保护，自动清理不会删除它；本次为你明确确认的手动删除。",
     "confirmDelete": "确认删除此版本",
-    "contextStatus": "{{path}} 的正文与主题按快照成对保存；{{status}}"
+    "contextStatus": "{{path}} 的正文与主题按快照成对保存；{{status}}",
+    "packageDependenciesMissing": "此历史版本缺少已保存的渲染包依赖，无法按原样恢复；未使用当前包重建",
+    "context": "{{path}} 的正文与主题按快照成对保存。"
   },
   "imageRename": {
     "viewAndRename": "查看与改名",
@@ -699,7 +697,8 @@
     "saveAsNew": "保存为新图片"
   },
   "platformPresets": {
-    "wechat-article": "微信公众号"
+    "wechat-article": "微信公众号",
+    "empty": "空校验器"
   },
   "articleDark": {
     "automatic": "深色由当前资料库的算法自动计算，仅可查看。色值取自右侧样张；同一颜色角色可能产生多个结果。",
@@ -711,6 +710,33 @@
     "multiple": "{{count}} 个结果",
     "inherited": "继承浅色",
     "inherit": "继承浅色",
-    "reset": "{{name}}：恢复继承浅色"
+    "reset": "{{name}}：恢复继承浅色",
+    "unusedDescription": "当前预览示例未使用此颜色"
+  },
+  "previewCss": {
+    "view": "查看当前预览CSS",
+    "readOnly": "只读样式结果",
+    "notReady": "当前预览CSS尚未就绪，请在预览成功后重新打开",
+    "library": "资料库样式",
+    "theme": "文章主题样式",
+    "configuration": "配置：{{id}}",
+    "renderer": "渲染包：{{id}} v{{version}}",
+    "entry": "样式入口：{{path}}（包含依赖）",
+    "noMapping": "未提供生成CSS与源文件的可靠定位映射",
+    "empty": "本次预览成功，生成CSS为空",
+    "generated": "生成CSS（只读）",
+    "libraryExplanation": "当前样式由资料库／自主渲染包提供，主题CSS不参与本次渲染；此处原值保留，可继续维护。"
+  },
+  "libraryCss": {
+    "source": "CSS 来源",
+    "themeSource": "主题 CSS（不参与当前渲染）",
+    "sharedScope": "直接编辑当前资料库的共享 CSS。保存会影响使用此文件的新预览和导出；已有文章与历史快照不自动更新。",
+    "noSources": "此包没有声明独立 CSS 文件；生成 CSS 仍可从预览工具栏只读查看。",
+    "loading": "正在读取 CSS 源文件…",
+    "editor": "CSS 源文件：{{path}}",
+    "save": "保存 CSS 并重载",
+    "unsaved": "此 CSS 源文件有未保存修改。保存会写入当前资料库的共享文件，并更新既有校验值。",
+    "reload": "重新载入 CSS 来源与渲染配置",
+    "problems": "CSS 源文件问题"
   }
 }

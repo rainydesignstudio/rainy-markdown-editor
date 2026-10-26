@@ -16,7 +16,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en-US" className="group/theme" data-editor-theme-state="loading" data-ui-locale-state="loading" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: EDITOR_THEME_BOOTSTRAP_SCRIPT }} /><script dangerouslySetInnerHTML={{ __html: UI_LOCALE_BOOTSTRAP_SCRIPT }} /></head>
       <body>
-        <UILocaleProvider><ToastProvider><AppProviders>
+        <UILocaleProvider><ToastProvider initiallyReady={false}><AppProviders>
           <AppShell>{children}</AppShell>
         </AppProviders></ToastProvider></UILocaleProvider>
       </body>

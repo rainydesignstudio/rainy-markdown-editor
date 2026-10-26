@@ -29,11 +29,12 @@ export function hasEditingDraft(drafts: readonly RegisteredDraft[], root: FileSy
   return drafts.some(draft => draft.root === root && draft.area === area && (objectId === undefined || draft.objectId === objectId));
 }
 
-type ArticleContent = { source: string; theme: unknown; themeValid: boolean };
+type ArticleContent = { source: string; theme: unknown; themeValid: boolean; folder?: string | null; folderNameDraft?: string };
 export function articleDraftBaseline(article: ArticleContent) {
   return { ...article, themeSignature: JSON.stringify(article.theme) };
 }
 export function articleDraftChanged(article: ArticleContent, baseline: ReturnType<typeof articleDraftBaseline> | null) {
-  return !baseline || article.source !== baseline.source || article.themeValid !== baseline.themeValid ||
+  return article.folderNameDraft !== undefined && article.folderNameDraft !== article.folder ||
+    !baseline || article.source !== baseline.source || article.themeValid !== baseline.themeValid ||
     article.theme !== baseline.theme && JSON.stringify(article.theme) !== baseline.themeSignature;
 }

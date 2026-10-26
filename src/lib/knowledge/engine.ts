@@ -1,7 +1,9 @@
 import { ProductError } from '../i18n/productMessages';
-import { KNOWLEDGE_LIMITS, validateKnowledgeManifest, knowledgePath, isKnowledgeId, type KnowledgeDocument, type KnowledgeRecord, type KnowledgeManifest, type KnowledgeSearchHit } from './model';
+import { KNOWLEDGE_LIMITS, validateKnowledgeManifest, knowledgePath, isKnowledgeId, type KnowledgeDocument, type KnowledgeRecord, type KnowledgeManifest, type KnowledgeSearchHit, type KnowledgeSearchQuery } from './model';
 import { parseKnowledgeText, knowledgeHash, resolveKnowledgeLinks } from './parse';
 import { buildKnowledgeGraph, type KnowledgeGraphOptions } from './graph';
+
+const compareHits = (a: KnowledgeSearchHit, b: KnowledgeSearchHit) => (b.score ?? 0) - (a.score ?? 0) || Number(b.titleMatch) - Number(a.titleMatch) || (a.path < b.path ? -1 : a.path > b.path ? 1 : a.line - b.line);
 
 export type FlushedKnowledgeShard = { blob: Blob; bytes: number; hash: string; documents: KnowledgeDocument[] };
 // Instantiated inside a worker. Only bounded shard buffers and two read caches are retained.
@@ -27,7 +29,7 @@ export class KnowledgeIndexEngine {
   }
   rank(hits: KnowledgeSearchHit[]): KnowledgeSearchHit[] {
     if (hits.length > KNOWLEDGE_LIMITS.searchResults * 2) throw new ProductError('knowledge.indexTooLarge');
-    return [...hits].sort((a, b) => Number(b.titleMatch) - Number(a.titleMatch) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)).slice(0, KNOWLEDGE_LIMITS.searchResults);
+    return [...hits].sort(compareHits).slice(0, KNOWLEDGE_LIMITS.searchResults);
   }
   async readText(file: Blob): Promise<{ text: string; truncated: boolean }> {
     const limited = file.size > KNOWLEDGE_LIMITS.documentBytes ? file.slice(0, KNOWLEDGE_LIMITS.documentBytes) : file;
@@ -67,7 +69,7 @@ export class KnowledgeIndexEngine {
     if (blob.size > KNOWLEDGE_LIMITS.manifestBytes) throw new ProductError('knowledge.indexTooLarge');
     return { manifest, blob };
   }
-  async search(file: Blob, id: string, hash: string, manifest: KnowledgeManifest, query: string): Promise<{ hits: KnowledgeSearchHit[]; total: number }> {
+  async search(file: Blob, id: string, hash: string, manifest: KnowledgeManifest, query: string | KnowledgeSearchQuery): Promise<{ hits: KnowledgeSearchHit[]; total: number }> {
     const key = manifest.sourceId + ':' + id + ':' + hash;
     let records = this.cache.get(key);
     if (records) { this.cache.delete(key); this.cache.set(key, records); }
@@ -87,25 +89,39 @@ export class KnowledgeIndexEngine {
       }
       this.cache.set(key, records!); while (this.cache.size > 2) this.cache.delete(this.cache.keys().next().value!);
     }
-    const terms = query.trim().slice(0, 200).toLowerCase().split(/\s+/).filter(Boolean), hits: KnowledgeSearchHit[] = [];
-    if (!terms.length) return { hits, total: 0 };
+    const raw = typeof query === 'string' ? { text: query } : query;
+    const fold = (value: unknown) => typeof value === 'string' ? value.trim().slice(0, 200).toLowerCase() : '';
+    const terms = fold(raw.text).split(/\s+/).filter(Boolean), phrase = fold(raw.phrase);
+    const excluded = fold(raw.exclude).split(/\s+/).filter(Boolean), titleFilter = fold(raw.title), pathFilter = fold(raw.path);
+    const positive = phrase ? [...terms, phrase] : terms, hits: KnowledgeSearchHit[] = [];
+    if (!positive.length && !excluded.length && !titleFilter && !pathFilter) return { hits, total: 0 };
     const active = new Map(manifest.documents.filter(doc => doc.status === 'indexed' && doc.shard === id).map(doc => [doc.path, doc]));
     let total = 0;
+    const offer = (hit: KnowledgeSearchHit) => {
+      total++;
+      if (hits.length === KNOWLEDGE_LIMITS.searchResults && compareHits(hit, hits.at(-1)!) >= 0) return;
+      let low = 0, high = hits.length;
+      while (low < high) { const middle = (low + high) >>> 1; if (compareHits(hit, hits[middle]) < 0) high = middle; else low = middle + 1; }
+      hits.splice(low, 0, hit); if (hits.length > KNOWLEDGE_LIMITS.searchResults) hits.pop();
+    };
     for (const record of records!) {
       const meta = active.get(record.meta.path); if (!meta || meta.hash !== record.meta.hash) continue;
       const body = record.text.toLowerCase(), title = meta.title.toLowerCase();
-      if (!terms.every(term => title.includes(term) || body.includes(term))) continue;
-      total++;
-      if (hits.length < KNOWLEDGE_LIMITS.searchResults) {
-        const positions = terms.map(term => body.indexOf(term)).filter(index => index >= 0);
-        const lowerIndex = positions.length ? Math.min(...positions) : 0;
-        let index = lowerIndex;
-        if (body.length !== record.text.length) {
-          let length = 0; index = 0;
-          for (const character of record.text) { const next = length + character.toLowerCase().length; if (next > lowerIndex) break; length = next; index += character.length; }
-        }
-        hits.push({ path: meta.path, title: meta.title, line: record.text.slice(0, index).split(/\r?\n/).length, snippet: record.text.slice(Math.max(0, index - 60), index + 120).replace(/\s+/g, ' '), titleMatch: terms.every(term => title.includes(term)) });
+      if (!title.includes(titleFilter) || !meta.path.toLowerCase().includes(pathFilter)
+        || !positive.every(term => title.includes(term) || body.includes(term))
+        || excluded.some(term => title.includes(term) || body.includes(term))) continue;
+      const titleMatch = positive.length > 0 && positive.every(term => title.includes(term));
+      const lines = record.text.split(/\r?\n/); let emitted = false;
+      for (let line = 0; line < lines.length;) {
+        if (!lines[line].trim()) { line++; continue; }
+        const start = line++; while (line < lines.length && lines[line].trim()) line++;
+        const paragraph = lines.slice(start, line).join('\n'), lower = paragraph.toLowerCase();
+        const count = positive.reduce((n, term) => n + Number(lower.includes(term)), 0);
+        if (!count) continue;
+        const first = Math.min(...positive.map(term => lower.indexOf(term)).filter(index => index >= 0)), offset = Math.max(0, first - 80);
+        offer({ path: meta.path, title: meta.title, line: start + 1, endLine: line, snippet: (offset ? '…' : '') + paragraph.slice(offset, offset + 300), titleMatch, score: (count === positive.length ? 1000 : 0) + count * 10 }); emitted = true;
       }
+      if (!emitted) offer({ path: meta.path, title: meta.title, line: 1, endLine: 1, snippet: record.text.slice(0, 300), titleMatch, score: titleMatch ? 500 : 0 });
     }
     return { hits, total };
   }

@@ -3,6 +3,7 @@ import test from 'node:test';
 
 const { createArticleSource, parseArticle, updateFrontMatter } = await import('../src/lib/frontMatter.ts');
 const {
+  initializeContentLibraries,
   DEFAULT_ARTICLE_SNIPPETS,
   DEFAULT_SNIPPET_CATEGORIES,
   DEFAULT_TEMPLATE_CATEGORIES,
@@ -100,6 +101,7 @@ const notes = { id: 'notes', name: '笔记', description: '测试分类', order:
 
 test('unlisted article formats no longer block a snippet or template save and are reported instead', async () => {
   const root = new MemoryDirectoryHandle('closed-article-format');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   await loadArticleTemplates(root);
   const snippets = await root.getDirectoryHandle('snippets');
@@ -119,6 +121,7 @@ test('unlisted article formats no longer block a snippet or template save and ar
 
 test('snippet and starter template save static Tailwind authoring classes without treating class as exported HTML', async () => {
   const root = new MemoryDirectoryHandle('authoring-classes');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   await loadArticleTemplates(root);
   const content = '<section class="w-full p-4"><img class="block h-auto max-w-full" src="/article-sample.png" /><span>图一▌</span></section>';
@@ -146,6 +149,7 @@ test('snippet and starter template save static Tailwind authoring classes withou
 
 test('side-border Tailwind classes save in snippets and starter templates', async () => {
   const root = new MemoryDirectoryHandle('side-border-authoring');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   await loadArticleTemplates(root);
   const content = '<blockquote class="my-7 border-l-0 border-r-4 border-b-4 border-article-line bg-article-tint px-6 py-5"><p>▌摘记</p></blockquote>';
@@ -161,6 +165,7 @@ test('side-border Tailwind classes save in snippets and starter templates', asyn
 
 test('template categories round-trip, move files without changing Markdown and recover a malformed index', async () => {
   const root = new MemoryDirectoryHandle('template-categories');
+  await initializeContentLibraries(root);
   const initial = await loadArticleTemplates(root);
   assert.deepEqual(initial.categories, DEFAULT_TEMPLATE_CATEGORIES);
   await saveTemplateCategory(root, notes, null);
@@ -184,6 +189,7 @@ test('template categories round-trip, move files without changing Markdown and r
 test('category directory rename updates its index, retains unknown files and moves all content for both libraries', async () => {
   for (const kind of ['snippets', 'templates']) {
     const root = new MemoryDirectoryHandle(`${kind}-category-rename`);
+  await initializeContentLibraries(root);
     const library = kind === 'snippets' ? await loadArticleSnippets(root) : await loadArticleTemplates(root);
     const old = library.categories[0], base = await root.getDirectoryHandle(kind), folder = await base.getDirectoryHandle(old.id);
     await writeText(folder, 'keep.txt', 'User notes\n');
@@ -204,6 +210,7 @@ test('category rename collisions, index write failure and partial old-file remov
   for (const kind of ['snippets', 'templates']) {
     for (const phase of ['collision', 'copy', 'index', 'removal']) {
       const root = new MemoryDirectoryHandle(`${kind}-${phase}`);
+  await initializeContentLibraries(root);
       const library = kind === 'snippets' ? await loadArticleSnippets(root) : await loadArticleTemplates(root);
       const saveCategory = kind === 'snippets' ? saveSnippetCategory : saveTemplateCategory;
       const old = library.categories[0], base = await root.getDirectoryHandle(kind), folder = await base.getDirectoryHandle(old.id);
@@ -235,6 +242,7 @@ test('category rename collisions, index write failure and partial old-file remov
 
 test('explicit creation never overwrites existing snippet or template files', async () => {
   const root = new MemoryDirectoryHandle('create-collision');
+  await initializeContentLibraries(root);
   const snippets = await loadArticleSnippets(root);
   const templates = await loadArticleTemplates(root);
   const original = snippets.snippets[0];
@@ -246,6 +254,7 @@ test('explicit creation never overwrites existing snippet or template files', as
 
 test('renaming snippets and templates writes the complete new file, removes the old and preserves unrelated assets', async () => {
   const root = new MemoryDirectoryHandle('rename-content');
+  await initializeContentLibraries(root);
   const snippets = await loadArticleSnippets(root), templates = await loadArticleTemplates(root);
   const old = snippets.snippets[0], template = templates.templates.find(item => item.id === 'markdown-guide');
   const saved = await saveArticleSnippet(root, { ...old, id: 'renamed-snippet', categoryId: 'zixu', content: '<p>Full body</p>' }, old.id);
@@ -266,6 +275,7 @@ test('renaming snippets and templates writes the complete new file, removes the 
 
 test('rename collisions and unavailable originals never replace any file', async () => {
   const root = new MemoryDirectoryHandle('rename-collision');
+  await initializeContentLibraries(root);
   const snippets = await loadArticleSnippets(root), templates = await loadArticleTemplates(root);
   const old = snippets.snippets[0];
   await assert.rejects(saveArticleSnippet(root, { ...old, id: snippets.snippets[1].id }, old.id), /占用/);
@@ -286,6 +296,7 @@ test('failed rename writes or old-file removal retain the original and clean up 
   for (const kind of ['snippets', 'templates']) {
     for (const phase of ['write', 'remove']) {
       const root = new MemoryDirectoryHandle(`${kind}-rename-${phase}`);
+  await initializeContentLibraries(root);
       const snippets = await loadArticleSnippets(root), templates = await loadArticleTemplates(root);
       const old = kind === 'snippets' ? snippets.snippets[0] : templates.templates[0];
       const base = await root.getDirectoryHandle(kind);
@@ -310,6 +321,7 @@ test('failed rename writes or old-file removal retain the original and clean up 
 test('a failed rollback explicitly reports the extra file while preserving the original bytes', async () => {
   for (const kind of ['snippets', 'templates']) {
     const root = new MemoryDirectoryHandle(`${kind}-rollback-failure`);
+  await initializeContentLibraries(root);
     const snippets = await loadArticleSnippets(root), templates = await loadArticleTemplates(root);
     const old = kind === 'snippets' ? snippets.snippets[0] : templates.templates[0];
     const base = await root.getDirectoryHandle(kind);
@@ -325,12 +337,13 @@ test('a failed rollback explicitly reports the extra file while preserving the o
   }
 });
 
-test('empty libraries seed themed snippets and sample templates in their categories', async () => {
+test('explicit initialization seeds themed snippets and sample templates in their categories', async () => {
   const root = new MemoryDirectoryHandle('isolated-content-library');
+  await initializeContentLibraries(root);
   const snippets = await loadArticleSnippets(root);
   const templates = await loadArticleTemplates(root);
 
-  assert.equal(snippets.snippets.length, 21);
+  assert.equal(snippets.snippets.length, 23);
   assert.deepEqual(snippets.categories, DEFAULT_SNIPPET_CATEGORIES);
   assert.equal(templates.templates.length, 5);
   assert.deepEqual(snippets.snippets.map((item) => item.trigger).sort(), DEFAULT_ARTICLE_SNIPPETS.map((item) => item.trigger).sort());
@@ -355,6 +368,7 @@ test('an existing snippet library keeps its files without receiving new defaults
 
 test('snippet and template changes round-trip without touching unrelated files', async () => {
   const root = new MemoryDirectoryHandle('round-trip-content-library');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   await loadArticleTemplates(root);
 
@@ -395,6 +409,7 @@ test('library readers report malformed siblings and keep their bytes untouched',
 
 test('snippet input rejects unsafe paths, ambiguous triggers, and multiple caret markers', async () => {
   const root = new MemoryDirectoryHandle('validation-content-library');
+  await initializeContentLibraries(root);
   await assert.rejects(saveArticleSnippet(root, { ...sampleSnippet, id: '../outside' }), /ID/);
   await assert.rejects(saveArticleSnippet(root, { ...sampleSnippet, trigger: '//bad trigger' }), /触发词/);
   await assert.rejects(saveArticleSnippet(root, { ...sampleSnippet, content: '▌ one ▌ two' }), /光标占位符/);
@@ -405,6 +420,7 @@ test('snippet input rejects unsafe paths, ambiguous triggers, and multiple caret
 
 test('failed writes do not replace existing snippets or leave new partial files', async () => {
   const root = new MemoryDirectoryHandle('failed-write-content-library');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   const directory = await root.getDirectoryHandle('snippets');
   const existing = await (await directory.getDirectoryHandle('default')).getFileHandle('callout.json');
@@ -450,6 +466,7 @@ test('template instantiation preserves defaults and body while replacing dates a
 
 test('category index names and orders folders while defaults share the default folder and runtime metadata stays out of files', async () => {
   const root = new MemoryDirectoryHandle('categories');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   await saveSnippetCategory(root, notes);
   await saveSnippetCategory(root, { id: 'zixu', name: '紫序', description: '组合', order: 5 });
@@ -503,6 +520,7 @@ test('cross-category duplicates and unsafe categories cannot silently overwrite 
 
 test('category moves keep the original on write or removal failure and remove it only after a complete write', async () => {
   const root = new MemoryDirectoryHandle('safe-category-move');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   await saveSnippetCategory(root, notes);
   const base = await root.getDirectoryHandle('snippets');
@@ -610,6 +628,7 @@ test('snippet insertion removes one cursor marker and returns its insertion-rela
 
 test('category icons round-trip through the index, preserve old entries, and reject arbitrary markup', async () => {
   const root = new MemoryDirectoryHandle('category-icons');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   const directory = await root.getDirectoryHandle('snippets');
   const index = await directory.getFileHandle('index.json');
@@ -629,6 +648,7 @@ test('category icons round-trip through the index, preserve old entries, and rej
 
 test('snippet icons round-trip, old bundled snippets receive their icon, and invalid values are rejected', async () => {
   const root = new MemoryDirectoryHandle('snippet-icons');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   const folder = await (await root.getDirectoryHandle('snippets')).getDirectoryHandle('default');
   const file = await folder.getFileHandle('callout.json');
@@ -649,6 +669,7 @@ test('snippet icons round-trip, old bundled snippets receive their icon, and inv
 
 test('editing snippet information saves the icon with metadata and keeps its body', async () => {
   const root = new MemoryDirectoryHandle('edit-snippet-icon');
+  await initializeContentLibraries(root);
   const original = (await loadArticleSnippets(root)).snippets.find(item => item.id === 'callout');
   const edited = { ...original, id: 'callout-revised', name: '新版提示', trigger: '//callout-revised', description: '新版说明', icon: 'image' };
   await saveArticleSnippet(root, edited, original.id);
@@ -662,6 +683,7 @@ test('editing snippet information saves the icon with metadata and keeps its bod
 
 test('an id matching an Object prototype property does not become a snippet icon', async () => {
   const root = new MemoryDirectoryHandle('snippet-icon-prototype');
+  await initializeContentLibraries(root);
   await loadArticleSnippets(root);
   const saved = await saveArticleSnippet(root, { ...sampleSnippet, id: 'constructor', trigger: '//constructor', categoryId: 'default' }, null);
   assert.equal(saved.icon, undefined);
@@ -670,6 +692,7 @@ test('an id matching an Object prototype property does not become a snippet icon
 
 test('template icons persist in the template, default for old files, and stay out of created articles', async () => {
   const root = new MemoryDirectoryHandle('template-icons');
+  await initializeContentLibraries(root);
   const original = (await loadArticleTemplates(root)).templates.find(item => item.id === 'tutorial');
   const folder = await (await root.getDirectoryHandle('templates')).getDirectoryHandle('default');
   const file = await folder.getFileHandle('tutorial.md');

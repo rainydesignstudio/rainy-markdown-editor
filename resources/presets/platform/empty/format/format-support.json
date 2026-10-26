@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "meta": {
+    "id": "empty",
+    "name": "空校验器（自定义规范起点）",
+    "sources": {}
+  },
+  "rules": [],
+  "manualReview": []
+}

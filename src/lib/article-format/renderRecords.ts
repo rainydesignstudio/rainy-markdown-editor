@@ -1,5 +1,7 @@
 import { ProductError, productJoin, productReference, productText } from "../i18n/productMessages";
 import postcss from 'postcss';
+import { validateRendererPackage, rendererPolicy, PACKAGE_LIMITS, type RendererPackage } from './package';
+import { awaitPackagePreview, assertPackageCss, packageInputFor, packageResourcePath } from './packageRendering';
 import { canonicalFormatJson, compileFormatBundle, DEFAULT_FORMAT_BUNDLE, type FormatFormatter, type RawFormatter } from './config';
 import { getFormatSnapshot, type FormatSnapshot } from './runtime';
 import { contentHash, normalizeLibraryPath, readLibraryFile, loadStylesheetEnvironment, assertPortableStyles, STYLE_LIMITS, type CssAsset } from './styles';
@@ -20,6 +22,7 @@ export type RenderRecord = {
   html: string; css: string;
   assets: RenderAssetReference[];
   algorithmHash?: string;
+  rendererHash?: string;
   configuration?: ResolvedLibraryConfiguration;
 };
 type RenderManifest = {
@@ -28,6 +31,7 @@ type RenderManifest = {
   candidates: string[]; assets: RenderAssetReference[];
   compilerVersion: string;
   algorithms?: AlgorithmPackage;
+  renderer?: RendererPackage;
   configuration?: ResolvedLibraryConfiguration;
 };
 export type PreparedRenderRecord = { record: RenderRecord; assets: readonly CssAsset[]; manifest: RenderManifest };
@@ -56,6 +60,7 @@ export function validateRenderRecord(value: unknown): RenderRecord {
       typeof record.html !== 'string' || typeof record.css !== 'string' || !Array.isArray(record.assets) || record.assets.length > STYLE_LIMITS.assets) throw new ProductError("renderRecords.theRenderRecordProtocolIsInvalid");
   if (record.html.length + record.css.length > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderRecordExceedsTheSizeLimit");
   if (record.algorithmHash !== undefined && !HASH.test(record.algorithmHash)) throw new ProductError('algorithms.invalidPackage');
+  if (record.rendererHash !== undefined && !HASH.test(record.rendererHash)) throw new Error('Invalid render package identity');
   const formatter = checkedFormatter(record.rawFormatter);
   // Pre-mode records retain the source already determined by their validated raw
   // step. Compare its original shape without changing the stored record or hash.
@@ -66,9 +71,9 @@ export function validateRenderRecord(value: unknown): RenderRecord {
   if (canonicalFormatJson(formatter) !== canonicalFormatJson(record.formatter)) throw new ProductError("renderRecords.theRenderConfigurationDoesNotMatchTheValidatedSteps");
   if (record.configuration !== undefined) {
     const configuration = validateResolvedLibraryConfiguration(record.configuration);
-    assertConfigurationCompatible({ configuration, bundle: { formatter, validator: { meta: { enabled: false }, rules: [] } } });
+    assertConfigurationCompatible({ configuration, renderer: record.rendererHash, bundle: { formatter, validator: { meta: { enabled: false }, rules: [] } } });
   }
-  assertPortableStyles(record.css);
+  if (record.rendererHash) assertPackageCss(record.css, { images: ['https:'], styles: ['https:'], fonts: ['https:'] }); else assertPortableStyles(record.css);
   for (const asset of record.assets) {
     if (!HASH.test(asset.hash) || typeof asset.path !== 'string' || !/^(image|font)\//.test(asset.mime) || normalizeLibraryPath(asset.path) !== asset.path) throw new ProductError("renderRecords.theRenderResourceReferenceIsInvalid");
   }
@@ -86,9 +91,12 @@ export async function renderRecordMatches(record: RenderRecord, source: string, 
 }
 export async function prepareRenderRecord(source: string, theme: ThemeConfig, element: HTMLElement, css: string, options: { snapshot?: FormatSnapshot; root?: FileSystemDirectoryHandle; articlePath?: string } = {}): Promise<PreparedRenderRecord> {
   const snapshot = options.snapshot ?? getFormatSnapshot();
+  await awaitPackagePreview(element, parseArticle(source).body, theme, snapshot);
+  if (snapshot.renderer && element.querySelector('[data-asset-state="error"],[data-asset-state="loading"]')) throw new ProductError('renderRecords.localImagesAreNotLoadedNoRenderRecordWasGenerated');
   if (snapshot.bundle.formatter.mermaid && element.querySelector('[data-render-state="pending"][data-render-kind="mermaid"]')) throw new ProductError('mermaid.pending');
   const environment = snapshot.environment;
   const assets: CssAsset[] = [...(environment?.assets ?? [])];
+  if (snapshot.renderer) for (const asset of packageInputFor(element)?.assets ?? []) if (!assets.some(known => known.hash === asset.hash && known.path === asset.path)) assets.push(asset);
   const clone = element.cloneNode(true) as HTMLElement;
   // Storage tokens must be assigned in an inert document, without loading URLs.
   element.ownerDocument?.createElement('template').content?.append(clone);
@@ -99,7 +107,7 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
     for (let index = 0; index < images.length; index++) {
       const image = images[index], live = liveImages[index];
       const src = image.dataset.localAssetSrc!;
-      const path = src.startsWith('/') ? normalizeLibraryPath((snapshot.bundle.formatter.stylesheets?.publicRoot ?? 'assets') + src) : normalizeLibraryPath(src, options.articlePath);
+      const path = snapshot.renderer ? packageResourcePath(src, options.articlePath ?? '', snapshot) : src.startsWith('/') ? normalizeLibraryPath((snapshot.bundle.formatter.stylesheets?.publicRoot ?? 'assets') + src) : normalizeLibraryPath(src, options.articlePath);
       let asset = assets.find(item => item.path === path);
       if (!asset) {
         const blob = await readLibraryFile(options.root, path);
@@ -124,16 +132,19 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
   const rawFormatter = snapshot.rawFormatter ?? DEFAULT_FORMAT_BUNDLE.formatter;
   const formatter = checkedFormatter(rawFormatter);
   const refs = assets.map(({ path, hash, mime }) => ({ path, hash, mime }));
-  const algorithms = await validateAlgorithmPackage(snapshot.algorithms);
+  const algorithms = await validateAlgorithmPackage(snapshot.algorithms, snapshot.configuration);
+  const renderer = snapshot.renderer ? await validateRendererPackage(snapshot.renderer) : undefined;
   const configuration = snapshot.configuration && canonicalFormatJson(snapshot.configuration) !== canonicalFormatJson(DEFAULT_LIBRARY_CONFIGURATION) ? snapshot.configuration : undefined;
   const manifest: RenderManifest = { owner: OWNER, schemaVersion: 1, rawFormatter, rawFiles: { ...(environment?.rawFiles ?? {}) }, policy: environment?.policy ?? null, candidates: [...(environment?.candidates ?? [])], assets: refs, compilerVersion: TAILWIND_COMPILER_VERSION, algorithms, ...(configuration ? { configuration } : {}) };
+  if (renderer) manifest.renderer = renderer;
   const environmentHash = await contentHash(canonicalFormatJson(manifest));
-  return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, algorithmHash: algorithms.fingerprint, html, css: storedCss, assets: refs, ...(configuration ? { configuration } : {}) }, assets, manifest };
+  return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, algorithmHash: algorithms.fingerprint, ...(renderer ? { rendererHash: renderer.fingerprint } : {}), html, css: storedCss, assets: refs, ...(configuration ? { configuration } : {}) }, assets, manifest };
 }
 export async function persistRenderRecord(root: FileSystemDirectoryHandle, target: FileSystemDirectoryHandle, prepared: PreparedRenderRecord) {
   const record = validateRenderRecord(prepared.record);
+  if (prepared.manifest.renderer ? (await validateRendererPackage(prepared.manifest.renderer)).fingerprint !== record.rendererHash : record.rendererHash !== undefined) throw new Error('Render package manifest mismatch');
   if (prepared.manifest.algorithms) {
-    const algorithms = await validateAlgorithmPackage(prepared.manifest.algorithms);
+    const algorithms = await validateAlgorithmPackage(prepared.manifest.algorithms, record.configuration);
     if (record.algorithmHash !== algorithms.fingerprint) throw new ProductError('algorithms.hashMismatch', { path: 'render.json' });
   } else if (record.algorithmHash !== undefined) throw new ProductError('algorithms.invalidPackage');
   const objects = await directory(root, 'assets/.objects', true);
@@ -164,7 +175,7 @@ export async function copyRenderRecord(source: FileSystemDirectoryHandle, destin
 }
 async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecord): Promise<RenderManifest> {
   const file = await readLibraryFile(root, 'styles/.versions/' + record.environmentHash + '/manifest.json');
-  if (file.size > STYLE_LIMITS.cssBytes + ALGORITHM_LIMITS.totalBytes * 2) throw new ProductError("renderRecords.theRenderManifestIsTooLarge");
+  if (file.size > STYLE_LIMITS.cssBytes + ALGORITHM_LIMITS.totalBytes * 2 + PACKAGE_LIMITS.totalBytes * 2) throw new ProductError("renderRecords.theRenderManifestIsTooLarge");
   const text = await file.text();
   if (await contentHash(text) !== record.environmentHash) throw new ProductError("renderRecords.theHistoricalRenderVersionIsMissingOrFailedVerification");
   const manifest = JSON.parse(text) as RenderManifest;
@@ -175,7 +186,10 @@ async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecor
 }
 export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, value: RenderRecord, live = getFormatSnapshot()): Promise<{ snapshot: FormatSnapshot; html: string; css: string; dispose: () => void }> {
   const record = validateRenderRecord(value), manifest = await readManifest(root, record);
-  const algorithms = manifest.algorithms ? await validateAlgorithmPackage(manifest.algorithms) : DEFAULT_ALGORITHMS;
+  const renderer = manifest.renderer ? await validateRendererPackage(manifest.renderer) : undefined;
+  if (renderer) assertPackageCss(record.css, renderer.declaration.permissions);
+  if (renderer?.fingerprint !== record.rendererHash) throw new Error('Historical format package mismatch');
+  const algorithms = manifest.algorithms ? await validateAlgorithmPackage(manifest.algorithms, record.configuration) : DEFAULT_ALGORITHMS;
   if (record.algorithmHash !== undefined && record.algorithmHash !== algorithms.fingerprint || manifest.algorithms && record.algorithmHash === undefined) throw new ProductError('algorithms.hashMismatch', { path: 'render.json' });
   const files = new Map<string, Blob>();
   let bytes = 0;
@@ -202,7 +216,7 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
     },
     async *entries() { /* no host enumeration */ },
   } as unknown as FileSystemDirectoryHandle);
-  const environment = manifest.policy ? await loadStylesheetEnvironment(virtual(), manifest.policy) : undefined;
+  const environment = manifest.policy ? await loadStylesheetEnvironment(virtual(), manifest.policy, renderer?.declaration.protocol === 'rainy-format/2' ? { aliases: record.configuration?.resources?.aliases ?? {}, allowedPaths: [...files.keys()] } : undefined) : undefined;
   const urls: string[] = [];
   const extraAssets: CssAsset[] = [];
   let html = record.html, css = record.css;
@@ -214,7 +228,7 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
     css = css.replaceAll('article-asset:' + asset.hash, url);
   }
   const dispose = () => { environment?.dispose(); urls.forEach(url => URL.revokeObjectURL(url)); };
-  const snapshot: FormatSnapshot = { ...live, configuration: record.configuration ?? DEFAULT_LIBRARY_CONFIGURATION, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter }, algorithms, algorithmSource: manifest.algorithms ? 'library' : 'legacy', officialDefault: live.officialDefault && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint && canonicalFormatJson(record.rawFormatter) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE.formatter),
+  const snapshot: FormatSnapshot = { ...live, renderer, resources: renderer ? extraAssets : undefined, rawBundle: renderer ? rendererPolicy(renderer) : undefined, configuration: record.configuration ?? DEFAULT_LIBRARY_CONFIGURATION, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter }, algorithms, algorithmSource: manifest.algorithms ? 'library' : 'legacy', officialDefault: live.officialDefault && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint && canonicalFormatJson(record.rawFormatter) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE.formatter),
     ...(environment ? { environment: { ...environment, get assets() { return [...environment.assets, ...extraAssets]; }, rawFiles: manifest.rawFiles, candidates: manifest.candidates, fingerprint: record.environmentHash } } : { environment: undefined }) };
   return { snapshot, html, css, dispose };
 }

@@ -32,6 +32,7 @@ async function dialog(file, imports = {}) {
     module, exports: module.exports, require(id) {
 if (id.endsWith('/i18n/productMessages')) return productMessages;
       if (id === 'react') return react;
+      if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs, Fragment };
       if (id.endsWith('/i18n/formatters')) return uiFormatters;
       if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ locale: locale }), useUITranslation: namespace => ({ t: instance.getFixedT(locale, namespace) }) };
@@ -121,7 +122,7 @@ test('registered theme bindings translate by IDs and preserve authored CSS label
 test('delete confirmation renders plural titles without translating manuscript names or paths', async () => {
   const ui = await dialog('articles/ArticleDialogs.tsx', { '/fileSystem': { monthKey: () => '2026-10' } });
   const article = { id: 'user-id', month: '2026-10', folder: '原始目录', parse: { metadata: { title: '我的文稿' } } };
-  const props = { articles: [article], archived: false, onClose() {}, onConfirm() {} };
+  const props = { articles: [article], archived: false, trashEnabled: false, onClose() {}, onConfirm() {} };
   let tree = ui.render('DeleteDialog', props);
   assert.equal(nodes(tree).find(node => node.type === 'header').props.title, 'Permanently delete this manuscript?');
   assert.ok(text(tree).includes('我的文稿')); assert.ok(text(tree).includes('2026-10/原始目录'));
@@ -130,3 +131,12 @@ test('delete confirmation renders plural titles without translating manuscript n
   ui.language('zh-CN'); tree = ui.render('DeleteDialog', props);
   assert.equal(nodes(tree).find(node => node.type === 'header').props.title, '永久删除文稿？');
 });
+
+ test('default article deletion promises reversible trash and invalid settings block confirmation', async () => {
+  const ui = await dialog('articles/ArticleDialogs.tsx', { '/fileSystem': { monthKey: () => '2026-10' } });
+  const article = { id: 'one', month: '2026-10', folder: 'original', parse: { metadata: { title: 'My article' } } };
+  const tree = ui.render('DeleteDialog', { articles: [article], archived: false, disabled: true, onClose() {}, onConfirm() {} });
+  assert.equal(nodes(tree).find(node => node.type === 'header').props.title, 'Move articles to trash');
+  assert.match(text(tree), /can be restored/);
+  assert.ok(nodes(tree).some(node => node.props.disabled === true && text(node) === 'Move to trash'));
+ });

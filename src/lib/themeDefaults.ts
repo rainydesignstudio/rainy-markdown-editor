@@ -2,9 +2,10 @@ import { getBuiltinEditorThemes } from './editorThemes';
 import { getBuiltinArticleThemes } from '../themes/article-themes/index';
 import { getThemeDirectory } from './themeDirectories';
 import { ProductError, productDiagnosticReference, productErrorMessage, productJoin } from './i18n/productMessages';
+import { initializeContentLibraries } from './contentLibraries';
 import { initializeThemePreviewSample } from './themePreviewSample';
 
-import { LIBRARY_SEED_MARKER as MARKER, readLibrarySeedLocale, readLibrarySeedRecord, resolveSeedLocale, type LibrarySeedRecord } from './librarySeeds';
+import { LIBRARY_SEED_MARKER as MARKER, readLibrarySeedLocale, readLibrarySeedRecord, resolveSeedLocale, type LibrarySeedRecord, type ContentSeedProfile } from './librarySeeds';
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
 export type ThemeDefaultResult = { added: number; skipped: number; issues: { file: string; message: string }[] };
 
@@ -44,15 +45,18 @@ async function writeSeedReceipt(themes: FileSystemDirectoryHandle, record: Libra
 
 // Keep the seed choice through a failed initialization. Legacy receipts without
 // `initialized` already mean complete and are never rewritten or reseeded.
-export async function initializeThemeDefaults(root: FileSystemDirectoryHandle, locale: string = 'en-US', options: { previewSample?: boolean } = {}): Promise<void> {
+export async function initializeThemeDefaults(root: FileSystemDirectoryHandle, locale: string = 'en-US', options: { previewSample?: boolean; contentSeed?: ContentSeedProfile } = {}): Promise<void> {
   const themes = await root.getDirectoryHandle('themes', { create: true });
   const record = await readLibrarySeedRecord(root);
   if (record && record.initialized !== false) return;
   const seedLocale = record?.locale ?? resolveSeedLocale(locale);
-  if (!record) await writeSeedReceipt(themes, { version: 1, locale: seedLocale, initialized: false });
+  const contentSeed = record?.contentSeed ?? options.contentSeed;
+  const selection = contentSeed ? { contentSeed } : {};
+  if (!record) await writeSeedReceipt(themes, { version: 1, locale: seedLocale, initialized: false, ...selection });
   const article = await copyDefaultThemes(root, 'article-themes', seedLocale);
   const editor = await copyDefaultThemes(root, 'editor-themes', seedLocale);
   if (article.issues.length || editor.issues.length) throw new ProductError('shared.compose', { parts: productJoin([...article.issues, ...editor.issues].map(issue => productJoin([issue.file, '：', productDiagnosticReference(issue)])), '；') });
   if (options.previewSample) await initializeThemePreviewSample(root, seedLocale);
-  await writeSeedReceipt(themes, { version: 1, locale: seedLocale, initialized: true });
+  if (contentSeed) await initializeContentLibraries(root);
+  await writeSeedReceipt(themes, { version: 1, locale: seedLocale, initialized: true, ...selection });
 }

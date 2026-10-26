@@ -29,6 +29,7 @@ class Directory {
 async function fixture() {
   const root = new Directory(), articles = await root.getDirectoryHandle('articles', { create: true }), month = await articles.getDirectoryHandle('2026-10', { create: true });
   const source = await month.getDirectoryHandle('source', { create: true }), target = await month.getDirectoryHandle('target', { create: true });
+  await target.getFileHandle('article.md', { create: true });
   const images = await (await source.getDirectoryHandle('media', { create: true })).getDirectoryHandle('image', { create: true });
   const handle = await images.getFileHandle('cover.png', { create: true }); handle.bytes = png;
   const markdown = await source.getFileHandle('article.md', { create: true }); markdown.bytes = new TextEncoder().encode('![image](media/image/cover.png)');
@@ -58,6 +59,7 @@ test('description metadata round-trips unknown fields and write failures preserv
 test('unreferenced transfer moves bytes and description; referenced transfer copies and preserves source', async () => {
   for (const referenced of [false,true]) {
     const f = await fixture(); await saveMediaDescription(f.images, 'cover.png', f.asset.description);
+    if (!referenced) f.source.children.get('article.md').bytes = new TextEncoder().encode('No image reference.');
     const result = await transferMedia(f.asset, { kind: 'shared' }, { body: referenced ? 1 : 0, history: 0, issues: [] }, () => true);
     assert.equal(result.ok, true); const target = await (await f.root.getDirectoryHandle('shared')).getDirectoryHandle('image');
     assert.deepEqual((await (await target.getFileHandle('cover.png')).getFile()).size, png.length);
@@ -147,4 +149,19 @@ test('article rename removes an unreferenced original, preserves its description
   context.mutationQueueRef.current.canSave = () => true;
   const result = await controllerAction('renameMediaImage', context)(f.asset, 'renamed');
   assert.equal(result.tone, 'success'); assert.equal(f.images.children.has('cover.png'), false); assert.equal(f.images.children.has('renamed.png'), true); assert.equal((await readMediaMetadata(f.images)).images['renamed.png'].description, 'a picture'); assert.equal(context.articleRef.current.source, source);
+});
+
+test('transfer rechecks cross-article references before removing an apparently unused source', async () => {
+  const f = await fixture(); f.source.children.get('article.md').bytes = new TextEncoder().encode('No own image.');
+  f.target.children.get('article.md').bytes = new TextEncoder().encode('![cross](../source/media/image/cover.png)');
+  const result = await transferMedia(f.asset, { kind: 'shared' }, { body: 0, history: 0, issues: [] }, () => true);
+  assert.equal(result.ok, true); assert.match(result.message, /已复制/); assert.equal(f.images.children.has('cover.png'), true);
+});
+
+test('shared image referenced only by a live unsaved draft is copied and retained', async () => {
+  const f = await fixture(); await transferMedia(f.asset, { kind: 'shared' }, { body: 1, history: 0, issues: [] }, () => true);
+  const directory = await (await f.root.getDirectoryHandle('shared')).getDirectoryHandle('image');
+  const shared = { ...f.asset, kind: 'shared', handle: await directory.getFileHandle('cover.png') };
+  const result = await transferMedia(shared, { kind: 'article', articleId: '2026-10/target', month: '2026-10', folder: 'target' }, { body: 0, history: 0, issues: [] }, () => true, { source: '![live](/shared/image/cover.png)', month: '2026-10', folder: 'source' });
+  assert.equal(result.ok, true); assert.match(result.message, /已复制/); assert.equal(directory.children.has('cover.png'), true);
 });

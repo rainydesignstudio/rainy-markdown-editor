@@ -99,7 +99,7 @@ export function normalizeDataDirectoryName(input: string): string {
 }
 
 export async function createNamedDataDirectory(parent: DirectoryHandle, input: string, presetId: string = DEFAULT_PLATFORM_PRESET_ID, seedLocale: string = 'en-US'): Promise<DirectoryHandle> {
-  getPublicPlatformPreset(presetId);
+  const preset = getPublicPlatformPreset(presetId);
   await ensurePermission(parent);
   const name = normalizeDataDirectoryName(input);
   for await (const [existing] of parent.entries()) {
@@ -114,7 +114,7 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
   try {
     await ensureArticleDirectories(child);
     await initializeLibraryFormat(child, presetId);
-    await initializeThemeDefaults(child, seedLocale, { previewSample: true });
+    await initializeThemeDefaults(child, seedLocale, { previewSample: true, contentSeed: preset.contentSeed });
   } catch (error) {
     let rollbackSafe = true;
     for await (const [entryName, entry] of child.entries()) {
@@ -521,7 +521,7 @@ async function copyDirectoryContents(source: DirectoryHandle, destination: Direc
 
 type MonthIndexResult = { updated: boolean; error?: string };
 
-async function writeMonthIndexEntry(
+export async function writeMonthIndexEntry(
   monthDirectory: DirectoryHandle,
   folder: string,
   entry: Record<string, unknown> | null,

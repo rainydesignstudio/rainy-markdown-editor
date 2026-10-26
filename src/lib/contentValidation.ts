@@ -24,7 +24,8 @@ export async function validateContentSource(kind: 'snippets' | 'templates', sour
   if (errors.length) return { issues: [], errors, errorMessage: productReference('shared.compose', { parts: productJoin(diagnostics.map(productDiagnosticReference), '；') }) };
   const body = parsed ? parsed.body : source.replace('▌', '');
   const issues = options.theme && typeof document !== 'undefined'
-    ? (await inspectArticleFormatReport(replaceArticleBody(createArticleSource('资源格式检查', options.theme.id), body), options.theme, articleFormatPreviewStructure(body))).body.issues
+    // A structural probe has no package render binding; the package validates its source through its measurement services.
+    ? (await inspectArticleFormatReport(replaceArticleBody(createArticleSource('资源格式检查', options.theme.id), body), options.theme, snapshot.renderer ? null : articleFormatPreviewStructure(body))).body.issues
     : await validateArticleAuthoringMarkdown(body, kind === 'snippets' ? '片段正文' : '起稿模板正文');
   const blocking = contentFormatBlockingIssues(issues, { purpose: options.purpose, sampleResources: snapshot.bundle.validator.product.theme.savePolicy?.sampleResources });
   return { issues, errors: blocking.length ? [articleFormatMessage(blocking)] : [], ...(blocking.length ? { errorMessage: articleFormatMessageReference(blocking) } : {}) };

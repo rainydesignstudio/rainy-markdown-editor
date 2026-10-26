@@ -1,4 +1,59 @@
 @layer components {
+  .toast-surface {
+    @apply pointer-events-auto min-w-0 max-w-full rounded-lg border border-line bg-panel shadow-(--editor-dialog-shadow) data-[tone=success]:border-success/30 data-[tone=warning]:border-warning-line data-[tone=error]:border-danger/40;
+
+    @variant data-[animated=true] {
+      /* Geometry rationale: details retain 500ms; the existing motion API is read from a bounded data attribute. */
+      @apply block overflow-clip transition-[width,height,translate,opacity] duration-[500ms,500ms,attr(data-motion-ms_ms,240ms),attr(data-motion-ms_ms,240ms)] ease-[ease-in-out,ease-in-out,cubic-bezier(.2,0,0,1),cubic-bezier(.2,0,0,1)] translate-x-0 translate-y-0 opacity-100 motion-reduce:transition-none;
+      @variant data-[phase=entering] {
+        @apply opacity-0 data-[enter-from=top]:-translate-y-3 data-[enter-from=bottom]:translate-y-3 data-[enter-from=left]:-translate-x-3 data-[enter-from=right]:translate-x-3;
+      }
+      @variant data-[phase=exiting] {
+        @apply opacity-0 data-[enter-from=top]:-translate-y-3 data-[enter-from=bottom]:translate-y-3 data-[enter-from=left]:-translate-x-3 data-[enter-from=right]:translate-x-3;
+      }
+    }
+
+    @variant data-[animated=false] {
+      @apply flex items-center gap-3 px-4 py-3;
+    }
+  }
+
+  .toast-stack {
+    @apply grid w-full min-w-0 justify-items-center gap-3;
+  }
+
+  .toast-slot {
+    @apply flex w-full min-w-0 justify-center;
+  }
+
+  .toast-body {
+    @apply flex w-max min-w-0 items-center gap-3 px-4 py-3;
+  }
+
+  .toast-copy {
+    @apply relative min-w-0 flex-1;
+  }
+
+  .toast-heading {
+    @apply flex min-h-6 items-center text-sm font-medium;
+  }
+
+  .toast-label {
+    @apply relative -top-px min-w-0 wrap-anywhere;
+  }
+
+  .toast-actions {
+    @apply flex shrink-0 items-center gap-1;
+  }
+
+  .toast-details {
+    @apply mt-2 max-h-48 overflow-x-clip overflow-y-auto whitespace-pre-wrap wrap-anywhere text-xs text-secondary opacity-0 transition-opacity duration-500 ease-in-out data-[open=true]:opacity-100 data-[open=false]:pointer-events-none data-[open=false]:absolute data-[open=false]:top-full motion-reduce:transition-none;
+  }
+
+  .toast-countdown {
+    @apply pointer-events-none absolute inset-0 size-6 -rotate-90 text-faint motion-reduce:hidden;
+  }
+
   .information-button {
     @apply flex min-w-0 items-center gap-2.5 rounded-md text-left text-primary;
 
@@ -121,7 +176,7 @@
   }
 
   .mode-switch {
-    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md p-1 text-xs text-muted hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 aria-disabled:opacity-50;
+    @apply inline-flex shrink-0 items-center gap-1.5 rounded-md p-1 text-xs text-muted enabled:hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 aria-disabled:opacity-50;
   }
 
   .mode-switch-track {

@@ -5,26 +5,28 @@ import crypto from 'node:crypto';
 import { build as bundle, version as esbuildVersion } from 'esbuild';
 
 const root = process.cwd();
-// Only this explicitly public preset is bundled. Never enumerate sibling presets.
-const algorithmRoot = path.join(root, 'resources/presets/platform/wechat-article/format/algorithms');
-const algorithmManifest = JSON.parse(fs.readFileSync(path.join(algorithmRoot, 'manifest.json'), 'utf8'));
-const algorithmFiles = {};
-for (const component of algorithmManifest.components) {
-  for (const file of [...component.scripts, component.license]) {
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(file.path) || file.path.split('/').includes('..')) throw new Error('Invalid public algorithm path');
-    const bytes = fs.readFileSync(path.join(algorithmRoot, file.path));
-    if (crypto.createHash('sha256').update(bytes).digest('hex') !== file.sha256) throw new Error('Public algorithm hash mismatch: ' + file.path);
-    algorithmFiles[file.path] = bytes.toString('utf8');
-  }
-}
+// Only explicitly public presets are bundled. Never enumerate sibling presets.
 const canonical = value => JSON.stringify((function normalize(item) {
   return Array.isArray(item) ? item.map(normalize) : item && typeof item === 'object' ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => [key, normalize(val)])) : item;
 })(value));
-const algorithmPackage = { manifest: algorithmManifest, files: algorithmFiles };
-algorithmPackage.fingerprint = crypto.createHash('sha256').update(canonical(algorithmPackage)).digest('hex');
-const algorithmTarget = path.join(root, 'resources/presets/platform/wechat-article/algorithms.generated.json');
-const algorithmData = JSON.stringify(algorithmPackage, null, 2) + '\n';
-if (!fs.existsSync(algorithmTarget) || fs.readFileSync(algorithmTarget, 'utf8') !== algorithmData) fs.writeFileSync(algorithmTarget, algorithmData);
+for (const preset of ['wechat-article', 'empty']) {
+  const algorithmRoot = path.join(root, 'resources/presets/platform', preset, 'format/algorithms');
+  const algorithmManifest = JSON.parse(fs.readFileSync(path.join(algorithmRoot, 'manifest.json'), 'utf8'));
+  const algorithmFiles = {};
+  for (const component of algorithmManifest.components) {
+    for (const file of [...component.scripts, component.license]) {
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(file.path) || file.path.split('/').includes('..')) throw new Error('Invalid public algorithm path');
+      const bytes = fs.readFileSync(path.join(algorithmRoot, file.path));
+      if (crypto.createHash('sha256').update(bytes).digest('hex') !== file.sha256) throw new Error('Public algorithm hash mismatch: ' + file.path);
+      algorithmFiles[file.path] = bytes.toString('utf8');
+    }
+  }
+  const algorithmPackage = { manifest: algorithmManifest, files: algorithmFiles };
+  algorithmPackage.fingerprint = crypto.createHash('sha256').update(canonical(algorithmPackage)).digest('hex');
+  const algorithmTarget = path.join(root, 'resources/presets/platform', preset, 'algorithms.generated.json');
+  const algorithmData = JSON.stringify(algorithmPackage, null, 2) + '\n';
+  if (!fs.existsSync(algorithmTarget) || fs.readFileSync(algorithmTarget, 'utf8') !== algorithmData) fs.writeFileSync(algorithmTarget, algorithmData);
+}
 function compile(file) {
   const source = fs.readFileSync(path.join(root, file), 'utf8');
   return ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext } }).outputText
@@ -84,3 +86,81 @@ collectDiagramLicenses(path.join(root, 'node_modules/mermaid'));
 diagramLicenses.sort((a, b) => a.path.localeCompare(b.path));
 const licenseIndex = path.join(root, 'resources/render/mermaid-licenses.json'), licenseData = JSON.stringify(diagramLicenses, null, 2) + '\n';
 if (!fs.existsSync(licenseIndex) || fs.readFileSync(licenseIndex, 'utf8') !== licenseData) fs.writeFileSync(licenseIndex, licenseData);
+
+// Each initialized library receives this self-contained library-root interpreter.
+// Existing libraries retain their own bytes when the application is upgraded.
+const rendererBuild = await bundle({ entryPoints: ['src/lib/article-format/presetPackage.tsx'], bundle: true, write: false, metafile: true, platform: 'browser', target: 'es2022', format: 'esm', minify: true, legalComments: 'eof', define: { 'process.env.NODE_ENV': '"production"' } });
+const rendererSource = rendererBuild.outputFiles[0].text;
+const rendererNotices = new Map();
+for (const input of Object.keys(rendererBuild.metafile.inputs).filter(name => name.startsWith('node_modules/'))) {
+  let cursor = path.dirname(path.join(root, input));
+  while (cursor.startsWith(path.join(root, 'node_modules'))) {
+    const file = path.join(cursor, 'package.json');
+    if (fs.existsSync(file)) {
+      const metadata = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (metadata.name && metadata.version) {
+        if (!rendererNotices.has(metadata.name)) {
+          const names = fs.readdirSync(cursor).filter(name => /^(?:licen[sc]e|copying)(?:[._-].*)?$/i.test(name) && fs.statSync(path.join(cursor, name)).isFile());
+          let notice = names.map(name => fs.readFileSync(path.join(cursor, name), 'utf8')).join('\n');
+          if (!notice) {
+            // Some MIT monorepo packages publish their declaration in README only.
+            // Preserve that original attribution and package metadata, with the common MIT terms.
+            const readme = fs.readdirSync(cursor).find(name => /^readme(?:\.md)?$/i.test(name));
+            const declaration = readme ? fs.readFileSync(path.join(cursor, readme), 'utf8') : '';
+            if (!(metadata.license === 'MIT' || metadata.licenses?.some(license => license.type === 'MIT')) || !/\bMIT\b/.test(declaration)) throw new Error('Missing format interpreter license: ' + metadata.name);
+            const terms = fs.readFileSync(path.join(root, 'node_modules/react/LICENSE'), 'utf8');
+            notice = JSON.stringify(metadata, null, 2) + '\n\n' + declaration + '\n\nMIT terms:\n' + terms.slice(terms.indexOf('Permission is hereby granted'));
+          }
+          rendererNotices.set(metadata.name, `${metadata.name} ${metadata.version}\n${notice}`);
+        }
+        break;
+      }
+    }
+    cursor = path.dirname(cursor);
+  }
+}
+const rendererLicense = [...rendererNotices.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([, notice]) => notice).join('\n\n---\n\n');
+const legacyEngine = fs.readFileSync(path.join(root, 'public/format/article-format-engine.js'), 'utf8');
+const widthStart = legacyEngine.indexOf('    const p = rule.parameters; const html = root.outerHTML; const screens = [];', legacyEngine.indexOf('async function widthCheck'));
+const widthEnd = legacyEngine.indexOf('    const original = [root,', widthStart);
+if (widthStart < 0 || widthEnd < 0) throw new Error('Review package layout adapter after engine change');
+const packageEngine = legacyEngine.slice(0, widthStart) + `    const p = rule.parameters;
+    const constraints = p.constrainMaxWidth ? '.article-preview *{max-width:100%!important;box-sizing:border-box!important;overflow-wrap:break-word!important}' : '';
+    const measured = await window.ArticleFormatMeasure({html:root.outerHTML,css:'body{margin:0}'+constraints+css,widths:p.widths});
+    const originalNodes = [root,...root.querySelectorAll('*')];
+    if (measured.screens.some(screen=>screen.boxes.length!==originalNodes.length)) throw new Error('Layout node mapping changed');
+    if (measured.screens.some(screen=>screen.images.some(image=>!image.complete))) add(rule,root,'Image geometry unavailable','incomplete');
+    const screens = measured.screens.map(screen=>screen.boxes.map((rect,index)=>{
+      const node=originalNodes[index], parent=rect.parent, left=rect.left-parent.left, right=parent.right-rect.right;
+      return {node,index,width:rect.width,ratio:parent.width?rect.width/parent.width:0,centered:Math.abs(left-right)<=p.overflowTolerance,fills:Math.abs(rect.width-parent.width)<=p.overflowTolerance,overflow:rect.left < -p.overflowTolerance || rect.right > screen.width+p.overflowTolerance,ignored:ignored(node,p.ignoreAttribute),text:text(node)};
+    }));
+` + legacyEngine.slice(widthEnd);
+const rendererPackages = {};
+for (const preset of ['wechat-article', 'empty']) {
+  const files = { 'format/renderer.js': rendererSource, 'format/engine.js': packageEngine };
+  files['format/LICENSES.txt'] = rendererLicense;
+  for (const name of ['format-support.json', 'validator.json', 'formatter.json']) files['format/' + name] = fs.readFileSync(path.join(root, 'resources/presets/platform', preset, 'format', name), 'utf8');
+  const algorithms = JSON.parse(fs.readFileSync(path.join(root, 'resources/presets/platform', preset, 'algorithms.generated.json'), 'utf8'));
+  for (const [name, source] of Object.entries(algorithms.files)) files['format/algorithms/' + name] = source;
+  const algorithmManifest = { schemaVersion: 2, components: algorithms.manifest.components.map(component => ({ ...component,
+    scripts: component.scripts.map(file => ({ ...file, path: 'format/algorithms/' + file.path })),
+    license: { ...component.license, path: 'format/algorithms/' + component.license.path },
+  })) };
+  files['format/algorithms/manifest.json'] = JSON.stringify(algorithmManifest, null, 2) + '\n';
+  const declaration = { protocol: 'rainy-format/2', id: preset, version: '2.0.0', entry: 'format/renderer.js',
+    files: Object.entries(files).map(([path, source]) => ({ path, sha256: crypto.createHash('sha256').update(source).digest('hex') })),
+    actions: [
+      { id: 'render', label: 'Preview', kind: 'render' }, { id: 'validate', label: 'Validate', kind: 'validate' },
+      { id: 'format', label: 'Trim trailing spaces', kind: 'format' }, { id: 'copy', label: 'Rich text', kind: 'copy' },
+      { id: 'markdown', label: 'Markdown', kind: 'export', extension: 'md', mime: 'text/markdown' },
+      { id: 'body', label: 'Markdown body', kind: 'export', extension: 'md', mime: 'text/markdown' },
+      { id: 'html', label: 'HTML + CSS', kind: 'export', extension: 'html', mime: 'text/html' },
+      { id: 'archive', label: 'Source archive', kind: 'export', extension: 'zip', mime: 'application/zip' },
+      { id: 'png', label: 'PNG', kind: 'export', extension: 'png', mime: 'image/png' },
+      { id: 'pdf', label: 'PDF', kind: 'export', extension: 'pdf', mime: 'application/pdf' },
+    ], settings: [], values: {}, permissions: { images: ['https:'] } };
+  rendererPackages[preset] = { declaration, files, fingerprint: crypto.createHash('sha256').update(canonical({ declaration, files })).digest('hex') };
+}
+const rendererTarget = path.join(root, 'resources/presets/platform/renderers.generated.json');
+const rendererData = JSON.stringify(rendererPackages) + '\n';
+if (!fs.existsSync(rendererTarget) || fs.readFileSync(rendererTarget, 'utf8') !== rendererData) fs.writeFileSync(rendererTarget, rendererData);

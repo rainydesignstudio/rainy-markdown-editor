@@ -51,7 +51,7 @@ function ReleaseBlock({ release, open, onToggle }: { release: Release; open: boo
       </span>
     </button>
     <p className="text-sm text-muted">{t(textKey + '.summary')}</p>
-    {collapsible ? <div id={bodyId} ref={bodyRef} className="overflow-hidden transition-[max-height] duration-200 ease-out motion-reduce:transition-none">
+    {collapsible ? <div id={bodyId} ref={bodyRef} className="max-h-0 overflow-hidden data-[disclosure=open]:max-h-none data-[disclosure=moving]:max-h-(--disclosure-height) transition-[max-height] duration-200 ease-out motion-reduce:transition-none">
       <div className="grid gap-2">{release.sections!.map((section, sectionIndex) => <details key={section.title} className="collapsible-panel group/section">
         <summary className="panel-heading list-none [&::-webkit-details-marker]:hidden"><span className="min-w-0 flex-1">{t(textKey + `.sections.${sectionIndex}.title`)}</span><span className="font-mono text-xs font-normal text-faint">{formatUINumber(section.items.length, locale)}</span><svg className="size-4 shrink-0 text-faint group-open/section:rotate-90" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg></summary>
         <ul className="grid list-disc gap-3 px-8 pb-4 text-sm text-secondary">{section.items.map((item, itemIndex) => {

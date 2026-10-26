@@ -42,15 +42,24 @@ function barFixture(extras = {}) {
   render(); return { props, calls, nodes, query, replacement, key, document, render };
 }
 
-test('Cmd/Ctrl+Enter in replacement performs only the current match and returns focus, preserving popup copy', () => {
+test('Enter in replacement performs the current match and returns focus', () => {
+  const f = barFixture();
+  f.key(f.replacement);
+  assert.equal(f.calls.replace, 1); assert.equal(f.calls.all, 0); assert.equal(f.calls.confirm, 0);
+  assert.equal(f.document.activeElement, f.replacement);
+  assert.deepEqual(f.calls.move, []);
+  assert.ok(f.nodes().some(node => node.props.tooltip === '替换当前匹配（Enter）'));
+});
+
+test('Cmd/Ctrl+Enter in replacement requests bulk replacement without confirming or replacing the current match', () => {
   for (const modifier of ['metaKey', 'ctrlKey']) {
     const f = barFixture();
     f.key(f.replacement, { [modifier]: true });
-    assert.equal(f.calls.replace, 1); assert.equal(f.calls.all, 0); assert.equal(f.calls.confirm, 0);
-    assert.equal(f.document.activeElement, f.replacement);
-    assert.ok(f.nodes().some(node => node.props.tooltip === '替换当前匹配'));
-    f.key(f.query, { [modifier]: true }); assert.equal(f.calls.replace, 1);
-    f.props.disabled = true; f.render(); f.key(f.replacement, { [modifier]: true }); assert.equal(f.calls.replace, 1);
+    assert.equal(f.calls.replace, 0); assert.equal(f.calls.all, 1); assert.equal(f.calls.confirm, 0);
+    assert.ok(f.nodes().some(node => node.props.tooltip === '替换全部匹配，一次撤销（⌘Enter / Ctrl+Enter）'));
+    f.key(f.query, { [modifier]: true }); assert.equal(f.calls.all, 1);
+    assert.deepEqual(f.calls.move, []);
+    f.props.disabled = true; f.render(); f.key(f.replacement, { [modifier]: true }); assert.equal(f.calls.all, 1);
   }
 });
 
@@ -58,9 +67,20 @@ test('plain Enter navigates; composing input blocks replacements even when a sta
   const f = barFixture(); f.key(f.query); f.key(f.query, { shiftKey: true });
   assert.deepEqual(f.calls.move, [1, -1]);
   f.nodes().find(node => node.props.role === 'search').props.onCompositionStart(); f.render();
+  f.key(f.replacement);
   f.key(f.replacement, { metaKey: true });
-  assert.equal(f.calls.replace, 0);
-  f.nodes().find(node => node.props.tooltip === '替换当前匹配').props.onClick(); assert.equal(f.calls.replace, 0);
+  assert.equal(f.calls.replace, 0); assert.equal(f.calls.all, 0);
+  f.nodes().find(node => node.props.tooltip === '替换当前匹配（Enter）').props.onClick(); assert.equal(f.calls.replace, 0);
+  f.nodes().find(node => node.props.tooltip === '替换全部匹配，一次撤销（⌘Enter / Ctrl+Enter）').props.onClick(); assert.equal(f.calls.all, 0);
+  f.nodes().find(node => node.props.role === 'search').props.onCompositionEnd(); f.render();
+  for (const guard of [{ nativeEvent: { isComposing: true } }, { keyCode: 229 }, { defaultPrevented: true }, { altKey: true }]) {
+    f.key(f.replacement, guard); f.key(f.replacement, { metaKey: true, ...guard });
+  }
+  for (const props of [{ disabled: true }, { composing: true }, { count: 0 }]) {
+    const guarded = barFixture(props); guarded.key(guarded.replacement); guarded.key(guarded.replacement, { ctrlKey: true });
+    assert.equal(guarded.calls.replace, 0); assert.equal(guarded.calls.all, 0);
+  }
+  assert.equal(f.calls.replace, 0); assert.equal(f.calls.all, 0);
 });
 
 test('bulk confirmation exposes scope, exact query, deletion semantics and count, with cancel/confirm sharing focus return', () => {

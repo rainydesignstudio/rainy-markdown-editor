@@ -1,5 +1,11 @@
 'use client';
 
+import { OperationFeedback } from '../global/OperationFeedback';
+import { productReference } from '../../lib/i18n/productMessages';
+import { ARTICLE_SORTS, sortArticleList, type ArticleSort } from '../../lib/articleListSorting';
+import { ContentIcon } from '../global/ContentIcon';
+import { IconPopover } from '../global/IconPopover';
+import { SelectField } from '../global/SelectField';
 import { useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
 import { hasEditingDraft } from '../../lib/editingDrafts';
 
@@ -102,13 +108,12 @@ export function ArticlesPage({
   const drafts = useEditingDrafts();
   const [query, setQuery] = useState('');
   const [month, setMonth] = useState('all');
+  const [sort, setSort] = useState<ArticleSort>('updated-desc');
+  const [moreTagsOpen, setMoreTagsOpen] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
-  const [managingCategories, setManagingCategories] = useState(false);
-  const [categoryTargets, setCategoryTargets] = useState<string[]>([]);
-  const [categoryDecision, setCategoryDecision] = useState<{ rows: ArticleSummary[]; labels: string[]; scope: string } | null>(null);
   const [indexDecision, setIndexDecision] = useState<string[] | null>(null);
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
   const projectMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -124,15 +129,15 @@ export function ArticlesPage({
   );
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase('zh-CN');
-    return articles.filter((item) => {
+    return sortArticleList(articles.filter((item) => {
       const titleMatches = !needle || item.parse.metadata.title.toLocaleLowerCase('zh-CN').includes(needle);
       const monthMatches = month === 'all' || item.month === month;
       const categoryMatches = selectedCategories.length === 0 || selectedCategories.some((category) => item.parse.metadata.categories.includes(category));
       return titleMatches && monthMatches && categoryMatches;
-    });
-  }, [articles, month, query, selectedCategories]);
+    }), sort, locale);
+  }, [articles, month, query, selectedCategories, sort, locale]);
 
-  useEffect(() => { setSelectedCategories([]); setSelectedIds([]); setSelecting(false); setProjectMenuOpen(false); setManagingCategories(false); }, [collection, directory]);
+  useEffect(() => { setSelectedCategories([]); setSelectedIds([]); setSelecting(false); setProjectMenuOpen(false); setMoreTagsOpen(false); }, [collection, directory]);
 
   useEffect(() => {
     setSelectedIds([]);
@@ -167,14 +172,11 @@ export function ArticlesPage({
   }, [projectMenuOpen]);
 
   const scope = JSON.stringify([collection, query, month, selectedCategories]);
-  const scopeRef = useRef(scope); scopeRef.current = scope;
   const totals = summarizeArticleListChecks(filtered, checks);
   const listBusy = busy || listWork !== null;
-  const affected = filtered.filter(item => item.parse.metadata.categories.some(label => categoryTargets.includes(label)));
-  useEffect(() => { onCancelCheck(true); setCategoryTargets([]); setCategoryDecision(null); return () => onCancelCheck(true); }, [scope, directory, onCancelCheck]);
+  useEffect(() => { onCancelCheck(true); setMoreTagsOpen(false); return () => onCancelCheck(true); }, [scope, directory, onCancelCheck]);
 
   const toggleCategory = (category: string) => {
-    if (managingCategories) { setCategoryTargets(current => current.includes(category) ? current.filter(item => item !== category) : [...current, category]); return; }
     setSelectedCategories((current) => current.includes(category) ? current.filter((item) => item !== category) : [...current, category]);
   };
   const hasActiveFilters = Boolean(query.trim() || month !== 'all' || selectedCategories.length);
@@ -183,7 +185,7 @@ export function ArticlesPage({
   const allFilteredSelected = Boolean(filtered.length) && filtered.every((item) => selectedIds.includes(item.id));
   const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const leaveSelection = () => { setSelecting(false); setSelectedIds([]); setProjectMenuOpen(false); };
-  const toggleSelection = () => { setManagingCategories(false); setCategoryTargets([]); selecting ? leaveSelection() : setSelecting(true); };
+  const toggleSelection = () => { setMoreTagsOpen(false); selecting ? leaveSelection() : setSelecting(true); };
 
   useEffect(() => {
     if (!selectedArticles.length || busy) setProjectMenuOpen(false);
@@ -216,12 +218,12 @@ export function ArticlesPage({
               <strong className="font-mono text-3xl font-medium tracking-tight text-accent-text">{formatUINumber(filtered.length, locale, { minimumIntegerDigits: 2, useGrouping: false })}</strong>
               <span className="text-xs text-muted">{t('articles:documentUnit', { count: filtered.length })}</span>
             </div>
-            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportTasks ? <button className="button button-quiet" type="button" onClick={onImportTasks}>{t('messages:imports.tasksTitle')}</button> : null}{onImportMarkdown ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={onImportMarkdown}>{t('messages:imports.title')}</button> : null}<button className="button button-primary" type="button" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
+            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportTasks ? <button className="button button-quiet" type="button" onClick={onImportTasks}><ContentIcon name="changes" />{t('messages:imports.tasksTitle')}</button> : null}{onImportMarkdown ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={onImportMarkdown}><ContentIcon name="apply" />{t('messages:imports.title')}</button> : null}<button className="button button-primary" type="button" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
           </div>
         </PageHeading>
 
         <section className="min-w-0 rounded-lg border border-line bg-panel" aria-label={t('articles:list.filters')}>
-          <div className="flex flex-col gap-3 border-b border-line p-4 md:flex-row md:items-end md:p-5">
+          <div className="flex flex-col gap-3 border-b border-line p-4 md:flex-row md:items-end">
             <label className="block min-w-0 flex-1">
               <span className="field-label mb-1.5 block">{t('articles:filter.title')}</span>
               <span className="relative block">
@@ -231,32 +233,22 @@ export function ArticlesPage({
             </label>
             <label className="block md:w-44 md:shrink-0">
               <span className="field-label mb-1.5 block">{t('articles:filter.month')}</span>
-              <select className="field" value={month} onChange={(event) => setMonth(event.target.value)}>
-                <option value="all">{t('articles:filter.allMonths')}</option>
-                {months.map((value) => <option key={value} value={value}>{formatUIMonth(value, locale)}</option>)}
-              </select>
+              <SelectField label={t('articles:filter.month')} value={month} onChange={nextValue => setMonth(nextValue)} options={[{ value: "all", label: t('articles:filter.allMonths') }, ...(months.map((value) => ({ value: value, label: formatUIMonth(value, locale) })) ?? [])]} />
             </label>
+            <label className="block md:w-44 md:shrink-0"><span className="field-label mb-1.5 block">{t('articles:filter.sort')}</span><SelectField label={t('articles:filter.sort')} value={sort} onChange={value => setSort(value as ArticleSort)} options={ARTICLE_SORTS.map(value => ({ value, label: t('articles:sort.' + value) }))} /></label>
           </div>
 
-          {indexIssues.length ? <div className="grid gap-2 border-b border-warning-line bg-warning-surface p-4" role="status"><p className="text-xs text-warning-strong">{t('articles:index.warning')}</p>{indexIssues.map(issue => <p key={`${issue.month}-${issue.message}`} className="break-words text-xs text-muted">{issue.month}：{formatDiagnosticMessage(issue, t)}</p>)}<button className="button button-quiet self-start" type="button" disabled={listBusy} onClick={() => setIndexDecision([...new Set(indexIssues.map(item => item.month))])}>{t('articles:index.rebuild')}</button></div> : null}
-          {listNotice.label ? <p className="status-copy border-b border-line px-4 py-3 md:px-5" data-tone={listNotice.tone} role="status">{formatProductMessage(listNotice, t)}</p> : null}
-          <div className="flex min-w-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3 md:px-5">
-            <IconButton tooltip={collection === 'archived' ? t('articles:categories.readOnly') : managingCategories ? t('articles:categories.exit') : t('articles:categories.select')} disabled={collection === 'archived' || listBusy || !categories.length} aria-pressed={managingCategories} onClick={() => { leaveSelection(); setManagingCategories(value => !value); setCategoryTargets([]); }} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1" /><path d="m5 7 2 2 3-4M15 5h6M15 10h6M3 17h8M15 17h6" /></svg>} />
-            <span className="mr-1 text-xs font-medium text-muted">{t('articles:categories.title')}</span>
-            {categories.length ? categories.map((category) => {
-              const pressed = managingCategories ? categoryTargets.includes(category) : selectedCategories.includes(category);
-              return <button key={category} type="button" className="rounded-full border border-line bg-panel px-2.5 py-1 text-xs text-muted transition hover:border-accent-line hover:text-secondary aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:font-medium aria-pressed:text-accent-text focus-visible:outline-2 focus-visible:outline-accent" aria-pressed={pressed} disabled={listBusy} onClick={() => toggleCategory(category)}>{category}</button>;
-            }) : <span className="text-xs text-faint">{t('articles:categories.empty')}</span>}
-            {managingCategories ? <><span className="text-xs text-faint">{t('articles:categories.selected', { count: categoryTargets.length })}</span><button className="button button-danger min-h-8 px-2 py-1 text-xs" type="button" disabled={!affected.length || listBusy} onClick={() => setCategoryDecision({ rows: [...affected], labels: [...categoryTargets], scope })}>{t('articles:categories.remove')}</button><button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={listBusy} onClick={() => { setManagingCategories(false); setCategoryTargets([]); }}>{t('common:actions.cancel')}</button></> : null}
-            {hasActiveFilters ? <button className="ml-auto rounded-md border-0 bg-transparent px-2 py-1 text-xs text-muted underline underline-offset-2 hover:text-secondary focus-visible:outline-2 focus-visible:outline-accent" type="button" onClick={() => { setQuery(''); setMonth('all'); setSelectedCategories([]); }}>{t('articles:filter.clear')}</button> : null}
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-list pl-3 pr-4 py-3 md:pr-5">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-list px-4 py-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <button className="grid size-8 shrink-0 place-items-center rounded-md border border-line bg-panel text-muted transition-colors hover:border-accent-line hover:text-accent-text focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-accent-text" type="button" aria-label={selectionActive ? t('articles:selection.exit') : t('articles:selection.enter')} aria-pressed={selectionActive} data-tooltip={selectionActive ? t('articles:selection.exitShort') : t('articles:selection.label')} onClick={toggleSelection}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="8" height="8" rx="1" /><path d="m5.5 7 1.5 1.5L10 5.5M15 5h6M15 10h6M3 17h8M15 17h6" /></svg></button>
-              <div className="flex items-baseline gap-2">
+              <div className="flex shrink-0 items-baseline gap-2">
                 <h3 className="font-sub-heading text-sm font-semibold text-primary">{t('articles:list.title')}</h3>
                 <span className="text-xs text-faint">{selectionActive ? t('articles:selection.count', { selected: selectedArticles.length, total: filtered.length }) : t('articles:list.count', { shown: filtered.length, total: articles.length })}</span>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center gap-1" role="group" aria-label={t('articles:categories.title')}>
+                {categories.slice(0, 5).map(category => <button key={category} type="button" title={category} className="min-w-0 max-w-32 truncate rounded-full border border-line bg-panel px-2.5 py-1 text-xs text-muted transition hover:border-accent-line hover:text-secondary aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-accent-text focus-visible:outline-2 focus-visible:outline-accent" aria-pressed={selectedCategories.includes(category)} disabled={listBusy} onClick={() => toggleCategory(category)}>{category}</button>)}
+                {categories.length > 5 ? <IconPopover label={t('articles:categories.more')} icon={<ContentIcon name="more" />} kind="dialog" open={moreTagsOpen} disabled={listBusy} onToggle={() => setMoreTagsOpen(value => !value)} onClose={() => setMoreTagsOpen(false)}><div className="grid gap-1">{categories.slice(5).map(category => <button key={category} type="button" className="min-w-0 truncate rounded px-3 py-2 text-left text-xs hover:bg-hover aria-pressed:bg-accent-soft aria-pressed:text-accent-text focus-visible:outline-2 focus-visible:outline-accent" aria-pressed={selectedCategories.includes(category)} title={category} onClick={() => toggleCategory(category)}>{category}</button>)}</div></IconPopover> : null}
+                {hasActiveFilters ? <IconButton variant="inline" tooltip={t('articles:filter.clear')} icon={<ContentIcon name="close" />} onClick={() => { setQuery(''); setMonth('all'); setSelectedCategories([]); }} /> : null}
               </div>
               {selectionActive && filtered.length ? <button className="rounded-md border-0 bg-transparent px-1 text-xs text-muted underline underline-offset-2 transition-colors hover:text-secondary focus-visible:outline-2 focus-visible:outline-accent" type="button" onClick={() => setSelectedIds(allFilteredSelected ? [] : filtered.map((item) => item.id))}>{allFilteredSelected ? t('articles:selection.clear') : t('articles:selection.all')}</button> : null}
             </div>
@@ -274,11 +266,11 @@ export function ArticlesPage({
                 <button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onArchiveMany(selectedArticles, true)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v12h14V8M10 12h4" /></svg>{t('articles:collections.archived')}</button>
               </>}
             </ButtonBar> : null}
-            <div className="ml-auto flex min-w-0 flex-wrap items-center gap-3">
+            <div className="ml-auto flex min-w-0 flex-wrap items-center gap-3"><OperationFeedback id="article-list-operation" notice={listNotice.label ? listNotice : null} tone={listNotice.tone} /><OperationFeedback id="article-index-diagnostics" label={t('common:feedback.indexDiagnostics') + ' (' + indexIssues.length + ')'} notice={indexIssues.length ? productReference('feedback.filesRepair', { count: indexIssues.length }) : null} tone="warning">{indexIssues.length ? <ul className="grid gap-2">{indexIssues.map(issue => <li className="break-words" key={`${issue.month}-${issue.message}`}>{issue.month} · {formatDiagnosticMessage(issue, t)}</li>)}</ul> : null}{indexIssues.length ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={() => setIndexDecision([...new Set(indexIssues.map(item => item.month))])}>{t('articles:index.rebuild')}</button> : null}</OperationFeedback>
               <span className="status-copy" data-tone={totals.error || totals.failed ? 'error' : totals.warning || totals.stale ? 'warning' : 'neutral'} role="status">{filtered.length ? t('articles:checks.summary', totals) + (totals.stale ? t('articles:checks.staleSummary', { count: totals.stale }) : '') + (totals.failed ? t('articles:checks.failedSummary', { count: totals.failed }) : '') : t('articles:checks.empty')}</span>
               {listWork?.kind === 'check' ? <><span className="text-xs text-muted">{t('articles:checks.progress', listWork)}</span><button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" onClick={() => onCancelCheck()}>{t('articles:checks.cancel')}</button></> : <button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={!filtered.length || listBusy} onClick={() => void onCheck([...filtered])}>{t('articles:checks.run')}</button>}
               <IconButton tooltip={t('articles:index.rebuildCurrent')} disabled={listBusy || !indexMonths.length} onClick={() => setIndexDecision(month === 'all' ? [...indexMonths] : [month])} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8l5 5v2M13 3v5h5M7 11h4M7 15h2" /><path d="M21 13v4h-4M21 17a4 4 0 1 1-1.17-2.83" /></svg>} />
-              <button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={listBusy} onClick={onRefresh}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9a7 7 0 0 1 12-2L20 12M4 12l2.5 5a7 7 0 0 0 12-2" /></svg>{t('common:actions.refresh')}</button>
+              <IconButton tooltip={t('common:actions.refresh')} icon={<ContentIcon name="reset" />} disabled={listBusy} onClick={onRefresh} />
             </div>
           </div>
 
@@ -312,9 +304,9 @@ export function ArticlesPage({
                   toggleSelected(item.id);
                 };
                 return (
-                  <article key={item.id} className="group relative flex min-w-0 items-start gap-3 border-b border-line px-4 py-4 last:border-b-0 hover:bg-hover data-[current=true]:bg-accent-soft data-[selected=true]:bg-accent-soft data-[selected=true]:hover:bg-accent-soft data-[selecting=true]:cursor-pointer data-[selection-opacity=muted]:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:items-center md:px-5" data-current={current && !selectionActive} data-selected={selected} data-selecting={selectionActive} data-selection-opacity={selectionActive && !selected ? 'muted' : 'full'} role={selectionActive ? 'checkbox' : undefined} aria-checked={selectionActive ? selected : undefined} aria-label={selectionActive ? t('articles:selection.itemLabel', { title: title }) : undefined} tabIndex={selectionActive ? 0 : undefined} onClick={selectionActive ? () => toggleSelected(item.id) : undefined} onKeyDown={selectionActive ? selectOnKey : undefined}>
+                  <article key={item.id} className="group relative flex min-w-0 items-start gap-2 border-b border-line px-4 py-4 last:border-b-0 hover:bg-hover data-[current=true]:bg-accent-soft data-[selected=true]:bg-accent-soft data-[selected=true]:hover:bg-accent-soft data-[selecting=true]:cursor-pointer data-[selection-opacity=muted]:opacity-75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:items-center" data-current={current && !selectionActive} data-selected={selected} data-selecting={selectionActive} data-selection-opacity={selectionActive && !selected ? 'muted' : 'full'} role={selectionActive ? 'checkbox' : undefined} aria-checked={selectionActive ? selected : undefined} aria-label={selectionActive ? t('articles:selection.itemLabel', { title: title }) : undefined} tabIndex={selectionActive ? 0 : undefined} onClick={selectionActive ? () => toggleSelected(item.id) : undefined} onKeyDown={selectionActive ? selectOnKey : undefined}>
                     {current && !selectionActive ? <span className="absolute inset-y-3 left-0 w-0.75 rounded-full bg-accent" aria-hidden="true" /> : null}
-                    <span className="grid w-6 shrink-0 place-items-start pt-0.5 md:pt-0"><span className="font-mono text-xs text-faint" aria-hidden="true">{formatUINumber(index + 1, locale, { minimumIntegerDigits: 2, useGrouping: false })}</span></span>
+                    <span className="w-8 shrink-0 pt-0.5 text-center font-mono text-xs text-faint md:pt-0" aria-hidden="true">{formatUINumber(index + 1, locale, { minimumIntegerDigits: 2, useGrouping: false })}</span>
                     {selectionActive ? <span className="min-w-0 flex-1 text-left">{content}</span> : <button className="min-w-0 flex-1 border-0 bg-transparent p-0 text-left focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-accent" type="button" onClick={() => onOpen(item)}>{content}</button>}
                     {selectionActive ? <span className="grid size-8 shrink-0 place-items-center rounded-md border border-line-strong bg-panel text-faint data-[checked=true]:border-accent data-[checked=true]:bg-accent data-[checked=true]:text-on-accent" data-checked={selected} aria-hidden="true"><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" />{selected ? <path d="m7 12 3.5 3.5L17 9" /> : null}</svg></span> : <ArticleActionsMenu article={item} archived={collection === 'archived' || organization.archived} disabled={busy} onInfo={onInfo} onArchive={onArchive} onFork={onFork} onDelete={onDelete} />}
                   </article>
@@ -329,7 +321,6 @@ export function ArticlesPage({
             </div>
           )}
         </section>
-        {categoryDecision && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="remove-categories-title" role="alertdialog" onClose={() => setCategoryDecision(null)}><DialogHeader titleId="remove-categories-title" eyebrow={t('articles:categories.eyebrow')} title={t('articles:categories.removeTitle')} onClose={() => setCategoryDecision(null)} /><div className="grid gap-4 p-4"><p className="text-sm text-primary">{t('articles:categories.labels', { labels: categoryDecision.labels.join('、') })}</p><p className="text-sm text-muted">{t('articles:categories.scope', { name: displayCollectionTitle, count: categoryDecision.rows.length })}{query.trim() ? t('articles:categories.query', { query: query.trim() }) : ''}{month !== 'all' ? t('articles:categories.month', { month: formatUIMonth(month, locale) }) : ''}</p><p className="text-xs text-warning-strong">{t('articles:categories.removeHelp')}</p><DialogActions><DialogButton autoFocus onClick={() => setCategoryDecision(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" onClick={() => { const decision = categoryDecision; setCategoryDecision(null); void onRemoveCategories(decision.rows, decision.labels).then(done => { if (done && scopeRef.current === decision.scope) setCategoryTargets([]); }); }}>{t('articles:categories.confirm')}</DialogButton></DialogActions></div></DialogFrame>, document.body) : null}
         {indexDecision && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="rebuild-index-title" onClose={() => setIndexDecision(null)}><DialogHeader titleId="rebuild-index-title" eyebrow={t('articles:index.eyebrow')} title={t('articles:index.rebuild')} onClose={() => setIndexDecision(null)} /><div className="grid gap-4 p-4"><p className="text-sm text-primary">{t('articles:index.targets', { months: indexDecision.map(value => formatUIMonth(value, locale)).join(locale === 'en-US' ? ', ' : '、') })}</p><p className="text-xs text-muted">{t('articles:index.description')}</p><DialogActions><DialogButton autoFocus onClick={() => setIndexDecision(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" onClick={() => { const months = indexDecision; setIndexDecision(null); void onRebuildIndexes(months); }}>{t('articles:index.start')}</DialogButton></DialogActions></div></DialogFrame>, document.body) : null}
     </section>
   );

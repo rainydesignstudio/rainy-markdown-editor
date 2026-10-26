@@ -12,8 +12,8 @@ async function directoryLoadFailure(duringLoad = () => {}) {
   const start = source.indexOf('  const openAuthorizedDirectory = useCallback(');
   const end = source.indexOf('\n\n  const rememberAuthorizedDirectory', start);
   const root = { name: 'startup-test' }, statuses = [], states = [], appearance = [];
-  const context = { ...productMessages, Error,
-    useCallback: callback => callback, view: 'articles',
+  const context = { ...productMessages, Error, manualLibraryLoad: { current: null },
+    useCallback: callback => callback, view: 'articles', resumeIntentRef: { current: { active: false } }, routePathRef: { current: '/articles' }, applyStoredArticle() {}, notifyToast() {},
     directorySelectionRef: { current: 1 }, directoryRef: { current: root },
     articleListAbortRef: { current: null }, historyBaselineRef: { current: null },
     articleRef: { current: {} }, editorWorkspaceRef: { current: {} }, editorWorkspaceSnapshotRef: { current: {} },
@@ -24,7 +24,7 @@ async function directoryLoadFailure(duringLoad = () => {}) {
     setEditorAppearanceLoaded: value => appearance.push(value),
     ensureArticleDirectories: async () => { duringLoad(context); throw new Error('directory denied'); },
   };
-  for (const name of ['setEditorAppearanceVerified', 'setEditorDirectoryId', 'activateEditorThemeDirectory', 'invalidateThemePreviewSample', 'setDirectory', 'setDirectoryName', 'setThemeLibrary', 'setThemeIssues', 'setEditorThemes', 'setEditorThemeIssues', 'setSnippets', 'setSnippetCategories', 'setSnippetIssues', 'setTemplates', 'setTemplateCategories', 'setTemplateIssues', 'setArticleChecks', 'setArticleIndexIssues', 'setArticleIndexMonths', 'setArticleListNotice', 'setStoredArticles', 'setArticleSettings', 'setEditorWorkspace', 'setEditorWorkspaceIssue', 'setEditorWorkspaceBusy', 'setSettingsIssue', 'setSettingsBusy', 'setSettingsNotice', 'openDocument', 'advanceContentLibraryRootSession', 'navigateArticleMode', 'refreshArticles', 'setPreferredArticleMode']) context[name] = () => {};
+  for (const name of ['setLibraryLoadIssue', 'setEditorAppearanceVerified', 'setEditorDirectoryId', 'activateEditorThemeDirectory', 'invalidateThemePreviewSample', 'setDirectory', 'setDirectoryName', 'setThemeLibrary', 'setThemeIssues', 'setEditorThemes', 'setEditorThemeIssues', 'setSnippets', 'setSnippetCategories', 'setSnippetIssues', 'setTemplates', 'setTemplateCategories', 'setTemplateIssues', 'setArticleChecks', 'setArticleIndexIssues', 'setArticleIndexMonths', 'setArticleListNotice', 'setStoredArticles', 'setArticleSettings', 'setEditorWorkspace', 'setEditorWorkspaceIssue', 'setEditorWorkspaceBusy', 'setSettingsIssue', 'setSettingsBusy', 'setSettingsNotice', 'openDocument', 'advanceContentLibraryRootSession', 'navigateArticleMode', 'refreshArticles', 'setPreferredArticleMode']) context[name] = () => {};
   vm.runInNewContext(ts.transpileModule(source.slice(start, end) + '\nglobalThis.open = openAuthorizedDirectory;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
   await context.open(root, 1);
   return { context, root, statuses, states, appearance };
@@ -60,31 +60,41 @@ test('a later error does not replace an already settled format diagnostic', asyn
   assert.equal(getFormatSnapshot().error, 'existing format diagnostic');
 });
 
+async function startupPanel() {
+  const file=await readFile(new URL('../src/components/global/AppProviders.tsx',import.meta.url),'utf8');
+  const source=file.slice(file.indexOf('function StartupLoading('),file.indexOf('export function useEditorControllerContext'))+'\nglobalThis.component = StartupLoading;';
+  let cursor=0,previous,cleanup,timerId=0,localeReady=false,retries=0,choices=0;
+  const cells=[],effects=[],timers=new Map(),readiness=[];
+  const context={...productMessages,exports:{},require:()=>({jsx,jsxs}),useUITranslation:()=>({t:key=>key}),useUILocale:()=>({ready:localeReady}),
+    useState(initial){const i=cursor++;if(!(i in cells))cells[i]=initial;return[cells[i],value=>{cells[i]=value;}];},
+    useEffect(effect,deps){if(!previous||deps.some((v,i)=>v!==previous[i]))effects.push(()=>{cleanup?.();previous=deps;cleanup=effect();});},
+    window:{setTimeout(fn,ms){assert.equal(ms,300);timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);}}};
+  vm.runInNewContext(ts.transpileModule(source,{fileName:'loading.tsx',compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,context);
+  const onReady=value=>readiness.push(value),onRetry=()=>retries++,onChoose=()=>choices++;
+  const render=(loading,issue=null)=>{cursor=0;const node=context.component({loading,issue,onReady,onRetry,onChoose});while(effects.length)effects.shift()();return node;};
+  const walk=node=>Array.isArray(node)?node.flatMap(walk):node?.props?[node,...walk(node.props.children)]:[];
+  return{render,walk,timers,readiness,setLocaleReady:()=>localeReady=true,get retries(){return retries;},get choices(){return choices;}};
+}
+
 test('loading remains full-screen until ready, fades for 300ms, and a new load cancels removal', async () => {
-  const file = await readFile(new URL('../src/components/global/AppProviders.tsx', import.meta.url), 'utf8');
-  const source = file.slice(file.indexOf('function StartupLoading('), file.indexOf('export function useEditorControllerContext')) + '\nglobalThis.component = StartupLoading;';
-  let cursor = 0, previous, cleanup; const cells = [], effects = [], timers = new Map(); let timerId = 0, localeReady = false;
-  const context = { require: () => ({ jsx, jsxs }), exports: {},
-    useUITranslation: () => ({ t: key => key }),
-    useUILocale: () => ({ ready: localeReady }),
-    useState(initial) { const i = cursor++; if (!(i in cells)) cells[i] = initial; return [cells[i], value => { cells[i] = value; }]; },
-    useEffect(effect, dependencies) { if (!previous || previous[0] !== dependencies[0]) { effects.push(() => { cleanup?.(); previous = dependencies; cleanup = effect(); }); } },
-    window: { setTimeout(fn, duration) { assert.equal(duration, 300); timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } },
-  };
-  vm.runInNewContext(ts.transpileModule(source, { fileName: 'loading.tsx', compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, context);
-  const render = loading => { cursor = 0; const node = context.component({ loading }); while (effects.length) effects.shift()(); return node; };
-  assert.equal(render(true).props['data-fading'], false);
-  assert.equal(render(true).props['aria-label'], undefined, 'wrong-language loading text is not exposed before locale readiness');
-  assert.equal(render(true).props.children.props.children[1].props.hidden, true);
-  localeReady = true;
-  assert.equal(render(true).props.children.props.children[1].props.hidden, false);
-  assert.equal(timers.size, 0);
-  render(false);
-  assert.equal(render(false).props['data-fading'], true);
-  assert.equal(timers.size, 1);
-  render(true);
-  assert.equal(timers.size, 0, 'new loading cancels the previous fade removal');
-  assert.equal(render(true).props['data-fading'], false);
-  render(false); [...timers.values()][0]();
-  assert.equal(render(false), null);
+  const f=await startupPanel();
+  assert.equal(f.render(true).props['data-fading'],false);
+  assert.equal(f.render(true).props['aria-label'],undefined);
+  assert.equal(f.walk(f.render(true)).find(n=>n.type==='p').props.hidden,true);
+  f.setLocaleReady();assert.equal(f.walk(f.render(true)).find(n=>n.type==='p').props.hidden,false);
+  assert.equal(f.timers.size,0);
+  f.render(false);assert.equal(f.render(false).props['data-fading'],true);assert.equal(f.timers.size,1);
+  f.render(true);assert.equal(f.timers.size,0);assert.equal(f.render(true).props['data-fading'],false);
+  f.render(false);[...f.timers.values()][0]();assert.equal(f.render(false),null);assert.equal(f.readiness.at(-1),true);
+});
+
+test('a failed startup stays at the loading location with recovery actions and an explicit non-blocking continue', async () => {
+  const f=await startupPanel();f.setLocaleReady();f.render(true);
+  let tree=f.render(false,{label:'directory denied'});tree=f.render(false,{label:'directory denied'});
+  assert.equal(f.timers.size,0);assert.equal(f.readiness.at(-1),false);
+  assert.ok(f.walk(tree).some(n=>n.type==='p'&&n.props.children==='directory denied'));
+  const button=key=>f.walk(tree).find(n=>n.type==='button'&&n.props.children===key);
+  button('loading.retry').props.onClick();button('loading.choose').props.onClick();assert.equal(f.retries,1);assert.equal(f.choices,1);
+  button('loading.continue').props.onClick();f.render(false,{label:'directory denied'});assert.equal(f.timers.size,1);
+  [...f.timers.values()][0]();assert.equal(f.render(false,{label:'directory denied'}),null);assert.equal(f.readiness.at(-1),true);
 });

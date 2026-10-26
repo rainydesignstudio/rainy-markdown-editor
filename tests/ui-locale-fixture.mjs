@@ -1,3 +1,5 @@
+import * as articleListSorting from '../src/lib/articleListSorting.ts';
+import * as feedback from '../src/lib/i18n/feedback.ts';
 import * as uiFormatters from '../src/lib/i18n/formatters.ts';
 import { createUII18n } from '../src/lib/i18n/runtime.ts';
 import { articleCollectionLabel } from '../src/lib/i18n/articleLabels.ts';
@@ -13,6 +15,15 @@ import * as libraryConfiguration from '../src/lib/article-format/libraryConfigur
 const instance = createUII18n('zh-CN');
 export function withUILocaleImports(resolve) {
   return id => {
+    if (id.endsWith('/PreviewCssDetails')) return { PreviewCssDetails: 'preview-css-details' };
+    if (id.endsWith('/OperationFeedback')) return { OperationFeedback: 'operation-feedback' };
+    if (id.endsWith('/articleListSorting')) return articleListSorting;
+    if (id.endsWith('/i18n/feedback')) return feedback;
+    if (id.endsWith('/useMediaReferences')) return { useMediaReferences: () => ({ states: undefined, pending: false, issue: null }) };
+    if (id.endsWith('/MediaArticleNavigation')) return { MediaArticleNavigation: 'article-navigation' };
+    if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
+    if (id.endsWith('/LibraryCard')) return { LibraryCard: 'button', LibraryCardFrame: 'article', LibraryCardGrid: 'div' };
+    if (id.endsWith('/ContentIcon')) return { ContentIcon: 'svg' };
     if (id.endsWith('/UILocaleProvider')) return {
       useUITranslation: (namespace = 'common') => ({ t: instance.getFixedT('zh-CN', namespace) }),
       useUILocale: () => ({ locale: 'zh-CN', ready: true }),

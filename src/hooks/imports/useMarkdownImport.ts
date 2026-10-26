@@ -86,7 +86,7 @@ export function useMarkdownImport(bridge: Bridge) {
       if (mode !== 'knowledge') return;
       busyRef.current = true; setBusy(true);
       try {
-        const restored = await restoreKnowledgeSource(scope.root, undefined, () => alive(scope));
+        const restored = await restoreKnowledgeSource(scope.root, undefined, () => alive(scope), sourceId);
         if (restored.status !== 'ready' || !restored.source || restored.binding?.sourceId !== sourceId || !path) throw new ProductError('imports.sourceRequired');
         const source = await knowledgeImportSource(restored.source, path);
         if (requestRef.current === next && alive(scope)) replace({ ...next, source });
@@ -147,7 +147,7 @@ export function useMarkdownImport(bridge: Bridge) {
     const local = await restoreLocalImportSource(job.task.id, job.root, job.task.source, () => alive(job), true);
     if (local) return local;
     if (job.task.source.kind === 'knowledge') {
-      const restored = await restoreKnowledgeSource(job.root, undefined, () => alive(job));
+      const restored = await restoreKnowledgeSource(job.root, undefined, () => alive(job), job.task.source.sourceId);
       if (restored.binding?.sourceId !== job.task.source.sourceId) throw new ProductError('imports.sourceRequired');
       if (restored.status === 'needs-permission' && restored.source) await restored.source.requestReadPermission();
       if (restored.source) { const source = await knowledgeImportSource(restored.source, job.task.source.path); if (source.origin.hash !== job.task.source.hash) throw new ProductError('imports.sourceChanged'); return source; }

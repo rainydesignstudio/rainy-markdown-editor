@@ -26,6 +26,9 @@ import { cachedArticleImage, readArticleImage, type CachedArticleImage } from '.
 import { resourceReferenceIntent } from '../resources/references';
 import { LocalFileLink } from './LocalFileLink';
 import { MermaidDiagram } from './MermaidDiagram';
+import { PackagePreview } from './PackagePreview';
+import { BASIC_THEME } from '../themes';
+import type { ThemeConfig } from '../types';
 
 export type ArticleMediaContext = {
   root: FileSystemDirectoryHandle | null;
@@ -219,9 +222,9 @@ function LocalArticleSourceSet(props: LocalSourceSetProps) {
   );
 }
 
-type MarkdownPreviewProps = { source: string; media?: ArticleMediaContext | null; snapshot?: FormatSnapshot; previewOnly?: boolean };
+type MarkdownPreviewProps = { source: string; media?: ArticleMediaContext | null; snapshot?: FormatSnapshot; previewOnly?: boolean; theme?: ThemeConfig };
 export function sameMarkdownPreviewInput(previous: MarkdownPreviewProps, next: MarkdownPreviewProps) {
-  return previous.source === next.source && previous.snapshot === next.snapshot && previous.previewOnly === next.previewOnly && previous.media?.root === next.media?.root && previous.media?.article?.id === next.media?.article?.id && previous.media?.articleTitle === next.media?.articleTitle && previous.media?.sessionKey === next.media?.sessionKey && previous.media?.onOpen === next.media?.onOpen && previous.media?.onResourceError === next.media?.onResourceError;
+  return previous.theme === next.theme && previous.source === next.source && previous.snapshot === next.snapshot && previous.previewOnly === next.previewOnly && previous.media?.root === next.media?.root && previous.media?.article?.id === next.media?.article?.id && previous.media?.articleTitle === next.media?.articleTitle && previous.media?.sessionKey === next.media?.sessionKey && previous.media?.onOpen === next.media?.onOpen && previous.media?.onResourceError === next.media?.onResourceError;
 }
 function MarkdownPreviewContent({
   source,
@@ -375,4 +378,8 @@ function ReactiveLibraryImage({ media, ...props }: Omit<ComponentProps<typeof Li
   if (state?.state && state.state !== 'complete') return <span role="img" aria-busy={state.state === 'pending' || state.state === 'running'} data-local-asset-src={props.source} data-asset-state={state.state === 'failed' || state.state === 'cancelled' ? 'error' : 'loading'}>{t(state.state === 'failed' || state.state === 'cancelled' ? 'messages:resources.importFailed' : 'messages:resources.importPending', { name: props.source, cause: '' })}</span>;
   return <LibraryArticleImage {...props} root={media?.root ?? null} refreshKey={`${media?.sessionKey}:${version}`} />;
 }
-export const MarkdownPreview = memo(MarkdownPreviewContent, sameMarkdownPreviewInput);
+function PreviewRouter(props: MarkdownPreviewProps) {
+  const active = useFormatSnapshot(), snapshot = props.snapshot ?? active;
+  return snapshot.renderer ? <PackagePreview {...props} snapshot={snapshot} theme={props.theme ?? BASIC_THEME} /> : <MarkdownPreviewContent {...props} />;
+}
+export const MarkdownPreview = memo(PreviewRouter, sameMarkdownPreviewInput);

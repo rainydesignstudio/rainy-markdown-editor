@@ -29,6 +29,8 @@ export function EditorPage() {
 
   return (
     <EditorWorkspace
+      librarySessionKey={controller.contentLibraryRootSession}
+      isLibraryCurrent={() => controller.directoryRef.current === controller.directory && controller.contentLibraryRootSessionRef.current === controller.contentLibraryRootSession}
       article={controller.article}
       themeUpdateAvailable={Boolean(availableArticleThemeUpdate(controller.article.theme, controller.themeLibrary))}
       parsed={controller.parsed}

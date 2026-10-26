@@ -33,7 +33,7 @@ export const ArticlePreviewCanvas = memo(function ArticlePreviewCanvas({
     <div ref={lightHostRef} className="min-h-full min-w-0" style={previewSurfaceStyle(false, snapshot)} />
     {target ? createPortal(<>{!native ? <style data-article-style="true">{articlePreviewStyle(compiledCss, snapshot)}</style> : null}
       <ArticleDocument snapshot={snapshot} themeId={article.theme.id} attach={attach} media={media}>
-        {parsed.canCopy && article.themeValid ? <MarkdownPreview source={parsed.body} media={media} snapshot={snapshot} /> : <div className="empty-state"><strong>{t('preview.blocked')}</strong><p>{t('preview.repair')}</p></div>}
+        {parsed.canCopy && article.themeValid ? <MarkdownPreview source={parsed.body} theme={article.theme} media={media} snapshot={snapshot} /> : <div className="empty-state"><strong>{t('preview.blocked')}</strong><p>{t('preview.repair')}</p></div>}
       </ArticleDocument></>, target) : null}
   </div>{openedImage && (!media || media.isCurrent()) ? createPortal(<MediaPreviewDialog rendered={openedImage} sessionKey={snapshot.id} isCurrent={() => !media || media.isCurrent()} onClose={() => { setOpenedImage(null); requestAnimationFrame(openedImage.focus); }} />, document.body) : null}</>;
 });

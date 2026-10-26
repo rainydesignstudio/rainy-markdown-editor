@@ -1,5 +1,6 @@
 'use client';
 
+import { SelectField } from '../global/SelectField';
 import { formatProductMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
@@ -37,7 +38,7 @@ export function ContentMetadataEditor({ snippet, metadata, inputs, fileId, fileE
       {fileField}
       <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.name')}</span><input name="snippet-name" className="field" value={snippet.name} maxLength={80} onChange={event => onSnippetChange({ name: event.target.value })} disabled={disabled} required /></label>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.category')}</span><select name="snippet-category" className="field" value={categoryId ?? ''} onChange={event => onCategoryChange(event.target.value || undefined)} disabled={disabled}><option value="" disabled={Boolean(categoryId)}>{t('dialogs:ui.chooseACategory')}</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+        <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.category')}</span><SelectField label={t('dialogs:ui.category')} name="snippet-category" value={categoryId ?? ''} onChange={nextValue => onCategoryChange(nextValue || undefined)} disabled={disabled} options={[{ value: "", label: t('dialogs:ui.chooseACategory'), disabled: Boolean(categoryId) }, ...(categories.map(category => ({ value: category.id, label: category.name })) ?? [])]} /></label>
         <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.trigger')}</span><input name="snippet-trigger" className="field font-mono text-xs" value={snippet.trigger} placeholder="//my-snippet" onChange={event => onSnippetChange({ trigger: event.target.value })} spellCheck={false} disabled={disabled} required /></label>
       </div>
     </div>
@@ -57,7 +58,7 @@ export function ContentMetadataEditor({ snippet, metadata, inputs, fileId, fileE
       {fileField}
       <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.headings')}</span><input name="template-title" className="field" value={inputs?.title ?? metadata.title} onChange={event => onMetadataChange('title', event.target.value)} disabled={disabled || invalid} /></label>
       <div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.templateCategory')}</span><select name="template-category" className="field" value={categoryId ?? ''} onChange={event => onCategoryChange(event.target.value || undefined)} disabled={disabled}><option value="" disabled={Boolean(categoryId)}>{t('dialogs:ui.chooseACategory')}</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+        <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.templateCategory')}</span><SelectField label={t('dialogs:ui.templateCategory')} name="template-category" value={categoryId ?? ''} onChange={nextValue => onCategoryChange(nextValue || undefined)} disabled={disabled} options={[{ value: "", label: t('dialogs:ui.chooseACategory'), disabled: Boolean(categoryId) }, ...(categories.map(category => ({ value: category.id, label: category.name })) ?? [])]} /></label>
         <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.author')}</span><input name="template-author" className="field" value={inputs?.author ?? metadata.author} onChange={event => onMetadataChange('author', event.target.value)} disabled={disabled || invalid} /></label>
       </div>
       <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.articleCategories')}</span><input name="template-categories" className="field" value={inputs?.categories ?? metadata.categories.join(', ')} placeholder={t('dialogs:ui.separateCategoriesWithCommasAlternative')} onChange={event => onMetadataChange('categories', event.target.value)} disabled={disabled || invalid} /></label>

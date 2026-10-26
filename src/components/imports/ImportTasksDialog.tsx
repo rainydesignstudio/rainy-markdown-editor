@@ -1,4 +1,5 @@
 'use client';
+import { SelectField } from '../global/SelectField';
 import { useEffect, useState } from 'react';
 import { useUITranslation, useUILocale } from '../global/UILocaleProvider';
 import { formatUINumber } from '../../lib/i18n/formatters';
@@ -31,7 +32,7 @@ export function ImportTasksDialog({ tasks, selectedId, busy, issues, onSelect, o
       <p id="import-tasks-description" className="text-sm text-muted">{t('imports.tasksHelp')}</p>
       {issues.map((issue, index) => <p key={index} role="alert" className="status-copy" data-tone="warning">{formatProductMessage(issue, t)}</p>)}
       {selected ? <>
-        <label className="field-stack" htmlFor="import-task-select"><span className="field-label">{t('imports.taskLabel')}</span><select id="import-task-select" className="field" value={selected.id} disabled={busy} onChange={event => onSelect(event.target.value)}>{tasks.map(task => <option key={task.id} value={task.id}>{task.target.folder} · {t('imports.states.' + task.state)}</option>)}</select></label>
+        <label className="field-stack" htmlFor="import-task-select"><span className="field-label">{t('imports.taskLabel')}</span><SelectField label={t('imports.taskLabel')} id="import-task-select" value={selected.id} disabled={busy} onChange={nextValue => onSelect(nextValue)} options={[...(tasks.map(task => ({ value: task.id, label: [task.target.folder, " · ", t('imports.states.' + task.state)].join('') })) ?? [])]} /></label>
         <div className="grid min-w-0 gap-2 rounded-lg border border-line bg-list/50 p-4"><p className="break-all text-sm text-primary">{selected.target.articleId}</p><p className="break-all text-xs text-muted">{selected.source.name} · {t('imports.states.' + selected.state)}</p><p className="text-xs text-secondary">{t('imports.progressCount', { count: resources.filter(resource => resource.state === 'complete').length, total: resources.length })}</p></div>
         <ButtonBar label={t('imports.tasksTitle')}>
           <DialogButton disabled={busy || running || selected.state === 'complete'} onClick={() => onRetry(selected.id)}>{t('imports.retry')}</DialogButton>

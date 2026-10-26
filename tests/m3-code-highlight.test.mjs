@@ -10,6 +10,12 @@ import { rehypeAlignSanitizedFragmentLinks } from '../src/lib/articleTableOfCont
 import { rehypeArticleCodeHighlight, rehypeArticleCodeWhitespace } from '../src/lib/articleCodeHighlight.ts';
 import { clipboardPlainText, rehypeSafeStyles, SAFE_REHYPE_SCHEMA } from '../src/lib/render.ts';
 import { BASIC_THEME, RAINY_THEME, themePreviewCss, themeToCss } from '../src/lib/themes.ts';
+import { getDefaultContentLibrary } from '../src/lib/contentLibraries.ts';
+import { prepareSnippetInsertion } from '../src/lib/snippetComposer.ts';
+import { getBuiltinArticleThemes } from '../src/themes/article-themes/index.ts';
+import { articleMarkdownPlugins, articleHtmlPlugins } from '../src/lib/article-format/pipeline.ts';
+import { validateArticleAuthoringMarkdown } from '../src/lib/articleAuthoringFormat.ts';
+import { articleFormatBlocks } from '../src/lib/articleFormat.ts';
 
 function findElements(node, predicate, matches = []) {
   if (predicate(node)) matches.push(node);
@@ -92,4 +98,53 @@ test('Basic and Rainy expose scoped code-token CSS for article, history, and the
     assert.match(scoped, /color-mix\(in oklch/);
   }
   assert.notEqual(BASIC_THEME.tokens['color-article-link'], RAINY_THEME.tokens['color-article-link']);
+});
+
+test('mac-style snippets keep SVG decoration outside editable HTML code and preserve clipboard whitespace', async () => {
+  for (const locale of ['zh-CN', 'en-US']) {
+    for (const id of ['mac-style-code-block', 'mac-style-code-block-nowrap']) {
+      const defaults = getDefaultContentLibrary(locale);
+      const snippet = defaults.snippets.find(item => item.id === id);
+      if (id === 'mac-style-code-block') assert.equal(snippet.name, locale === 'zh-CN' ? 'MacOS 主题代码块' : 'macOS-style code block');
+      assert.equal(snippet.trigger, '//' + id);
+      assert.equal(snippet.categoryId, 'default');
+      assert.doesNotMatch(snippet.content, /class="[^"]*mac-style-code-block/);
+      const insertion = prepareSnippetInsertion(snippet.content);
+      assert.equal(insertion.text.includes('▌'), false);
+      assert.ok(insertion.text.slice(insertion.caretOffset).startsWith('function'));
+      const original = 'const fragment = "<script>still text</script>";  \n\tconsole.log(fragment);\n';
+      const encoded = original.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const source = insertion.text.replace(/(<code\b[^>]*>)[\s\S]*?<\/code>/, (_, opening) => {
+        const tagged = opening.includes('class="') ? opening.replace('class="', 'class="language-typescript ') : opening.replace('<code', '<code class="language-typescript"');
+        return tagged + encoded + '</code>';
+      }) + '\n\n' + fence('', 'ordinary code\n');
+      const processor = unified().use(remarkParse).use(articleMarkdownPlugins())
+        .use(remarkRehype, { allowDangerousHtml: true }).use(articleHtmlPlugins());
+      const tree = await processor.run(processor.parse(source), { value: source });
+      const window = tree.children.find(node => node.tagName === 'section');
+      assert.ok(window);
+      assert.equal(findElements(window, node => node.tagName === 'svg').length, 1);
+      assert.equal(findElements(window, node => node.tagName === 'circle').length, 3);
+      const pre = window.children.find(node => node.tagName === 'pre');
+      const code = pre.children.find(node => node.tagName === 'code');
+      assert.equal(findElements(pre, node => node.tagName === 'svg').length, 0);
+      assert.equal(authoredCodeText(code), original);
+      assert.equal(clipboardPlainText(asDom(code, { tagName: 'PRE' })), original);
+      assert.ok(findElements(code, node => node.properties?.className?.includes('hljs-keyword')).length);
+      assert.equal(findElements(tree, node => node.tagName === 'script').length, 0);
+      assert.equal(tree.children.filter(node => node.tagName === 'pre').length, 1, 'ordinary fences remain outside the optional window');
+    }
+  }
+});
+
+test('mac-style snippet validates in every built-in theme without theme-specific registration', async () => {
+  for (const locale of ['zh-CN', 'en-US']) {
+    const snippet = getDefaultContentLibrary(locale).snippets.find(item => item.id === 'mac-style-code-block');
+    for (const theme of getBuiltinArticleThemes(locale)) {
+      assert.equal(Object.keys(theme.tokens).length, 11);
+      assert.doesNotMatch(theme.css, /\.mac-style-code-block/);
+      const issues = await validateArticleAuthoringMarkdown(prepareSnippetInsertion(snippet.content).text, 'Mac code', undefined, theme);
+      assert.deepEqual(issues.filter(issue => articleFormatBlocks(issue.tier) || issue.tier === 'unknown'), [], `${locale}/${theme.id}`);
+    }
+  }
 });

@@ -1,7 +1,7 @@
 {
   "id": "basic",
   "name": "基础",
-  "version": "1.0.6",
+  "version": "1.0.8",
   "formatVersion": 1,
   "tokens": {
     "color-article-ink": "#444444",

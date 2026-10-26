@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_FORMAT_BUNDLE, enabledFormatRules, validateFormatBundle, compileFormatBundle } from '../src/lib/article-format/config.ts';
 import { activateFormatBundle, assertCurrentFormat, assertFormatReady, getFormatSnapshot, invalidateFormatBundle } from '../src/lib/article-format/runtime.ts';
-import { initializeLibraryFormat, readLibraryFormat, PUBLIC_PLATFORM_PRESETS } from '../src/lib/article-format/library.ts';
+import { initializeLibraryFormat, readLibraryFormat, PUBLIC_PLATFORM_PRESETS, getPublicPlatformPreset } from '../src/lib/article-format/library.ts';
 import { findSourceMatches, replaceAllSourceMatches } from '../src/lib/sourceSearch.ts';
 import { validateArticleFormatMarkdown, validateArticleFormatCss } from '../src/lib/articleFormat.ts';
 
@@ -31,7 +31,7 @@ test('dark source is exclusive, token mode requires no algorithm, and legacy JSO
   activateFormatBundle(copy(), null, 'built-in');
 });
 test('only public presets can initialize a library and invalid selection writes nothing', async () => {
-  assert.deepEqual(PUBLIC_PLATFORM_PRESETS.map(preset => preset.id), ['wechat-article']);
+  assert.deepEqual(PUBLIC_PLATFORM_PRESETS.map(preset => preset.id), ['wechat-article', 'empty']);
   const root = directory();
   await assert.rejects(initializeLibraryFormat(root, 'unlisted-platform'), /未知/);
   assert.equal(root.children.size, 0);
@@ -47,6 +47,26 @@ test('configuration can add registered rules and additive formatter steps withou
   const result = compileFormatBundle(raw);
   assert.deepEqual(result.formatter.output.dropCssProperties, ['font-family', 'text-transform']);
   assert.equal(result.validator.rules.at(-1).parameters.property, 'text-align');
+});
+test('the empty preset retains product safety and theme contracts while platform rules and formatting stay empty', t => {
+  t.after(() => activateFormatBundle(copy(), null, 'built-in'));
+  const { bundle, algorithms } = getPublicPlatformPreset('empty');
+  assert.deepEqual(bundle.validator.product, DEFAULT_FORMAT_BUNDLE.validator.product);
+  const snapshot = activateFormatBundle(bundle, 'empty-library', 'library', undefined, algorithms, 'library');
+  assert.equal(snapshot.officialDefault, false);
+  assert.equal(snapshot.bundle.validator.meta.enabled, false);
+  assert.deepEqual(enabledFormatRules(snapshot.bundle), []);
+  assert.deepEqual(bundle.support.rules, []);
+  assert.deepEqual(bundle.support.manualReview, []);
+  assert.deepEqual(bundle.formatter.steps, []);
+  assert.equal(snapshot.bundle.formatter.preview.dark.transform, 'preserve');
+  assert.equal(snapshot.bundle.formatter.codeHighlight.enabled, false);
+  assert.ok(validateArticleFormatCss('.example { width: expression(x); }').some(issue => issue.domain === 'product' && issue.tier === 'error'));
+  assert.ok(validateArticleFormatMarkdown('<script>alert(1)</script>').some(issue => issue.domain === 'product' && issue.tier === 'error'));
+  assert.equal(validateArticleFormatCss('.example { font-family: Georgia; }').some(issue => issue.domain === 'standard'), false);
+  for (const mutate of [raw => { delete raw.validator.product; }, raw => { raw.formatter.meta.id = 'other'; }, raw => { raw.validator.rules.push({ id: 'bad', operator: 'invented', enabled: false, stages: ['authoring'], parameters: {} }); }]) {
+    const bad = structuredClone(bundle); mutate(bad); assert.throws(() => validateFormatBundle(bad));
+  }
 });
 test('unknown fields, operators, wrong parameter types, conflicting steps and missing references fail explicitly', () => {
   for (const mutate of [
@@ -95,7 +115,7 @@ test('validator meta.enabled is a platform-only boolean gate; absent and true re
   for (const mutate of [raw => { raw.validator.meta.enabled = 'false'; }, raw => { raw.validator.rules[0].operator = 'unregistered'; }, raw => { delete raw.validator.product; }, raw => { raw.formatter.meta.id = 'other'; }]) {
     const bad = structuredClone(disabled); mutate(bad); assert.throws(() => validateFormatBundle(bad));
   }
-  const root = directory(); await initializeLibraryFormat(root);
+  const root = directory(); await seedLegacy(root);
   const format = root.children.get('format');
   format.children.set('validator.json', JSON.stringify(disabled.validator));
   const before = format.counts.reads;
@@ -117,10 +137,16 @@ function directory(name = 'test') {
     },
   };
 }
+async function seedLegacy(root) {
+  const format = await root.getDirectoryHandle('format', { create: true });
+  for (const [name, value] of Object.entries({ 'format-support.json': copy().support, 'validator.json': copy().validator, 'formatter.json': copy().formatter })) {
+    const writer = await (await format.getFileHandle(name, { create: true })).createWritable(); await writer.write(JSON.stringify(value)); await writer.close();
+  }
+}
 test('library fallback is explicit; partial or old bundles are invalid; initialization never overwrites', async () => {
   const root = directory(); const absent = await readLibraryFormat(root);
   assert.equal(absent.source, 'built-in'); assert.ok(absent.message);
-  await initializeLibraryFormat(root); const format = root.children.get('format');
+  await seedLegacy(root); const format = root.children.get('format');
   assert.equal(format.counts.writes, 3); assert.equal((await readLibraryFormat(root)).source, 'library');
   await initializeLibraryFormat(root); assert.equal(format.counts.writes, 3);
   format.children.delete('validator.json'); assert.equal((await readLibraryFormat(root)).source, 'invalid');

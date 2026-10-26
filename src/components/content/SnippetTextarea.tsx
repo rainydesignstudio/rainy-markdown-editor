@@ -7,6 +7,7 @@ import { useUITranslation } from '../global/UILocaleProvider';
 import { findSourceMatches, replaceAllSourceMatches } from '../../lib/sourceSearch';
 import { SourceFindBar, FindIcon, type ReplaceAllDecision } from './SourceFindBar';
 import { IconButton } from '../global/IconButton';
+import { ScrollViewport } from '../global/ScrollViewport';
 import { insertUndoableText } from '../../lib/nativeTextareaEdit';
 import { sourceOffsetRect, revealSourceRect, visibleSourceGutterDigits, sourceLinePaddingClass, SOURCE_LINE_NUMBER_CLASS } from '../../lib/sourceViewport';
 import { formatInlineSelection, inlineFormatShortcut, type InlineFormat } from '../../lib/editor/inlineFormatting';
@@ -518,23 +519,24 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
         onReplace={replaceCurrent} onReplaceAll={requestReplaceAll} onClose={closeFind} />
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       {!openFindRef && !findOpen ? <div className="absolute top-2 right-2 z-30"><IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={openFind} /></div> : null}
-      <div ref={viewportRef} data-source-viewport="true" className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto scrollbar-gutter-stable" onScroll={handleViewportScroll}>
-      <div className="flex min-h-full min-w-0 flex-col">
       {sourceHeader}
+      <ScrollViewport ref={viewportRef} data-source-viewport="true" className="flex-1" onScroll={handleViewportScroll}>
+      <div className="flex min-h-full min-w-0 flex-col">
       <div data-source-content="true" className="relative min-h-0 w-full flex-1">
       <div ref={highlightRef} className={`pointer-events-none ${isComposing ? 'opacity-0' : ''}`} aria-hidden="true"><pre ref={sourceRef} className={sourceBoxClass}>{highlightedSource}</pre></div>
       {showLineNumbers || lineConcerns.size > 0 ? <div ref={gutterRef} className="pointer-events-none absolute inset-0 z-20 overflow-clip">
-        <div className={sourceBoxClass}>
+        {/* Block rows wrap differently from a continuous preformatted source flow. */}
+        <pre className={sourceBoxClass}>
           {sourceLines.map((line, index) => {
             const number = index + 1 + lineOffset;
             const concern = lineConcerns.get(index + 1);
-            return <div key={number} className="relative min-w-0 whitespace-pre-wrap wrap-anywhere">
+            return <span key={number} className="relative">
               {showLineNumbers ? concern ? <button className={`${gutterNumberClass} pointer-events-auto bg-transparent p-0 data-[severity=warning]:text-warning data-[severity=error]:text-danger focus-visible:outline-2 focus-visible:outline-accent`} type="button" data-severity={concern.severity} aria-label={t('editor:diagnostics.line', { line: number, severity: t('editor:diagnostics.' + concern.severity), messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={(event) => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={(event) => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{number}</button> : <span className={gutterNumberClass} aria-hidden="true">{number}</span> : null}
               {concern && (!showLineNumbers || concern.severities) ? <button type="button" className={`pointer-events-auto absolute top-0 flex h-6 items-center justify-center gap-0.5 bg-transparent p-0 focus-visible:outline-2 focus-visible:outline-accent ${showLineNumbers ? '-left-[calc(var(--spacing)*12+var(--source-gutter-extra))] w-3 md:-left-[calc(var(--spacing)*16+var(--source-gutter-extra))]' : '-left-5 w-4 md:-left-6'}`} aria-label={t('editor:diagnostics.lineLabel', { line: number, messages: sourceLineMessages(concern, t).join('；') })} onMouseEnter={event => showConcern(event.currentTarget, number, concern)} onMouseLeave={scheduleTooltipClose} onFocus={event => showConcern(event.currentTarget, number, concern)} onBlur={scheduleTooltipClose}>{(concern.severities ?? [concern.severity]).map(severity => <span key={severity} data-severity={severity} className="size-1.5 shrink-0 rounded-full data-[severity=warning]:bg-warning data-[severity=error]:bg-danger" aria-hidden="true" />)}</button> : null}
-              <span className="invisible" aria-hidden="true">{line || '\u200b'}</span>
-            </div>;
+              <span className="invisible" aria-hidden="true">{line || '\u200b'}</span>{index < sourceLines.length - 1 ? '\n' : null}
+            </span>;
           })}
-        </div>
+        </pre>
       </div> : null}
       <textarea
         id={id}
@@ -587,7 +589,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       />
       </div>
       </div>
-      </div>
+      </ScrollViewport>
       </div>
       {insertionIssue ? <div className="diagnostic" data-level="error" role="alert">{formatProductMessage(insertionIssue, t)}</div> : null}
       {visibleMatch ? (
@@ -607,7 +609,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
                 aria-selected={index === safeActiveIndex}
                 disabled={disabled}
                 onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setActiveIndex(index)}
+                onMouseMove={event => { if (event.movementX || event.movementY) setActiveIndex(index); }}
                 onClick={() => { if (row.snippet) commitSnippet(row.snippet, visibleMatch!.start, visibleMatch!.end); else { setActiveIndex(index); toggleGroup(row.group.id); } }}
               >
                 {row.snippet ? <><span className="mt-0.5 inline-flex size-4 shrink-0"><CategoryIcon name={row.snippet.icon} /></span><span className="grid min-w-0 flex-1 gap-1"><span className="snippet-option-heading"><strong className="min-w-0 break-words">{row.snippet.name}</strong><code>{row.snippet.trigger}</code></span><span className="snippet-option-description">{row.snippet.description}</span></span></> : <><span className="inline-flex size-4 shrink-0 text-accent-text"><CategoryIcon name={row.group.icon ?? 'snippet'} /></span><strong className="min-w-0 flex-1 truncate font-sub-heading text-sm font-semibold">{row.group.name}</strong><span className="font-mono text-xs text-faint">{row.group.items.length}</span><svg className={`size-4 text-faint ${expanded.includes(row.group.id) ? 'rotate-90' : ''}`} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg></>}

@@ -5,6 +5,8 @@ import vm from 'node:vm';
 import { parse } from 'parse5';
 import { formatPreviewDocument } from '../src/lib/article-format/frame.ts';
 import { getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
+import { compileFormatBundle } from '../src/lib/article-format/config.ts';
+import { getPublicPlatformPreset } from '../src/lib/article-format/library.ts';
 
 test('responsive document frames retain natural content without a fixed-width crop', () => {
   const snapshot = structuredClone(getFormatSnapshot());
@@ -58,5 +60,24 @@ test('static frame bootstrap reports inspection results and failures without eva
     assert.equal(posted[0][1], payload.origin);
     if (fail) { assert.match(posted[0][0].error, /measurement failed/); assert.equal(attributes[0][0], 'data-preview-error'); }
     else { assert.equal(posted[0][0].result.checked[0], 'width'); assert.equal(context.document.body.dataset.previewReady, 'true'); }
+  }
+});
+
+test('empty light and dark previews complete without calling a platform transform', async () => {
+  const script = await readFile(new URL('../public/format/article-format-bootstrap.js', import.meta.url), 'utf8');
+  const preset = getPublicPlatformPreset('empty'), bundle = compileFormatBundle(preset.bundle);
+  for (const dark of [false, true]) {
+    const attributes = {}, classes = new Set(); let configured;
+    const payload = { kind: 'preview', dark, bundle, algorithms: preset.algorithms };
+    const context = {
+      document: { head: { querySelector: () => ({ textContent: JSON.stringify(payload) }) }, querySelector: () => ({ setAttribute: (key, value) => { attributes[key] = value; } }), documentElement: { classList: { add: name => classes.add(name) }, dataset: {} }, body: { dataset: {}, setAttribute: (key, value) => { attributes[key] = value; } } },
+      window: { ArticleAlgorithmHost: { configure: algorithms => { configured = algorithms; } }, ArticleFormatEngine: { transform: async () => { throw new Error('Empty preset must not execute platform algorithms'); } } },
+    };
+    vm.runInNewContext(script.replace('void runFormatFrameBootstrap();', 'window.bootComplete = runFormatFrameBootstrap();'), context, { codeGeneration: { strings: false, wasm: false } });
+    await context.window.bootComplete;
+    assert.equal(context.document.body.dataset.previewReady, 'true');
+    assert.equal(configured.manifest.components.length, 0);
+    assert.equal(classes.has('dark'), dark);
+    assert.equal(attributes['data-preview-error'], undefined);
   }
 });

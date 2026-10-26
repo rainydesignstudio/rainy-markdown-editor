@@ -12,29 +12,36 @@ import { withUILocaleImports } from './ui-locale-fixture.mjs';
 
 const code = ts.transpileModule(await readFile(new URL('../src/components/content/ContentRenderPreview.tsx', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2020 } }).outputText;
 
+const styleCode = ts.transpileModule(await readFile(new URL('../src/hooks/useResourcePreviewStyles.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 const mountCode = ts.transpileModule(await readFile(new URL('../src/lib/article-format/useArticleRenderMount.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
 
 function preview() {
   let cursor = 0, tree, timerId = 0, shadows = 0;
   const cells = [], effects = [], timers = new Map(), calls = [];
-  const mount = {};
+  const mount = { addEventListener() {}, removeEventListener() {} };
   const shadow = { querySelector: () => mount };
   const host = { shadowRoot: null, attachShadow: () => { shadows++; return host.shadowRoot = shadow; } };
   const props = { source: 'first', theme: BASIC_THEME };
   const module = { exports: {} };
   const react = {
+    useId() { return 'preview-fixture'; },
     useState(value) { const i = cursor++; if (!(i in cells)) cells[i] = value; return [cells[i], next => { cells[i] = typeof next === 'function' ? next(cells[i]) : next; }]; },
     useRef(value) { const i = cursor++; return cells[i] ??= { current: value }; },
     useEffect(effect, dependencies) { const i = cursor++, old = cells[i]; if (old && dependencies.every((value, n) => Object.is(value, old.dependencies[n]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { dependencies, cleanup: effect() }; }); },
   };
+  const clock = { addEventListener() {}, removeEventListener() {}, setTimeout(fn, delay) { assert.equal(delay, 200); timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } };
+  const compiler = { compileArticleStyles(source, theme) { return new Promise((resolve, reject) => calls.push({ source, theme, resolve, reject })); } };
+  const stylesModule = { exports: {} };
+  vm.runInNewContext(styleCode, { module: stylesModule, exports: stylesModule.exports, window: clock, require(id) { if (id === 'react') return react; if (id.endsWith('/renderer')) return compiler; if (id.endsWith('/productMessages')) return productMessages; throw new Error(id); } });
   const mountModule = { exports: {} };
   vm.runInNewContext(mountCode, {
 ...productMessages, module: mountModule, exports: mountModule.exports, require: withUILocaleImports(id => id === 'react' ? { ...react, useLayoutEffect: react.useEffect } : {}) });
   vm.runInNewContext(code, {
 ...productMessages,
     module, exports: module.exports,
-    window: { addEventListener() {}, removeEventListener() {}, setTimeout(fn, delay) { assert.equal(delay, 200); timers.set(++timerId, fn); return timerId; }, clearTimeout(id) { timers.delete(id); } },
+    window: clock,
     require: withUILocaleImports(function(id){
+    if (id.endsWith('/useResourcePreviewStyles')) return stylesModule.exports;
     if (id.endsWith('/useArticleRenderMount')) return mountModule.exports;
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => formatRuntime.getFormatSnapshot() };
@@ -89,4 +96,32 @@ test('late compilations cannot overwrite a newer source, a blocked template, or 
   p.props.blocked = false; p.render(); p.flush(); p.unmount();
   p.calls[3].resolve({ css: 'after unmount' }); await Promise.resolve();
   assert.equal(p.nodes().some(node => node.type === 'style' && node.props.children === 'after unmount'), false);
+});
+
+
+test('preview failures retain structured details in a fixed feedback entry without adding status rows', async () => {
+  const p = preview(); p.props.bare = true; p.render(); p.flush();
+  p.calls[0].reject(new productMessages.ProductError('libraryConfiguration.identity')); await new Promise(setImmediate); p.render();
+  const feedback = p.nodes().find(node => node.type === 'operation-feedback');
+  assert.equal(feedback.props.notice.messageKey, 'libraryConfiguration.identity');
+  assert.equal(feedback.props.summary.messageKey, 'feedback.compileFailed');
+  assert.equal(feedback.props.tone, 'error');
+  assert.equal(p.nodes().some(node => node.type === 'p' && node.props.role === 'alert'), false);
+  assert.equal(p.nodes().some(node => node.type === 'p' && node.props.role === 'status'), false);
+  assert.ok(p.nodes().some(node => node.type === 'header' && node.props.className.includes('flex-wrap')));
+  assert.equal(p.nodes().some(node => node.props.className?.includes('absolute right-3')), false);
+  assert.equal(feedback.props.announce, false, 'preview diagnostics stay local while editing');
+  p.unmount();
+});
+
+
+test('empty generated CSS is a successful current result and old results cannot be inspected after source changes', async () => {
+  const p = preview(); p.flush(); p.calls[0].resolve({ css: '' }); await new Promise(setImmediate); p.render();
+  let inspector = p.nodes().find(node => node.type === 'preview-css-details');
+  assert.equal(inspector.props.ready, true); assert.equal(inspector.props.css, '');
+  const result = inspector.props.revision;
+  p.props.source = 'new source'; p.render();
+  inspector = p.nodes().find(node => node.type === 'preview-css-details');
+  assert.equal(inspector.props.ready, false); assert.notEqual(inspector.props.revision, result);
+  p.unmount();
 });

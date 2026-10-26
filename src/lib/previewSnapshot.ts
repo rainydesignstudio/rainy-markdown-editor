@@ -12,18 +12,19 @@ export type PreviewInput = {
 export function retainPreviewInput(original: PreviewInput): { original: PreviewInput; input: PreviewInput; dispose: () => void } {
   const environment = original.snapshot.environment;
   const replacements = new Map<string, string>();
-  const assets = environment?.assets.map(asset => {
-    const url = URL.createObjectURL(asset.blob); replacements.set(asset.url, url);
+  const cloneAsset = (asset: NonNullable<typeof original.snapshot.resources>[number]) => {
+    const url = replacements.get(asset.url) ?? URL.createObjectURL(asset.blob); replacements.set(asset.url, url);
     return Object.freeze({ ...asset, url });
-  });
+  };
+  const assets = environment?.assets.map(cloneAsset), resources = original.snapshot.resources?.map(cloneAsset);
   const rewrite = (text: string) => { for (const [from, to] of replacements) text = text.replaceAll(from, to); return text; };
   const dispose = () => { replacements.forEach(url => URL.revokeObjectURL(url)); replacements.clear(); };
-  const snapshot = environment ? Object.freeze({ ...original.snapshot, environment: Object.freeze({
+  const snapshot = environment || resources ? Object.freeze({ ...original.snapshot, resources: resources && Object.freeze(resources), ...(environment ? { environment: Object.freeze({
     ...environment, assets: Object.freeze(assets!),
     files: Object.freeze(Object.fromEntries(Object.entries(environment.files).map(([path, css]) => [path, rewrite(css)]))),
     // Display-only snapshots are never passed to compilation, validation, or persistence.
     resolveCss: environment.resolveCss, dispose,
-  }) }) : original.snapshot;
+  }) } : {}) }) : original.snapshot;
   return { original, input: { ...original, compiledCss: rewrite(original.compiledCss), snapshot }, dispose };
 }
 

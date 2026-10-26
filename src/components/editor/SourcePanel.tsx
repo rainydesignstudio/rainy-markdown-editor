@@ -25,17 +25,15 @@ import { InformationButton, InformationIcon } from '../global/InformationButton'
 import { articleSourceLayout, type parseArticle } from '../../lib/frontMatter';
 import { usePreviewPreferences } from '../../hooks/usePreviewPreferences';
 import { sourceLinePaddingClass, SOURCE_LINE_NUMBER_CLASS } from '../../lib/sourceViewport';
+import { PanelHeading } from '../global/CollapsiblePanel';
 
 const EMPTY_FORMAT_ISSUES: readonly ArticleFormatIssue[] = [];
 
 export function SourceMetadataHeader({ lines, showLineNumbers }: { lines: string[]; showLineNumbers: boolean }) {
   const { t } = useUITranslation('editor');
-  return <details className="group/metadata shrink-0 border-b border-line bg-editor-surface" data-source-metadata="true">
-    <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-2 text-xs text-muted focus-visible:outline-2 focus-visible:outline-accent">
-      <svg className="size-3 shrink-0 transition-transform group-open/metadata:rotate-90 motion-reduce:transition-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
-      <span>{t('editor:source.metadataLines', { count: lines.length })}</span><span className="ml-auto text-faint">{t('editor:source.metadataViewOnly')}</span>
-    </summary>
-    <div className={`min-w-0 pr-5 pb-3 font-article-source text-editor-source md:pr-8 ${sourceLinePaddingClass(showLineNumbers)}`} aria-label={t('editor:source.metadataViewOnly')}>
+  return <details className="group/panel shrink-0 border-b border-line bg-editor-surface" data-source-metadata="true">
+    <PanelHeading as="summary" compact title={t('editor:source.metadataLines', { count: lines.length })}><span className="ml-auto text-faint">{t('editor:source.metadataViewOnly')}</span></PanelHeading>
+    <div className={`max-h-64 min-w-0 overflow-x-clip overflow-y-auto pr-5 pb-3 font-article-source text-editor-source scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent md:pr-8 ${sourceLinePaddingClass(showLineNumbers)}`} aria-label={t('editor:source.metadataViewOnly')}>
       {lines.map((line, index) => <div className="relative min-w-0 whitespace-pre-wrap wrap-anywhere" key={index}>{showLineNumbers ? <span className={`${SOURCE_LINE_NUMBER_CLASS} select-none`} aria-hidden="true">{index + 1}</span> : null}<code className="font-article-source text-secondary">{line || '\u200b'}</code></div>)}
     </div>
   </details>;
@@ -67,6 +65,8 @@ type Props = {
   onOpenMediaPicker: () => void;
   mediaBusy: boolean;
   readOnly: boolean;
+  citationTools?: ReactNode;
+  citationStatus?: ReactNode;
 };
 
 export function SourcePanel({
@@ -95,6 +95,8 @@ export function SourcePanel({
   onOpenMediaPicker,
   mediaBusy,
   readOnly,
+  citationTools,
+  citationStatus,
 }: Props) {
   const { t } = useUITranslation('editor');
   const { preferences } = usePreviewPreferences();
@@ -177,6 +179,7 @@ export function SourcePanel({
           <input ref={imagePickerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif" multiple hidden onChange={handleImageFiles} />
           <IconButton tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
           <IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
+          {citationTools}
           <InsertElementsMenu
             disabled={readOnly || mediaBusy || parsed.diagnostics.some(item => item.level === 'error')}
             readOnly={readOnly}
@@ -212,13 +215,13 @@ export function SourcePanel({
       {lineCount > 1000 ? <p className="shrink-0 border-t border-warning-line bg-warning-surface px-3 py-2 text-xs text-warning-strong" role="status">{t(preferences.saveOnly ? 'editor:source.longDocumentSavedOnly' : 'editor:source.longDocumentWarning', { count: lineCount })}</p> : null}
       <div className="source-footer">
         <label className="flex shrink-0 items-center gap-1.5 text-2xs text-muted"><input type="checkbox" role="switch" className="size-3 accent-accent" checked={checksEnabled} onChange={event => setChecksEnabled(event.target.checked)} aria-label={checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')} />{checksEnabled ? t('editor:source.checksOn') : t('editor:source.checksOff')}</label>
-        <span className="status-copy" data-tone={status.tone} role="status">{formatProductMessage(status, t)}</span>
+        {status.formatRevision !== undefined || status.tone === 'neutral' ? <span className="status-copy" data-tone={status.tone} role="status">{formatProductMessage(status, t)}</span> : null}
         {importProgress}
+        {citationStatus}
         <span className="status-copy">{article.dirty ? t('editor:source.unsaved') : t('editor:source.saved')}{preferences.saveOnly ? ` · ${t('editor:source.saveRefreshPreview')}` : ''}{status.formatRevision === revision ? '' : ` · revision ${revision}`}</span>
         {parsed.diagnostics.some((item) => item.level === 'error') ? <span className="status-copy" data-tone="error">{t('editor:source.metadataReadOnly')}</span> : null}
         {checksEnabled && lineValidationError ? <span className="status-copy" data-tone="warning" role="status">{t('editor:source.diagnosticsUnavailable', { message: lineValidationError })}</span> : null}
       </div>
-      {directory && article.month && article.folder ? null : <p>{t('editor:source.notStored')}</p>}
     </section>
   );
 }

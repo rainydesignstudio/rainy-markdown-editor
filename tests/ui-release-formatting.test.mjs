@@ -27,6 +27,7 @@ async function component(file, extra = {}) {
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require(id) {
       if (id === 'react') return react;
+      if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs, Fragment };
       if (id.endsWith('/UILocaleProvider')) return { useUITranslation: ns => ({ t: instance.getFixedT(locale, ns) }), useUILocale: () => ({ locale }) };
       if (id.endsWith('/i18n/formatters')) return formats;
@@ -180,10 +181,10 @@ test('localized month option labels keep raw select values and callback paramete
     article: { month: '2026-09' }, title: '作者文稿', month: '2026-09', months: ['2026-09', '2026-08'],
     applyTheme: null, usesCurrentDraft: false, onChangeTitle() {}, onChangeMonth: value => selected.push(value), onClose() {}, onConfirm() {},
   });
-  const select = nodes(tree).find(node => node.type === 'select');
+  const select = nodes(tree).find(node => node.type === 'select-field');
   assert.equal(select.props.value, '2026-09');
-  const september = nodes(select).find(node => node.type === 'option' && node.props.value === '2026-09');
-  assert.equal(text(september), 'September 2026');
-  select.props.onChange({ target: { value: '2026-08' } });
+  const september = select.props.options.find(option => option.value === '2026-09');
+  assert.equal(september.label, 'September 2026');
+  select.props.onChange('2026-08');
   assert.deepEqual(selected, ['2026-08']);
 });

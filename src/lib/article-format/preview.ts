@@ -11,3 +11,10 @@ export function articlePreviewStyle(css: string, snapshot = getFormatSnapshot())
   const surface = preview.stripThemeBackground ? '\narticle.article-preview,article.article-preview>.article-body{background:transparent;}' : '';
   return `:host{${font}color:${preview.color};}\n${css}${surface}`;
 }
+
+
+/** Resource hosts share policy; document viewport, source CSS and export geometry stay independent. */
+export function resourcePreviewWidth(snapshot = getFormatSnapshot()) { return snapshot.configuration?.rendering.previewWidth ?? 'default'; }
+export function resourcePreviewHostClass(snapshot = getFormatSnapshot(), framed = false) {
+  return `min-h-full min-w-0 w-full ${framed ? `mx-auto rounded-lg shadow-panel ${resourcePreviewWidth(snapshot) === 'default' ? 'max-w-3xl' : ''}` : 'border-0'}`;
+}

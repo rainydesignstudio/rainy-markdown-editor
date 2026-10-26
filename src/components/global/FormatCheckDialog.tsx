@@ -63,7 +63,7 @@ function FormatDisclosure({ section, tab, group, bodyLineOffset }: { section: Fo
       <span className={`text-sm font-medium ${tone}`}>{t('dialogs:formatGroups.' + group.severity)}</span>
       <span className="flex items-center gap-2 text-xs text-muted"><span>{t('dialogs:formatSummaries.' + group.severity, { count })}</span><svg className="size-4 shrink-0 text-faint transition-transform duration-200 ease-out motion-reduce:transition-none group-aria-expanded/format:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></span>
     </button>
-    <div id={bodyId} ref={bodyRef} className="overflow-hidden transition-[max-height] duration-200 ease-out motion-reduce:transition-none">
+    <div id={bodyId} ref={bodyRef} className="max-h-0 overflow-hidden data-[disclosure=open]:max-h-none data-[disclosure=moving]:max-h-(--disclosure-height) transition-[max-height] duration-200 ease-out motion-reduce:transition-none">
       {count ? <div className="grid gap-3 pt-3">
         {names.length ? <ul className="grid gap-2 text-sm text-secondary">{names.map(name => <li key={name} className="break-words">{formatProductMessage(name, t)}</li>)}</ul> : null}
         {ISSUE_SOURCES.map(source => {
@@ -99,7 +99,7 @@ export function FormatCheckDialog({ mode, report, onDecision }: { mode: 'save' |
     <p id="format-check-description" className="p-4 text-sm text-muted">{mode === 'save'
       ? t('dialogs:ui.sourceSavedChecksUseTheCurrentLibraryConfiguration')
       : mode === 'inspect' ? t('dialogs:ui.resultsUseTheCurrentDraftAndLibraryConfiguration')
-      : mode === 'export' ? t('dialogs:ui.reviewThemeAndBodyBeforeExportingIncompleteChecks') : concerns ? t('dialogs:ui.reviewThemeAndBodyBeforeCopyingIncompleteChecks') : t('dialogs:ui.noActionableConcernsFoundInTheThemeOr')}<span className="mt-1 block text-xs text-faint">{format.bundle.support.meta.name}{format.bundle.validator.meta.enabled === false ? t('dialogs:ui.platformValidationDisabled') : ''}{format.officialDefault ? t('dialogs:ui.officialDefaults') : t('dialogs:ui.customLibraryConfiguration')}{report.complete === false ? t('dialogs:ui.layoutConversionChecksIncomplete') : ''}</span></p>
+      : mode === 'export' ? t('dialogs:ui.reviewThemeAndBodyBeforeExportingIncompleteChecks') : concerns ? t('dialogs:ui.reviewThemeAndBodyBeforeCopyingIncompleteChecks') : t('dialogs:ui.noActionableConcernsFoundInTheThemeOr')}<span className="mt-1 block text-xs text-faint">{format.bundle.support.meta.name}{!format.renderer && format.bundle.validator.meta.enabled === false ? t('dialogs:ui.platformValidationDisabled') : ''}{format.officialDefault ? t('dialogs:ui.officialDefaults') : t('dialogs:ui.customLibraryConfiguration')}{report.complete === false ? t('dialogs:ui.layoutConversionChecksIncomplete') : ''}</span></p>
     <div className="grid shrink-0 grid-cols-2 gap-1 border-b border-line p-4" role="tablist" aria-label={t('dialogs:ui.checkTarget')}>
       {TABS.map((item, index) => {
         const errorCount = report[item.id].issues.filter(issue => articleFormatSeverity(issue.tier) === 'error').length;

@@ -7,6 +7,7 @@ import { cliLocale, createCliTranslation } from '../scripts/cli-locale.mjs';
 import { parseStaticServerOptions } from '../scripts/static-server-options.mjs';
 import { articleFormatMessage, articleFormatMessageReference } from '../src/lib/articleFormat.ts';
 import { formatDiagnosticMessage, formatDiagnosticName } from '../src/lib/i18n/productMessages.ts';
+import { choice } from '../src/lib/article-format/contracts.ts';
 import { groupSourceLineIssues, sourceLineMessages } from '../src/lib/sourceLineDiagnostics.ts';
 
 test('product messages retain their canonical value and translate an existing record without regeneration', () => {
@@ -112,4 +113,14 @@ test('error labels and reports retain nested message identity and raw user param
   assert.equal(formatProductMessage(report, en), formatProductMessage(error, en));
   assert.ok(!/[\p{Script=Han}]/u.test(formatProductMessage(report, en)));
   assert.equal(productErrorLabel(new Error('用户原因')).label, '用户原因');
+});
+
+test('configuration field failures retain a structured localized cause without changing canonical validation', () => {
+  let error;
+  try { choice('rainy-format/1')('rainy-format/999', 'config.json.renderer.protocol'); } catch (cause) { error = cause; }
+  assert.ok(error instanceof ProductError);
+  assert.equal(error.message, 'config.json.renderer.protocol：仅支持rainy-format/1。');
+  const en = createUII18n('en-US').getFixedT('en-US', 'messages');
+  const record = productReference('shared.compose', { parts: productCause(error) });
+  assert.equal(formatProductMessage(record, en), 'config.json.renderer.protocol: Supported values: rainy-format/1.');
 });

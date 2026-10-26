@@ -27,12 +27,14 @@ export function commitPreviewMarkup(target: HTMLElement, html: string): void {
       }
       if (current.nodeType === 1) {
         const element = current as Element, wanted = next as Element;
+        const checkedChanged = element.localName === 'input' && element.hasAttribute('checked') !== wanted.hasAttribute('checked');
         for (const attribute of Array.from(element.attributes)) {
           if (!wanted.hasAttributeNS(attribute.namespaceURI, attribute.localName)) element.removeAttributeNS(attribute.namespaceURI, attribute.localName);
         }
         for (const attribute of Array.from(wanted.attributes)) {
           if (element.getAttributeNS(attribute.namespaceURI, attribute.localName) !== attribute.value) element.setAttributeNS(attribute.namespaceURI, attribute.name, attribute.value);
         }
+        if (checkedChanged) (element as HTMLInputElement).checked = wanted.hasAttribute('checked');
         sync(element, wanted);
       } else if (current.nodeValue !== next.nodeValue) current.nodeValue = next.nodeValue;
       current = current.nextSibling;

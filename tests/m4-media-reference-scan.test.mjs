@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import { libraryMediaAssetKey } from '../src/lib/articleMedia.ts';
 import { countCurrentMediaReferences, scanWorkspaceMediaReferences } from '../src/lib/mediaManagement.ts';
 
 class Directory {
@@ -44,7 +45,7 @@ test('explicit batch scan reads every saved source once, includes history and ig
   const f = fixture();
   f.other.children.get('article.md').getFile = async () => { f.reads.push('library/articles/2026-10/other/article.md'); return new File(['![copy](media/image/a%20b.png)\n![cross](../source/media/image/a%20b.png)\n<img src="../../../shared/image/a%20b.png?size=2#view">\n![remote](https://example.com/shared/image/a%20b.png)'], 'article.md'); };
   const result = await scanWorkspaceMediaReferences(f.root, [f.article, f.shared, f.article], f.current, new AbortController().signal, () => true);
-  assert.deepEqual(result, { current: 3, workspace: 5, issues: [] });
+  assert.deepEqual(result, { current: 3, workspace: 5, issues: [], referenced: { [libraryMediaAssetKey(f.article)]: true, [libraryMediaAssetKey(f.shared)]: true } });
   assert.equal(f.reads.length, 3); assert.equal(new Set(f.reads).size, 3);
   assert.ok(f.reads.every(path => path.endsWith('/article.md')));
 });
@@ -54,7 +55,7 @@ test('unreadable records are qualified; empty libraries stay empty and do not re
   const result = await scanWorkspaceMediaReferences(f.root, [f.article], f.current, new AbortController().signal, () => true);
   assert.equal(result.workspace, 2); assert.equal(result.issues.length, 1); assert.match(result.issues[0], /other.*read denied/);
   const empty = new Directory('empty', []);
-  assert.deepEqual(await scanWorkspaceMediaReferences(empty, [{ ...f.shared, root: empty }], null, new AbortController().signal, () => true), { current: null, workspace: 0, issues: [] });
+  assert.deepEqual(await scanWorkspaceMediaReferences(empty, [{ ...f.shared, root: empty }], null, new AbortController().signal, () => true), { current: null, workspace: 0, issues: [], referenced: { [libraryMediaAssetKey(f.shared)]: false } });
   assert.equal(empty.children.size, 0);
 });
 
@@ -113,7 +114,17 @@ test('cancel aborts a pending scan and late results do not replace statistics; f
   let attempts = 0;
   const retry = await dialog(async () => { if (++attempts === 1) throw new Error('permission denied'); return { current: 2, workspace: 4, issues: ['one unreadable file'] }; });
   retry.button('扫描引用').onClick(); await new Promise(resolve => setImmediate(resolve)); retry.render();
-  assert.match(text(retry.tree()), /引用扫描失败.*permission denied/);
+  assert.match(JSON.stringify(retry.tree().find(node => node.type === 'header').props.actions.props.notice), /permission denied/);
   retry.button('扫描引用').onClick(); await new Promise(resolve => setImmediate(resolve)); retry.render();
-  assert.match(retry.status(), /全工作区 4 处.*部分未核对/); assert.match(text(retry.tree()), /统计不完整/);
+  assert.match(retry.status(), /全工作区 4 处.*部分未核对/); assert.match(retry.tree().find(node => node.type === 'header').props.actions.props.notice.message, /统计不完整/);
+});
+
+ test('one batch returns separate current/history/unreferenced flags without rereading a document per resource', async () => {
+  const f = fixture();
+  f.source.children.get('history').directory('snapshot-two').file('article.md', '![historic](media/image/history-only.png)');
+  const historic = { ...f.article, fileName: 'history-only.png' }, unused = { ...f.article, fileName: 'unused.png' };
+  const result = await scanWorkspaceMediaReferences(f.root, [f.article, f.shared, historic, unused], f.current, new AbortController().signal, () => true);
+  assert.equal(result.referenced[libraryMediaAssetKey(historic)], true);
+  assert.equal(result.referenced[libraryMediaAssetKey(unused)], false);
+  assert.equal(f.reads.length, 4); assert.equal(new Set(f.reads).size, 4);
 });

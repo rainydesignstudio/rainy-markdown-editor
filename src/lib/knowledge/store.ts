@@ -1,12 +1,12 @@
 import { ProductError } from '../i18n/productMessages';
-import { readKnowledgeBinding, type ReadonlyKnowledgeSource } from './source';
-import { knowledgeShardPath, type KnowledgeManifest } from './model';
+import { readKnowledgeBinding, knowledgeSourceDirectory, type ReadonlyKnowledgeSource } from './source';
+import { knowledgeShardPath, validateKnowledgeManifest, KNOWLEDGE_LIMITS, type KnowledgeManifest } from './model';
 import type { KnowledgeWorkerClient } from './workerClient';
 
 export function assertIndexNotAborted(signal?: AbortSignal) { if (signal?.aborted) throw new ProductError('knowledge.indexCancelled'); }
 export async function assertKnowledgeIndexTarget(library: FileSystemDirectoryHandle, source: ReadonlyKnowledgeSource, signal?: AbortSignal) {
   assertIndexNotAborted(signal); await source.assertCurrent();
-  if ((await readKnowledgeBinding(library))?.sourceId !== source.binding.sourceId) throw new ProductError('knowledge.indexSourceChanged');
+  if ((await readKnowledgeBinding(library, source.binding.sourceId))?.sourceId !== source.binding.sourceId) throw new ProductError('knowledge.indexSourceChanged');
   assertIndexNotAborted(signal);
 }
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
@@ -18,7 +18,7 @@ async function childDirectory(parent: FileSystemDirectoryHandle, name: string, s
   await source.assertTargetOutsideSource(child); return child;
 }
 async function indexDirectory(library: FileSystemDirectoryHandle, source: ReadonlyKnowledgeSource, create: boolean) {
-  const knowledge = await childDirectory(library, 'knowledge', source, create);
+  const knowledge = await knowledgeSourceDirectory(library, source, create);
   return knowledge ? childDirectory(knowledge, 'index', source, create) : null;
 }
 async function indexFile(parent: FileSystemDirectoryHandle, name: string, source: ReadonlyKnowledgeSource, create: boolean): Promise<FileSystemFileHandle | null> {
@@ -83,4 +83,17 @@ export async function removeUncommittedKnowledgeGeneration(library: FileSystemDi
   const generations = index && await childDirectory(index, 'generations', source, false);
   const directory = generations && await childDirectory(generations, generation, source, false);
   if (directory && generations) { await source.assertTargetOutsideSource(directory); await generations.removeEntry(generation, { recursive: true }); }
+}
+
+export async function readKnowledgeIndexStates(library: FileSystemDirectoryHandle, entries: { sourceId: string; directory: string }[], isCurrent: () => boolean, getWorker?: () => KnowledgeWorkerClient): Promise<Record<string, boolean>> {
+  const states: Record<string, boolean> = {};
+  for (const entry of entries) {
+    if (!isCurrent()) break;
+    try {
+      const knowledge = await library.getDirectoryHandle('knowledge'), folder = entry.directory ? await knowledge.getDirectoryHandle(entry.directory) : knowledge;
+      const file = await (await (await folder.getDirectoryHandle('index')).getFileHandle('manifest.json')).getFile();
+      if (file.size <= KNOWLEDGE_LIMITS.manifestBytes) states[entry.sourceId] = (getWorker ? await getWorker().request('manifest', [file, entry.sourceId]) : validateKnowledgeManifest(JSON.parse(await file.text()), entry.sourceId)).status === 'ready';
+    } catch { states[entry.sourceId] = false; }
+  }
+  return states;
 }

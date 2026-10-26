@@ -1,13 +1,16 @@
 'use client';
 
 import { articleDraftBaseline, articleDraftChanged } from '../lib/editingDrafts';
-import { useToast } from '../components/global/Toast';
+import { useToast, useToastReady } from '../components/global/Toast';
+import { useArticleTrash } from './useArticleTrash';
+import { trashStoredArticle } from '../lib/articleTrash';
+import { articleResumeStorage, forgetArticleResume, readArticleResume, rememberArticleResume } from '../lib/articleResume';
 import { normalizeArticleDirectoryName, renameStoredArticleDirectory } from '../lib/articleFolder';
 import { captureEditingLocation, restoreEditingLocation, type RememberedEditingLocation } from '../lib/editingLocation';
 
 import type { UILocale } from '../lib/i18n/preferences';
 
-import { productJoin, productDiagnosticReference, productErrorLabel, productErrorMessage, ProductError, productCause, productLabel, productMessage, productReference, productText } from "../lib/i18n/productMessages";
+import { type ProductMessageInfo, type ProductMessageValue, productJoin, productDiagnosticReference, productErrorLabel, productErrorMessage, ProductError, productCause, productLabel, productMessage, productReference, productText } from "../lib/i18n/productMessages";
 import { prepareRenderRecord, persistRenderRecord, restoreRenderEnvironment, renderRecordMatches, type RenderRecord } from '../lib/article-format/renderRecords';
 import type { FormatSnapshot } from '../lib/article-format/runtime';
 
@@ -79,7 +82,9 @@ import {
   loadArticleTemplates,
   type ContentLibraryIssue,
 } from '../lib/contentLibraries';
+import { awaitPackagePreview, packageClipboard, packageInputFor, packageResourcePath } from '../lib/article-format/packageRendering';
 import { buildClipboardPayload, extractMarkdownClassCandidates } from '../lib/article-format/output';
+import { localResourceReference } from '../lib/resources/references';
 import { embedClipboardImages } from '../lib/clipboardImages';
 import { ARTICLE_EXAMPLE_IMAGE } from '../lib/articleExamples';
 import { compiledArticleFormatStatus, inspectArticleFormatReport, type ArticleFormatReport } from '../lib/articleFormatReport';
@@ -127,7 +132,7 @@ import type { MediaRenameOutcome } from '../components/media/MediaLibrary';
 export type ViewKey = 'articles' | 'assets' | 'themes' | 'template' | 'settings' | 'knowledge';
 export type ArticleMode = 'overview' | 'editor';
 export type Tone = 'neutral' | 'success' | 'warning' | 'error';
-export type ArticleCollection = 'all' | 'unclassified' | 'archived' | `project:${string}`;
+export type ArticleCollection = 'all' | 'unclassified' | 'archived' | 'trash' | `project:${string}`;
 export type LibraryCreationResult = { status: 'created' | 'cancelled' } | { status: 'error'; message: string };
 type PendingAction = { label: string; run: () => void | Promise<void>; onCancel?: () => void };
 type MediaPickerRequest = {
@@ -156,6 +161,7 @@ function errorDiagnostics(diagnostics: ArticleDiagnostic[]): ArticleDiagnostic[]
 }
 
 type ArticleSnapshot = {
+  folderNameDraft?: string;
   renderRecord?: RenderRecord | null;
   renderCss?: string;
   renderSnapshot?: FormatSnapshot;
@@ -197,6 +203,8 @@ function articleFingerprint(source: string, theme: ThemeConfig): string {
 
 export function useEditorController(seedLocale: UILocale = 'en-US') {
   const notifyToast = useToast();
+  const notificationsReady = useToastReady();
+  const manualLibraryLoad = useRef<number | null>(null);
   const formatSnapshot = useFormatSnapshot();
   const [mounted, setMounted] = useState(false);
   const [fileSystemReady, setFileSystemReady] = useState(false);
@@ -204,6 +212,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const { navigateRoute, registerNavigationGuard } = useRouteNavigation(pathname);
   const routePath = (pathname ?? '/').replace(/\/+$/, '') || '/';
   const routeSegment = routePath.split('/').filter(Boolean)[0] ?? '';
+  const routePathRef = useRef(routePath); routePathRef.current = routePath;
+  const resumeIntentRef = useRef({ active: routePath === '/editor' });
+  if (routePath !== '/editor') resumeIntentRef.current.active = false;
   const routeView: ViewKey = routeSegment === 'snippets' || routeSegment === 'templates' ? 'template' : routeSegment === 'editor' || routeSegment === 'articles'
     ? 'articles'
     : (['assets', 'themes', 'template', 'settings', 'knowledge'].includes(routeSegment) ? routeSegment as ViewKey : 'articles');
@@ -213,7 +224,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const articleMode: ArticleMode = routePath === '/articles'
     ? 'overview'
     : routePath === '/editor' ? 'editor' : preferredArticleMode;
+  const editorPageRef = useRef(false);
+  editorPageRef.current = view === 'articles' && articleMode === 'editor';
   const navigateArticleMode = useCallback((mode: ArticleMode) => {
+    resumeIntentRef.current.active = false;
     if (mode === 'editor' && !directoryRef.current) {
       setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeEditing"), tone: 'warning' });
       navigateRoute('/settings/');
@@ -223,6 +237,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     navigateRoute(mode === 'editor' ? '/editor/' : '/articles/');
   }, [navigateRoute]);
   const navigateView = useCallback((target: ViewKey, tab: TemplateTab = 'snippets') => {
+    resumeIntentRef.current.active = false;
     const textarea = sourceTextareaRef.current;
     if (textarea) lastImageSelectionRef.current = { articleId: articleId(articleRef.current), body: textarea.value, start: textarea.selectionStart, end: textarea.selectionEnd };
     if (target === 'template') {
@@ -241,6 +256,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const [directoryBookmarkIssue, setDirectoryBookmarkIssue] = useState<string | null>(null);
   const [contentLibraryRootSession, setContentLibraryRootSession] = useState(0);
   const [contentLibrariesState, setContentLibrariesState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  const [libraryLoadIssue, setLibraryLoadIssue] = useState<ReturnType<typeof productErrorLabel> | null>(null);
   const [directoryName, setDirectoryName] = useState<string | null>(null);
   const [storedArticles, setStoredArticles] = useState<ArticleSummary[]>([]);
   const [articleIndexIssues, setArticleIndexIssues] = useState<ArticleIndexIssue[]>([]);
@@ -278,10 +294,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const [editorDirectoryId, setEditorDirectoryId] = useState<string | null>(null);
   const [selectedArticleCollection, setSelectedArticleCollection] = useState<ArticleCollection>('all');
   const [articleInfoDialogOpen, setArticleInfoDialogOpen] = useState(false);
-  const [articleFolderName, setArticleFolderName] = useState('');
+  const articleFolderName = article.folderNameDraft ?? article.folder ?? '';
   const [projectDeleteTarget, setProjectDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [settingsIssue, setSettingsIssue] = useState<string | null>(null);
-  const [settingsNotice, setSettingsNotice] = useState<{ label: string; tone: Tone }>({ ...productLabel("controller.defaultIntervalsAutoSaveEvery60SecondsAutomaticSnapshotEvery30Minutes"), tone: 'neutral' });
+  const [settingsNotice, setSettingsNotice] = useState<{ label: string; tone: Tone; notify?: boolean }>({ label: '', tone: 'neutral' });
   const [settingsBusy, setSettingsBusy] = useState(false);
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historySnapshots, setHistorySnapshots] = useState<ArticleHistorySnapshot[]>([]);
@@ -289,12 +305,12 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const [historySelectedId, setHistorySelectedId] = useState<string | null>(null);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [historyRefreshPending, setHistoryRefreshPending] = useState(false);
-  const [historyNotice, setHistoryNotice] = useState<{ label: string; tone: Tone }>({ ...productLabel("controller.historyIsStoredOnlyInTheCurrentArticleDirectory"), tone: 'neutral' });
+  const [historyNotice, setHistoryNotice] = useState<{ label: string; tone: Tone; notify?: boolean }>({ label: '', tone: 'neutral' });
   const [revision, setRevision] = useState(1);
   const [compiledRevision, setCompiledRevision] = useState<number | null>(null);
   const [compiledCss, setCompiledCss] = useState('');
   const [savedPreviewRevision, setSavedPreviewRevision] = useState(0);
-  const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
+  const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number; notify?: boolean }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
   const capabilityAllowed = useCallback((key: LibraryCapability) => {
     try { assertLibraryCapability(getFormatSnapshot(), key); return true; }
     catch (error) { setStatus({ ...productErrorLabel(error), tone: 'warning' }); return false; }
@@ -369,6 +385,14 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const editorWorkspaceQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const contentLibraryRootSessionRef = useRef(0);
   const directorySelectionRef = useRef(0);
+  useEffect(() => {
+    if (!notificationsReady || contentLibrariesState === 'loading' || manualLibraryLoad.current === null) return;
+    const current = manualLibraryLoad.current === directorySelectionRef.current;
+    manualLibraryLoad.current = null;
+    if (current && contentLibrariesState === 'ready') notifyToast({ key: 'library-open', label: '', summary: productReference('feedback.libraryLoaded'), tone: 'success' });
+  }, [notificationsReady, contentLibrariesState, notifyToast]);
+
+
   const directoryBookmarkWriteRef = useRef<Promise<void>>(Promise.resolve());
   const revisionRef = useRef(revision);
   const mutationQueueRef = useRef(createArticleMutationQueue());
@@ -468,6 +492,13 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
 
   useEffect(() => {
     articleListAbortRef.current?.abort();
+    const retained = articleRef.current.renderSnapshot;
+    // Reload changes request authority, not the saved manuscript's interpreter.
+    if (retained && retained.id !== formatSnapshot.id && !formatSnapshot.error && !formatSnapshot.loading &&
+      documentTokenRef.current?.root === directoryRef.current && retained.library === formatSnapshot.library) {
+      const next = { ...articleRef.current, renderSnapshot: { ...retained, id: formatSnapshot.id, generation: formatSnapshot.generation } };
+      articleRef.current = next; setArticle(next);
+    }
     setArticleChecks({});
     setCompiledRevision(null); setCompiledCss(''); setIsCompiling(false); compiledFormatRef.current = null;
     setFormatCheck(null); formatCheckResolveRef.current?.(false); formatCheckResolveRef.current = null;
@@ -502,7 +533,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     };
   }, [article, contentLibraryRootSession, currentTitle, mediaBaseRevision]);
 
-  const updateArticle = useCallback((nextSource: string, nextTheme?: ThemeConfig, kind: 'article' | 'article-info' = 'article') => {
+  const updateArticle = useCallback((nextSource: string, nextTheme?: ThemeConfig, kind: 'article' | 'article-info' = 'article', folderNameDraft?: string) => {
     const documentToken = documentTokenRef.current;
     const current = articleRef.current;
     if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, articleId(current)).archived) {
@@ -516,7 +547,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     articleDraftKindRef.current = kind;
     const changedId = articleId(current);
     setArticleChecks(records => records[changedId] ? { ...records, [changedId]: { ...records[changedId], state: 'stale' } } : records);
-    const content = { ...current, source: nextSource, theme: nextTheme ?? current.theme, themeValid: nextTheme ? true : current.themeValid };
+    const content = { ...current, ...(folderNameDraft === undefined ? {} : { folderNameDraft }), source: nextSource, theme: nextTheme ?? current.theme, themeValid: nextTheme ? true : current.themeValid };
     const nextArticle = { ...content, dirty: articleDraftChanged(content, articleBaselineRef.current) };
     articleRef.current = nextArticle;
     revisionRef.current += 1;
@@ -528,6 +559,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     setCompiledRevision(null);
   }, []);
 
+  const setArticleFolderName = useCallback((name: string) => {
+    updateArticle(articleRef.current.source, undefined, 'article-info', name);
+  }, [updateArticle]);
+
   const updateArticleBody = useCallback((body: string) => {
     try {
       const nextSource = replaceArticleBody(articleRef.current.source, body);
@@ -538,13 +573,14 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, [updateArticle]);
 
   const snapshotFor = useCallback((current = articleRef.current, targetRevision = revisionRef.current): ArticleSnapshot => ({
-    renderSnapshot: current.renderSnapshot,
+    renderSnapshot: current.renderSnapshot ?? (getFormatSnapshot().renderer ? getFormatSnapshot() : undefined),
     renderRecord: current.renderRecord, renderCss: current.renderCss,
     renderIssue: current.renderIssue,
     source: current.source,
     theme: current.theme,
     themeValid: current.themeValid,
     folder: current.folder,
+    folderNameDraft: current.folderNameDraft,
     month: current.month,
     revision: targetRevision,
     articleId: articleId(current),
@@ -600,6 +636,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       // Format rules must be checked against the committed preview, including its new stylesheet.
       flushSync(() => { setCompiledCss(result.css); setCompiledRevision(snapshot.revision); });
       const preview = previewRef.current;
+      if (preview) await awaitPackagePreview(preview, parseArticle(snapshot.source).body, snapshot.theme, snapshot.renderSnapshot ?? getFormatSnapshot());
       const report = await inspectArticleFormatReport(snapshot.source, snapshot.theme, preview, { root: snapshot.directory, month: snapshot.month, folder: snapshot.folder }, { deep: false }).catch((cause): ArticleFormatReport => ({
         theme: { passed: [], issues: [{ kind: 'engine', name: productText("controller.formatCheckEngine"), source: productText("controller.currentArticleFormatCheck"), tier: 'unknown', ...productMessage("controller.theCurrentFormatCouldNotBeChecked", { "cause": productCause(cause) }) }] },
         body: { passed: [], issues: [] },
@@ -617,7 +654,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       return true;
     } catch (error) {
       if (requestId === compileRequestRef.current && matchesSnapshot(snapshot)) {
-        setStatus({ ...productLabel("controller.styleGenerationFailed", { "cause": productCause(error) }), tone: 'error' });
+        setStatus({ ...productLabel("controller.styleGenerationFailed", { "cause": productCause(error) }), tone: 'error', formatRevision: snapshot.revision });
       }
       return false;
     } finally {
@@ -638,7 +675,8 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     mutationQueueRef.current.run(() => loadStoredArticles(root))
   ), [loadStoredArticles]);
 
-  const applyStoredArticle = useCallback(async (stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current) => {
+  const applyStoredArticle = useCallback(async (stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current, isAllowed: () => boolean = () => true) => {
+    if (!isAllowed()) return false;
     const documentToken = openDocument(root, stored.id);
     if (!documentToken) {
       setStatus({ ...productLabel("controller.thisArticleIsBeingDeletedRefreshTheArticleListLater"), tone: 'warning' });
@@ -655,7 +693,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       }
       catch (error) { renderIssue = productText("controller.historicalRenderDependenciesCouldNotLoad") + (error instanceof Error ? error.message : String(error)); }
     }
-    if (directoryRef.current !== root || documentTokenRef.current !== documentToken) { restored?.dispose(); return false; }
+    if (!isAllowed() || directoryRef.current !== root || documentTokenRef.current !== documentToken) { restored?.dispose(); return false; }
     renderEnvironmentRef.current?.dispose(); renderEnvironmentRef.current = restored ?? null;
     const nextArticle: WorkingArticle = { source: stored.source, folder: stored.folder, month: stored.month, theme: stored.theme, themeValid: stored.themeValid, dirty: false, renderRecord: stored.renderRecord, renderSnapshot: restored?.snapshot, renderCss: restored?.css, renderIssue };
     articleBaselineRef.current = articleDraftBaseline(nextArticle);
@@ -672,11 +710,66 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     setCompiledRevision(null);
     const loadedMessage = productReference(stored.parse.diagnostics.length > 0 ? 'controller.loadedResolveDiagnosticsFirst' : 'controller.loaded', { storedFilePath: stored.filePath });
     const legacyAlgorithm = restored?.snapshot.algorithmSource === 'legacy' && restored.snapshot.bundle.formatter.preview.dark.transform !== 'preserve';
-    setStatus({ ...productLabel('shared.compose', { parts: productJoin(legacyAlgorithm ? [loadedMessage, productReference('algorithms.legacyHistory')] : [loadedMessage], '；') }), tone: stored.parse.diagnostics.length > 0 || legacyAlgorithm ? 'warning' : 'success' });
+    setStatus({ ...productLabel('shared.compose', { parts: productJoin(legacyAlgorithm ? [loadedMessage, productReference('algorithms.legacyHistory')] : [loadedMessage], '；') }), tone: stored.parse.diagnostics.length > 0 || legacyAlgorithm ? 'warning' : 'neutral' });
     if (navigateToEditor) navigateArticleMode('editor');
     void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
     return true;
   }, [compileCurrent, navigateArticleMode, openDocument, snapshotFor]);
+
+  const closeMediaPicker = useCallback(() => {
+    mediaPickerRequestRef.current = null; setMediaPickerRequest(null);
+    window.requestAnimationFrame(() => sourceTextareaRef.current?.focus());
+  }, []);
+
+  const renameSavedArticleFolder = useCallback(async (target: ArticleSnapshot, name: string): Promise<ArticleSnapshot | null> => {
+    const root = target.directory, month = target.month, folder = target.folder, id = target.articleId;
+    if (!root || !month || !folder || mediaOperationRef.current || editorWorkspaceIssue || !matchesSnapshot(target)) return null;
+    if (getArticleOrganization(editorWorkspaceRef.current, id).archived) return null;
+    if (name === folder) {
+      const next = { ...articleRef.current, folderNameDraft: undefined };
+      next.dirty = articleDraftChanged(next, articleBaselineRef.current);
+      articleRef.current = next; setArticle(next);
+      return snapshotFor();
+    }
+    const lease = beginHistoryOperation(); if (!lease) return null;
+    let blocked: ReturnType<typeof mutationQueueRef.current.beginDelete> = null;
+    let moved: Awaited<ReturnType<typeof renameStoredArticleDirectory>> | undefined;
+    try {
+      await editorWorkspaceQueueRef.current;
+      if (importFolderRef.current.isBusy(root, id)) throw new ProductError('articleFolder.pendingImports');
+      blocked = mutationQueueRef.current.beginDelete(root, id);
+      if (!blocked) throw new ProductError('articleFolder.changed');
+      moved = await mutationQueueRef.current.run(() => renameStoredArticleDirectory(root, month, folder, name, { expectedSource: target.source, isCurrent: () => matchesSnapshot(target) }));
+      mutationQueueRef.current.finishDelete(blocked); blocked = null;
+      if (!matchesSnapshot(target)) return null;
+      importFolderRef.current.moved(root, id, moved.article.folder);
+      setMediaTarget(null); closeMediaPicker();
+      setStoredArticles(items => upsertStoredArticle(items.filter(item => item.id !== id), moved!.article));
+      setArticleChecks(records => { const next = { ...records }; delete next[id]; return next; });
+      const loadedWorkspace = await loadEditorWorkspace(root);
+      if (!matchesSnapshot(target)) return null;
+      if (!loadedWorkspace.issue) {
+        editorWorkspaceRef.current = loadedWorkspace.workspace;
+        editorWorkspaceSnapshotRef.current = { fileExists: loadedWorkspace.fileExists, rawContent: loadedWorkspace.rawContent };
+        setEditorWorkspace(loadedWorkspace.workspace);
+      }
+      let loaded = moved.article, rereadIssue: string | null = loadedWorkspace.issue;
+      try { loaded = await readStoredArticleById(root, month, moved.article.folder); }
+      catch (error) { rereadIssue = error instanceof Error ? error.message : String(error); }
+      if (!matchesSnapshot(target) || !await applyStoredArticle(loaded, false, root)) return null;
+      setMediaRefreshRevision(value => value + 1);
+      const issue = moved.cleanupIssue ?? rereadIssue;
+      if (issue) setStatus({ label: issue, tone: 'warning' });
+      return snapshotFor();
+    } catch (error) {
+      if (blocked) { mutationQueueRef.current.failDelete(blocked); blocked = null; }
+      if (directoryRef.current === root && (articleId(articleRef.current) === id || moved && articleId(articleRef.current) === moved.article.id)) {
+        if (moved) await applyStoredArticle(moved.article, false, root);
+        setStatus({ ...productErrorLabel(error), tone: 'error' });
+      }
+      return null;
+    } finally { if (blocked) mutationQueueRef.current.failDelete(blocked); finishHistoryOperation(lease); }
+  }, [applyStoredArticle, beginHistoryOperation, closeMediaPicker, editorWorkspaceIssue, finishHistoryOperation, matchesSnapshot, setMediaRefreshRevision, snapshotFor]);
 
   useEffect(() => {
     if (isCompiling || articleMode !== 'editor' || loadInspectionRevision === null || compiledRevision !== loadInspectionRevision || !previewElement) return;
@@ -696,7 +789,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     return () => { cancelled = true; };
   }, [articleMode, cacheLoadedArticleReport, compiledRevision, isCompiling, loadInspectionRevision, matchesSnapshot, previewElement, snapshotFor]);
 
-  const performSaveSnapshot = useCallback(async (snapshot: ArticleSnapshot): Promise<SaveSnapshotResult> => {
+  const performSaveSnapshot = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true, quiet = false): Promise<SaveSnapshotResult> => {
     const root = snapshot.directory;
     if (!root) {
       setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeSaving"), tone: 'warning' });
@@ -724,11 +817,15 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           prepared = await prepareRenderRecord(nextSource, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: snapshot.folder && snapshot.month ? 'articles/' + snapshot.month + '/' + snapshot.folder : undefined });
         } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
       } else renderIssue = productText("controller.theCurrentRenderIsNotReadyUpdateStylesAndSaveAgain");
+      if (!isAllowed()) return { ok: false, current: matchesSnapshot(snapshot) };
       const result = await saveStoredArticle(root, nextSource, snapshot.theme, snapshot.folder, snapshot.month, { writeTheme: !preserveThemeSnapshot });
-      if (prepared && result.article.themeValid) {
+      if (isAllowed() && prepared && result.article.themeValid) {
         try {
-          await persistRenderRecord(root, await getStoredArticleDirectory(root, result.article.month, result.article.folder), prepared);
-          result.article.renderRecord = prepared.record;
+          const savedDirectory = await getStoredArticleDirectory(root, result.article.month, result.article.folder);
+          if (isAllowed()) {
+            await persistRenderRecord(root, savedDirectory, prepared);
+            result.article.renderRecord = prepared.record;
+          }
         } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
       }
       if (renderIssue) result.article.renderIssue = renderIssue;
@@ -752,8 +849,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       if (current) {
         documentTokenRef.current = nextDocumentToken;
         setStoredArticles((items) => upsertStoredArticle(items, result.article));
-        const savedArticle: WorkingArticle = { source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false, renderSnapshot: snapshot.renderSnapshot, renderCss: prepared ? compiled?.css : undefined, renderRecord: result.article.renderRecord, renderIssue: snapshot.renderIssue };
+        const savedArticle: WorkingArticle = { folderNameDraft: snapshot.folderNameDraft, source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false, renderSnapshot: snapshot.renderSnapshot, renderCss: prepared ? compiled?.css : undefined, renderRecord: result.article.renderRecord, renderIssue: snapshot.renderIssue };
         articleBaselineRef.current = articleDraftBaseline(savedArticle);
+        savedArticle.dirty = articleDraftChanged(savedArticle, articleBaselineRef.current);
         articleSourceLocationRef.current = null; articleInfoLocationRef.current = null;
         articleRef.current = savedArticle;
         savedPreviewPendingRef.current = savedSnapshot;
@@ -768,7 +866,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         }
         setCompiledRevision(null);
         if (result.indexUpdated && result.indexError) setStatus({ ...productLabel("controller.sourceSavedTheMonthlyIndexWasRebuilt", { "resultIndexError": result.indexError }), tone: 'warning' });
-        else if (result.indexUpdated) setStatus({ ...productLabel("controller.sourceSaved", { "result_articleFilePath": result.article.filePath }), tone: 'success' });
+        else if (result.indexUpdated) { if (!quiet) setStatus({ ...productLabel("controller.sourceSaved", { "result_articleFilePath": result.article.filePath }), tone: 'success' }); }
         else setStatus({ ...productLabel("controller.sourceSavedTheIndexWasNotUpdated", { "value": (result.indexError ?? productReference("controller.unknownError")) }), tone: 'warning' });
         if (renderIssue) setStatus({ ...productLabel("shared.compose", { parts: productJoin([productReference("controller.sourceSavedTheRenderRecordWasNotUpdated"), renderIssue]) }), tone: 'warning' });
       } else if (result.sourceSaved && snapshot.folder && snapshot.month && directoryRef.current === root &&
@@ -788,33 +886,53 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     }
   }, [matchesSnapshot, openDocument]);
 
-  const saveSnapshot = useCallback(async (snapshot: ArticleSnapshot): Promise<SaveSnapshotResult> => {
+  const saveSnapshot = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true, quiet = false): Promise<SaveSnapshotResult> => {
+    let folderName: string | undefined;
+    if (snapshot.folder && snapshot.folderNameDraft !== undefined && snapshot.folderNameDraft !== snapshot.folder) {
+      try { folderName = normalizeArticleDirectoryName(snapshot.folderNameDraft); }
+      catch (error) {
+        if (matchesSnapshot(snapshot)) setStatus({ ...productErrorLabel(error), tone: 'error' });
+        return { ok: false, current: matchesSnapshot(snapshot) };
+      }
+    }
     const result: SaveSnapshotResult = await mutationQueueRef.current.run(() => {
       const current = matchesSnapshot(snapshot);
+      if (!isAllowed()) return { ok: false, current };
       const tokenMatchesSnapshot = snapshot.documentToken.root === snapshot.directory && snapshot.documentToken.articleId === snapshot.articleId;
       if (!tokenMatchesSnapshot || !mutationQueueRef.current.canSave(snapshot.documentToken)) {
         if (current) setStatus({ ...productLabel("controller.savingCancelledThisArticleIsBeingDeletedOrHasBeenDeletedOpen"), tone: 'warning' });
         return { ok: false, current };
       }
-      return performSaveSnapshot(snapshot);
+      return performSaveSnapshot(snapshot, isAllowed, quiet);
     });
-    if (getPreviewPreferences().saveOnly && result.ok && result.current && result.savedSnapshot &&
+    if (isAllowed() && result.ok && result.current && result.savedSnapshot && folderName !== undefined) {
+      const renamed = await renameSavedArticleFolder(result.savedSnapshot, folderName);
+      if (!renamed) return { ...result, ok: false, current: matchesSnapshot(result.savedSnapshot) };
+      result.savedSnapshot = renamed;
+      result.current = matchesSnapshot(renamed);
+    }
+    if (isAllowed() && getPreviewPreferences().saveOnly && result.ok && result.current && result.savedSnapshot &&
       result.result?.article.parse.canCopy) {
       result.rendered = await compileCurrent(result.savedSnapshot);
     }
     return result;
-  }, [matchesSnapshot, performSaveSnapshot, compileCurrent]);
+  }, [matchesSnapshot, performSaveSnapshot, compileCurrent, renameSavedArticleFolder]);
 
-  const captureSavedRender = useCallback(async (snapshot: ArticleSnapshot) => {
+  const captureSavedRender = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true) => {
     const root = snapshot.directory, preview = previewRef.current, compiled = compiledFormatRef.current;
-    if (!root || !snapshot.month || !snapshot.folder || !preview || !compiled || !matchesSnapshot(snapshot)) return false;
+    if (!isAllowed() || !root || !snapshot.month || !snapshot.folder || !preview || !compiled || !matchesSnapshot(snapshot)) return false;
     try {
       const prepared = await prepareRenderRecord(snapshot.source, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: 'articles/' + snapshot.month + '/' + snapshot.folder });
-      if (!matchesSnapshot(snapshot)) return false;
-      await mutationQueueRef.current.run(async () => {
+      if (!isAllowed() || !matchesSnapshot(snapshot)) return false;
+      const persisted = await mutationQueueRef.current.run(async () => {
+        if (!isAllowed()) return false;
         if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new ProductError("controller.theArticleSessionChangedTheRenderRecordWasNotUpdated");
-        await persistRenderRecord(root, await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!), prepared);
+        const savedDirectory = await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!);
+        if (!isAllowed()) return false;
+        await persistRenderRecord(root, savedDirectory, prepared);
+        return true;
       });
+      if (!persisted) return false;
       if (matchesSnapshot(snapshot)) {
         const next = { ...articleRef.current, renderRecord: prepared.record, renderCss: compiled.css, renderIssue: undefined };
         articleRef.current = next; setArticle(next);
@@ -893,7 +1011,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     const root = directoryRef.current;
     if (!root) return;
     setSettingsBusy(true);
-    setSettingsNotice({ ...productLabel("controller.savingSettingsJson"), tone: 'warning' });
+    setSettingsNotice({ label: '', tone: 'neutral', notify: false });
     try {
       const saved = await saveArticleSettings(root, nextSettings);
       if (directoryRef.current !== root) return;
@@ -1051,7 +1169,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     const lease = beginHistoryOperation();
     if (!lease) return;
     setHistoryRefreshPending(false);
-    setHistoryNotice({ ...productLabel("controller.loadingHistoricalVersions"), tone: 'warning' });
+    setHistoryNotice({ label: '', tone: 'neutral' });
     try {
       const result = await mutationQueueRef.current.run(async () => {
         if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedHistoryReadingWasCancelled");
@@ -1064,7 +1182,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       if (!historyBaselineRef.current || historyBaselineRef.current.root !== root || historyBaselineRef.current.articleId !== target.articleId) {
         historyBaselineRef.current = { root, articleId: target.articleId, fingerprint: null, initialized: false };
       }
-      setHistoryNotice({ ...(result.issues.length ? productLabel("controller.completeVersionsLoadedDamagedOrIncompleteRecordsExcludedFromRestore", { "result_snapshotsCount": result.snapshots.length, "result_issuesCount": result.issues.length }) : productLabel("controller.historicalVersionsLoaded", { "result_snapshotsCount": result.snapshots.length })), tone: result.issues.length ? 'warning' : 'neutral' });
+      setHistoryNotice({ ...(result.issues.length ? productLabel("controller.completeVersionsLoadedDamagedOrIncompleteRecordsExcludedFromRestore", { "result_snapshotsCount": result.snapshots.length, "result_issuesCount": result.issues.length }) : { label: '' }), tone: result.issues.length ? 'warning' : 'neutral' });
       setHistoryDialogOpen(true);
     } catch (error) {
       if (directoryRef.current === root && matchesSnapshot(target)) setHistoryNotice({ ...productLabel("controller.historyReadingFailed", { "cause": productCause(error) }), tone: 'error' });
@@ -1192,7 +1310,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     const lease = beginHistoryOperation();
     if (!lease) return;
     setHistoryRefreshPending(true);
-    setHistoryNotice({ ...productLabel("controller.refreshingTheHistoryListWithoutWritingFiles"), tone: 'warning' });
+    setHistoryNotice({ label: '', tone: 'neutral' });
     try {
       const history = await mutationQueueRef.current.run(async () => {
         if (!matchesSnapshot(current) || !mutationQueueRef.current.canSave(current.documentToken)) throw new ProductError("controller.theArticleOrLibraryChangedHistoryRefreshWasCancelled");
@@ -1202,7 +1320,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       setHistorySnapshots(history.snapshots);
       setHistoryIssues(history.issues);
       setHistoryRefreshPending(false);
-      setHistoryNotice({ ...productLabel("controller.historyListRefreshedCompleteVersions", { "history_snapshotsCount": history.snapshots.length, "value": (history.issues.length ? productReference("controller.unreadableRecords", { "history_issuesCount": history.issues.length }) : '') }), tone: history.issues.length ? 'warning' : 'success' });
+      setHistoryNotice({ ...(history.issues.length ? productLabel('controller.unreadableRecords', { history_issuesCount: history.issues.length }) : { label: '' }), tone: history.issues.length ? 'warning' : 'neutral' });
     } catch (error) {
       if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productLabel("controller.historyRefreshStillFailedProtectionWillNotBeWrittenAgain", { "cause": productCause(error) }), tone: 'warning' });
     } finally {
@@ -1275,7 +1393,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       ].filter(Boolean);
       const detail = notes.length ? productJoin(['；', productJoin(notes, '；')]) : '';
       setHistoryNotice({ ...productLabel("controller.selectedVersionRestoredContentFromBeforeRestoreIsRetainedIn", { "resultCheckpointId": result.checkpointId, "detail": detail }), tone: notes.length ? 'warning' : 'success' });
-      setStatus({ ...productLabel("controller.historicalVersionRestoredContentFromBeforeRestoreIsRetainedIn", { "resultCheckpointId": result.checkpointId, "detail": detail }), tone: notes.length ? 'warning' : 'success' });
+      setStatus({ ...productLabel("controller.historicalVersionRestoredContentFromBeforeRestoreIsRetainedIn", { "resultCheckpointId": result.checkpointId, "detail": detail }), notify: false, tone: notes.length ? 'warning' : 'success' });
     } catch (error) {
       if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productErrorLabel(error), tone: 'error' });
     } finally {
@@ -1284,16 +1402,20 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, [articleSettings.autoSnapshot.maxCount, applyStoredArticle, beginHistoryOperation, finishHistoryOperation, loadStoredArticles, matchesSnapshot, snapshotFor]);
 
   const saveHistoryAsArticle = useCallback(async (selected: ArticleHistorySnapshot, title: string, targetMonth: string) => {
+    const report = (label: ReturnType<typeof productLabel>, tone: Exclude<Tone, 'neutral'>) => {
+      const notice = { ...label, tone };
+      setHistoryNotice({ ...notice, notify: false }); notifyToast({ key: 'history-fork', ...notice });
+      return true;
+    };
     const current = snapshotFor();
     const root = current.directory;
     const cleanTitle = title.trim();
     const persisted = storedArticles.find((item) => item.id === current.articleId);
     if (!root || !current.folder || !current.month || !cleanTitle || !selected.themeMatches || !persisted || !current.themeValid || persisted.parse.diagnostics.some((item) => item.level === 'error')) {
-      setHistoryNotice({ ...productLabel("controller.anIndependentCopyCannotBeCreatedSafelyAValidCurrentArticleMatching"), tone: 'error' });
-      return;
+      return report(productLabel("controller.anIndependentCopyCannotBeCreatedSafelyAValidCurrentArticleMatching"), 'error');
     }
     const lease = beginHistoryOperation();
-    if (!lease) return;
+    if (!lease) return false;
     setHistoryNotice({ ...productLabel("controller.copyingArticleAssetsAndCreatingAnIndependentVersion"), tone: 'warning' });
     try {
       const result = await mutationQueueRef.current.run(async () => {
@@ -1316,17 +1438,18 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           throw error;
         }
       });
-      if (directoryRef.current !== root) return;
+      if (directoryRef.current !== root) return false;
       setStoredArticles((items) => upsertStoredArticle(items, result.article));
-      if (!matchesSnapshot(current)) return;
+      if (!matchesSnapshot(current)) return false;
       const indexNote = result.indexUpdated ? (result.indexError ? productReference("controller.indexRebuilt", { "resultIndexError": result.indexError }) : '') : productReference("controller.monthlyIndexNotUpdated", { "value": (result.indexError ?? productReference("controller.unknownError")) });
-      setHistoryNotice({ ...productLabel("controller.savedAnIndependentArticleItsBodyUsesTheSelectedHistoricalVersionAssets", { "result_article_parse_metadataTitle": result.article.parse.metadata.title, "indexNote": indexNote }), tone: result.indexUpdated && !result.indexError ? 'success' : 'warning' });
+      return report(productLabel("controller.savedAnIndependentArticleItsBodyUsesTheSelectedHistoricalVersionAssets", { "result_article_parse_metadataTitle": result.article.parse.metadata.title, "indexNote": indexNote }), result.indexUpdated && !result.indexError ? 'success' : 'warning');
     } catch (error) {
-      if (directoryRef.current === root && matchesSnapshot(current)) setHistoryNotice({ ...productLabel("controller.saveAsFailedTheOriginalManuscriptAndHistoryAreUnchanged", { "cause": productCause(error) }), tone: 'error' });
+      if (directoryRef.current === root && matchesSnapshot(current)) return report(productLabel("controller.saveAsFailedTheOriginalManuscriptAndHistoryAreUnchanged", { "cause": productCause(error) }), 'error');
+      return false;
     } finally {
       finishHistoryOperation(lease);
     }
-  }, [beginHistoryOperation, finishHistoryOperation, matchesSnapshot, snapshotFor, storedArticles]);
+  }, [beginHistoryOperation, finishHistoryOperation, matchesSnapshot, notifyToast, snapshotFor, storedArticles]);
 
   const insertImagesIntoDraft = useCallback((target: ArticleSnapshot, fileNames: string[], selection: { start: number; end: number }, storage: 'image' | 'file' = 'image'): MediaActionOutcome => {
     const notice = (message: string, tone: MediaActionOutcome['tone'], ok = false): MediaActionOutcome => {
@@ -1416,31 +1539,32 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const importSharedFiles = useCallback(async (files: File[]): Promise<MediaActionOutcome> => {
     const root = directoryRef.current, session = contentLibraryRootSessionRef.current;
     const current = () => directoryRef.current === root && contentLibraryRootSessionRef.current === session;
-    const notice = (message: string, tone: MediaActionOutcome['tone'], ok = false): MediaActionOutcome => {
-      if (current()) setStatus({ label: message, tone });
-      return { ok, message, tone };
+    const notice = (message: string | ProductMessageInfo, tone: MediaActionOutcome['tone'], ok = false): MediaActionOutcome => {
+      const fields = productErrorMessage(message);
+      if (current()) setStatus({ ...fields, label: fields.message, tone });
+      return { ...fields, ok, tone };
     };
-    if (!root) return notice(productText("controller.openALibraryFirst"), 'warning');
-    if (mediaOperationRef.current || historyOperationRef.current) return notice(productText("controller.anotherAssetOrHistoryOperationIsInProgress"), 'warning');
-    if (!files.length) return notice(productText("controller.noImagesSelected"), 'warning');
+    if (!root) return notice(productReference("controller.openALibraryFirst"), 'warning');
+    if (mediaOperationRef.current || historyOperationRef.current) return notice(productReference("controller.anotherAssetOrHistoryOperationIsInProgress"), 'warning');
+    if (!files.length) return notice(productReference("controller.noImagesSelected"), 'warning');
     mediaOperationRef.current = true; setMediaOperation('import');
-    notice(productText("controller.importingSharedImages"), 'warning');
+    notice(productReference("controller.importingSharedImages"), 'warning');
     try {
       const result = await mutationQueueRef.current.run(async () => {
         let imported = 0;
-        const failures: string[] = [];
+        const failures: ProductMessageValue[] = [];
         for (const file of files) {
           if (!current()) break;
           try { await importResourceFile(root, { kind: 'shared' }, file, current); imported += 1; }
-          catch (error) { failures.push(productText("controller.message", { "value": (file.name || productReference("snippetCategoryIcons.image")), "cause": productCause(error) })); }
+          catch (error) { failures.push(productReference("controller.message", { "value": (file.name || productReference("snippetCategoryIcons.image")), "cause": productCause(error) })); }
         }
         return { imported, failures };
       });
       if (!current()) return { ok: false, ...productMessage("controller.theLibraryChangedImportedFilesRemainInTheOriginalLibrary"), tone: 'warning' };
       if (result.imported) setMediaRefreshRevision((revision) => revision + 1);
-      const failure = result.failures.length ? `；${result.failures.join('；')}` : '';
-      return notice(result.imported ? productText("controller.sharedImagesImported", { "resultImported": result.imported, "failure": failure }) : productText("controller.sharedImagesWereNotImported", { "failure": failure }), result.failures.length ? 'warning' : result.imported ? 'success' : 'error', result.imported > 0);
-    } catch (error) { return notice(productText("mediaLibrary.sharedImageImportFailed", { "cause": productCause(error) }), 'error'); }
+      const failure = result.failures.length ? productJoin(['\n', productJoin(result.failures, '\n')]) : '';
+      return notice(result.imported ? productReference("controller.sharedImagesImported", { "resultImported": result.imported, "failure": failure, failed: result.failures.length }) : productReference("controller.sharedImagesWereNotImported", { "failure": failure, failed: result.failures.length }), result.failures.length ? 'warning' : result.imported ? 'success' : 'error', result.imported > 0);
+    } catch (error) { return notice(productReference("mediaLibrary.sharedImageImportFailed", { "cause": productCause(error) }), 'error'); }
     finally { mediaOperationRef.current = false; setMediaOperation(null); }
   }, []);
 
@@ -1463,11 +1587,6 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     setMobilePane('source');
     navigateArticleMode('editor');
   }, [navigateArticleMode]);
-
-  const closeMediaPicker = useCallback(() => {
-    mediaPickerRequestRef.current = null; setMediaPickerRequest(null);
-    window.requestAnimationFrame(() => sourceTextareaRef.current?.focus());
-  }, []);
 
   const adoptLibraryImage = useCallback(async (asset: LibraryMediaAsset): Promise<MediaActionOutcome> => {
     const request = mediaPickerRequestRef.current;
@@ -1581,8 +1700,8 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           if (!isRootCurrent()) return { fileCreated: true, fileName: created.fileName, ...productMessage("controller.newImageSavedTheLibrarySessionChangedTheOriginalFileIsRetained"), tone: 'warning' as const };
           const retained = Boolean(usage.body || usage.history || usage.issues.length);
           if (!retained) { await imageDirectory.removeEntry(asset.fileName); removedSourceRef.value = true; await removeMediaDescription(imageDirectory, asset.fileName, isRootCurrent, metadataGuard); }
-          const message = productText("controller.imageOperationCompleted", { "value": (replacement ? productReference("mediaManagement.replacedWith") : productReference("mediaManagement.renamedTo")), "createdFileName": created.fileName, "value2": (retained ? productReference("controller.savedBodyOrHistoryStillNeedsTheOriginalFileWhichIsRetained") : productReference("controller.theUnreferencedOriginalFileWasRemoved")) });
-          return { fileCreated: true, fileName: created.fileName, message, tone: 'success' as const };
+          const messageInfo = productMessage("controller.imageOperationCompleted", { "value": (replacement ? productReference("mediaManagement.replacedWith") : productReference("mediaManagement.renamedTo")), "createdFileName": created.fileName, "value2": (retained ? productReference("controller.savedBodyOrHistoryStillNeedsTheOriginalFileWhichIsRetained") : productReference("controller.theUnreferencedOriginalFileWasRemoved")) });
+          return { fileCreated: true, fileName: created.fileName, ...messageInfo, tone: 'success' as const };
         }
         const nextSource = updateFrontMatter(references.source, { updatedAt: new Date().toISOString() });
 
@@ -1594,11 +1713,11 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           const saveResult = await performSaveSnapshot(snapshotFor());
           const sourceSaved = saveResult.ok && saveResult.current && Boolean(saveResult.savedSnapshot);
           const indexNote = saveResult.result?.indexError ? productReference("controller.monthlyIndexStatus", { "saveResult_resultIndexError": saveResult.result.indexError }) : '';
-          const message = sourceSaved
-            ? productText("controller.newImageSavedCurrentManuscriptReferencesWereUpdatedAndSavedOriginalFile", { "createdFileName": created.fileName, "assetFileName": asset.fileName, "indexNote": indexNote })
-            : productText("controller.newImageSavedButWritingManuscriptReferencesWasNotConfirmedUnsavedEdits", { "createdFileName": created.fileName, "assetFileName": asset.fileName });
-          setStatus({ label: message, tone: sourceSaved && !saveResult.result?.indexError ? 'success' : 'warning' });
-          return { fileCreated: true, fileName: created.fileName, message, tone: sourceSaved && !saveResult.result?.indexError ? 'success' as const : 'warning' as const };
+          const messageInfo = sourceSaved
+            ? productMessage("controller.newImageSavedCurrentManuscriptReferencesWereUpdatedAndSavedOriginalFile", { "createdFileName": created.fileName, "assetFileName": asset.fileName, "indexNote": indexNote })
+            : productMessage("controller.newImageSavedButWritingManuscriptReferencesWasNotConfirmedUnsavedEdits", { "createdFileName": created.fileName, "assetFileName": asset.fileName });
+          setStatus({ ...messageInfo, label: messageInfo.message, tone: sourceSaved && !saveResult.result?.indexError ? 'success' : 'warning' });
+          return { fileCreated: true, fileName: created.fileName, ...messageInfo, tone: sourceSaved && !saveResult.result?.indexError ? 'success' as const : 'warning' as const };
         }
 
         const saved = await saveStoredArticle(root, nextSource, theme, folder, month, { writeTheme: false, expectedSource: source, requestPermission: false, guard: async (handle, path) => {
@@ -1608,19 +1727,19 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           if (!isRootCurrent()) throw new ProductError('resources.changed');
         } });
         if (isRootCurrent()) setStoredArticles((items) => upsertStoredArticle(items, saved.article));
-        const message = saved.sourceSaved
-          ? productText("controller.newImageSavedReferencesInItsOwningArticleWereUpdatedAndSaved", { "createdFileName": created.fileName, "assetFileName": asset.fileName, "value": (saved.indexError ? productReference("controller.monthlyIndexStatus2", { "savedIndexError": saved.indexError }) : '') })
-          : productText("controller.newImageSavedButWritingReferencesInItsOwningArticleWasNot", { "createdFileName": created.fileName, "assetFileName": asset.fileName });
-        if (isRootCurrent()) setStatus({ label: message, tone: saved.sourceSaved && !saved.indexError ? 'success' : 'warning' });
-        return { fileCreated: true, fileName: created.fileName, message, tone: saved.sourceSaved && !saved.indexError ? 'success' as const : 'warning' as const };
+        const messageInfo = saved.sourceSaved
+          ? productMessage("controller.newImageSavedReferencesInItsOwningArticleWereUpdatedAndSaved", { "createdFileName": created.fileName, "assetFileName": asset.fileName, "value": (saved.indexError ? productReference("controller.monthlyIndexStatus2", { "savedIndexError": saved.indexError }) : '') })
+          : productMessage("controller.newImageSavedButWritingReferencesInItsOwningArticleWasNot", { "createdFileName": created.fileName, "assetFileName": asset.fileName });
+        if (isRootCurrent()) setStatus({ ...messageInfo, label: messageInfo.message, tone: saved.sourceSaved && !saved.indexError ? 'success' : 'warning' });
+        return { fileCreated: true, fileName: created.fileName, ...messageInfo, tone: saved.sourceSaved && !saved.indexError ? 'success' as const : 'warning' as const };
       });
       return result;
     } catch (error) {
       if (createdRef.value) {
         const created = createdRef.value;
-        const message = productText("controller.newImageSavedButArticleReferenceUpdateFailed", { "createdFileName": created.fileName, "cause": productCause(error), "value": (removedSourceRef.value ? productReference("controller.theOriginalFileWasRemovedButTheDescriptionIndexOrLaterOperation") : productReference("controller.originalFileIsRetained", { "assetFileName": asset.fileName })) });
-        if (directoryRef.current === root) setStatus({ label: message, tone: 'warning' });
-        return { fileCreated: true, fileName: created.fileName, message, tone: 'warning' };
+        const messageInfo = productMessage("controller.newImageSavedButArticleReferenceUpdateFailed", { "createdFileName": created.fileName, "cause": productCause(error), "value": (removedSourceRef.value ? productReference("controller.theOriginalFileWasRemovedButTheDescriptionIndexOrLaterOperation") : productReference("controller.originalFileIsRetained", { "assetFileName": asset.fileName })) });
+        if (directoryRef.current === root) setStatus({ ...messageInfo, label: messageInfo.message, tone: 'warning' });
+        return { fileCreated: true, fileName: created.fileName, ...messageInfo, tone: 'warning' };
       }
       throw error;
     } finally {
@@ -1791,60 +1910,8 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
 
   const closeTemplateDialog = useCallback(() => setShowTemplateDialog(false), []);
 
-  useEffect(() => { setArticleFolderName(article.folder ?? ''); }, [article.folder, article.month, directory]);
-
-  const renameCurrentArticleFolder = useCallback((name: string): Promise<boolean> => {
-    const root = directoryRef.current, initial = articleRef.current;
-    if (!root || !initial.month || !initial.folder || historyOperationRef.current || mediaOperationRef.current || editorWorkspaceIssue) return Promise.resolve(false);
-    const month = initial.month, folder = initial.folder, id = articleId(initial);
-    try { name = normalizeArticleDirectoryName(name); }
-    catch (error) { const notice = { ...productErrorLabel(error), tone: 'error' as const }; notifyToast({ key: 'article-folder', ...notice }); setStatus(notice); return Promise.resolve(false); }
-    if (name === folder) return Promise.resolve(true);
-    if (getArticleOrganization(editorWorkspaceRef.current, id).archived) return Promise.resolve(false);
-    return new Promise(resolve => runAfterDraftDecision({ label: productText('articleFolder.renameAction'), onCancel: () => resolve(false), run: async () => {
-      const target = snapshotFor();
-      if (target.directory !== root || target.articleId !== id || articleRef.current.dirty) { resolve(false); return; }
-      const lease = beginHistoryOperation(); if (!lease) { resolve(false); return; }
-      let blocked: ReturnType<typeof mutationQueueRef.current.beginDelete> = null;
-      let moved: Awaited<ReturnType<typeof renameStoredArticleDirectory>> | undefined;
-      try {
-        await editorWorkspaceQueueRef.current;
-        if (importFolderRef.current.isBusy(root, id)) throw new ProductError('articleFolder.pendingImports');
-        blocked = mutationQueueRef.current.beginDelete(root, id);
-        if (!blocked) throw new ProductError('articleFolder.changed');
-        moved = await mutationQueueRef.current.run(() => renameStoredArticleDirectory(root, month, folder, name, { expectedSource: target.source, isCurrent: () => matchesSnapshot(target) && !articleRef.current.dirty }));
-        mutationQueueRef.current.finishDelete(blocked); blocked = null;
-        if (!matchesSnapshot(target)) { resolve(false); return; }
-        importFolderRef.current.moved(root, id, moved.article.folder);
-        setMediaTarget(null); closeMediaPicker();
-        setStoredArticles(items => upsertStoredArticle(items.filter(item => item.id !== id), moved!.article));
-        setArticleChecks(records => { const next = { ...records }; delete next[id]; return next; });
-        const loadedWorkspace = await loadEditorWorkspace(root);
-        if (!loadedWorkspace.issue && directoryRef.current === root) {
-          editorWorkspaceRef.current = loadedWorkspace.workspace;
-          editorWorkspaceSnapshotRef.current = { fileExists: loadedWorkspace.fileExists, rawContent: loadedWorkspace.rawContent };
-          setEditorWorkspace(loadedWorkspace.workspace);
-        }
-        let loaded = moved.article, rereadIssue: string | null = loadedWorkspace.issue;
-        try { loaded = await readStoredArticleById(root, month, moved.article.folder); }
-        catch (error) { rereadIssue = error instanceof Error ? error.message : String(error); }
-        if (!await applyStoredArticle(loaded, false, root)) { resolve(false); return; }
-        setMediaRefreshRevision(value => value + 1);
-        const issue = moved.cleanupIssue ?? rereadIssue;
-        const notice = { label: issue ?? productText('articleFolder.renamed'), tone: issue ? 'warning' as const : 'success' as const };
-        notifyToast({ key: 'article-folder', ...notice }); setStatus(notice); resolve(true);
-      } catch (error) {
-        if (blocked) { mutationQueueRef.current.failDelete(blocked); blocked = null; }
-        if (directoryRef.current === root && (articleId(articleRef.current) === id || moved && articleId(articleRef.current) === moved.article.id)) {
-          if (moved) await applyStoredArticle(moved.article, false, root);
-          const notice = { ...productErrorLabel(error), tone: 'error' as const }; notifyToast({ key: 'article-folder', ...notice }); setStatus(notice);
-        }
-        resolve(false);
-      } finally { if (blocked) mutationQueueRef.current.failDelete(blocked); finishHistoryOperation(lease); }
-    } }));
-  }, [applyStoredArticle, beginHistoryOperation, closeMediaPicker, editorWorkspaceIssue, finishHistoryOperation, matchesSnapshot, notifyToast, runAfterDraftDecision, setMediaRefreshRevision, snapshotFor]);
-
   const openStoredArticle = useCallback((stored: ArticleSummary) => {
+    resumeIntentRef.current.active = false;
     const root = directoryRef.current;
     if (!root) return;
     if (mutationQueueRef.current.isDeleting(root, stored.id)) {
@@ -1906,7 +1973,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const manageLibraryMedia = useCallback(async (operation: MediaMutation): Promise<MediaActionOutcome> => {
     const root = directoryRef.current, session = contentLibraryRootSessionRef.current;
     const current = () => root !== null && directoryRef.current === root && contentLibraryRootSessionRef.current === session;
-    if (!root || !operation.assets.length || mediaOperationRef.current || historyOperationRef.current) return { ok: false, tone: 'warning', ...productMessage("controller.anotherOperationIsInProgressOrNoAssetIsSelected") };
+    if (!root || !operation.assets.length || mediaOperationRef.current || historyOperationRef.current) return { ok: false, tone: 'error', ...productMessage("controller.anotherOperationIsInProgressOrNoAssetIsSelected") };
     const outcomes: MediaActionOutcome[] = [];
     const failedKeys: string[] = [];
     const keyOf = libraryMediaAssetKey;
@@ -1917,7 +1984,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         if (operation.destination?.kind === 'article' && getArticleOrganization(editorWorkspaceRef.current, operation.destination.articleId).archived) throw new ProductError("controller.theTargetArticleIsArchivedAndReadOnly");
         if ((operation.type === 'rename' || operation.type === 'replace') && asset.kind === 'article') {
           const result = await renameMediaImage(asset, operation.name ?? asset.fileName.replace(/\.[^.]+$/, ''), operation.type === 'replace' ? operation.file : undefined);
-          const outcome = { ok: result.fileCreated && result.tone === 'success', tone: result.tone, message: result.message }; outcomes.push(outcome); if (!outcome.ok) failedKeys.push(keyOf(asset));
+          const outcome = { ...result, changed: result.fileCreated, ok: result.fileCreated && result.tone === 'success' }; outcomes.push(outcome); if (!outcome.ok) failedKeys.push(keyOf(asset));
           continue;
         }
         mediaOperationRef.current = true; setMediaOperation('rename');
@@ -1930,19 +1997,19 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           if (operation.type === 'describe') { await saveMediaDescription(directory, asset.fileName, operation.description ?? '', current, metadataGuard); return { ok: true, tone: 'success', ...productMessage("controller.descriptionSaved") }; }
           if (operation.type === 'delete') {
             try { if (asset.storage === 'file') await deleteResourceFile(asset, current); else await directory.removeEntry(asset.fileName); } catch (error) { if (!(error && typeof error === 'object' && 'name' in error && error.name === 'NotFoundError')) throw error; }
-            try { await removeMediaDescription(directory, asset.fileName, current, metadataGuard); } catch (error) { return { ok: false, tone: 'warning', ...productMessage("controller.fileWasDeletedButItsDescriptionIndexWasNotCleaned", { "assetFileName": asset.fileName, "cause": productCause(error) }) }; } return { ok: true, tone: 'warning', ...productMessage("controller.deletedBodyAndHistoryReferencesAreRetained", { "assetFileName": asset.fileName }) }; }
+            try { await removeMediaDescription(directory, asset.fileName, current, metadataGuard); } catch (error) { return { ok: false, changed: true, tone: 'warning', ...productMessage("controller.fileWasDeletedButItsDescriptionIndexWasNotCleaned", { "assetFileName": asset.fileName, "cause": productCause(error) }) }; } return { ok: true, tone: 'warning', ...productMessage("controller.deletedBodyAndHistoryReferencesAreRetained", { "assetFileName": asset.fileName }) }; }
           if (!operation.destination) throw new ProductError("controller.chooseADestination");
           const source = asset.kind === 'article' && articleId(articleRef.current) === asset.articleId ? articleRef.current.source : undefined;
           const usage = await inspectMediaUsage(asset, source);
           if (!current()) throw new ProductError("controller.theLibrarySessionChanged");
-          return transferMedia(asset, operation.destination, usage, current);
+          return transferMedia(asset, operation.destination, usage, current, { source: articleRef.current.source, month: articleRef.current.month, folder: articleRef.current.folder });
         });
         outcomes.push(result); if (!result.ok) failedKeys.push(keyOf(asset));
-      } catch (error) { outcomes.push({ ok: false, tone: 'error', message: `${asset.fileName}：${error instanceof Error ? error.message : String(error)}` }); failedKeys.push(keyOf(asset)); }
+      } catch (error) { outcomes.push({ ok: false, tone: 'error', ...productMessage('controller.assetOperationFailed', { fileName: asset.fileName, cause: productCause(error) }) }); failedKeys.push(keyOf(asset)); }
       finally { mediaOperationRef.current = false; if (current()) { setMediaOperation(null); setMediaRefreshRevision(value => value + 1); } }
     }
-    const ok = outcomes.every(result => result.ok), tone = outcomes.some(result => !result.ok) ? 'warning' : outcomes.some(result => result.tone === 'warning') ? 'warning' : 'success';
-    const result: MediaActionOutcome = { ok, tone, failedKeys, ...productMessage("controller.completed", { "outcomes_filter_result_result_ok_Count": outcomes.filter(result => result.ok).length, "operation_assetsCount": operation.assets.length, "details": outcomes.map(result => result.message.replace(/。$/, '')).join('；') }) };
+    const ok = outcomes.length === operation.assets.length && outcomes.every(result => result.ok), tone = !ok ? outcomes.some(result => result.ok || result.changed) ? 'warning' : 'error' : outcomes.some(result => result.tone === 'warning') ? 'warning' : 'success';
+    const result: MediaActionOutcome = { ok, tone, failedKeys, ...productMessage("controller.completed", { "outcomes_filter_result_result_ok_Count": outcomes.filter(result => result.ok).length, "operation_assetsCount": operation.assets.length, "operation": operation.type, "details": productJoin(outcomes.map(result => productCause(result)), '；') }) };
     if (current()) {
       const request = mediaPickerRequestRef.current, snapshot = snapshotFor();
       if (request && request.root === root && request.articleId === snapshot.articleId) { const updated = { ...request, documentToken: snapshot.documentToken, body: parseArticle(snapshot.source).body }; mediaPickerRequestRef.current = updated; setMediaPickerRequest(updated); }
@@ -2083,8 +2150,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     );
   }, [persistEditorWorkspace, storedArticles]);
 
-  const openAuthorizedDirectory = useCallback(async (handle: FileSystemDirectoryHandle, selection: number) => {
+  const openAuthorizedDirectory = useCallback(async (handle: FileSystemDirectoryHandle, selection: number, manual = false) => {
     const isCurrentSelection = () => directorySelectionRef.current === selection;
+    const startedForResume = resumeIntentRef.current.active;
     let selectedRoot: FileSystemDirectoryHandle | null = null;
     let libraryLoadFinished = false;
     try {
@@ -2114,7 +2182,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
             setSelectedArticleCollection('all');
           }
           setDirectory(handle);
+          manualLibraryLoad.current = manual ? selection : null;
           setContentLibrariesState('loading');
+          setLibraryLoadIssue(null);
           setDirectoryName(displayDirectoryName(handle));
           setThemeLibrary([]);
           setThemeIssues([]);
@@ -2141,7 +2211,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         setEditorWorkspaceBusy(false);
         setSettingsIssue(null);
           setSettingsBusy(false);
-          setSettingsNotice({ ...productLabel("controller.readingLibrarySettings"), tone: 'warning' });
+          setSettingsNotice({ label: '', tone: 'neutral', notify: false });
           historyBaselineRef.current = null;
           openDocument(handle, articleId(articleRef.current));
           await ensureArticleDirectories(handle);
@@ -2213,11 +2283,11 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
               ...(settingsResult.value.issue
                 ? productLabel("controller.settingsJsonIsInvalidAutoSaveAndSnapshotsArePausedRepairThe")
                 : settingsResult.value.fileExists ? productLabel("controller.workflowSettingsLoadedForThisLibrary") : productLabel("controller.thisDirectoryHasNoSettingsJsonDefaultsAreBeingUsedNoFile")),
-              tone: settingsResult.value.issue ? 'warning' : 'neutral',
+              tone: settingsResult.value.issue ? 'warning' : 'neutral', notify: false,
             });
           } else {
             setSettingsIssue(settingsResult.reason instanceof Error ? settingsResult.reason.message : String(settingsResult.reason));
-            setSettingsNotice({ ...productLabel("controller.settingsCouldNotBeReadAutoSaveAndSnapshotsArePaused"), tone: 'error' });
+            setSettingsNotice({ ...productLabel("controller.settingsCouldNotBeReadAutoSaveAndSnapshotsArePaused"), notify: false, tone: 'error' });
           }
           let availableEditorThemes = editorThemeResult.status === 'fulfilled'
             ? editorThemeResult.value.themes
@@ -2248,9 +2318,32 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           const libraryLoadSucceeded = snippetResult.status === 'fulfilled' && templateResult.status === 'fulfilled';
           libraryLoadFinished = true;
           setContentLibrariesState(libraryLoadSucceeded ? 'ready' : 'failed');
+          if (!libraryLoadSucceeded) setLibraryLoadIssue(productErrorLabel(productReference('shared.compose', { parts: productJoin([snippetResult, templateResult].flatMap(result => result.status === 'rejected' ? [productCause(result.reason)] : []), '\n') })));
           const next = await refreshArticles(handle);
           if (!isCurrentSelection() || directoryRef.current !== handle) return;
-          if (view === 'articles') navigateArticleMode('overview');
+          if (resumeIntentRef.current.active) {
+            const current = () => isCurrentSelection() && directoryRef.current === handle && resumeIntentRef.current.active && routePathRef.current === '/editor';
+            try {
+              const remembered = readArticleResume(articleResumeStorage(), bookmarkId);
+              if (remembered) {
+                const [month, folder] = remembered.articleId.split('/');
+                const stored = await readStoredArticleById(handle, month, folder);
+                if (!current()) return;
+                if (stored.parse.metadata.createdAt !== remembered.createdAt || stored.parse.diagnostics.some(item => item.level === 'error')) throw new ProductError('resume.invalid');
+                if (await applyStoredArticle(stored, false, handle, current)) { resumeIntentRef.current.active = false; setPreferredArticleMode('editor'); }
+                return;
+              }
+              resumeIntentRef.current.active = false; navigateArticleMode('overview'); return;
+            } catch (error) {
+              if (!current()) return;
+              forgetArticleResume(articleResumeStorage(), bookmarkId); resumeIntentRef.current.active = false;
+              navigateArticleMode('overview');
+              notifyToast({ key: 'article-resume', label: '', summary: productReference('resume.unavailable'), details: productReference('resume.details', { cause: productCause(error) }), tone: 'warning' });
+              return;
+            }
+          }
+          if (startedForResume) return;
+          if (routePathRef.current === '/articles' || routePathRef.current === '/editor') navigateArticleMode('overview');
           else setPreferredArticleMode('overview');
           setStatus({
             ...(workspaceIssue
@@ -2262,14 +2355,15 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       if (!isCurrentSelection()) return;
       if (!libraryLoadFinished && selectedRoot && directoryRef.current === selectedRoot) {
         setContentLibrariesState('failed');
+        setLibraryLoadIssue(productErrorLabel(error));
         const pending = getFormatSnapshot();
-        if (pending.loading && pending.library === selectedRoot.name) invalidateFormatBundle(selectedRoot.name, productErrorMessage(error).message);
+        if (pending.loading && pending.library === selectedRoot.name) invalidateFormatBundle(selectedRoot.name, error);
       }
       setStatus({ ...productErrorLabel(error), tone: 'error' });
     } finally {
       if (isCurrentSelection() && selectedRoot && directoryRef.current === selectedRoot) setEditorAppearanceLoaded(true);
     }
-  }, [advanceContentLibraryRootSession, navigateArticleMode, openDocument, refreshArticles, setPreferredArticleMode, view]);
+  }, [advanceContentLibraryRootSession, applyStoredArticle, navigateArticleMode, notifyToast, openDocument, refreshArticles, setPreferredArticleMode]);
 
   const rememberAuthorizedDirectory = useCallback((handle: FileSystemDirectoryHandle, selection: number) => {
     setRememberedDirectory(handle);
@@ -2297,40 +2391,42 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, []);
 
   const authorizeDirectory = useCallback(() => {
+    resumeIntentRef.current.active = false;
     const selection = ++directorySelectionRef.current;
     runAfterDraftDecision({
       label: productText("controller.switchLibraryDirectories"),
       run: async () => {
         try {
-          setStatus({ ...productLabel("controller.chooseAnExistingLibraryFolder"), tone: 'neutral' });
           const handle = await pickDataDirectory();
           if (directorySelectionRef.current !== selection) return;
           await assertExistingDataDirectory(handle);
           rememberAuthorizedDirectory(handle, selection);
-          await openAuthorizedDirectory(handle, selection);
+          await openAuthorizedDirectory(handle, selection, true);
         } catch (error) {
           if (directorySelectionRef.current !== selection || error instanceof DOMException && error.name === 'AbortError') return;
-          setStatus({ ...productErrorLabel(error), tone: 'error' });
+          const notice = { ...productErrorLabel(error), tone: 'error' as const };
+          setStatus({ ...notice, notify: false });
+          notifyToast({ key: 'library-open', ...notice });
         }
       },
     });
-  }, [openAuthorizedDirectory, rememberAuthorizedDirectory, runAfterDraftDecision]);
+  }, [notifyToast, openAuthorizedDirectory, rememberAuthorizedDirectory, runAfterDraftDecision]);
 
   const requestCreateDataDirectory = useCallback(() => {
     runAfterDraftDecision({ label: productText("controller.createALibrary"), run: () => { setCreateLibraryDialogOpen(true); } });
   }, [runAfterDraftDecision]);
 
   const createDataDirectory = useCallback(async (name: string, presetId: PlatformPresetId = DEFAULT_PLATFORM_PRESET_ID): Promise<LibraryCreationResult> => {
+    resumeIntentRef.current.active = false;
     const selection = ++directorySelectionRef.current;
     try {
       getPublicPlatformPreset(presetId);
-      setStatus({ ...productLabel("controller.chooseTheParentDirectoryForTheNewLibrary"), tone: 'neutral' });
       const parent = await pickDataDirectory();
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
       const handle = await createNamedDataDirectory(parent, name, presetId, seedLocale);
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
       rememberAuthorizedDirectory(handle, selection);
-      await openAuthorizedDirectory(handle, selection);
+      await openAuthorizedDirectory(handle, selection, true);
       return { status: directorySelectionRef.current === selection ? 'created' : 'cancelled' };
     } catch (error) {
       if (directorySelectionRef.current !== selection || error instanceof DOMException && error.name === 'AbortError') return { status: 'cancelled' };
@@ -2348,17 +2444,23 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       async (permission) => {
         if (directorySelectionRef.current !== selection) return;
         if (permission !== 'granted') {
-          setStatus({ ...productLabel("controller.thePreviousLibraryLacksReadWritePermissionAuthorizeItOrChooseAnother"), tone: 'warning' });
+          const notice = { ...productLabel("controller.thePreviousLibraryLacksReadWritePermissionAuthorizeItOrChooseAnother"), tone: 'warning' as const };
+          setStatus({ ...notice, notify: false });
+          notifyToast({ key: 'library-open', ...notice });
           return;
         }
         setDirectoryRestoreState('idle');
-        await openAuthorizedDirectory(handle, selection);
+        await openAuthorizedDirectory(handle, selection, true);
       },
       (error: unknown) => {
-        if (directorySelectionRef.current === selection) setStatus({ ...productErrorLabel(error), tone: 'error' });
+        if (directorySelectionRef.current === selection) {
+          const notice = { ...productErrorLabel(error), tone: 'error' as const };
+          setStatus({ ...notice, notify: false });
+          notifyToast({ key: 'library-open', ...notice });
+        }
       },
     );
-  }, [openAuthorizedDirectory, rememberedDirectory]);
+  }, [notifyToast, openAuthorizedDirectory, rememberedDirectory]);
 
   const confirmFormatCheck = useCallback((report: ArticleFormatReport, mode: 'copy' | 'export' = 'copy') => new Promise<boolean>((resolve) => {
     formatCheckResolveRef.current?.(false);
@@ -2422,17 +2524,23 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     }
     try {
       const proceed = await confirmFormatCheck(report);
-      if (!proceed) { setStatus({ ...productLabel("controller.copyCancelledTheClipboardIsUnchanged"), tone: 'warning' }); return; }
+      if (!proceed) return;
       if (!current() || !previewRef.current) { setStatus({ ...productLabel("controller.theManuscriptChangedDuringValidationCopyTheCurrentDraftAgain"), tone: 'warning' }); return; }
       if (mediaRefreshRevisionRef.current !== reportMediaRevision) throw new ProductError('resources.changedDuringOutput');
       if (previewRef.current.querySelector('[data-render-state="pending"][data-render-kind="mermaid"]')) throw new ProductError('mermaid.pending');
       const outputMediaRevision = mediaRefreshRevisionRef.current;
       const outputCurrent = () => current() && mediaRefreshRevisionRef.current === outputMediaRevision;
-      const payload = buildClipboardPayload(previewRef.current, target.renderSnapshot);
+      const outputSnapshot = target.renderSnapshot ?? getFormatSnapshot();
+      const payload = outputSnapshot.renderer ? await packageClipboard(previewRef.current, outputSnapshot) : buildClipboardPayload(previewRef.current, outputSnapshot);
       if (previewRef.current.querySelector('[data-local-asset-src]:not(img), [data-local-asset-srcset]:not(img):not(source)')) throw new ProductError("controller.localImagesAreNotReadyOrAreUnavailableCheckTheImagesAnd");
       let imageDirectory: Promise<FileSystemDirectoryHandle> | null = null;
       setStatus({ ...productLabel("controller.preparingTheCompleteRichTextArticleAndImages"), tone: 'neutral' });
-      const complete = await embedClipboardImages(payload, async fileName => {
+      const complete = await embedClipboardImages(payload, async (fileName, source) => {
+        if (target.directory && source && localResourceReference(source)?.shared) {
+          const directory = await getResourceDirectory(target.directory, { kind: 'shared' }, 'image', false, outputCurrent);
+          if (!directory || !outputCurrent()) throw new ProductError('resources.changedDuringOutput');
+          return (await directory.getFileHandle(fileName)).getFile();
+        }
         if (!target.directory || !target.month || !target.folder) throw new ProductError("controller.saveTheManuscriptAndAuthorizeTheLibraryContainingItsImagesFirst");
         imageDirectory ??= getArticleMediaDirectory(target.directory, target.month, target.folder, false);
         const directory = await imageDirectory;
@@ -2442,7 +2550,12 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         const response = await fetch(ARTICLE_EXAMPLE_IMAGE);
         if (!response.ok) throw new ProductError("controller.theSampleImageCouldNotBeReadRefreshAndTryAgain");
         return response.blob();
-      });
+      }, outputSnapshot.renderer ? source => {
+        try {
+          const path = packageResourcePath(source, target.month && target.folder ? `articles/${target.month}/${target.folder}` : '', outputSnapshot);
+          return packageInputFor(previewRef.current!)?.assets?.find(asset => asset.path === path)?.blob ?? null;
+        } catch { return null; }
+      } : undefined);
       if (!outputCurrent()) throw new ProductError('resources.changedDuringOutput');
       const item = new ClipboardItem({
         'text/html': new Blob([complete.html], { type: 'text/html' }),
@@ -2668,7 +2781,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       setArticle(nextArticle);
       setRevision(revisionRef.current);
       setCompiledRevision(null);
-      setStatus({ ...(template ? productLabel("controller.newDraftCreatedFromTheOriginalTemplateAndSavedArticlesAreUnchanged", { "templateName": template.name }) : productLabel("controller.newBlankDraftCreatedItIsWrittenToDiskOnlyAfterChoosing")), tone: 'warning' });
+      setStatus({ ...(template ? productLabel("controller.newDraftCreatedFromTheOriginalTemplateAndSavedArticlesAreUnchanged", { "templateName": template.name }) : productLabel("controller.newBlankDraftCreatedItIsWrittenToDiskOnlyAfterChoosing")), tone: 'neutral' });
       setShowTemplateDialog(false);
       navigateArticleMode('editor');
       void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
@@ -2733,24 +2846,49 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         if (directoryRef.current !== root) return;
         if (openCreatedArticle) applyStoredArticle(result.article, true, root);
         const themeNote = themeOverride ? productReference("controller.themeV", { "themeOverrideName": themeOverride.name, "result_article_themeVersion": result.article.theme.version }) : '';
-        setStatus({ ...productLabel("controller.forkCreatedTheOriginalManuscriptIsUnchanged", { "result_article_parse_metadataTitle": result.article.parse.metadata.title, "themeNote": themeNote, "monthNote": monthNote, "collisionNote": collisionNote, "indexNote": indexNote, "refreshNote": refreshNote }), tone: result.indexUpdated && !result.indexError && !refreshError ? 'success' : 'warning' });
+        const notice = { ...productLabel("controller.forkCreatedTheOriginalManuscriptIsUnchanged", { "result_article_parse_metadataTitle": result.article.parse.metadata.title, "themeNote": themeNote, "monthNote": monthNote, "collisionNote": collisionNote, "indexNote": indexNote, "refreshNote": refreshNote }), tone: result.indexUpdated && !result.indexError && !refreshError ? 'success' as const : 'warning' as const };
+        setStatus({ ...notice, notify: false });
+        notifyToast({ key: 'article-fork', label: '', summary: productReference(notice.tone === 'success' ? 'feedback.forkCreated' : 'feedback.forkReview'), details: notice, tone: notice.tone });
       } catch (error) {
         if (directoryRef.current !== root) return;
-        setStatus({ ...productLabel("controller.forkFailedTheOriginalManuscriptAndUnsavedStateAreRetained", { "cause": productCause(error) }), tone: 'error' });
+        const notice = { ...productLabel("controller.forkFailedTheOriginalManuscriptAndUnsavedStateAreRetained", { "cause": productCause(error) }), tone: 'error' as const };
+        setStatus({ ...notice, notify: false });
+        notifyToast({ key: 'article-fork', label: '', summary: productReference('feedback.forkFailed'), details: notice, tone: notice.tone });
       }
     })();
-  }, [applyStoredArticle, copyFromThemeLibrary, copyMonth, copySourceOverride, copyTarget, copyThemeTarget, copyTitle, loadStoredArticles]);
+  }, [applyStoredArticle, copyFromThemeLibrary, copyMonth, copySourceOverride, copyTarget, copyThemeTarget, copyTitle, loadStoredArticles, notifyToast]);
+
+  const trashQueue = useCallback(<T,>(work: () => Promise<T>) => mutationQueueRef.current.run(work), []);
+  const trash = useArticleTrash({
+    root: directory, session: contentLibraryRootSession, libraryId: editorDirectoryId,
+    ready: Boolean(notificationsReady && directory && editorAppearanceLoaded && !settingsIssue), enabled: articleSettings.trash.enabled,
+    isCurrent: (root, session) => directoryRef.current === root && contentLibraryRootSessionRef.current === session,
+    queue: trashQueue,
+    onRestored: async root => {
+      const loaded = await loadEditorWorkspace(root);
+      if (directoryRef.current !== root || contentLibraryRootSessionRef.current !== contentLibraryRootSession) return;
+      editorWorkspaceRef.current = loaded.workspace;
+      editorWorkspaceSnapshotRef.current = { fileExists: loaded.fileExists, rawContent: loaded.rawContent };
+      setEditorWorkspace(loaded.workspace); setEditorWorkspaceIssue(loaded.issue);
+      await refreshArticles(root);
+    },
+  });
 
   const confirmDelete = useCallback(() => {
     const targets = deleteTargets;
     const root = directoryRef.current;
-    if (!targets.length || !root) return;
+    if (!targets.length || !root || settingsIssue) return;
+    const session = contentLibraryRootSessionRef.current, recycle = articleSettings.trash.enabled;
+    const current = () => directoryRef.current === root && contentLibraryRootSessionRef.current === session;
+    const operationKey = `article-delete:${crypto.randomUUID()}`;
     const targetIds = new Set(targets.map((item) => item.id));
     const protectCurrentDraft = documentTokenRef.current?.root === root && targetIds.has(articleId(articleRef.current));
     setDeleteTargets([]);
     runAfterDraftDecision({
       label: targets.length === 1 ? productText("controller.delete", { "targets_0_parse_metadataTitle": targets[0].parse.metadata.title }) : productText("controller.deleteTheSelectedManuscripts", { "targetsCount": targets.length }),
       run: async () => {
+        if (!current()) return;
+        trash.announce({ key: operationKey, label: '', summary: productReference(recycle ? 'trash.moving' : 'feedback.deleting'), tone: 'info', lifetime: { mode: 'locked' } });
         const deletingDocumentToken = directoryRef.current === root &&
           documentTokenRef.current?.root === root &&
           targetIds.has(documentTokenRef.current.articleId) &&
@@ -2764,19 +2902,34 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         });
         if (!queued.length) {
           if (directoryRef.current === root) setStatus({ ...productLabel("controller.selectedManuscriptsAreBeingDeletedRefreshTheArticleListLater"), tone: 'warning' });
+          notifyToast({ key: operationKey, dismiss: true });
           return;
         }
         const settled = new Set<ReturnType<typeof mutationQueueRef.current.beginDelete>>();
         const deletedIds: string[] = [];
         const failedTitles: string[] = [];
+        const recoveredIds: string[] = [], trashIssues: ProductMessageInfo[] = [];
         let indexUpdated = true;
         let indexError = '';
         let clearedCurrent = false;
         try {
           const { refreshError, workspaceCleanupError } = await mutationQueueRef.current.run(async () => {
+            const policy = await loadArticleSettings(root);
+            if (!current() || policy.issue || policy.settings.trash.enabled !== recycle) throw new ProductError('trash.invalidSetting');
             for (const { target, token } of queued) {
               try {
-                const result = await deleteStoredArticle(root, target.month, target.folder);
+                if (!current()) throw new ProductError('trash.changed');
+                let result: { indexUpdated: boolean; indexError?: string };
+                if (recycle) {
+                  const organization = getArticleOrganization(editorWorkspaceRef.current, target.id);
+                  const order = editorWorkspaceRef.current.articleOrder[editorArticleGroupKey(organization.projectId)];
+                  const position = order?.indexOf(target.id) ?? -1;
+                  const moved = await trashStoredArticle(root, target, organization, position < 0 ? null : position, current, order);
+                  trashIssues.push(...moved.issues);
+                  if (!moved.sourceRemoved) throw new ProductError('trash.recoveryRequired', { cause: productReference('trash.sourceChanged') });
+                  recoveredIds.push(moved.entry.id);
+                  result = { indexUpdated: !moved.issues.length };
+                } else result = await deleteStoredArticle(root, target.month, target.folder);
                 mutationQueueRef.current.finishDelete(token);
                 settled.add(token);
                 deletedIds.push(target.id);
@@ -2786,6 +2939,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
                 mutationQueueRef.current.failDelete(token);
                 settled.add(token);
                 failedTitles.push(target.parse.metadata.title || productText("controller.untitledArticle"));
+                trashIssues.push(productReference('trash.operationIssue', { cause: productCause(error) }));
               }
             }
             if (directoryRef.current === root && deletedIds.length) {
@@ -2835,20 +2989,28 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
             ? productReference("controller.listRefreshPendingClickRefreshArticlesToRetry", { "cause": productCause(refreshError) })
             : '';
           const failedMessage = failedTitles.length ? productReference("controller.articlesNotDeleted", { "failedTitlesCount": failedTitles.length, "details": failedTitles.join('、') }) : '';
-          const details = productJoin([indexMessage, refreshMessage, workspaceCleanupError, failedMessage].filter(Boolean), '；');
-          if (directoryRef.current !== root) return;
+          const details = productJoin([indexMessage, refreshMessage, workspaceCleanupError, failedMessage, ...trashIssues].filter(Boolean), '；');
+          if (!current()) return;
           const subject = deletedIds.length === 1 ? productReference("controller.article") : productReference("controller.articles", { "deletedIdsCount": deletedIds.length });
-          setStatus({
+          const notice = {
             ...(deletedIds.length
               ? productLabel("controller.andItsAssetsAndHistoryWereDeleted", { "subject": subject, "value": productJoin([' ', details]) })
               : productLabel("controller.deletionFailedTheManuscriptIsUnchanged", { "value": productJoin([' ', details]) })),
             tone: deletedIds.length
-              ? (failedTitles.length || !indexUpdated || indexError || refreshError || workspaceCleanupError ? 'warning' : 'success')
-              : 'error',
+              ? (failedTitles.length || !indexUpdated || indexError || refreshError || workspaceCleanupError || trashIssues.length ? 'warning' as const : 'success' as const)
+              : 'error' as const,
+          };
+          if (!recycle) setStatus(notice);
+          trash.announce({ key: operationKey, label: '', tone: notice.tone,
+            summary: recycle ? productReference(!deletedIds.length ? 'trash.moveFailed' : notice.tone === 'warning' ? 'trash.movePartial' : 'trash.movedCount', { count: deletedIds.length, failed: failedTitles.length || trashIssues.length }) : productReference(deletedIds.length ? 'feedback.deleted' : 'feedback.failed'),
+            details: details || undefined,
+            lifetime: recycle && deletedIds.length ? { mode: 'auto', durationMs: 10000 } : notice.tone === 'success' ? { mode: 'auto', durationMs: 3000 } : { mode: 'manual' },
+            actions: recoveredIds.length ? [{ id: 'undo', label: productReference('trash.undo'), presentation: 'icon', icon: 'reset', run: () => current() ? trash.restore(recoveredIds, operationKey) : Promise.resolve() }] : [],
           });
+          await trash.refresh();
         } catch (error) {
           for (const { token } of queued) if (!settled.has(token)) mutationQueueRef.current.failDelete(token);
-          if (directoryRef.current !== root) return;
+          if (!current()) return;
           const subject = deletedIds.length === 1 ? productReference("controller.article") : productReference("controller.articles", { "deletedIdsCount": deletedIds.length });
           setStatus({
             ...(deletedIds.length
@@ -2856,10 +3018,12 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
               : productLabel("controller.deletionFailed", { "cause": productCause(error) })),
             tone: deletedIds.length ? 'warning' : 'error',
           });
+          trash.announce({ key: operationKey, label: '', tone: deletedIds.length ? 'warning' : 'error', summary: productReference(recycle ? 'trash.moveFailed' : 'feedback.failed'), details: productReference('trash.operationIssue', { cause: productCause(error) }), actions: recoveredIds.length ? [{ id: 'undo', label: productReference('trash.undo'), presentation: 'icon', icon: 'reset', run: () => current() ? trash.restore(recoveredIds) : Promise.resolve() }] : [] });
+          await trash.refresh();
         }
       },
     }, protectCurrentDraft);
-  }, [compileCurrent, deleteTargets, loadStoredArticles, navigateArticleMode, openDocument, persistEditorWorkspace, runAfterDraftDecision, snapshotFor]);
+  }, [articleSettings.trash.enabled, settingsIssue, trash, compileCurrent, deleteTargets, loadStoredArticles, navigateArticleMode, openDocument, persistEditorWorkspace, runAfterDraftDecision, snapshotFor]);
 
   useEffect(() => {
     setMounted(true);
@@ -2903,6 +3067,12 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, [directoryRestoreState, openAuthorizedDirectory]);
 
   useEffect(() => {
+    const token = documentTokenRef.current;
+    if (!mounted || !directory || !article.folder || !article.month || token?.root !== directory || token.articleId !== articleId(article)) return;
+    rememberArticleResume(articleResumeStorage(), editorDirectoryId, articleId(article), parseArticle(article.source).metadata.createdAt);
+  }, [mounted, directory, editorDirectoryId, article.folder, article.month, currentDocumentGeneration]);
+
+  useEffect(() => {
     const root = directory;
     const current = articleRef.current;
     const token = documentTokenRef.current;
@@ -2942,7 +3112,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     const root = directory;
     const token = documentTokenRef.current;
     const id = articleId(article);
-    if (!root || settingsIssue || !articleSettings.autoSave.enabled || !article.dirty ||
+    if (!editorPageRef.current || !root || settingsIssue || !articleSettings.autoSave.enabled || !article.dirty ||
       (article.folder && article.month && getArticleOrganization(editorWorkspace, id).archived) ||
       !token || token.root !== root || token.articleId !== id || !mutationQueueRef.current.canSave(token)) return;
     const timer = window.setInterval(() => {
@@ -2950,15 +3120,15 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         const current = articleRef.current;
         const activeToken = documentTokenRef.current;
         if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, id).archived) return;
-        if (historyOperationRef.current || autoSaveBusyRef.current || mediaOperationRef.current || !current.dirty || directoryRef.current !== root ||
+        if (!editorPageRef.current || historyOperationRef.current || autoSaveBusyRef.current || mediaOperationRef.current || !current.dirty || directoryRef.current !== root ||
           activeToken !== token || articleId(current) !== id || activeToken?.root !== root || activeToken.articleId !== id ||
           !mutationQueueRef.current.canSave(token)) return;
         autoSaveBusyRef.current = true;
         try {
           const snapshot = snapshotFor(current);
-          const result = await saveSnapshot(snapshot);
-          if (result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy && result.savedSnapshot.documentToken.root === root) {
-            if (result.rendered ?? await compileCurrent(result.savedSnapshot)) await captureSavedRender(result.savedSnapshot);
+          const result = await saveSnapshot(snapshot, () => editorPageRef.current, true);
+          if (editorPageRef.current && result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy && result.savedSnapshot.documentToken.root === root) {
+            if (result.rendered ?? await compileCurrent(result.savedSnapshot)) { if (editorPageRef.current) await captureSavedRender(result.savedSnapshot, () => editorPageRef.current); }
           }
         } finally {
           autoSaveBusyRef.current = false;
@@ -2966,13 +3136,13 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       })();
     }, articleSettings.autoSave.intervalSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [articleSettings.autoSave.enabled, articleSettings.autoSave.intervalSeconds, article.dirty, article.folder, article.month, captureSavedRender, compileCurrent, currentDocumentGeneration, directory, editorWorkspace, saveSnapshot, settingsIssue, snapshotFor]);
+  }, [view, articleMode, articleSettings.autoSave.enabled, articleSettings.autoSave.intervalSeconds, article.dirty, article.folder, article.month, captureSavedRender, compileCurrent, currentDocumentGeneration, directory, editorWorkspace, saveSnapshot, settingsIssue, snapshotFor]);
 
   useEffect(() => {
     const root = directory;
     const token = documentTokenRef.current;
     const id = articleId(article);
-    if (!root || settingsIssue || !articleSettings.autoSnapshot.enabled ||
+    if (!editorPageRef.current || !root || settingsIssue || !articleSettings.autoSnapshot.enabled ||
       (article.folder && article.month && getArticleOrganization(editorWorkspace, id).archived) ||
       !token || token.root !== root || token.articleId !== id ||
       !mutationQueueRef.current.canSave(token)) return;
@@ -2981,7 +3151,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         const current = articleRef.current;
         const activeToken = documentTokenRef.current;
         if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, id).archived) return;
-        if (historyOperationRef.current || autoSnapshotBusyRef.current || mediaOperationRef.current || directoryRef.current !== root || activeToken !== token ||
+        if (!editorPageRef.current || historyOperationRef.current || autoSnapshotBusyRef.current || mediaOperationRef.current || directoryRef.current !== root || activeToken !== token ||
           articleId(current) !== id || activeToken?.root !== root || activeToken.articleId !== id || !mutationQueueRef.current.canSave(token)) return;
         if ((!current.folder || !current.month) && !current.dirty) return;
         autoSnapshotBusyRef.current = true;
@@ -2989,16 +3159,16 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           let target = snapshotFor(current);
           const wasDraft = !target.folder || !target.month;
           if (wasDraft) {
-            const archived = await saveSnapshot(target);
+            const archived = await saveSnapshot(target, () => editorPageRef.current, true);
             if (!archived.ok || !archived.current || !archived.savedSnapshot) return;
             target = archived.savedSnapshot;
             historyBaselineRef.current = { root, articleId: target.articleId, fingerprint: null, initialized: true };
           }
-          if (historyOperationRef.current || !target.month || !target.folder || directoryRef.current !== root || !matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) return;
+          if (!editorPageRef.current || historyOperationRef.current || !target.month || !target.folder || directoryRef.current !== root || !matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) return;
           const result = await mutationQueueRef.current.run(async () => {
-            if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) return null;
+            if (!editorPageRef.current || !matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) return null;
             const history = await listArticleHistory(root, target.month!, target.folder!);
-            if (!matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) return null;
+            if (!editorPageRef.current || !matchesSnapshot(target) || !mutationQueueRef.current.canSave(target.documentToken)) return null;
             const fingerprint = articleFingerprint(target.source, target.theme);
             const baseline = historyBaselineRef.current;
             const baselineMatches = baseline?.root === root && baseline.articleId === target.articleId;
@@ -3034,7 +3204,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
             }
             if (directoryRef.current !== root || !matchesSnapshot(target)) return;
             const cleanupNote = result.cleanupIssues.length ? productReference("controller.cleanupNotes", { "details": result.cleanupIssues.join('；') }) : '';
-            setStatus({ ...(result.created ? productLabel("controller.automaticHistorySnapshotSaved", { "result_snapshotId": result.snapshot.id, "cleanupNote": cleanupNote }) : productLabel("controller.contentIsUnchangedNoDuplicateHistoricalSnapshotWasCreated", { "cleanupNote": cleanupNote })), tone: result.cleanupIssues.length ? 'warning' : result.created ? 'success' : 'neutral' });
+            if (result.cleanupIssues.length) setStatus({ ...(result.created ? productLabel("controller.automaticHistorySnapshotSaved", { "result_snapshotId": result.snapshot.id, "cleanupNote": cleanupNote }) : productLabel("controller.contentIsUnchangedNoDuplicateHistoricalSnapshotWasCreated", { "cleanupNote": cleanupNote })), tone: result.cleanupIssues.length ? 'warning' : result.created ? 'success' : 'neutral' });
           }
         } catch (error) {
           if (directoryRef.current === root && articleId(articleRef.current) === id && documentTokenRef.current === token) setStatus({ ...productLabel("controller.automaticHistorySnapshotFailed", { "cause": productCause(error) }), tone: 'error' });
@@ -3044,7 +3214,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       })();
     }, articleSettings.autoSnapshot.intervalMinutes * 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [article.folder, article.month, articleSettings.autoSnapshot.enabled, articleSettings.autoSnapshot.intervalMinutes, articleSettings.autoSnapshot.maxCount, currentDocumentGeneration, directory, editorWorkspace, matchesSnapshot, saveSnapshot, settingsIssue, snapshotFor]);
+  }, [view, articleMode, article.folder, article.month, articleSettings.autoSnapshot.enabled, articleSettings.autoSnapshot.intervalMinutes, articleSettings.autoSnapshot.maxCount, currentDocumentGeneration, directory, editorWorkspace, matchesSnapshot, saveSnapshot, settingsIssue, snapshotFor]);
 
   useEffect(() => {
     if (mounted) void compileCurrent();
@@ -3086,6 +3256,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     .sort((left, right) => right.parse.metadata.updatedAt.localeCompare(left.parse.metadata.updatedAt));
   const articlesForOverview = selectedArticleCollection === 'unclassified'
     ? orderedUnclassifiedArticles
+    : selectedArticleCollection === 'trash' ? []
     : selectedArticleCollection === 'archived'
       ? orderedArchivedArticles
       : selectedArticleCollection.startsWith('project:')
@@ -3093,6 +3264,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         : [...orderedUnclassifiedArticles, ...orderedProjectArticles];
   const articleCollectionTitle = selectedArticleCollection === 'unclassified'
     ? productText("controller.unclassified")
+    : selectedArticleCollection === 'trash' ? productText('trash.title')
     : selectedArticleCollection === 'archived'
       ? productText("controller.archivedArticles")
       : selectedArticleCollection.startsWith('project:')
@@ -3115,15 +3287,15 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   importCancelRef.current = markdownImport.cancelArticle;
   importFolderRef.current = { isBusy: markdownImport.articleFolderIsBusy, moved: markdownImport.articleFolderMoved };
   return {
-    mounted, fileSystemReady, view, articleMode, navigateView, navigateArticleMode, registerNavigationGuard, markdownImport,
+    mounted, fileSystemReady, view, articleMode, navigateView, navigateArticleMode, registerNavigationGuard, markdownImport, trash,
     directory, setDirectory, contentLibraryRootSession, contentLibrariesState, setContentLibrariesState,
-    directoryName, setDirectoryName, rememberedDirectoryName: rememberedDirectory?.name ?? null,
+    directoryName, setDirectoryName, libraryLoadIssue, rememberedDirectoryName: rememberedDirectory?.name ?? null,
     directoryRestoreState, directoryBookmarkIssue, storedArticles, setStoredArticles, articleIndexIssues, articleIndexMonths, articleChecks, articleListNotice, articleListWork, checkArticleList, cancelArticleListCheck, rebuildListIndexes, removeListCategories,
     editorWorkspace, editorWorkspaceIssue, editorWorkspaceBusy, selectedArticleCollection,
     editorDirectoryId, editorAppearanceVerified,
     editorAppearanceReady: directory ? editorAppearanceLoaded : directoryRestoreState !== 'checking',
     articlesForOverview, articleCollectionTitle, editorProjectsInDisplayOrder, orderedUnclassifiedArticles, orderedArchivedArticles,
-    articleInfoDialogOpen, setArticleInfoDialogOpen, articleFolderName, setArticleFolderName, renameCurrentArticleFolder, projectDeleteTarget, setProjectDeleteTarget,
+    articleInfoDialogOpen, setArticleInfoDialogOpen, articleFolderName, setArticleFolderName, projectDeleteTarget, setProjectDeleteTarget,
     themeLibrary, setThemeLibrary, themeIssues, setThemeIssues,
     editorThemes, editorThemeIssues, createEditorTheme, loadDefaultEditorThemes, removeEditorTheme, retryLocalFonts,
     snippets, setSnippets, snippetIssues, setSnippetIssues, snippetCategories, setSnippetCategories,

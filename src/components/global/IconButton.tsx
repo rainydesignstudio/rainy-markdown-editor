@@ -7,6 +7,7 @@ const tones = { default: '', danger: 'text-danger' };
 const variants = {
   preference: 'mode-picker-trigger',
   surface: 'button button-quiet icon-button-surface icon-button-toggle',
+  primary: 'button button-primary icon-button-surface',
   inline: 'icon-button-inline',
   history: 'button button-quiet icon-button-surface history-retain',
 };

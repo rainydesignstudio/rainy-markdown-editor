@@ -209,15 +209,13 @@
     "nextImageRightArrow": "Next image · Right arrow",
     "nextImage": "Next image",
     "newLibrary": "New library",
-    "nameYourLibraryThenChooseItsParentDirectory": "Name your library, then choose its parent directory.",
     "libraryName": "Library name",
     "exampleMyManuscripts": "Example: My manuscripts",
     "usedAsTheNewFolderNameUpTo": "Used as the new folder name; up to 80 characters.",
     "libraryLocationPreview": "Library location preview",
     "creationLocation": "Creation location",
     "chosenParentDirectory": "Chosen parent directory /",
-    "chooseTheParentInTheSystemDialogNext": "Choose the parent in the system dialog next. The library is created inside this new folder. Existing folders with the same name are not overwritten.",
-    "afterSelectingAParentTheLibraryWillBe": "After selecting a parent, the library will be created and opened…",
+    "chooseTheParentInTheSystemDialogNext": "The library is created in the new folder shown above. Existing folders with the same name are not overwritten.",
     "creating": "Creating…",
     "chooseParentAndCreate": "Choose parent and create",
     "currentColor": "Current color",
@@ -391,7 +389,7 @@
     "aboutToDelete": "About to delete",
     "none": "None",
     "validationAndAlgorithmTemplate": "Validation and processing template",
-    "newLibraryPresetHelp": "Sets format checks and preview processing for the new library. You can customize them in the library later.",
+    "newLibraryPresetHelp": "Sets format checks and preview processing for the new library. Empty validator has no platform rules or processing algorithms; you can customize it later.",
     "opacity": "Opacity",
     "solidColor": "Solid",
     "gradientColor": "Gradient",
@@ -402,8 +400,6 @@
     "imageZoomHelp": "Ctrl/⌘ + wheel to zoom; click the scale to toggle zoom and fit width",
     "fitToWidth": "Fit to width",
     "articleFolderName": "Article folder name",
-    "applyFolderName": "Apply folder name",
-    "folderRenameImmediate": "Press Enter or Apply to update the index and reload the manuscript immediately. The filename remains article.md.",
     "imageZoomToggle": "Toggle zoom and fit width",
     "searchHitSample": "Search result"
   },
@@ -687,7 +683,9 @@
     "deleteExplanation": "Delete only this selected version. This cannot be undone. The current draft, other versions, article media and shared rendering resources are retained.",
     "deleteProtectedExplanation": "This version is protected from automatic cleanup. This is an explicitly confirmed manual deletion.",
     "confirmDelete": "Confirm version deletion",
-    "contextStatus": "{{path}} stores article and theme together in each snapshot; {{status}}"
+    "contextStatus": "{{path}} stores article and theme together in each snapshot; {{status}}",
+    "packageDependenciesMissing": "This historical version has no retained format package dependencies. It cannot be restored faithfully and was not rebuilt with the current package",
+    "context": "{{path}} stores article and theme together in each snapshot."
   },
   "imageRename": {
     "viewAndRename": "View and rename",
@@ -699,7 +697,8 @@
     "saveAsNew": "Save as a new image"
   },
   "platformPresets": {
-    "wechat-article": "WeChat Official Account"
+    "wechat-article": "WeChat Official Account",
+    "empty": "Empty validator"
   },
   "articleDark": {
     "automatic": "Dark colors are calculated by this library’s algorithm and are read only. Values come from the sample; one role may produce several results.",
@@ -711,6 +710,33 @@
     "multiple": "{{count}} results",
     "inherited": "Inherits light",
     "inherit": "Inherit light",
-    "reset": "{{name}}: inherit the light color"
+    "reset": "{{name}}: inherit the light color",
+    "unusedDescription": "This color is not used in the current preview sample."
+  },
+  "previewCss": {
+    "view": "View current preview CSS",
+    "readOnly": "Read-only style result",
+    "notReady": "Current preview CSS is not ready. Reopen after the preview succeeds.",
+    "library": "Library styles",
+    "theme": "Article-theme styles",
+    "configuration": "Configuration: {{id}}",
+    "renderer": "Renderer: {{id}} v{{version}}",
+    "entry": "Stylesheet entry: {{path}} (including dependencies)",
+    "noMapping": "No reliable mapping from generated CSS to source files was provided.",
+    "empty": "The preview succeeded and generated empty CSS.",
+    "generated": "Generated CSS (read only)",
+    "libraryExplanation": "The library or renderer supplies the current styles. Theme CSS does not participate in this render; its original value remains editable here."
+  },
+  "libraryCss": {
+    "source": "CSS source",
+    "themeSource": "Theme CSS (not used in this rendition)",
+    "sharedScope": "Edit shared CSS in the current library. Saving affects new previews and exports that use this file; saved articles and history snapshots are not updated automatically.",
+    "noSources": "This package declares no separate CSS file. Generated CSS remains available read-only from the preview toolbar.",
+    "loading": "Reading CSS source…",
+    "editor": "CSS source: {{path}}",
+    "save": "Save CSS and reload",
+    "unsaved": "This CSS source has unsaved changes. Saving writes the shared file in this library and updates its existing integrity hash.",
+    "reload": "Reload CSS source and rendering configuration",
+    "problems": "CSS source problems"
   }
 }

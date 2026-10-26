@@ -51,9 +51,9 @@ async function readDocument(root: FileSystemDirectoryHandle): Promise<SettingsDo
   let workspaceExists = false;
   let legacyAppearance: LegacyEditorAppearance | undefined;
   if (parsed?.version === 2) {
-    const keys = ['version', 'defaultArticleThemeId', 'autoSave', 'autoSnapshot', 'projects', 'projectOrder', 'articleOrganization', 'articleOrder', 'appearance'];
+    const keys = ['version', 'defaultArticleThemeId', 'autoSave', 'autoSnapshot', 'trash', 'projects', 'projectOrder', 'articleOrganization', 'articleOrder', 'appearance'];
     if (Object.keys(parsed).some(key => !keys.includes(key))) throw new ProductError("settingsFile.settingsJsonContainsUnknownFieldsTheOriginalFileWasNotRewritten");
-    settings = validateArticleSettings({ version: 1, defaultArticleThemeId: parsed.defaultArticleThemeId, autoSave: parsed.autoSave, autoSnapshot: parsed.autoSnapshot });
+    settings = validateArticleSettings({ version: 1, defaultArticleThemeId: parsed.defaultArticleThemeId, autoSave: parsed.autoSave, autoSnapshot: parsed.autoSnapshot, trash: parsed.trash });
     const legacy = parsed.appearance && typeof parsed.appearance === 'object' && 'preset' in parsed.appearance;
     workspace = validateEditorWorkspace({ version: legacy ? 1 : 2, projects: parsed.projects, projectOrder: parsed.projectOrder, articleOrganization: parsed.articleOrganization, articleOrder: parsed.articleOrder, appearance: parsed.appearance });
     if (legacy) legacyAppearance = parsed.appearance;

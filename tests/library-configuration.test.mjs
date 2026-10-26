@@ -4,9 +4,10 @@ import { DEFAULT_FORMAT_BUNDLE, compileFormatBundle } from '../src/lib/article-f
 import { activateFormatBundle, assertCurrentFormat, getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
 import { readLibraryFormat } from '../src/lib/article-format/library.ts';
 import { DEFAULT_ALGORITHMS } from '../src/lib/article-format/algorithms.ts';
-import { DEFAULT_LIBRARY_CONFIGURATION, resolveLibraryConfiguration, validateLibraryConfiguration, libraryCapability, assertLibraryCapability } from '../src/lib/article-format/libraryConfiguration.ts';
+import { DEFAULT_LIBRARY_CONFIGURATION, validateResolvedLibraryConfiguration, resolveLibraryConfiguration, validateLibraryConfiguration, libraryCapability, assertLibraryCapability } from '../src/lib/article-format/libraryConfiguration.ts';
 import { loadStylesheetEnvironment } from '../src/lib/article-format/styles.ts';
 import { compileArticleStyles, clearArticleStyleCache } from '../src/lib/tailwind.ts';
+import { resourcePreviewWidth, resourcePreviewHostClass } from '../src/lib/article-format/preview.ts';
 import { BASIC_THEME } from '../src/lib/themes.ts';
 
 const copy = () => structuredClone(DEFAULT_FORMAT_BUNDLE);
@@ -120,4 +121,20 @@ test('library style authority prevents theme CSS from overriding its stylesheet 
   const again = await loadStylesheetEnvironment(fs.root, compileFormatBundle(raw).formatter.stylesheets);
   const legacy = activateFormatBundle(raw, 'website', 'library', again);
   assert.match((await compileArticleStyles('A paragraph', theme, { snapshot: legacy })).css, /#fedcba/);
+});
+
+
+test('resource host width has one optional policy, preserves old records and invalidates immutable configuration identity', async () => {
+  const legacy = structuredClone(DEFAULT_LIBRARY_CONFIGURATION), bytes = JSON.stringify(legacy);
+  assert.equal(validateResolvedLibraryConfiguration(legacy), legacy); assert.equal(JSON.stringify(legacy),bytes);
+  const first = activateFormatBundle(copy(), 'width');
+  assert.equal(resourcePreviewWidth(first),'default'); assert.match(resourcePreviewHostClass(first,true),/max-w-3xl/);
+  const before = await compileArticleStyles('A paragraph', BASIC_THEME, { snapshot:first });
+  const next = activateFormatBundle(copy(), 'width','library',undefined,DEFAULT_ALGORITHMS,'library',config({rendering:{previewWidth:'available'}}));
+  assert.equal(resourcePreviewWidth(next),'available'); assert.doesNotMatch(resourcePreviewHostClass(next,true),/max-w-/);
+  assert.throws(()=>assertCurrentFormat(first)); assert.throws(()=>{next.configuration.rendering.previewWidth='default';});
+  assert.equal((await compileArticleStyles('A paragraph',BASIC_THEME,{snapshot:next})).css,before.css,'host policy does not alter document/export CSS');
+  assert.throws(()=>validateLibraryConfiguration(config({rendering:{previewWidth:'viewport'}})));
+  const raw=copy();raw.formatter.meta.rendering={previewWidth:'available'};
+  assert.throws(()=>resolveLibraryConfiguration(raw,config({rendering:{previewWidth:'default'}})));
 });

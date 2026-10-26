@@ -833,6 +833,125 @@
           ]
         }
       ]
+    },
+    "v0_3_2": {
+      "summary": "Multiple knowledge sources and a lightweight writing-reference panel support search, excerpts, free-text citations, topics and source-change review. Library render packages, source CSS editing, original-source recovery and webpage output are refined alongside editing, assets and history.",
+      "sections": [
+        {
+          "title": "Libraries and render packages",
+          "items": [
+            "Each library can maintain rendering, validation and settings in its own format package and declare formatting, copying and export actions.",
+            "Existing manuscripts and history retain their render records, interpreter and resources. Explicitly Update styles to adopt the current library environment; no automatic migration.",
+            "Stronger consistency checks across manuscript text, configuration and image resources prevent stale rendering or output after changes.",
+            "New libraries offer an Empty validator preset while retaining general syntax, resource and safety checks. Configuration synchronization preserves user modifications.",
+            "Resource previews share default/available host width without changing internal viewport, content-owned widths or manuscript exports.",
+            "Current successful preview CSS has a read-only viewer with mode/configuration identity. Library-owned styles retain theme CSS originals; unused-color text follows the existing swatch popup content.",
+            "The empty preset starts in the selected language with no snippets or snippet categories and three plain-Markdown starters. Reopening preserves cleared content; explicitly loading defaults retains the original seed choice and user edits. The WeChat preset keeps its existing resources.",
+            "The theme editor edits declared source CSS and reloads under the current SHA policy; disabling verification preserves configuration bytes. Theme CSS, generated output and saved snapshots remain separate, with conflicts and partial writes reported distinctly.",
+            "New libraries use rainy-format/2 with library-root paths, deep styles directories and JSON resource aliases. Legacy protocols and history remain intact; upgrades are explicit, with algorithm code and notices maintained through versioned manifests.",
+            "Expected SHA verification is configurable and enabled by default. Explicitly disabling it permits IDE edits and read-only reload; synchronize expected hashes before re-enabling. Actual file identity, conflicts and history protection remain.",
+            "The host guarantees complete Markdown-source download, including metadata and unsaved edits, even when configuration or rendering fails. This is separate from body-only export.",
+            "Webpage output can embed declared local styles and resources, resolving library aliases and temporary resource URLs. External HTTPS resources remain subject to permissions and network availability."
+          ]
+        },
+        {
+          "title": "Knowledge and research materials",
+          "items": [
+            "A manuscript library can connect multiple external knowledge sources, each with its own index and research data. External originals remain read-only.",
+            "Search supports same-paragraph ranking, grouped passages, exact phrases, exclusions, and title and path filters.",
+            "Safe reading supports contents, source locations, document links and anchors, with a return to previous reading positions.",
+            "Create independent topics, link manuscripts and collect full documents or passages while retaining notes, order and captured text.",
+            "Existing inbound and outbound links show their source sentences and locations, with navigation to related documents and the graph.",
+            "Review changes to collected sources centrally, adjust locations and explicitly decide whether to update retained snapshots. Manuscript text stays unchanged.",
+            "Knowledge-source actions move to the top page toolbar. View tabs, reading actions and pagination use icons and tooltips.",
+            "Refine the two collapsible source and document rails with persistent icons and tooltips, corrected card spacing, ellipses for collapsed empty states and theme-aware loading progress.",
+            "All five knowledge views share the top toolbar. Search filters gain icons and spacing; Toast feedback and a fixed diagnostics entry preserve reading height.",
+            "The graph starts in Local mode with two hops. Switches control scope/depth and icon actions control zoom, reset, location, reading and center. Help retains its display policy; clipping notices stay locked while the condition persists and become dismissible after it clears.",
+            "The reading toolbar separates line numbers, article creation, download, passage collection and whole-document collection. Passages require a valid selection, contents stay open after navigation, and line numbers follow the original source without changing its text.",
+            "Collections, references and changes share responsive research cards. Captured text is immediately visible; upper and lower reference regions open the source sentence and target. Notes, order and explicit snapshot review are preserved.",
+            "Fix knowledge collection eligibility for the active selection and topic while preserving both controls and their labels. Rename manuscript creation to “Create article” and prevent grouped search results from clipping.",
+            "Place shelf topic notes and linked manuscripts in a separate information panel; open captured content and notes from a card's preview or title.",
+            "Move or copy shelf captures between topics in the same source, open originals or remove captures; replace up/down controls with manual drag order and six automatic sort orders."
+          ]
+        },
+        {
+          "title": "Writing references and citations",
+          "items": [
+            "The editor gains a dedicated lightweight reference panel above the manuscript preview. Collapse it or drag the divider to adjust the two regions.",
+            "Browse sources and responsive document cards, then open full read-only previews. Breadcrumb navigation preserves the previous selection and scroll position.",
+            "The excerpt action becomes available for a valid selection in the current reference, adopts exactly the selected text and preserves the manuscript insertion position.",
+            "Add free-text citations to existing arguments while retaining the manuscript selection and appending the marker after it. Source details are optional.",
+            "Explicitly reuse citation numbers, edit in a dialog or at the manuscript end, and manually renumber or remove unused entries. Legacy citations require explicit adoption; code examples stay unchanged.",
+            "Add icons to Renumber, Save entry text and Insert citation while preserving their order, tooltips and disabled states."
+          ]
+        },
+        {
+          "title": "Editing and history",
+          "items": [
+            "Auto-save and automatic snapshots pause outside the editor and resume according to existing settings. Auto-save defaults to off for new libraries; explicit preferences are preserved.",
+            "Correct source line-number alignment after soft wrapping. The metadata disclosure spans the source column, with separately scrolling expanded content.",
+            "In Replace, Enter replaces the current match and Cmd/Ctrl+Enter confirms Replace all. Tooltips show the shortcuts, and Replace all remains a single undoable edit.",
+            "Source and reference text share a thin-scrollbar viewport with transparent tracks, editor-theme colors and consistent gutter space. Reference text also aligns with its header.",
+            "Center the column-divider handle, remove the duplicate saved indicator from the preview toolbar and move its light/dark switch to the left of the three preview buttons.",
+            "Refine the history title, version details, comparison switch and top actions. Forking a historical version reports its result promptly and restores focus correctly.",
+            "Fix false centering warnings during normal image scaling while retaining checks for actual alignment changes and overflow.",
+            "Selection menus share hierarchical navigation, space-aware presentation and keyboard controls. Asset types are grouped by category, selections inside dialogs preserve focus, and child-option icons align with their parent directory text, with an SVG selection mark at the trailing edge.",
+            "The folder name in manuscript details is saved with Save article. Remove the separate apply action, duplicate saved badge and rename-success notification while retaining name-collision, unsaved-change and failure protections."
+          ]
+        },
+        {
+          "title": "Assets and snippets",
+          "items": [
+            "Add individual transfer actions to asset cards and details, and support Escape to exit selection mode.",
+            "Cards and details show consistent reference status. Resources referenced by manuscripts, history or shared locations are copied; unreferenced resources are moved. Unknown states restrict actions, and execution rechecks references.",
+            "Snippets gain category creation and duplication actions. Copies are edited independently with source code, description, icon and category retained, while names and triggers are checked for conflicts.",
+            "Mac-style code-window snippets offer wrapping and non-wrapping variants, synchronized with bilingual built-in resources and authorized libraries. They use utility classes and preserve existing manuscripts and historical snapshots."
+          ]
+        },
+        {
+          "title": "Data protection and recovery",
+          "items": [
+            "Relocating a knowledge source preserves its identity, topics and citation links. Replacing it requires separate confirmation, and deletion or replacement retains the old research partition.",
+            "Manuscript or directory renames retain existing topic and citation associations so path changes do not lose research links.",
+            "Failed first auxiliary-data writes clean up only verified residues from that operation and allow retry, preserving existing and externally changed content."
+          ]
+        },
+        {
+          "title": "Page layout and feedback",
+          "items": [
+            "Article lists add six sort orders and place tag filters beside the list heading. Import actions gain icons; refresh becomes an icon button. Sorting preserves sidebar organization. Row numbers share the header selection button’s centerline and remain centered for three-digit values.",
+            "The history light/dark switch stays visible and is unavailable in source comparison, with an explanatory tooltip. Returning to rendered comparison preserves the previous choice.",
+            "Article assets gain collapsible project navigation. Cards, details and selection mode share consistent action order and support selected downloads while retaining reference checks and copy/move boundaries.",
+            "Necessary explicit-operation results appear directly in Toasts, with information buttons only for extra content. Startup neither produces, queues nor replays ordinary notices; blocking failures show causes and recovery centrally. Refresh restoration and successful background saves/snapshots stay quiet. Button progress, typing and ordinary previews do not announce again; manual library loading gives one aggregate result.",
+            "Toast success, warning and error tones follow operation results. An information icon after the main text opens details with 500ms size and text-opacity transitions; expanded reading and keyboard focus pause the remaining auto-dismiss timer. Auto-dismiss notices show a counterclockwise countdown ring around the close icon; hovering anywhere on the notice pauses the remaining time.",
+            "Empty operation entries are hidden; unavailable business actions retain their reason. Article-list Fork results use Toast feedback, while CSS inspection and theme/version details remain available.",
+            "Remove duplicate footer Close actions from captured-content and read-only CSS dialogs. Prevent a stationary pointer from overriding keyboard selection while the snippet list scrolls.",
+            "Toasts share states, actions and automatic/manual/locked lifetimes. Three remain visible by default and extra notices queue. Global positioning uses top-12; Tailwind state styles control entry/exit direction and opacity. Measured layout motion, page persistence and counterclockwise rings remain, while reading and async actions pause the shared clock.",
+            "Preview controls occupy their header or an external toolbar, allowing long labels and narrow layouts to wrap. Configuration problems share the Validation and algorithms header; reload results announce directly, separately from instructions.",
+            "The main navigation and article sidebar each remember their desktop expanded or collapsed state across refresh. Unavailable browser storage retains session choices; temporary mobile drawers are not persisted.",
+            "Library action dialogs add shared icons to Cancel and Download; the action button is labeled Download.",
+            "The shared CSS editor uses remaining height with reachable bottom actions and a dismissible impact notice; narrow layouts retain independent scrolling."
+          ]
+        },
+        {
+          "title": "Agent guides and online access",
+          "items": [
+            "Root and bilingual READMEs add online access, explain local-directory permission and distinguish the online release from development versions.",
+            "Bilingual guides cover controllable desktop-browser prerequisites, new/existing library checkpoints, step-by-step or direct use, and four artifact-based tutorials with save/reopen checks. Public Agent entry guidance remains separate from maintainer governance.",
+            "Finalized Toast, trash and editor-refresh behavior is documented with bilingual record contracts. Paired example assets save/reload on isolated disk libraries; Chrome replay covers writing, appearance adoption, combined previews/rich-text receiving and importing/editing a preserved original. ",
+            "Revise bilingual manuals: README focuses on use, THEME/FORMAT retain authoring contracts, and AGENT-GUIDE adds cold-start task routing, contract identification, failure recovery and delivery checks."
+          ]
+        },
+        {
+          "title": "Article recovery and refresh",
+          "items": [
+            "Article trash defaults to enabled, retaining the complete body, theme, assets, history and recovery metadata in _trash/. Normal deletion offers ten-second Undo and later restoration from the sidebar trash entry without overwriting occupied paths.",
+            "Settings has three workflow cards with matching switches. Disabled controls retain values. With trash disabled, explicit permanent deletion has no Undo; existing trash remains restorable and invalid settings block deletion. The cards align at their bottom edges, with the trash path and clear action on one row. Save settings and appearance actions align with the bottom of their heading descriptions.",
+            "Clearing a fixed batch offers thirty-second Undo before physical cleanup; notices and receipts share the remaining clock. Closing a notice or navigating never commits early; refresh/reopen resumes checked records, while later entries stay outside the earlier batch.",
+            "Refreshing the editor reopens this tab’s saved article in the same library. Other pages stay in place, invalid identities return to the list with feedback, and active navigation cancels a late restore. Unsaved body text is not persisted."
+          ]
+        }
+      ]
     }
   }
 }

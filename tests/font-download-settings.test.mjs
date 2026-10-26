@@ -37,9 +37,10 @@ async function fixture() {
   }
   sources.setFontSource('google-fonts');
   const { createRoot } = await import('react-dom/client');
-  const i18n = createUII18n('zh-CN'); let locale = 'zh-CN';
+  const i18n = createUII18n('zh-CN'); let locale = 'zh-CN', feedback;
   const module = { exports: {} };
   vm.runInNewContext(componentCode, { module, exports: module.exports, require(id) {
+    if (id.endsWith('/OperationFeedback')) return { OperationFeedback: props => { feedback = props; return React.createElement('button', { 'data-diagnostics':true }, 'Details'); } };
     if (id === 'react') return React;
     if (id === 'react/jsx-runtime') return jsxRuntime;
     if (id.endsWith('/UILocaleProvider')) return { useUITranslation: namespace => ({ t: i18n.getFixedT(locale, namespace) }) };
@@ -53,7 +54,7 @@ async function fixture() {
   const render = async () => { await React.act(async () => root.render(React.createElement(module.exports.FontDownloadSettings, props))); };
   await render();
   return {
-    document, window, props, render,
+    document, window, props, render, feedbackText: () => messages.formatProductMessage(feedback?.notice, i18n.getFixedT(locale, 'messages')),
     button(text) { return [...document.querySelectorAll('button')].find(button => button.textContent === text); },
     async click(element) { assert.ok(element); await React.act(async () => element.click()); },
     async language(value) { locale = value; await render(); },
@@ -71,12 +72,12 @@ test('font source is selectable before connecting; ready fonts expose no redunda
   assert.equal(f.document.querySelector('input:checked').value, 'google-fonts');
   await f.click(f.document.querySelector('input[value="jsdmirror"]'));
   assert.equal(f.window.localStorage.getItem(sources.FONT_SOURCE_STORAGE_KEY), 'jsdmirror');
-  assert.equal(f.document.querySelectorAll('button').length, 0);
+  assert.equal(f.document.querySelectorAll('button:not([data-diagnostics])').length, 0);
   assert.match(f.document.body.textContent, /连接资料库后/);
   const directory = library(true); f.props.root = directory; await f.render();
   await React.act(async () => fonts.initializeLocalFonts(directory));
   assert.match(f.document.body.textContent, /字体已就绪/);
-  assert.equal(f.document.querySelectorAll('button').length, 0);
+  assert.equal(f.document.querySelectorAll('button:not([data-diagnostics])').length, 0);
   assert.equal(fetches, 0); assert.deepEqual(directory.writes, []);
 });
 
@@ -87,7 +88,8 @@ test('downloading shows progress and cancel; cancellation preserves retry and ex
   t.mock.method(globalThis, 'fetch', () => { started(); return new Promise(() => {}); });
   let pending;
   await React.act(async () => { pending = fonts.initializeLocalFonts(directory); await fetching; });
-  assert.match(f.document.body.textContent, /正在加载字体文件 0 \/ 3/);
+  assert.match(f.document.querySelector('[role="status"]').textContent, /正在下载字体 0／3/);
+  assert.equal(f.feedbackText(), '', 'download progress does not emit repeated diagnostics');
   assert.equal(f.button('补充缺失字体'), undefined);
   await f.click(f.button('取消下载')); await React.act(async () => pending);
   assert.match(f.document.body.textContent, /下载未完成/);
@@ -105,11 +107,11 @@ test('errors retain their reason beside retry, translate in place and do not lea
   const directory = library(); f.props.root = directory; await f.render();
   t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 503 }));
   await React.act(async () => { await assert.rejects(fonts.initializeLocalFonts(directory)); });
-  assert.match(f.document.body.textContent, /503/); assert.ok(f.button('重试下载'));
+  assert.match(f.feedbackText(), /503/); assert.ok(f.button('重试下载'));
   await f.language('en-US');
-  assert.match(f.document.body.textContent, /503/); assert.ok(f.button('Retry download'));
+  assert.match(f.feedbackText(), /503/); assert.ok(f.button('Retry download'));
   f.props.root = library(true); await f.render();
-  assert.doesNotMatch(f.document.body.textContent, /503|Download incomplete/);
+  assert.doesNotMatch(f.document.body.textContent + f.feedbackText(), /503|Download incomplete/);
   assert.match(f.document.body.textContent, /Not checked/); assert.ok(f.button('Download missing fonts'));
   assert.deepEqual(directory.writes, []);
 });

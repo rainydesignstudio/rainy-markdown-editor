@@ -165,7 +165,7 @@ test('a failed adoption preserves the selection, displays its error and permits 
   const view = picker(async () => { if (++attempts === 1) throw new Error('write failed'); return { ok: true, message: 'done', tone: 'success' }; });
   view.adopt(); await new Promise(resolve => setImmediate(resolve)); view.render();
   assert.equal(view.closes, 0); assert.equal(view.find(node => node.type === 'gallery').props.selected, 'cover.png');
-  assert.match(text(view.find(node => node.props['data-tone'] === 'error')), /write failed/);
+  assert.match(JSON.stringify(view.find(node => node.type === 'operation-feedback' && node.props.tone === 'error').props.notice), /write failed/);
   view.adopt(); await new Promise(resolve => setImmediate(resolve)); assert.equal(view.closes, 1);
 });
 

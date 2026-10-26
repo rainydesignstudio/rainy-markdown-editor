@@ -27,6 +27,7 @@ export function tree(name, files = {}, parent = null) {
       root.children.get(key).seed(parts.join('/'), value); return;
     }
     const file = { name: key, kind: 'file', parent: root, value, modified: 1000,
+      async isSameEntry(other) { return file === other; },
       async getFile() { counters.reads++; counters.fileReads.push(key); return new (class extends File { async arrayBuffer() { counters.bodyReads++; return super.arrayBuffer(); } async text() { counters.bodyReads++; return super.text(); } })([file.value], key, { lastModified: file.modified }); },
       async createWritable() {
         let pending = file.value;

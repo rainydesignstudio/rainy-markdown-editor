@@ -49,3 +49,16 @@ test('pointer and Home/End sizing use the same divider-excluded width', () => {
   assert.equal(resizeEditorSourceRatio(1032, 50, 'ArrowRight'), 52);
   assert.equal(resizeEditorSourceRatio(1032, 50, 'Tab'), null);
 });
+
+test('reference height uses the same sizing contract with 160px minimum regions', () => {
+  const limits = getEditorSplitLimits(532, 160);
+  assert.equal(getEditorSplitLimits(331, 160), null);
+  assert.equal(getEditorSourceWidth(332, 0, 160), 160);
+  assert.equal(getEditorSourceWidth(532, 0, 160), 160);
+  assert.equal(getEditorSourceWidth(532, 100, 160), 360);
+  assert.equal(editorSourceRatioFromPointer(100 + 6 + 160, 100, 532, 160), limits.minimumRatio);
+  assert.equal(resizeEditorSourceRatio(532, 50, 'ArrowUp', 160), 48);
+  assert.equal(resizeEditorSourceRatio(532, 50, 'ArrowDown', 160), 52);
+  assert.equal(resizeEditorSourceRatio(532, 50, 'Home', 160), limits.minimumRatio);
+  assert.equal(resizeEditorSourceRatio(532, 50, 'End', 160), limits.maximumRatio);
+});

@@ -1,11 +1,11 @@
-import { ProductError, productReference, productText } from "../i18n/productMessages";
+import { ProductError, legacyProductMessage, productReference, productText } from "../i18n/productMessages";
 // Capability contracts describe engine inputs. Platform decisions belong to library JSON.
 export type Guard = (value: unknown, path: string) => void;
 export const record = (value: unknown, path: string): Record<string, unknown> => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("contracts.mustBeAnObject", { "path": path });
   return value as Record<string, unknown>;
 };
-export const fail = (path: string, detail: string): never => { throw new Error(`${path}：${detail}。`); };
+export const fail = (path: string, detail: string): never => { throw new ProductError('contracts.invalidField', { path, detail: legacyProductMessage(detail) ?? detail }); };
 export const text: Guard = (value, path) => { if (typeof value !== 'string' || !value.trim()) fail(path, productText("contracts.mustBeANonemptyString")); };
 export const bool: Guard = (value, path) => { if (typeof value !== 'boolean') fail(path, productText("contracts.mustBeABoolean")); };
 export const number = (minimum = 0, maximum = Number.MAX_SAFE_INTEGER, integer = false): Guard => (value, path) => {

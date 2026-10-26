@@ -7,6 +7,7 @@ import { createArticleColorInspection, type ArticleColorSlot } from '../themeIns
 import type { ThemeConfig } from '../types';
 import { assertLibraryCapability } from './libraryConfiguration';
 import { articleDarkMode } from './styleTypes';
+import { packageDarkRendition } from './packageRendering';
 
 export type DarkRendition = { html: string; css: string; colors?: Record<string, string[]> };
 const renditions = new Map<string, DarkRendition>();
@@ -16,6 +17,7 @@ export function clearDarkRenditionCache() { renditions.clear(); }
 export async function nativeDarkRendition(root: HTMLElement, css: string, snapshot: FormatSnapshot, signal: AbortSignal, options: { retained?: boolean; colorTheme?: ThemeConfig; width?: number } = {}): Promise<DarkRendition> {
   signal.throwIfAborted();
   if (!options.retained) assertCurrentFormat(snapshot);
+  if (snapshot.renderer) return packageDarkRendition(root, snapshot);
   if (articleDarkMode(snapshot.bundle.formatter) === 'algorithm') assertLibraryCapability(snapshot, 'algorithm');
   const width = options.width || root.clientWidth || snapshot.bundle.formatter.output.visual.width;
   // The registered adapter captures computed paint inside its isolated document.

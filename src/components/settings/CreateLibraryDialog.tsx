@@ -1,6 +1,7 @@
 'use client';
 
-import { formatProductMessage, productText } from "../../lib/i18n/productMessages";
+import { SelectField } from '../global/SelectField';
+import { formatProductMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
@@ -38,7 +39,7 @@ export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: st
     try {
       const result = await onCreate(normalizedName, presetId);
       if (result.status === 'created') onClose();
-      else setFeedback({ label: result.status === 'error' ? result.message : productText("uiFeedback.directoryCancelled"), error: result.status === 'error' });
+      else if (result.status === 'error') setFeedback({ label: result.message, error: true });
     } catch (error) {
       setFeedback({ label: error instanceof Error ? error.message : String(error), error: true });
     } finally { creatingRef.current = false; setCreating(false); }
@@ -48,7 +49,6 @@ export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: st
     <DialogHeader titleId="create-library-title" eyebrow={t('common:eyebrows.createLocalLibrary')} title={t('dialogs:ui.newLibrary')} onClose={close} closeDisabled={creating} />
     <form onSubmit={create} aria-busy={creating}>
       <div className="dialog-content">
-        <p id="create-library-description" className="text-sm text-muted">{t('dialogs:ui.nameYourLibraryThenChooseItsParentDirectory')}</p>
         <label className="field-stack" htmlFor="new-library-name">
           <span className="field-label">{t('dialogs:ui.libraryName')}</span>
           <input id="new-library-name" name="library-name" className="field" value={name} maxLength={80} onChange={event => { setName(event.target.value); setFeedback(null); }} placeholder={t('dialogs:ui.exampleMyManuscripts')} autoFocus autoComplete="off" spellCheck={false} required disabled={creating} aria-invalid={Boolean(nameIssue)} aria-describedby={nameIssue ? 'create-library-name-error' : 'create-library-name-help'} />
@@ -57,18 +57,15 @@ export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: st
         </label>
         <label className="field-stack" htmlFor="new-library-preset">
           <span className="field-label">{t('dialogs:ui.validationAndAlgorithmTemplate')}</span>
-          <select id="new-library-preset" name="library-preset" className="field" value={presetId} disabled={creating} aria-describedby="new-library-preset-help" onChange={event => { setPresetId(event.target.value as PlatformPresetId); setFeedback(null); }}>
-            {PUBLIC_PLATFORM_PRESETS.map(preset => <option key={preset.id} value={preset.id}>{t('dialogs:platformPresets.' + preset.id)}</option>)}
-          </select>
+          <SelectField label={t('dialogs:ui.validationAndAlgorithmTemplate')} id="new-library-preset" name="library-preset" value={presetId} disabled={creating} aria-describedby="new-library-preset-help" onChange={nextValue => { setPresetId(nextValue as PlatformPresetId); setFeedback(null); }} options={[...(PUBLIC_PLATFORM_PRESETS.map(preset => ({ value: preset.id, label: t('dialogs:platformPresets.' + preset.id) })) ?? [])]} />
           <span id="new-library-preset-help" className="text-xs text-faint">{t('dialogs:ui.newLibraryPresetHelp')}</span>
         </label>
         <div className="grid min-w-0 gap-3 rounded-lg border border-line bg-list/50 p-4" aria-label={t('dialogs:ui.libraryLocationPreview')}>
           <p className="text-xs text-muted">{t('dialogs:ui.creationLocation')}</p>
           <div className="flex min-w-0 items-start gap-2 text-sm"><span className="mt-0.5 text-accent-text"><LibraryIcon /></span><p className="min-w-0 break-all"><span className="text-muted">{t('dialogs:ui.chosenParentDirectory')} </span><strong className="font-medium text-primary">{normalizedName || t('dialogs:ui.libraryName')}</strong></p></div>
-          <p className="text-xs text-muted">{t('dialogs:ui.chooseTheParentInTheSystemDialogNext')}</p>
+          <p id="create-library-description" className="text-xs text-muted">{t('dialogs:ui.chooseTheParentInTheSystemDialogNext')}</p>
         </div>
         {feedback ? <p className="status-copy" data-tone={feedback.error ? 'error' : 'neutral'} role={feedback.error ? 'alert' : 'status'}>{formatProductMessage(feedback, t)}</p> : null}
-        {creating ? <p className="text-xs text-muted" role="status">{t('dialogs:ui.afterSelectingAParentTheLibraryWillBe')}</p> : null}
       </div>
       <DialogFooter><DialogActions>
         <DialogButton disabled={creating} onClick={close}><LibraryIcon cancel />{t('common:actions.cancel')}</DialogButton>

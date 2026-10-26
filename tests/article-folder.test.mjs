@@ -1,3 +1,7 @@
+import { articleIdentityMap, adoptArticleReferences } from '../src/lib/articleIdentity.ts';
+import { addKnowledgeSource, knowledgeSourceDirectory } from '../src/lib/knowledge/source.ts';
+import { readResearch, updateResearch } from '../src/lib/knowledge/research.ts';
+import { tree as knowledgeTree, bookmarks as knowledgeBookmarks } from './knowledge/fs-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeArticleDirectoryName, renameStoredArticleDirectory } from '../src/lib/articleFolder.ts';
@@ -73,6 +77,27 @@ function taskFor(article, state = 'complete') {
   return { schemaVersion: 1, id: '11111111-1111-4111-8111-111111111111', createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z', target: { articleId: article.id, month: article.month, folder: article.folder }, source: { kind: 'local', sourceId: '22222222-2222-4222-8222-222222222222', path: 'draft.md', name: 'draft.md', hash: 'a'.repeat(64), size: 1, modified: 1 }, state, resources: [], diagnostics: [] };
 }
 const failure = key => error => error.messageKey === key;
+
+test('first article identity writer failure is retryable and preserves an externally replaced file', async () => {
+  for (const replaced of [false, true]) {
+    const root = knowledgeTree('library', { 'articles/2026-10/Example/article.md': '# Example' });
+    const folder = root.children.get('articles'), getFile = folder.getFileHandle;
+    folder.getFileHandle = async (name, options) => {
+      const file = await getFile(name, options);
+      if (name === 'index.json' && options?.create) file.createWritable = async () => {
+        if (replaced) folder.seed('index.json', 'external metadata');
+        throw new Error('writer unavailable');
+      };
+      return file;
+    };
+    await assert.rejects(adoptArticleReferences(root, ['2026-10/Example'], async () => {}), /writer unavailable/);
+    if (replaced) assert.equal(folder.children.get('index.json').value, 'external metadata');
+    else {
+      assert.equal(folder.children.has('index.json'), false); folder.getFileHandle = getFile;
+      assert.ok((await adoptArticleReferences(root, ['2026-10/Example'], async () => {})).get('2026-10/Example'));
+    }
+  }
+});
 
 test('legal Chinese punctuation survives rename, reread, save and index rebuild without compatibility folding', async () => {
   const { root, article, options } = await fixture();
@@ -180,4 +205,44 @@ test('special object-key folder names remain ordinary own index keys', async () 
   await renameStoredArticleDirectory(root, article.month, article.folder, '__proto__', options);
   const index = JSON.parse(await read(root, 'articles/2026-10/index.json'));
   assert.equal(Object.hasOwn(index, '__proto__'), true); assert.equal({}.summaryVersion, undefined);
+});
+
+test('article directory rename keeps stable collection and citation identity without changing retained source snapshots', async () => {
+  const { root, article, options } = await fixture();
+  const reader = await addKnowledgeSource(root, knowledgeTree('notes', { 'a.md': 'Quoted text' }), knowledgeBookmarks());
+  const capture = { sourceId: reader.binding.sourceId, path: 'a.md', title: 'A', content: 'Quoted text', line: 1, endLine: 1, whole: true, note: '' };
+  await updateResearch(root, reader, data => {
+    data.topics.push({ id: crypto.randomUUID(), name: 'Topic', note: '', articleIds: [article.id], items: [{ ...capture, id: crypto.randomUUID() }] });
+    data.citations.push({ ...capture, id: crypto.randomUUID(), articleId: article.id, citationId: 'rme-cite-' + crypto.randomUUID() });
+  });
+  const before = await readResearch(root, reader), stable = before.topics[0].articleIds[0];
+  assert.notEqual(stable, article.id); assert.equal(before.citations[0].articleId, stable);
+  const folder = await knowledgeSourceDirectory(root, reader), raw = await read(folder, 'research-' + reader.binding.sourceId + '.json');
+  const moved = await renameStoredArticleDirectory(root, article.month, article.folder, 'New folder', options);
+  const ids = await articleIdentityMap(root); assert.equal(ids.get(article.id), stable); assert.equal(ids.get(moved.article.id), stable);
+  const after = await readResearch(root, reader); assert.deepEqual(after, before);
+  assert.equal(await read(folder, 'research-' + reader.binding.sourceId + '.json'), raw);
+  assert.equal(moved.article.source, article.source);
+});
+
+test('legacy path references resolve through the article index after a rename without rewriting research data', async () => {
+  const { root, article, options } = await fixture(), reader = await addKnowledgeSource(root, knowledgeTree('notes'), knowledgeBookmarks());
+  const folder = await knowledgeSourceDirectory(root, reader), name = 'research-' + reader.binding.sourceId + '.json';
+  const raw = JSON.stringify({ schemaVersion: 1, sourceId: reader.binding.sourceId, topics: [{ id: crypto.randomUUID(), name: 'Old topic', note: '', articleIds: [article.id], items: [] }], citations: [] });
+  await write(folder, name, raw);
+  const moved = await renameStoredArticleDirectory(root, article.month, article.folder, 'Renamed legacy', options);
+  const stable = (await articleIdentityMap(root)).get(moved.article.id);
+  assert.equal((await readResearch(root, reader)).topics[0].articleIds[0], stable);
+  assert.equal(await read(folder, name), raw);
+});
+
+test('reusing a renamed folder creates a new reference identity without redirecting legacy aliases', async () => {
+  const { root, article, options } = await fixture();
+  const original = (await adoptArticleReferences(root, [article.id], async () => {})).get(article.id);
+  await renameStoredArticleDirectory(root, article.month, article.folder, 'Moved original', options);
+  await saveStoredArticle(root, article.source, article.theme, article.folder, article.month);
+  const reused = (await adoptArticleReferences(root, [article.id], async () => {})).get(article.id);
+  assert.notEqual(reused, original);
+  assert.equal((await articleIdentityMap(root)).get(article.id), reused);
+  assert.equal((await articleIdentityMap(root, true)).get(article.id), original);
 });

@@ -62,15 +62,16 @@ test('changing UI language updates iframe title without remounting, replacing th
   let findCalls = 0; const keyListeners = new Map();
   let cursor = 0, language = 'zh-CN', creations = 0, removals = 0;
   const cells = [], effects = [], frames = [], titles = { 'zh-CN': key => '中文:' + key, 'en-US': key => 'English:' + key };
-  const element = () => ({ dataset: {}, style: {}, textContent: '', remove() { removals++; } });
+  const element = () => ({ dataset: {}, style: {}, textContent: '', listeners: new Map(), addEventListener(name, fn) { this.listeners.set(name, fn); }, removeEventListener(name) { this.listeners.delete(name); }, remove() { removals++; } });
   const head = { styles: [], append(node) { this.styles.push(node); }, querySelector() { return this.styles[0]; } };
   const doc = { documentElement: { dataset: {}, style: {}, classList: { toggle() {} } }, body: { style: {}, append() {} }, head, open() {}, write() {}, close() {}, createElement: element, addEventListener(name, callback) { keyListeners.set(name, callback); }, removeEventListener(name) { keyListeners.delete(name); } };
   doc.createElement = () => ({ ...element(), ownerDocument: doc });
-  const host = { addEventListener() {}, removeEventListener() {}, style: {}, clientWidth: 996, clientHeight: 959, append(frame) { frames.push(frame); }, querySelectorAll() { return frames; } }, hostRef = { current: host };
+  const citationEvents = [];
+  const host = { dispatchEvent(event) { citationEvents.push(event); }, addEventListener() {}, removeEventListener() {}, style: {}, clientWidth: 996, clientHeight: 959, append(frame) { frames.push(frame); }, querySelectorAll() { return frames; } }, hostRef = { current: host };
   const effect = (fn, deps) => { const i = cursor++, old = cells[i]; if (old && deps.every((x, j) => Object.is(x, old.deps[j]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { deps, cleanup: fn() }; }); };
   const react = { useEffect: effect, useLayoutEffect: effect, useRef(value) { return cells[cursor++] ??= { current: value }; }, useState(value) { const i = cursor++; if (!(i in cells)) cells[i] = value; return [cells[i], value => { cells[i] = value; }]; } };
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, document: { createElement() { creations++; return { ...element(), contentDocument: doc, setAttribute() {} }; } }, ResizeObserver: class { observe() {} disconnect() {} }, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } }, document: { createElement() { creations++; return { ...element(), contentDocument: doc, setAttribute() {} }; } }, ResizeObserver: class { observe() {} disconnect() {} }, require(id) {
     if (id === 'react') return react;
     if (id.endsWith('/editor/previewScrolling')) return previewScrolling;
     if (id.endsWith('/i18n/formatters')) return uiFormatters;
@@ -85,6 +86,9 @@ test('changing UI language updates iframe title without remounting, replacing th
   assert.equal(frames[0].title, 'English:preview.frame');
   assert.equal(doc.documentElement.lang, 'zh-CN');
   assert.equal(head.styles[0].textContent, '.unchanged{}');
+  let prevented = false;
+  target.listeners.get('click')({ target: { closest: () => ({ getAttribute: () => '#user-content-rme-cite-aabb-0011' }) }, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true); assert.equal(citationEvents[0].type, 'rainy-citation-open'); assert.equal(citationEvents[0].detail, 'rme-cite-aabb-0011');
   const key = extras => ({ key: 'f', metaKey: true, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...extras });
   const command = key(); keyListeners.get('keydown')(command);
   assert.equal(command.defaultPrevented, true); assert.equal(findCalls, 1);

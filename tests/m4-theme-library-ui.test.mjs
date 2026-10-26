@@ -24,6 +24,7 @@ function page(fileSystem = {}) {
     if (id.endsWith('/ArticleDocument')) return { ArticleDocument: 'article-document' };
     if (id.endsWith('/contentValidation')) return { validateContentSource: async () => ({ errors: [], issues: [] }) };
     if ((id.endsWith('/article-format/runtime') || id === './runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
+    if (id.endsWith('/useResourcePreviewStyles')) return { useResourcePreviewStyles: () => ({ css: '', issue: '', ready: true, result: {} }) };
     if (id.endsWith('/useThemePreviewSample')) return { useThemePreviewSample: () => ({ status: 'ready', markdown: '# Sample', origin: 'library' }) };
     if (id.endsWith('/themePreviewSample')) return {};
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
@@ -48,6 +49,7 @@ function page(fileSystem = {}) {
     if (id.endsWith('/articleDarkPreview')) return {};
     if (id.endsWith('/EditorColorPicker')) return { EditorColorPicker: 'color-picker' };
     if (id.endsWith('/ArticleThemeFields')) return { ArticleThemeFields: 'article-theme-fields' };
+    if (id.endsWith('/LibraryCssEditor')) return { LibraryCssEditor: 'library-css-editor' };
     if (id.endsWith('/tailwindPalette')) return {};
     if (id.endsWith('/themes')) return themes;
     if (id.endsWith('/fileSystem')) return fileSystem;
@@ -227,7 +229,7 @@ test('a refresh failure after deletion offers reload without repeating deletion'
   view.button('删除主题').props.onClick(); view.render();
   await deletionDialog(view).props.onDelete(); view.render();
   assert.throws(() => deletionDialog(view), /Control exists/);
-  await view.button('重新载入主题列表').props.onClick(); view.render();
+  await view.find(node => node.type === 'operation-feedback' && node.props.onRetry).props.onRetry(); view.render();
   assert.deepEqual(deleted, ['basic']);
   assert.equal(view.writes.length, 1);
 });

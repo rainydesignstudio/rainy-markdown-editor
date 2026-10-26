@@ -2,7 +2,7 @@
   "kind": "article-theme",
   "id": "mokan",
   "name": "Ink Journal",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "formatVersion": 1,
   "tokens": {
     "color-article-ink": "#262626",

@@ -1,0 +1,9 @@
+{
+  "id": "mac-style-code-block-nowrap",
+  "name": "macOS-style code block (no wrap)",
+  "trigger": "//mac-style-code-block-nowrap",
+  "description": "Window-style code block; adopt an updated article theme first. Edit the filename, language marker and code; code does not wrap.",
+  "content": "<section class=\"my-6 overflow-hidden rounded-lg\">\n  <section class=\"flex items-center justify-between gap-3 bg-article-code px-4 py-2.5\">\n    <svg xmlns=\"http://www.w3.org/2000/svg\" class=\"block shrink-0\" width=\"52\" height=\"12\" viewBox=\"0 0 52 12\" aria-hidden=\"true\">\n      <circle cx=\"6\" cy=\"6\" r=\"6\" fill=\"#ff5f57\" />\n      <circle cx=\"26\" cy=\"6\" r=\"6\" fill=\"#febc2e\" />\n      <circle cx=\"46\" cy=\"6\" r=\"6\" fill=\"#28c840\" />\n    </svg>\n    <span class=\"min-w-0 flex-1 break-all text-right text-xs text-white\">example.ts</span>\n  </section>\n\n<pre class=\"p-4 border-none m-0 rounded-none\"><code class=\"block max-w-full w-full whitespace-pre-nowrap\">▌function greet(name: string) {\n\treturn `Hello, ${name}!`;\n}\n\nconsole.log(greet(\"Rainy\"));</code></pre>\n\n</section>",
+  "icon": "code",
+  "categoryId": "default"
+}

@@ -1,18 +1,24 @@
 'use client';
 
+import { feedbackNotice } from '../../lib/i18n/feedback';
+import { OperationFeedback } from '../global/OperationFeedback';
 import { ProductError, formatDiagnosticMessage, formatProductMessage, productCause, productDiagnosticReference, productJoin, productReference, productText, productErrorMessage, type ProductMessageInfo, type ProductMessageValue } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 import { useArticleRenderMount, type ArticleDarkColors } from '../../lib/article-format/useArticleRenderMount';
 import { ArticleDocument } from '../../lib/article-format/ArticleDocument';
 
+import { PreviewCssDetails } from '../content/PreviewCssDetails';
+import { useResourcePreviewStyles } from '../../hooks/useResourcePreviewStyles';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
-import { articlePreviewStyle, previewSurfaceStyle } from '../../lib/article-format/preview';
+import { articlePreviewStyle, previewSurfaceStyle, resourcePreviewHostClass, resourcePreviewWidth } from '../../lib/article-format/preview';
 import { SnippetTextarea } from '../content/SnippetTextarea';
 import { validateContentSource } from '../../lib/contentValidation';
 import { articleFormatMessageReference, type ArticleFormatIssue } from '../../lib/articleFormat';
 import { getFormatSnapshot } from '../../lib/article-format/runtime';
+import { LibraryCard } from '../global/LibraryCard';
+import { ContentIcon as ThemeIcon } from '../global/ContentIcon';
 import { PageHeading } from '../global/PageHeading';
 
 import { useResizableColumns } from '../../hooks/useResizableColumns';
@@ -27,6 +33,7 @@ import { PreviewModeSwitch } from '../editor/PreviewModeSwitch';
 import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
 import { EditorColorPicker } from '../settings/EditorColorPicker';
 import { ArticleThemeFields } from './ArticleThemeFields';
+import { LibraryCssEditor, type LibraryCssEditorHandle, type LibraryCssEditorState } from './LibraryCssEditor';
 import { tailwindColorToHex } from '../../lib/tailwindPalette';
 import type { EditorTheme } from '../../lib/editorThemes';
 import { copyDefaultThemes } from '../../lib/themeDefaults';
@@ -47,7 +54,7 @@ import { useThemePreviewSample } from '../../hooks/useThemePreviewSample';
 import { getThemePreviewSample } from '../../lib/themePreviewSample';
 import { getArticleNodeSelectors, createArticleColorInspection, type ColorBinding } from '../../lib/themeInspection';
 import { ThemeInspectionPreview, useThemeInspection, type ThemeInspection } from '../global/ThemeInspection';
-import { compileArticleStyles, compileThemeInspectionUtilities } from '../../lib/article-format/renderer';
+import { compileThemeInspectionUtilities } from '../../lib/article-format/renderer';
 
 type ThemeLibraryProps = {
   root: FileSystemDirectoryHandle | null;
@@ -77,24 +84,7 @@ function uniqueThemeId(base: string, themes: ThemeConfig[]): string {
   return `${safeBase}-${index}`;
 }
 
-function ThemeIcon({ name }: { name: 'book' | 'upload' | 'plus' | 'edit' | 'apply' | 'info' | 'check' | 'save' | 'delete' | 'copy' | 'close' | 'code' | 'reset' }) {
-  const paths = {
-    book: 'M12 5c-3-2-7-2-10-1v15c3-1 7-1 10 1m0-15c3-2 7-2 10-1v15c-3-1-7-1-10 1V5Z',
-    upload: 'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6',
-    plus: 'M12 5v14M5 12h14',
-    edit: 'm4 16 12-12 4 4L8 20H4v-4Zm10-10 4 4',
-    apply: 'M4 7h10m-4-4 4 4-4 4M4 13v7h16V7h-2',
-    info: 'M12 11v6M12 7h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
-    check: 'm4 12 5 5L20 6',
-    save: 'M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6',
-    delete: 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7',
-    copy: 'M8 8h12v12H8V8ZM4 16V4h12',
-    close: 'm6 6 12 12M18 6 6 18',
-    code: 'm8 6-6 6 6 6m8-12 6 6-6 6',
-    reset: 'M4 10a8 8 0 1 1 1 8M4 4v6h6',
-  };
-  return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
-}
+
 
 export function ThemePreview({ theme, source: explicitSource, className = 'theme-stylebook-reader', framed = false, dark = false, inspection, onLocate, onNodeColors, onDarkColors }: { theme: ThemeConfig; source?: string; className?: string; framed?: boolean; dark?: boolean; inspection?: ThemeInspection; onLocate?: (binding: ColorBinding) => void; onNodeColors?: (colors: Partial<Record<ThemeNodeKey, string>>) => void; onDarkColors?: (theme: ThemeConfig, colors: ArticleDarkColors) => void }) {
   const { t } = useUITranslation('themes');
@@ -108,25 +98,13 @@ export function ThemePreview({ theme, source: explicitSource, className = 'theme
   const articleRef = useRef<HTMLElement | null>(null);
   const lightHostRef = useRef<HTMLDivElement | null>(null);
 
-  const [compiledCss, setCompiledCss] = useState('');
-  const [compileError, setCompileError] = useState('');
+  const { css: compiledCss, issue: compileError, ready: compileReady, result: compileResult } = useResourcePreviewStyles(source, theme, formatSnapshot, sampleUnavailable);
   const provenanceRef = useRef<ReturnType<typeof createArticleColorInspection> | null>(null);
   const [inspectionRevision, setInspectionRevision] = useState(0);
   const utilitiesRef = useRef('');
   const articleCss = articlePreviewStyle(`${compiledCss}\narticle.article-preview { min-height: 100%; min-width: 0; width: 100%; }`);
   const { target: lightTarget, native, darkIssue, darkColors, darkFrameRef: frameRef } = useArticleRenderMount(lightHostRef, formatSnapshot, compiledCss, dark, { colorTheme: onDarkColors && !sampleUnavailable ? theme : undefined });
   useEffect(() => { onDarkColors?.(theme, compileError || sampleUnavailable ? { status: 'error', values: {} } : darkColors); }, [theme, darkColors, compileError, sampleUnavailable, sample.id, onDarkColors]);
-  useEffect(() => {
-    let active = true;
-    setCompiledCss(''); setCompileError('');
-    if (sampleUnavailable) return;
-    void compileArticleStyles(source, theme).then(({ css }) => {
-      if (active) setCompiledCss(css);
-    }).catch((error: unknown) => {
-      if (active) setCompileError(error instanceof Error ? error.message : String(error));
-    });
-    return () => { active = false; };
-  }, [source, theme, formatSnapshot.id, sampleUnavailable]);
   useEffect(() => {
     const article = articleRef.current;
     if (!onNodeColors) return;
@@ -161,25 +139,32 @@ export function ThemePreview({ theme, source: explicitSource, className = 'theme
       const shadow = lightHostRef.current?.shadowRoot;
       if (shadow && !shadow.querySelector('[data-theme-inspection-utilities]')) { const style = document.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = css; shadow.append(style); }
       const target = frameRef.current?.contentDocument;
-      if (target && !target.querySelector('[data-theme-inspection-utilities]')) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = css; target.head.append(style); }
+      if (target?.head && !target.querySelector('[data-theme-inspection-utilities]')) { const style = target.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = css; target.head.append(style); }
       setInspectionRevision(value => value + 1);
     });
     return () => { active = false; };
   }, [Boolean(inspection)]);
   useEffect(() => {
-    const doc = frameRef.current?.contentDocument;
-    if (!inspection || !doc || !utilitiesRef.current || doc.querySelector('[data-theme-inspection-utilities]')) return;
-    const style = doc.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; doc.head.append(style);
-    setInspectionRevision(value => value + 1);
+    const frame = frameRef.current;
+    if (!inspection || !frame || !utilitiesRef.current) return;
+    const attach = () => {
+      const doc = frame.contentDocument;
+      if (!doc?.head || doc.querySelector('[data-theme-inspection-utilities]')) return;
+      const style = doc.createElement('style'); style.dataset.themeInspectionUtilities = 'true'; style.textContent = utilitiesRef.current; doc.head.append(style);
+      setInspectionRevision(value => value + 1);
+    };
+    attach(); frame.addEventListener('load', attach);
+    return () => frame.removeEventListener('load', attach);
   }, [dark, darkColors, inspectionRevision, Boolean(inspection)]);
-    const content = <div className={`${className} ${scopeClass}`} style={previewSurfaceStyle(dark)} data-preview-mode={dark ? 'dark' : 'light'}>
-    {explicitSource === undefined && sample.status === 'loading' ? <p className="border-b border-line bg-panel p-4 text-xs text-muted" role="status">{t('themes:ui.previewSampleLoading')}</p> : null}
-    {explicitSource === undefined && sample.status === 'error' ? <p className="border-b border-warning-line bg-warning-surface p-4 text-xs text-warning-strong" role="alert">{t('themes:ui.previewSampleUnavailable', { cause: formatProductMessage(sample.error, t) })}</p> : null}
-    {explicitSource === undefined && sample.status === 'ready' && sample.origin === 'default' && sample.library ? <p className="border-b border-line bg-panel p-4 text-xs text-muted" role="status">{t('themes:ui.previewSampleDefault', { locale: sample.locale })}</p> : null}
-    <div ref={lightHostRef} hidden={sampleUnavailable} className={framed ? 'mx-auto min-h-full min-w-0 w-full max-w-3xl rounded-lg shadow-panel' : 'min-h-full min-w-0 w-full border-0'} aria-busy={sampleUnavailable ? sample.status === 'loading' : !compiledCss && !compileError} />
-    {lightTarget && !sampleUnavailable ? createPortal(<>{!native ? <style>{articleCss}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }}><MarkdownPreview source={source} snapshot={formatSnapshot} /></ArticleDocument></>, lightTarget) : null}
-    {compileError ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{t('themes:ui.themePreviewCompilationFailed')}{formatProductMessage(compileError, t)}</p> : null}
-    {darkIssue ? <p className="border-b border-warning-line bg-warning-surface px-4 py-3 text-xs text-warning-strong" role="alert">{formatProductMessage(darkIssue, t)}</p> : null}
+    const previewNotice = compileError || darkIssue || (explicitSource === undefined && sample.status === 'error' ? sample.error : null);
+    const content = <div className={`relative ${className} ${scopeClass}`} style={previewSurfaceStyle(dark)} data-preview-mode={dark ? 'dark' : 'light'}>
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-b border-line bg-list px-4 py-2">
+      <span className="min-w-0 flex-1 break-words text-xs text-muted" role="status">{explicitSource === undefined && sample.status === 'loading' ? t('messages:feedback.previewLoading') : explicitSource === undefined && sample.origin === 'default' && sample.library ? t('messages:feedback.previewDefault') : null}</span>
+      <div className="flex shrink-0 gap-2"><OperationFeedback id={`theme-preview-${theme.id}`} label={t('common:feedback.previewProblems')} announce={false} notice={previewNotice} tone={compileError || sample.status === 'error' ? 'error' : 'warning'} /><PreviewCssDetails css={compiledCss} ready={compileReady && !darkIssue && (!dark || !compiledCss || darkColors.status === 'ready')} revision={compileResult} snapshot={formatSnapshot} dark={dark} hostRef={lightHostRef} target={lightTarget} darkFrameRef={frameRef} /></div>
+    </div>
+    <div key={formatSnapshot.renderer?.fingerprint ?? (native ? 'native' : 'theme')} ref={lightHostRef} hidden={sampleUnavailable} data-preview-width={resourcePreviewWidth(formatSnapshot)} className={resourcePreviewHostClass(formatSnapshot, framed)} aria-busy={sampleUnavailable ? sample.status === 'loading' : !compileReady && !compileError} />
+    {lightTarget && !sampleUnavailable ? createPortal(<>{!native ? <style>{articleCss}</style> : null}<ArticleDocument snapshot={formatSnapshot} themeId={theme.id} attach={element => { articleRef.current = element; }}><MarkdownPreview source={source} theme={theme} snapshot={formatSnapshot} /></ArticleDocument></>, lightTarget) : null}
+
   </div>;
   return inspection ? <ThemeInspectionPreview inspection={inspection} dialogOwner="theme-stylebook-title" rootRef={articleRef} frameRef={dark ? frameRef : undefined} revision={`${inspectionRevision}:${dark}:${darkColors.status}:${articleCss}`} className="flex min-h-0 flex-1 flex-col" onLocate={onLocate} resolve={(element, root) => {
     const light = articleRef.current;
@@ -202,7 +187,9 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
   const [selected, setSelected] = useState<ThemeConfig | null>(null);
   const [browsedThemeId, setBrowsedThemeId] = useState<string | null>(null);
   const [stylebookTheme, setStylebookTheme] = useState<ThemeConfig | null>(null);
-  const [notice, setNotice] = useState<string | ProductMessageInfo | { message: string }>('');
+  const [notice, setNoticeValue] = useState<string | ProductMessageInfo | { message: string }>('');
+  const operationEvent = useRef(Date.now());
+  const setNotice = (value: string | ProductMessageInfo | { message: string }) => { operationEvent.current++; setNoticeValue(value); };
   const [working, setWorking] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ThemeConfig | null>(null);
@@ -445,7 +432,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
     <section className="page-card theme-library-page lg:overflow-hidden" aria-labelledby="theme-library-title">
       <PageHeading>
         <div className="min-w-0"><p id="theme-library-kicker" className="eyebrow">{t('themes:ui.articleStylebook')}</p><h2 id="theme-library-title" className="page-title font-heading">{t('themes:ui.themeLibraryAndTypographySamples')}</h2><p className="mt-3 text-sm text-muted">{t('themes:ui.chooseTypographyAndPreviewHeadingsBodyTextAnd')}</p></div>
-        <ButtonBar label={t('themes:ui.themeLibraryActions')}>
+        <ButtonBar label={t('themes:ui.themeLibraryActions')}><OperationFeedback hideTrigger revision={operationEvent.current} id="theme-library-operation" notice={working ? productReference('feedback.working') : notice} tone={working ? 'info' : undefined} onRetry={refreshPending ? retryRefresh : undefined} retryDisabled={working} /><OperationFeedback id="theme-library-files" label={t('common:feedback.fileProblems', { count: issues.length })} notice={issues.length ? productReference('shared.compose', { parts: productJoin(issues.map(issue => productJoin([issue.file, ' · ', productDiagnosticReference(issue)])), '\n') }) : null} summary={productReference('feedback.filesRepair', { count: issues.length })} tone="warning" />
           <button className="button button-quiet bg-panel" type="button" onClick={() => importRef.current?.click()} disabled={!root || working}><ThemeIcon name="upload" />{t('themes:ui.importJson')}</button>
           <input ref={importRef} className="sr-only" type="file" accept=".json,application/json" aria-label={t('themes:ui.importThemeJsonFile')} disabled={!root || working} onChange={(event) => void importTheme(event.currentTarget.files?.[0])} />
           <button className="button button-quiet" type="button" disabled={!root || working} onClick={() => void loadDefaults()}><ThemeIcon name="plus" />{t('themes:ui.loadDefaultThemes')}</button>
@@ -454,19 +441,16 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       </PageHeading>
 
       {!root ? <p className="shrink-0 rounded-lg border border-line bg-list px-4 py-3 text-xs text-muted">{t('themes:ui.connectALibraryToReadItsArticleThemes')}</p> : null}
-      {notice ? <p className="status-copy shrink-0 rounded-lg border border-accent-line bg-accent-soft px-4 py-3" role="status">{formatProductMessage(notice, t)}</p> : null}
-      {refreshPending ? <button className="button button-quiet self-start" type="button" onClick={() => void retryRefresh()} disabled={working}>{t('themes:ui.reloadThemeList')}</button> : null}
-      {issues.length ? <CollapsiblePanel id="theme-library-issues" title={t('themes:ui.themeFilesNeedRepair')} icon={<PanelIcon kind="issues" />} count={issues.length} open={issuesOpen} onToggle={() => setIssuesOpen(value => !value)} className="shrink-0 border-warning-line bg-warning-surface" contentClassName="text-xs text-warning-strong"><div className="grid max-h-32 gap-2 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{issues.map((issue) => <p className="break-words" key={`${issue.file}-${issue.message}`}><code>{issue.file}</code>：{formatDiagnosticMessage(issue, t)}</p>)}</div></CollapsiblePanel> : null}
+
 
       {browsedTheme ? (
         <div className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-panel lg:flex-1 lg:flex-row">
           <aside className="flex min-h-0 shrink-0 flex-col border-b border-line bg-list/50 lg:w-72 lg:border-b-0 lg:border-r" aria-label={t('themes:ui.themeList')}>
             <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-5 py-4"><h3 className="text-sm font-semibold text-primary">{t('themes:ui.articleThemes')}</h3><span className="font-mono text-xs text-faint">{t('themes:templates.themeCount', { count: themes.length })}</span></div>
             <div className="grid max-h-56 min-h-0 content-start gap-2 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent lg:max-h-none lg:flex-1">
-              {themes.map((theme) => <button key={theme.id} className="group flex min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors hover:border-line hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft" type="button" aria-label={t('themes:templates.previewTheme', { name: theme.name })} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-muted group-aria-pressed:border-accent-line group-aria-pressed:text-accent-text"><ThemeIcon name="book" /></span>
-                <span className="grid min-w-0 flex-1 gap-1"><span className="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text">{theme.name}{hasEditingDraft(editingDrafts, root, 'themes', theme.id) ? <UnsavedMark className="ml-2 inline-block" /> : null}</span><span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />{t('themes:ui.defaultForNewArticles')}</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />{t('themes:ui.usedByCurrentArticle')}</span> : null}</span>
-              </button>)}
+              {themes.map((theme) => <LibraryCard key={theme.id} icon={<ThemeIcon name="book" />} title={<>{theme.name}{hasEditingDraft(editingDrafts, root, 'themes', theme.id) ? <UnsavedMark className="ml-2 inline-block" /> : null}</>} titleClassName="break-words font-sub-heading text-base font-semibold text-primary group-aria-pressed:text-accent-text" aria-label={t('themes:templates.previewTheme', { name: theme.name })} aria-pressed={browsedTheme.id === theme.id} aria-controls="theme-library-preview" onClick={() => setBrowsedThemeId(theme.id)}>
+                <span className="break-all font-mono text-2xs text-faint">{theme.id} · v{theme.version}</span>{theme.id === defaultTheme.id ? <span className="flex items-center gap-1 text-2xs text-accent-text"><ThemeIcon name="check" />{t('themes:ui.defaultForNewArticles')}</span> : null}{theme.id === currentTheme.id && theme.version === currentTheme.version ? <span className="flex items-center gap-1 text-2xs text-muted"><ThemeIcon name="check" />{t('themes:ui.usedByCurrentArticle')}</span> : null}
+              </LibraryCard>)}
             </div>
             <p className="hidden shrink-0 border-t border-line px-5 py-4 text-xs text-faint lg:block">{t('themes:ui.selectAThemeToPreviewItTheArticle')}</p>
           </aside>
@@ -570,11 +554,10 @@ function ThemeDeleteDialog({ theme, busy, error, onCancel, onDelete }: {
 }) {
   const { t } = useUITranslation('dialogs');
   return <DialogFrame titleId="theme-delete-title" descriptionId="theme-delete-description" role="alertdialog" onClose={onCancel} dismissible={!busy}>
-    <DialogHeader titleId="theme-delete-title" eyebrow={t('common:eyebrows.deleteTheme')} title={t('dialogs:ui.deleteTheme')} onClose={onCancel} closeDisabled={busy} />
+    <DialogHeader actions={<OperationFeedback hideTrigger id="theme-library-operation" notice={error} tone="error" />} titleId="theme-delete-title" eyebrow={t('common:eyebrows.deleteTheme')} title={t('dialogs:ui.deleteTheme')} onClose={onCancel} closeDisabled={busy} />
     <div className="dialog-content">
       <p id="theme-delete-description" className="text-sm text-muted">{t('dialogs:templates.deleteTheme', { name: theme.name })}</p>
       <p className="break-all font-mono text-xs text-faint">{theme.id}.json</p>
-      {error ? <p className="text-sm text-danger" role="alert">{formatProductMessage(error, t)}</p> : null}
       <DialogActions><DialogButton onClick={onCancel} disabled={busy}><ThemeIcon name="close" />{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" onClick={() => void onDelete()} disabled={busy}><ThemeIcon name="delete" />{busy ? t('dialogs:ui.deleting') : t('dialogs:ui.confirmDeletion')}</DialogButton></DialogActions>
     </div>
   </DialogFrame>;
@@ -616,9 +599,12 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const darkColors: ArticleDarkColors | undefined = JSON.stringify(draft) !== JSON.stringify(previewTheme) ? { status: 'error', values: {} } : darkColorRecord?.theme === previewTheme ? darkColorRecord.colors : undefined;
   const inspection = useThemeInspection();
   const cssEditorRef = useRef<HTMLTextAreaElement | null>(null);
+  const libraryCssEditor = useRef<LibraryCssEditorHandle | null>(null);
+  const [libraryCssState, setLibraryCssState] = useState<LibraryCssEditorState>({ dirty: false, busy: false, blocking: false, source: false });
+  const libraryCssMode = formatSnapshot.configuration?.rendering.styleAuthority === 'library' || libraryCssState.source;
   const locateInspection = (binding: ColorBinding) => {
-    if (binding.kind === 'css') setEditorTab('css');
-    else { setEditorTab('tokens'); if (binding.node) setNodeKey(binding.node); }
+    if (binding.kind === 'css') chooseTab('css');
+    else chooseTab('tokens', () => { if (binding.node) setNodeKey(binding.node); });
   };
   useEffect(() => {
     const binding = inspection.selected;
@@ -634,6 +620,8 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   }, [inspection.selected, editorTab]);
   const [error, setError] = useState<ProductMessageValue>('');
   const [savedMessage, setSavedMessage] = useState('');
+  const [feedbackEvent, setFeedbackEvent] = useState(0), [feedbackAction, setFeedbackAction] = useState<'edit' | 'validate' | 'save'>('edit');
+  const wasDirty = useRef(false);
   const [sampleReport, setSampleReport] = useState<{ theme: ThemeConfig; formatId: string; sample: ReturnType<typeof getThemePreviewSample>; issues: ArticleFormatIssue[] } | null>(null);
   const [writeFailed, setWriteFailed] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -664,6 +652,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setSavedMessage('');
   };
   const validateCode = (): ThemeConfig | null => {
+    setFeedbackAction('validate'); setFeedbackEvent(value => value + 1);
     setWriteFailed(false);
     const cssFailures = inspectThemeCss(cssText);
     const failures: { css: ProductMessageValue; json: ProductMessageValue } = { css: cssFailures.length ? productReference('shared.compose', { parts: productJoin(cssFailures, '；') }) : '', json: '' };
@@ -698,6 +687,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
 
   const save = async (validatedDraft?: ThemeConfig): Promise<boolean> => {
     if (!root || !isRootCurrent(root) || savingRef.current || unappliedChanges && !validatedDraft || !dirty) return false;
+    setFeedbackAction('save'); setFeedbackEvent(value => value + 1);
     const operationRoot = root;
     const formatId = getFormatSnapshot().id;
     const sample = getThemePreviewSample();
@@ -738,7 +728,7 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
       return false;
     } finally {
       savingRef.current = false;
-      if (isRootCurrent(operationRoot)) setSaving(false);
+      if (isRootCurrent(operationRoot)) { setSaving(false); setFeedbackEvent(value => value + 1); }
     }
   };
 
@@ -753,9 +743,10 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   const jsonNeedsValidation = jsonText !== JSON.stringify(draft, null, 2);
   const unappliedChanges = cssNeedsValidation || jsonNeedsValidation;
   const dirty = JSON.stringify(draft) !== savedBaseline.current || unappliedChanges;
+  useEffect(() => { if (dirty && !wasDirty.current) { setFeedbackAction('edit'); setFeedbackEvent(value => value + 1); } wasDirty.current = dirty; }, [dirty]);
   const reviewIssues = !unappliedChanges && sampleReport?.theme === draft && sampleReport.formatId === formatSnapshot.id && sampleReport.sample === previewSample ? sampleReport.issues : [];
-  const resumeTheme = () => { setDeparture(false); setApplyAfter(false); setEditorTab(editOrigin.current); location.restore(); };
-  useEditingDraft(dirty ? { kind: 'article-theme', root, objectId: theme.id, resume: resumeTheme } : null);
+  const resumeTheme = () => { setDeparture(false); setApplyAfter(false); setEditorTab(libraryCssState.dirty || libraryCssState.busy ? 'css' : editOrigin.current); location.restore(); };
+  useEditingDraft(dirty || libraryCssState.dirty || libraryCssState.busy ? { kind: 'article-theme', root, objectId: theme.id, resume: resumeTheme } : null);
   const resetChanges = () => {
     if (readOnly || savingRef.current || !dirty) return;
     const baseline = cloneTheme(JSON.parse(savedBaseline.current) as ThemeConfig);
@@ -766,11 +757,12 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
     setCodeErrors({ css: '', json: '' });
     setWriteFailed(false);
     setError('');
-    setSavedMessage('');
+    setSavedMessage(productText('feedback.changesReset')); setFeedbackAction('validate'); setFeedbackEvent(value => value + 1);
   };
-  const close = () => { if (savingRef.current) return; if (dirty) { location.capture(); setDeparture(true); } else onClose(); };
+  const leaveLibraryCss = (next: () => void) => { if (libraryCssEditor.current) libraryCssEditor.current.leave(next); else next(); };
+  const close = () => leaveLibraryCss(() => { if (savingRef.current) return; if (dirty) { location.capture(); setDeparture(true); } else onClose(); });
   // Applying used to leave straight away, so unsaved edits were dropped without a word.
-  const requestApply = () => { if (savingRef.current) return; if (dirty) { location.capture(); setApplyAfter(true); setDeparture(true); } else onApply(); };
+  const requestApply = () => leaveLibraryCss(() => { if (savingRef.current) return; if (dirty) { location.capture(); setApplyAfter(true); setDeparture(true); } else onApply(); });
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty || savingRef.current) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload);
@@ -789,33 +781,34 @@ function ThemeStylebookDialog({ theme, root, isRootCurrent, canApply, onClose, o
   };
 
   const activeTab = editorTab;
-  const chooseTab = setEditorTab;
-  const tabs = [{ id: 'tokens', label: productText("themeLibrary.commonFields"), icon: 'edit', pending: false, modified: false, failed: false }, { id: 'css', label: 'CSS', icon: 'code', pending: cssNeedsValidation, modified: cssText !== savedCode.current.css, failed: Boolean(codeErrors.css) }, { id: 'json', label: 'JSON', icon: 'code', pending: jsonNeedsValidation, modified: jsonText !== savedCode.current.json, failed: Boolean(codeErrors.json) }] as const;
+  const chooseTab = (tab: typeof editorTab, after?: () => void) => leaveLibraryCss(() => { setEditorTab(tab); after?.(); });
+  const tabs = [{ id: 'tokens', label: productText("themeLibrary.commonFields"), icon: 'edit', pending: false, modified: false, failed: false }, { id: 'css', label: 'CSS', icon: 'code', pending: cssNeedsValidation, modified: cssText !== savedCode.current.css || libraryCssState.dirty, failed: Boolean(codeErrors.css) }, { id: 'json', label: 'JSON', icon: 'code', pending: jsonNeedsValidation, modified: jsonText !== savedCode.current.json, failed: Boolean(codeErrors.json) }] as const;
   const openColor = (label: string, token: string, value: string, select: (color: string) => void, scheme?: 'light' | 'dark') => {
     try { setPicker({ label, token, value: tailwindColorToHex(value, document), select, scheme }); }
     catch { setError(productText("themeLibrary.theCurrentColorCouldNotBeParsedFixItInCssOr")); }
   };
   return <>
-    <DialogFrame large titleId="theme-stylebook-title" onClose={close} dismissible={!saving && !picker && !departure} focusActive={!picker && !departure} onKeyDown={event => {
+    <DialogFrame large titleId="theme-stylebook-title" onClose={close} dismissible={!saving && !picker && !departure && !libraryCssState.busy && !libraryCssState.blocking} focusActive={!picker && !departure && !libraryCssState.blocking} onKeyDown={event => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 's') return;
       event.preventDefault(); event.stopPropagation();
       if (readOnly || savingRef.current || saving || picker || departure || event.repeat || event.nativeEvent.isComposing || event.keyCode === 229) return;
+      if (editorTab === 'css' && libraryCssState.source) { void libraryCssEditor.current?.save(); return; }
       if (unappliedChanges) { const next = validateCode(); if (next) void save(next); } else void save();
     }}>
-      <header className="dialog-header shrink-0"><div className="min-w-0"><p className="eyebrow">{t('common:eyebrows.articleTheme')} / v{draft.version}</p><h2 id="theme-stylebook-title" className="font-heading dialog-title break-words">{draft.name}</h2></div><ButtonBar label={t('dialogs:ui.articleThemeActions')}><button className="button button-quiet" type="button" onClick={requestApply} disabled={!canApply || saving}><ThemeIcon name="apply" />{t('dialogs:ui.applyToArticle')}</button><button className="button button-quiet" type="button" onClick={close} disabled={saving}><ThemeIcon name="close" />{t('common:actions.close')}</button></ButtonBar></header>
+      <header className="dialog-header shrink-0"><div className="min-w-0"><p className="eyebrow">{t('common:eyebrows.articleTheme')} / v{draft.version}</p><h2 id="theme-stylebook-title" className="font-heading dialog-title break-words">{draft.name}</h2></div><ButtonBar label={t('dialogs:ui.articleThemeActions')}><OperationFeedback id={`theme-stylebook-${theme.id}`} revision={feedbackEvent} announce={feedbackAction !== 'edit'} label={t('common:feedback.previewProblems')} notice={error || savedMessage} hideTrigger={!error && !reviewIssues.length} tone={saving ? 'info' : error ? 'error' : reviewIssues.length ? 'warning' : 'success'} summary={feedbackAction === 'edit' ? productReference('feedback.modified') : saving ? productReference('feedback.saving') : savedMessage ? feedbackNotice(savedMessage).summary : productReference(feedbackAction === 'save' ? 'feedback.saveFailed' : 'feedback.validationFailed')}>{reviewIssues.length ? <ul className="grid gap-2">{reviewIssues.map((issue, index) => <li className="break-words" key={index}>{formatProductMessage(articleFormatMessageReference([issue]), t)} · {issue.source}{issue.resourceSource ? ' · ' + issue.resourceSource : ''} · {formatDiagnosticMessage(issue, t)}</li>)}</ul> : null}</OperationFeedback><button className="button button-quiet" type="button" onClick={requestApply} disabled={!canApply || saving}><ThemeIcon name="apply" />{t('dialogs:ui.applyToArticle')}</button><button className="button button-quiet" type="button" onClick={close} disabled={saving}><ThemeIcon name="close" />{t('common:actions.close')}</button></ButtonBar></header>
       <div ref={layout.containerRef} className="group/theme-columns flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto data-[wide=true]:flex-row data-[wide=true]:overflow-hidden" data-wide={layout.wideEnough} data-dragging={layout.dragging} style={layout.style}>
-        <aside ref={inspection.listRef} {...inspection.listProps} className="flex h-96 min-h-0 min-w-0 shrink-0 flex-col border-b border-line bg-list/50 group-data-[wide=true]/theme-columns:h-auto group-data-[wide=true]/theme-columns:w-(--editor-source-width) group-data-[wide=true]/theme-columns:border-b-0" aria-label={t('dialogs:ui.temporaryThemeEditor')}>
+        <aside ref={inspection.listRef} {...inspection.listProps} data-library-css={editorTab === 'css' && libraryCssMode} className="flex h-96 min-h-0 min-w-0 shrink-0 flex-col border-b border-line bg-list/50 group-data-[wide=false]/theme-columns:data-[library-css=true]:h-160 group-data-[wide=true]/theme-columns:h-auto group-data-[wide=true]/theme-columns:w-(--editor-source-width) group-data-[wide=true]/theme-columns:border-b-0" aria-label={t('dialogs:ui.temporaryThemeEditor')}>
           <div className="shrink-0 border-b border-line p-4"><label className="grid min-w-0 gap-2 text-xs text-muted">{t('dialogs:ui.themeName')}<input className="field min-w-0 w-full" value={draft.name} disabled={readOnly || saving} onChange={event => updateDraft({ ...draft, name: event.target.value })} /></label><p className="mt-2 break-all font-mono text-2xs text-faint">{draft.id}</p></div>
           <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-line p-3" role="tablist" aria-label={t('dialogs:ui.themeEditMenu')}>{tabs.map((tab, index) => <button key={tab.id} id={`article-theme-tab-${tab.id}`} role="tab" type="button" tabIndex={activeTab === tab.id ? 0 : -1} aria-selected={activeTab === tab.id} aria-controls="article-theme-editor-panel" disabled={saving} data-validation={tab.failed ? 'failed' : tab.pending ? 'pending' : 'complete'} data-modified={tab.modified} aria-label={tab.failed ? t('dialogs:templates.tabFailed', { name: t('dialogs:themeTabs.' + tab.id) }) : tab.modified ? t('dialogs:templates.tabModified', { name: t('dialogs:themeTabs.' + tab.id) }) : undefined} className={`flex min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 py-2 whitespace-nowrap text-xs hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent ${tab.failed ? 'text-danger aria-selected:border-danger aria-selected:bg-danger/10 aria-selected:text-danger' : 'text-muted aria-selected:border-accent-line aria-selected:bg-accent-soft aria-selected:text-accent-text'}`} onClick={() => chooseTab(tab.id)} onKeyDown={event => { const next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null; if (next !== null) { event.preventDefault(); chooseTab(tabs[next].id); document.getElementById(`article-theme-tab-${tabs[next].id}`)?.focus(); } }}><ThemeIcon name={tab.icon} />{t('dialogs:themeTabs.' + tab.id)}{tab.modified ? <span className={`rounded px-1 text-2xs ${tab.failed ? 'bg-danger/10 text-danger' : 'bg-accent-soft text-accent-text'}`}>{t('dialogs:ui.modified')}</span> : null}</button>)}</nav>
           <div id="article-theme-editor-panel" role="tabpanel" aria-labelledby={`article-theme-tab-${activeTab}`} className="flex min-h-0 min-w-0 flex-1 flex-col p-4">
-            {editorTab === 'tokens' ? <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}><ArticleThemeFields theme={draft} darkColors={darkColors} onDarkToken={setDarkToken} nodeColors={nodeColors} disabled={readOnly || saving} nodeKey={nodeKey} onNodeKey={setNodeKey} onToken={setToken} onNodeValue={setNodeValue} onResetNode={resetNode} onColor={openColor} inspection={inspection} /></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><div className="flex min-h-0 flex-1 flex-col gap-2"><span className="shrink-0 font-sub-heading text-xs font-semibold text-primary">{editorTab === 'css' ? t('dialogs:ui.limitedCss') : t('dialogs:ui.fullThemeJson')}</span><SnippetTextarea ref={editorTab === 'css' ? cssEditorRef : undefined} sourceFont="editor" value={editorTab === 'css' ? cssText : jsonText} snippets={[]} readOnly={readOnly} disabled={saving} ariaLabel={editorTab === 'css' ? t('dialogs:ui.themeCss') : t('dialogs:ui.fullThemeJson')} onChange={value => changeCode(editorTab === 'css' ? 'css' : 'json', value)} /></div><p className="shrink-0 text-2xs text-faint">{editorTab === 'css' ? t('dialogs:ui.cssScope') : t('dialogs:ui.keepThemeId')}</p></div>}
+            {editorTab === 'tokens' ? <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onClick={event => { if (event.target === event.currentTarget) inspection.clear(); }}><ArticleThemeFields theme={draft} darkColors={darkColors} onDarkToken={setDarkToken} nodeColors={nodeColors} disabled={readOnly || saving} nodeKey={nodeKey} onNodeKey={setNodeKey} onToken={setToken} onNodeValue={setNodeValue} onResetNode={resetNode} onColor={openColor} inspection={inspection} /></div> : <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"><div className="flex min-h-0 flex-1 flex-col gap-2"><span className="shrink-0 font-sub-heading text-xs font-semibold text-primary" hidden={editorTab === 'css' && libraryCssMode}>{editorTab === 'css' ? libraryCssMode ? t('dialogs:libraryCss.source') : t('dialogs:ui.limitedCss') : t('dialogs:ui.fullThemeJson')}</span>{editorTab === 'css' && libraryCssMode ? <LibraryCssEditor ref={libraryCssEditor} root={root} snapshot={formatSnapshot} isRootCurrent={isRootCurrent} themeCss={cssText} onThemeCss={value => changeCode('css', value)} onState={setLibraryCssState} /> : <SnippetTextarea ref={editorTab === 'css' ? cssEditorRef : undefined} sourceFont="editor" value={editorTab === 'css' ? cssText : jsonText} snippets={[]} readOnly={readOnly} disabled={saving} ariaLabel={editorTab === 'css' ? t('dialogs:ui.themeCss') : t('dialogs:ui.fullThemeJson')} onChange={value => changeCode(editorTab === 'css' ? 'css' : 'json', value)} />}</div><p className="shrink-0 text-2xs text-faint" hidden={editorTab === 'css' && libraryCssMode && libraryCssState.source}>{editorTab === 'css' ? t('dialogs:ui.cssScope') : t('dialogs:ui.keepThemeId')}</p></div>}
           </div>
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line p-4"><ButtonBar label={t('dialogs:ui.themeSaveActions')} className="w-full justify-between"><button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !dirty} onClick={resetChanges}><ThemeIcon name="reset" />{t('dialogs:ui.resetChanges')}</button>{editorTab !== 'tokens' ? <button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !unappliedChanges} onClick={validateCode}><ThemeIcon name="check" />{t('dialogs:ui.validatePreview')}</button> : null}<span className="inline-flex min-w-0 after:top-auto after:bottom-full after:mb-2 after:mt-0" data-tooltip={unappliedChanges ? t('dialogs:ui.validateFirst') : undefined} tabIndex={unappliedChanges ? 0 : undefined} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><button className="button button-primary px-2 disabled:pointer-events-none" type="button" onClick={() => void save()} disabled={readOnly || saving || Boolean(error) && !writeFailed || unappliedChanges || !dirty} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><ThemeIcon name="save" />{saving ? t('dialogs:ui.saving') : t('dialogs:ui.saveTheme')}</button>{unappliedChanges ? <span id="article-theme-validation-hint" className="sr-only">{t('dialogs:ui.validateFirst')}</span> : null}</span></ButtonBar></div>
+          {editorTab === 'css' && libraryCssMode && libraryCssState.source ? null : <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line p-4"><ButtonBar label={t('dialogs:ui.themeSaveActions')} className="w-full justify-between"><button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !dirty} onClick={resetChanges}><ThemeIcon name="reset" />{t('dialogs:ui.resetChanges')}</button>{editorTab !== 'tokens' ? <button className="button button-quiet px-2" type="button" disabled={readOnly || saving || !unappliedChanges} onClick={validateCode}><ThemeIcon name="check" />{t('dialogs:ui.validatePreview')}</button> : null}<span className="inline-flex min-w-0 after:top-auto after:bottom-full after:mb-2 after:mt-0" data-tooltip={unappliedChanges ? t('dialogs:ui.validateFirst') : undefined} tabIndex={unappliedChanges ? 0 : undefined} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><button className="button button-primary px-2 disabled:pointer-events-none" type="button" onClick={() => void save()} disabled={readOnly || saving || Boolean(error) && !writeFailed || unappliedChanges || !dirty} aria-describedby={unappliedChanges ? 'article-theme-validation-hint' : undefined}><ThemeIcon name="save" />{saving ? t('dialogs:ui.saving') : t('dialogs:ui.saveTheme')}</button>{unappliedChanges ? <span id="article-theme-validation-hint" className="sr-only">{t('dialogs:ui.validateFirst')}</span> : null}</span></ButtonBar></div>}
         </aside>
         <ColumnSplitter layout={layout} label={t('dialogs:ui.resizeTheme')} controls="article-theme-editor-panel" />
         <div className="flex min-h-60 min-w-0 flex-1 flex-col gap-3 p-5 group-data-[wide=true]/theme-columns:min-h-0"><div className="flex shrink-0 items-center justify-between gap-3"><p className="font-sub-heading text-sm font-medium text-primary">{t('dialogs:ui.liveTypography')}</p><PreviewModeSwitch dark={dark} onToggle={toggle} /></div><ThemePreview theme={previewTheme} dark={dark} inspection={inspection} onLocate={locateInspection} onNodeColors={setNodeColors} onDarkColors={receiveDarkColors} /></div>
       </div>
-      {error || savedMessage ? <footer className="shrink-0 border-t border-line p-4">{error ? <p className="text-xs text-danger" role="alert">{formatProductMessage(error, t)}</p> : <p className="text-xs text-success" role="status">{formatProductMessage(savedMessage, t)}</p>}{reviewIssues.length ? <details className="mt-2 text-xs text-warning"><summary className="cursor-pointer">{formatProductMessage(productReference('themeLibrary.concernsRequiringReview', { measured_issuesCount: reviewIssues.length }), t)}</summary><ul className="mt-2 grid max-h-32 gap-2 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{reviewIssues.map((issue, index) => <li key={index}><p>{formatProductMessage(articleFormatMessageReference([issue]), t)}</p><p className="break-words text-muted">{issue.source}{issue.resourceSource ? ` · ${issue.resourceSource}` : ''} · {formatDiagnosticMessage(issue, t)}</p></li>)}</ul></details> : null}</footer> : null}
+
     </DialogFrame>
     {departure ? <UnsavedChangesDialog entries={[{ label: draft.name, detail: unappliedChanges ? t('dialogs:ui.unvalidatedCode') : t('dialogs:ui.themeChangesUnsaved') }]} description={t('dialogs:ui.themeUnsavedDescription')} saveLabel={applyAfter ? t('dialogs:ui.saveApply') : t('dialogs:ui.saveClose')} saveDisabled={Boolean(error) && !writeFailed || unappliedChanges || readOnly} onCancel={() => { setDeparture(false); setApplyAfter(false); }} onContinue={resumeTheme} onDiscard={onClose} onSave={async () => { if (!await save()) return false; if (applyAfter) { setApplyAfter(false); onApply(); } else onClose(); return true; }} /> : null}
     {picker ? <EditorColorPicker label={picker.label} token={picker.token} modeLabel={t(picker.scheme ? `dialogs:ui.${picker.scheme}` : 'dialogs:ui.articleTheme')} value={picker.value} onClose={() => setPicker(null)} onSelect={picker.select} /> : null}

@@ -29,11 +29,13 @@ vm.runInNewContext(ts.transpileModule(textareaSource, { compilerOptions: { modul
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input', highlightMarkdownSource: value => value };
     if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
     if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+    if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
     if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
     if (id === 'react') return actualReact;
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
@@ -55,6 +57,7 @@ test('article input and its highlight overlay use the same writing font while co
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input', highlightMarkdownSource: value => value };
       if (id === 'react') return { forwardRef: fn => fn, useMemo: fn => fn(), useLayoutEffect() {}, useRef: value => ({ current: value }), useState: value => [value, () => {}] };
@@ -135,6 +138,7 @@ function workspace() {
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input', highlightMarkdownSource: value => value };
       if (id === 'react') return react;
@@ -175,7 +179,7 @@ function workspace() {
   function find(predicate) { const node = all(tree).find(predicate); assert.ok(node, 'Expected control exists'); return node; }
   render(); render();
   return {
-    render, calls, find, props,
+    render, calls, find, props, nodes: () => all(tree),
     get guard() { return guard; },
     set saveError(value) { saveError = value; }, set refreshError(value) { refreshError = value; },
     set deferSave(value) { deferSave = value; }, set currentRoot(value) { currentRoot = value; },
@@ -206,6 +210,35 @@ test('each tab retains its own draft and returning to a tab restores its text', 
   w.switch('templates'); w.create(); w.change('# template unsaved');
   w.switch('snippets'); assert.equal(w.source().props.value, 'snippet unsaved');
   w.switch('templates'); assert.equal(w.source().props.value, '# template unsaved');
+});
+
+test('duplicate snippet reuses creation without overwriting its source and retains all snippet fields', async () => {
+  const w = workspace(), original = structuredClone(w.props.snippets[0]);
+  w.props.snippets.push({ ...original, id: original.id + '-copy', trigger: '//another-trigger' });
+  w.props.snippets.push({ ...original, id: 'other-copy', trigger: `//${original.id}-copy-2` });
+  w.render();
+  w.find(n => n.type === 'button' && Array.isArray(n.props.children) && n.props.children.includes('复制片段')).props.onClick(); w.render();
+  const editor = w.find(n => n.type === 'metadata-editor'), copy = editor.props.snippet;
+  assert.equal(copy.id, original.id + '-copy-3'); assert.equal(copy.trigger, '//' + copy.id);
+  assert.equal(copy.content, original.content); assert.equal(copy.categoryId, original.categoryId); assert.equal(copy.icon, original.icon);
+  assert.equal(copy.description, original.description); assert.match(copy.name, /副本$/); assert.equal(w.calls.saves, 0);
+  w.find(n => n.type === 'metadata-dialog').props.onSave(); w.render();
+  await w.save(); assert.equal(w.calls.writes.at(-1).originalId, null);
+  assert.deepEqual(w.props.snippets.find(item => item.id === original.id), original);
+  assert.equal(w.props.snippets.find(item => item.id === copy.id).content, original.content);
+});
+
+test('duplicate snippet honors the dirty-draft decision and unavailable states', () => {
+  const w = workspace(), original = structuredClone(w.props.snippets[0]);
+  const copyButton = () => w.find(n => n.type === 'button' && Array.isArray(n.props.children) && n.props.children.includes('复制片段'));
+  w.change('current edited content'); copyButton().props.onClick(); w.render();
+  const decision = w.find(n => n.type === 'unsaved-changes-dialog'); assert.equal(w.calls.saves, 0);
+  decision.props.onDiscard(); w.render();
+  assert.equal(w.find(n => n.type === 'metadata-editor').props.snippet.content, 'current edited content');
+  assert.deepEqual(w.props.snippets[0], original);
+  w.find(n => n.type === 'metadata-dialog').props.onClose(); w.render();
+  w.props.root = null; w.render(); assert.equal(copyButton().props.disabled, true);
+  w.props.snippets = []; w.render(); assert.equal(copyButton().props.disabled, true);
 });
 
 test('library theme selection previews snippets and templates without changing their source', () => {
@@ -314,7 +347,7 @@ test('one save shortcut validates current content and never writes a forbidden e
     await w.shortcut({ ctrlKey: true });
     assert.equal(w.calls.saves, 0);
     assert.equal(w.source().props.value, '<script>可执行内容</script>');
-    assert.ok(w.find(n => n.props['data-tone'] === 'error').props.children.includes('script'));
+    assert.ok(w.find(n => n.type === 'operation-feedback' && n.props.tone === 'error').props.notice.label.includes('script'));
     w.change('<p>修复后的内容</p>');
     await w.shortcut({ metaKey: true });
     assert.equal(w.calls.saves, 1);
@@ -328,9 +361,10 @@ test('saving shows progress and keeps format concerns in the final result after 
   w.formatIssues = [{ kind: 'style', name: 'height', tier: 'lowPriority', message: '保留的需核对提示' }];
   let complete; w.deferSave = new Promise(resolve => { complete = resolve; });
   const saving = w.shortcut({ ctrlKey: true }); w.render();
-  assert.equal(w.find(n => n.props['data-tone'] === 'neutral').props.children, '正在保存…');
+  assert.equal(w.nodes().some(n => n.type === 'operation-feedback' && n.props.notice?.label === '正在保存…'), false);
+  assert.ok(w.nodes().some(n => n.type === 'button' && /保存中|正在保存/.test(JSON.stringify(n.props.children))), 'the active save button keeps progress visible');
   complete(); await saving;
-  const final = w.find(n => n.props['data-tone'] === 'warning').props.children;
+  const final = w.find(n => n.type === 'operation-feedback' && n.props.tone === 'warning').props.notice.label;
   assert.ok(final.includes('已保存') && final.includes('保留的需核对提示'));
   assert.equal(w.calls.refreshes, 1);
 });
@@ -358,7 +392,7 @@ test('information shortcut saves metadata without saving a pending body, and fai
   w.change('Pending shortcut body'); w.info();
   w.find(n => n.type === 'metadata-editor').props.onSnippetChange({ name: 'Shortcut information' }); w.render();
   w.saveError = true; await w.shortcut({ metaKey: true });
-  assert.ok(w.find(n => n.type === 'metadata-dialog').props.error.includes('fixture save denied'));
+  assert.ok(w.find(n => n.type === 'operation-feedback' && n.props.tone === 'error').props.notice.label.includes('fixture save denied'));
   assert.equal(w.source().props.value, 'Pending shortcut body');
   w.saveError = false; await w.shortcut({ ctrlKey: true });
   assert.equal(w.props.snippets.find(n => n.name === 'Shortcut information').content, original);
@@ -382,9 +416,9 @@ test('a successful write followed by failed refresh clears the draft and retry o
   assert.equal(w.calls.saves, 1);
   assert.equal(w.calls.commits, 1);
   assert.equal(w.calls.refreshes, 1);
-  const retry = w.find((node) => node.type === 'button' && node.props.children === '重试刷新列表');
+  const retry = w.find(node => node.type === 'operation-feedback' && node.props.onRetry);
   w.refreshError = false;
-  await retry.props.onClick();
+  await retry.props.onRetry();
   await new Promise((resolve) => setImmediate(resolve)); w.render();
   assert.equal(w.calls.saves, 1);
   assert.equal(w.calls.refreshes, 2);
@@ -499,6 +533,7 @@ test('new manuscript menu only changes the themed preview until creation is conf
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input', highlightMarkdownSource: value => value };
       if (id === 'react') return { useState: state };
@@ -591,6 +626,7 @@ test('template article category tags render values and an explicit empty state',
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input', highlightMarkdownSource: value => value }; if (id === 'react/jsx-runtime') return { jsx, jsxs }; throw new Error(id); }),
   });
@@ -772,7 +808,7 @@ test('information cancellation and failed saving retain source drafts; successfu
   w.find(n => n.type === 'metadata-editor').props.onSnippetChange({ name: 'Saved information', icon: 'table' }); w.render();
   w.saveError = true;
   await w.saveInfo();
-  assert.ok(w.find(n => n.type === 'metadata-dialog').props.error.includes('fixture save denied'));
+  assert.ok(w.find(n => n.type === 'operation-feedback' && n.props.tone === 'error').props.notice.label.includes('fixture save denied'));
   assert.equal(w.source().props.value, '<p>Unsaved source</p>');
   assert.equal(w.calls.commits, 0);
   assert.equal(w.find(n => n.type === 'metadata-editor').props.snippet.icon, 'table');
@@ -826,6 +862,7 @@ test('contextual snippet expansion inserts the newline and content as one revers
       if (id.endsWith('/sourceSearch')) return sourceSearch;
       if (id.endsWith('/sourceViewport')) return sourceViewport;
       if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+      if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'source-input', highlightMarkdownSource: value => value };
       if (id === 'react') return react;
@@ -853,4 +890,14 @@ test('contextual snippet expansion inserts the newline and content as one revers
   // One simulated native undo restores the trigger and the contextual newline together.
   context.document.execCommand('undo');
   assert.equal(changes.at(-1), original);
+});
+
+
+test('typing content does not produce or update a Toast notification event', () => {
+  const w=workspace();
+  const notice=()=>w.find(n=>n.type==='operation-feedback' && n.props.id.startsWith('content-operation-')).props;
+  const event=notice().revision;
+  w.change('First change'); w.change('Second change');
+  assert.equal(notice().notice,null); assert.equal(notice().revision,event);
+  assert.match(w.source().props.value,/Second change/);
 });

@@ -14,9 +14,12 @@ test('English asset toolbar preserves user search and option names and submits c
   const instance = createUII18n('en-US'), module = { exports: {} };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require(id) {
+      if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs, Fragment };
       if (id.endsWith('/i18n/formatters')) return uiFormatters;
       if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ locale: 'en-US' }), useUITranslation: ns => ({ t: instance.getFixedT('en-US', ns) }) };
+      if (id.endsWith('/SnippetCategoryDialog')) return { CategoryIcon: 'category-icon' };
+      if (id.endsWith('/resources/types')) return { RESOURCE_TYPES: [] };
       if (id.endsWith('/IconPopover')) return { IconPopover: 'popover' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
       if (id.endsWith('/MediaGallery')) return { MediaIcon: 'icon', MediaSourceSwitch: 'source-switch' };
@@ -28,7 +31,7 @@ test('English asset toolbar preserves user search and option names and submits c
   const tree = module.exports.MediaToolbar({ source: 'article', query, groups, preferences, activeControl: 'sort', disabled: false, onControlChange() {}, onPreferencesChange: next => values.push(next), onQueryChange() {}, onSourceChange() {} });
   const nodes = walk(tree);
   assert.equal(nodes.find(node => node.type === 'input').props.value, query);
-  assert.ok(nodes.some(node => node.type === 'popover' && node.props.label === 'Project group' && node.props.tooltip === 'Group: 我的项目'));
+  assert.equal(nodes.some(node => node.type === 'popover' && node.props.label === 'Project group'), false, 'article navigation now owns grouping');
   const modified = nodes.find(node => node.type === 'button' && node.props.children?.some?.(child => child?.props?.children === 'Modified time'));
   assert.ok(modified); modified.props.onClick();
   assert.equal(values[0].sort, 'modified');

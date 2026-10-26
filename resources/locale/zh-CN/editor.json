@@ -31,7 +31,6 @@
     "saved": "已保存",
     "unsaved": "未保存",
     "metadataReadOnly": "元数据错误时正文只读",
-    "notStored": "文章尚未保存到资料目录；保存前不会生成文章文件。",
     "lineToggle": "{{action}}（⌘/ / Ctrl+/）",
     "diagnosticsUnavailable": "撰写诊断暂不可用：{{message}}",
     "saveRefreshPreview": "保存刷新预览",
@@ -46,7 +45,8 @@
     "preview": "预览",
     "metadataPaused": "元数据有误 · 正文编辑已暂停",
     "resize": "调整正文与预览宽度",
-    "diagnostics": "文章诊断"
+    "diagnostics": "文章诊断",
+    "resizeReference": "调整资料参照与文章预览高度"
   },
   "empty": {
     "chooseArticle": "先选择一篇文章或新建文稿",
@@ -88,8 +88,8 @@
     "replacementPlaceholder": "替换为",
     "replacement": "替换文本",
     "readOnly": "源码只读或暂不可编辑",
-    "replace": "替换当前匹配",
-    "replaceAll": "替换全部匹配，一次撤销",
+    "replace": "替换当前匹配（Enter）",
+    "replaceAll": "替换全部匹配，一次撤销（⌘Enter / Ctrl+Enter）",
     "allTitle": "替换全部",
     "queryLabel": "查找",
     "deleteMatches": "删除匹配内容",

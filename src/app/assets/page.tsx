@@ -17,6 +17,7 @@ export default function AssetsRoute() {
       onManage={controller.manageLibraryMedia}
       currentReferenceCount={controller.currentMediaReferenceCount}
       scanReferences={controller.scanLibraryMediaReferences}
+      referenceRevision={controller.article.source}
       onImport={controller.importSharedFiles}
       onAdopt={controller.openMediaPicker}
       currentArticleId={controller.currentArticleId}

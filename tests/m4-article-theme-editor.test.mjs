@@ -33,6 +33,7 @@ function editor(theme = FORMAT_THEME) {
     if (id.endsWith('/contentValidation')) return { validateContentSource: async (kind, source, options) => { sampleChecks.push(source); assert.equal(options.purpose, 'theme'); return validateSample(); } };
     if ((id.endsWith('/article-format/runtime') || id === './runtime')) return { getFormatSnapshot: () => ({ id: 'test-format' }) };
     if (id.endsWith('/PageHeading')) return { PageHeading: 'page-heading' };
+    if (id.endsWith('/useResourcePreviewStyles')) return { useResourcePreviewStyles: () => ({ css: '', issue: '', ready: true, result: {} }) };
     if (id.endsWith('/useThemePreviewSample')) return { useThemePreviewSample: () => sample };
     if (id.endsWith('/themePreviewSample')) return { getThemePreviewSample: () => sample };
     if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ id: 'test-format' }) };
@@ -54,6 +55,7 @@ function editor(theme = FORMAT_THEME) {
     if (id.endsWith('/useArticlePreviewMode')) return { useArticlePreviewMode: () => ({ dark: true, toggle() {} }) };
     if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-dialog' };
     if (id.endsWith('/ArticleThemeFields')) return { ArticleThemeFields: 'article-fields' };
+    if (id.endsWith('/LibraryCssEditor')) return { LibraryCssEditor: 'library-css-editor' };
     if (id.endsWith('/EditorColorPicker')) return { EditorColorPicker: 'color-picker' };
     if (id.endsWith('/MarkdownPreview')) return { MarkdownPreview: 'markdown-preview' };
     if (id.endsWith('/themes')) return themes;
@@ -140,7 +142,7 @@ test('theme colors preview live, unsafe CSS is rejected, and write failures pres
   view.setPersist(async () => { throw new Error('test disk denied'); });
   view.button('保存主题').props.onClick(); await new Promise(resolve => setImmediate(resolve)); view.render();
   assert.equal(view.fields().props.theme.tokens['color-article-quote-surface'], '#fafafa');
-  assert.ok(view.find(node => node.props.role === 'alert'));
+  assert.ok(view.find(node => node.type === 'operation-feedback' && node.props.tone === 'error').props.notice);
   view.frame().props.onClose(); view.render(); assert.equal(view.closes, 0);
   view.find(node => node.type === 'unsaved-dialog').props.onCancel(); view.render();
   view.tab('CSS'); view.find(node => node.type === 'source-input').props.onChange('@import "https://bad.invalid/style.css";'); view.render();
@@ -174,14 +176,15 @@ test('a saved theme retains sample review details without blocking future edits 
   view.fields().props.onToken('color-article-quote-surface', '#fafafa'); view.render();
   view.button('保存主题').props.onClick(); await new Promise(resolve => setImmediate(resolve)); view.render();
   assert.equal(view.writes, 1);
-  const details = view.find(node => node.type === 'details');
+  const details = view.find(node => node.type === 'operation-feedback' && node.props.id.startsWith('theme-stylebook-'));
   const text = node => typeof node === 'string' || typeof node === 'number' ? String(node) : Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : '';
   assert.match(text(details), /themes\/preview.md.*missing.png.*incomplete/);
   assert.match(text(details), /49/);
   assert.equal(issue.tier, 'unknown');
   view.fields().props.onToken('color-article-quote-surface', '#eeeeee'); view.render();
   assert.equal(view.button('保存主题').props.disabled, false);
-  assert.throws(() => view.find(node => node.type === 'details'), /control exists/);
+  const cleared = view.find(node => node.type === 'operation-feedback' && node.props.id.startsWith('theme-stylebook-'));
+  assert.ok(cleared); assert.equal(text(cleared), '');
 });
 
 test('resetting the last node override restores the original draft without a spurious unsaved dialog', () => {
@@ -275,7 +278,7 @@ test('reset restores the last saved theme, code buffers, preview and validation 
     assert.equal(tab.props['data-validation'], 'complete');
     assert.equal(tab.props['data-modified'], false);
   }
-  assert.throws(() => view.find(node => node.props.role === 'alert'), /control exists/);
+  assert.throws(() => view.find(node => node.type === 'operation-feedback' && node.props.tone === 'error'), /control exists/);
   assert.equal(view.writes, 1, 'reset never writes to the directory');
   view.frame().props.onClose(); assert.equal(view.closes, 1);
 });
@@ -332,7 +335,7 @@ test('unavailable samples cannot validate or save a theme, and the draft is reta
   assert.equal(view.writes, 0);
   assert.deepEqual(view.sampleChecks, []);
   assert.equal(view.fields().props.theme.tokens['color-article-quote-surface'], '#fafafa');
-  assert.ok(view.find(node => node.props.role === 'alert'));
+  assert.ok(view.find(node => node.type === 'operation-feedback' && node.props.tone === 'error').props.notice);
 });
 
 test('reloading the sample during a layout check prevents a stale theme write', async () => {

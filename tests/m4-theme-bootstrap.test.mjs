@@ -31,16 +31,19 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
   };
   function useEffect(effect, dependencies) { const index = cursor++; const old = cells[index]; if (old && dependencies.every((value, i) => Object.is(value, old.dependencies[i]))) return; effects.push(() => { old?.cleanup?.(); cells[index] = { dependencies, cleanup: effect() }; }); }
   let tree;
+  const format={ error:null, loading:false };
   const module = { exports: {} };
   vm.runInNewContext(code, {
     exports: module.exports, module,
     document,
     window: { matchMedia: () => media },
     require(id) {
+      if (id === './Toast') return { ToastReadiness: 'toast-readiness' };
+      if (id.endsWith('/i18n/productMessages')) return { formatProductMessage: value => value?.label ?? '' };
       if (id.endsWith('/EditingDrafts')) return { EditingDraftsProvider: 'draft-provider' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/useEditorController')) return { useEditorController: () => controller };
-      if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => ({ error: null }) };
+      if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => format };
       if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ ready: true, locale: 'zh-CN' }), useUITranslation: () => ({ t: key => key }) };
       if (id.endsWith('/editorThemes')) return themes;
       if (id.endsWith('/editorThemeCache')) return { ...cache,
@@ -56,7 +59,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
     },
   });
   function render() { cursor = 0; tree = module.exports.AppProviders({ children: 'app' }); while (effects.length) effects.shift()(); values.clear(); for (const [, key, value] of (themeStyle?.textContent ?? '').matchAll(/(--[a-z-]+): ([^;]+);/g)) values.set(key, value); }
-  return { controller, root, values, writes, render, context: () => tree.props.value };
+  return { controller, root, values, writes, render, format, tree: () => tree, context: () => tree.props.value };
 }
 
 test('refresh keeps the shell hidden until the selected theme has finished loading', () => {
@@ -197,4 +200,13 @@ test('later directory switches keep the last validated theme, never reapply the 
   page.render();
   assert.deepEqual([...page.values], before);
   assert.equal(page.root.dataset.editorTheme, 'ink-white');
+});
+
+test('render-package reload after startup does not restart the full-screen loader', () => {
+  const f=provider();
+  f.controller.editorAppearanceReady=true;
+  f.controller.contentLibrariesState='ready';
+  f.render();f.render();f.format.loading=true;f.render();
+  const children=f.tree().props.children;
+  assert.equal(children.at(-1).props.loading,false);
 });

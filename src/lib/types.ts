@@ -77,6 +77,7 @@ export type ArticleTemplate = {
 };
 
 export type WorkingArticle = {
+  folderNameDraft?: string;
   renderCss?: string;
   renderRecord?: import('./article-format/renderRecords').RenderRecord | null;
   renderSnapshot?: import('./article-format/runtime').FormatSnapshot;

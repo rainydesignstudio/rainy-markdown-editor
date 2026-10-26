@@ -10,24 +10,32 @@ import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import * as format from '../src/lib/articleFormat.ts';
 import * as reports from '../src/lib/articleFormatReport.ts';
+import { awaitPackagePreview } from '../src/lib/article-format/packageRendering.ts';
 import { createArticleSource, parseArticle } from '../src/lib/frontMatter.ts';
 import { BASIC_THEME } from '../src/lib/themes.ts';
 
 const controllerSource = await readFile(new URL('../src/hooks/useEditorController.ts', import.meta.url), 'utf8');
+const controllerTree = ts.createSourceFile('controller.ts', controllerSource, ts.ScriptTarget.Latest, true);
 const report = {
   theme: { passed: ['color', 'display'], issues: [{ kind: 'style', name: 'height', tier: 'lowPriority', source: '主题 CSS', message: '需核对' }] },
   body: { passed: ['p'], issues: [{ kind: 'element', name: '错闭合', tier: 'danger', source: '正文', message: '错闭合', line: 2 }, { kind: 'style', name: '未核实', tier: 'unknown', source: '正文', message: '未核实' }] },
 };
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node?.props ? [node, ...nodes(node.props.children)] : [];
 const text = node => Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : typeof node === 'string' ? node : '';
-function action(name, next, context) {
+function action(name, _next, context) {
+  context.getFormatSnapshot ??= formatRuntime.getFormatSnapshot;
+  context.awaitPackagePreview ??= awaitPackagePreview;
+  context.parseArticle ??= parseArticle;
   context.getPreviewPreferences ??= () => ({ saveReport: true });
   context.sourceReports ??= [];
   context.publishSourceFormatReport ??= (snapshot, report) => context.sourceReports.push({ snapshot, report });
-  const start = controllerSource.indexOf(`  const ${name} = useCallback(`);
-  const end = controllerSource.indexOf(next === 'useEffect' ? '\n\n  useEffect' : `\n\n  const ${next}`, start);
-  assert.ok(start >= 0 && end > start);
-  const source = controllerSource.slice(start, end) + `\nglobalThis.action = ${name};`;
+  let callback;
+  function visit(node) {
+    if (ts.isVariableDeclaration(node) && node.name.getText(controllerTree) === name) callback = node.initializer.arguments[0];
+    ts.forEachChild(node, visit);
+  }
+  visit(controllerTree); assert.ok(callback, name);
+  const source = `globalThis.action = ${callback.getText(controllerTree)};`;
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
   return context.action;
 }

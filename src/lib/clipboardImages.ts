@@ -2,13 +2,14 @@ import { ProductError, productCause } from "./i18n/productMessages";
 import { parseFragment, serialize, type DefaultTreeAdapterMap } from 'parse5';
 import { articleImageFileNameFromSource, articleImageSourceSetCandidates, inspectArticleImage, replaceArticleImageSourceSetUrls } from './articleMedia';
 import { ARTICLE_EXAMPLE_IMAGE, isApplicationExampleImage } from './articleExamples';
+import { localResourceReference } from './resources/references';
 import type { ClipboardPayload } from './article-format/output';
 
 type Element = DefaultTreeAdapterMap['element'];
 type Node = DefaultTreeAdapterMap['node'];
 
 /** Embed bytes in authored positions; repeated references read each file only once. */
-export async function embedClipboardImages(payload: ClipboardPayload, readImage: (fileName: string) => Promise<Blob>, isCurrent: () => boolean, readExample?: () => Promise<Blob>) {
+export async function embedClipboardImages(payload: ClipboardPayload, readImage: (fileName: string, source?: string) => Promise<Blob>, isCurrent: () => boolean, readExample?: () => Promise<Blob>, readRetained?: (source: string) => Blob | null) {
   const document = parseFragment(payload.html);
   const images: Element[] = [];
   const visit = (node: Node) => {
@@ -20,17 +21,19 @@ export async function embedClipboardImages(payload: ClipboardPayload, readImage:
   let embeddedImageCount = 0;
   const assertCurrent = () => { if (!isCurrent()) throw new ProductError("controller.theManuscriptOrLibraryChangedCopyingThePreviousDraftWasCancelled"); };
   const embed = async (source: string): Promise<string> => {
-    const fileName = articleImageFileNameFromSource(source);
+    assertCurrent(); const retained = readRetained?.(source);
+    const local = localResourceReference(source);
+    const fileName = local?.storage === 'image' ? local.fileName : articleImageFileNameFromSource(source);
     const example = isApplicationExampleImage(source);
-    if (!fileName && !example) {
+    if (!retained && !fileName && !example) {
       if (/^(?:blob:|\.\.?\/|media\/image\/)/i.test(source)) throw new ProductError("clipboardImages.theLocalImageReferenceCouldNotBeRead", { "source": source });
       return source;
     }
     assertCurrent();
-    const key = example ? ARTICLE_EXAMPLE_IMAGE : fileName!;
+    const key = retained ? source : example ? ARTICLE_EXAMPLE_IMAGE : local?.shared ? '/shared/image/' + fileName : fileName!;
     if (!cache.has(key)) cache.set(key, (async () => {
       let file: Blob;
-      try { file = example ? await (readExample?.() ?? Promise.reject(new ProductError("clipboardImages.theSampleImageCannotBeRead"))) : await readImage(fileName!); }
+      try { file = retained ?? (example ? await (readExample?.() ?? Promise.reject(new ProductError("clipboardImages.theSampleImageCannotBeRead"))) : await readImage(fileName!, source)); }
       catch (error) { throw new ProductError("clipboardImages.imageCouldNotBeRead", { "key": key, "cause": productCause(error) }); }
       assertCurrent();
       const format = await inspectArticleImage(file);

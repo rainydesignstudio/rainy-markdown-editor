@@ -50,3 +50,16 @@ test('commits preserve the visible source anchor and update namespaced elements'
   assert.equal(mount.querySelector('svg'), svg);
   assert.equal(mount.querySelector('use').getAttribute('href'), '#new');
 });
+
+test('native radio selection survives unrelated source edits, while authored checked changes take effect', () => {
+  const dom = new JSDOM('<div id="target"></div>'), target = dom.window.document.getElementById('target');
+  const before = '<input type="radio" id="a" name="tabs" checked><label for="a">A</label><input type="radio" id="b" name="tabs"><label for="b">B</label><p>Before</p>';
+  commitPreviewMarkup(target, before);
+  const a = target.querySelector('#a'), b = target.querySelector('#b'); b.click();
+  commitPreviewMarkup(target, before.replace('Before', 'After'));
+  assert.equal(target.querySelector('#b'), b); assert.equal(b.checked, true); assert.equal(a.checked, false);
+  commitPreviewMarkup(target, before.replace('id="a" name="tabs" checked', 'id="a" name="tabs"').replace('id="b" name="tabs"', 'id="b" name="tabs" checked'));
+  assert.equal(b.checked, true); assert.equal(a.checked, false);
+  commitPreviewMarkup(target, before);
+  assert.equal(a.checked, true); assert.equal(b.checked, false);
+});

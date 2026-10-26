@@ -94,7 +94,8 @@
     "placeholder": "输入文章标题",
     "month": "保存年月",
     "allMonths": "全部年月",
-    "clear": "清除筛选"
+    "clear": "清除筛选",
+    "sort": "排序"
   },
   "categories": {
     "title": "分类",
@@ -113,7 +114,8 @@
     "scope_one": "范围：{{name}}当前筛选结果，共影响 {{count}} 篇文章。",
     "scope_other": "范围：{{name}}当前筛选结果，共影响 {{count}} 篇文章。",
     "query": "搜索：{{query}}。",
-    "month": "年月：{{month}}。"
+    "month": "年月：{{month}}。",
+    "more": "更多标签"
   },
   "selection": {
     "enter": "进入多选模式",
@@ -172,5 +174,13 @@
     "version": "主题「{{name}}」版本 {{version}}"
   },
   "documentUnit_one": "篇文稿",
-  "documentUnit_other": "篇文稿"
+  "documentUnit_other": "篇文稿",
+  "sort": {
+    "updated-desc": "更新：新→旧",
+    "updated-asc": "更新：旧→新",
+    "created-desc": "创建：新→旧",
+    "created-asc": "创建：旧→新",
+    "title-asc": "标题：升序",
+    "title-desc": "标题：降序"
+  }
 }

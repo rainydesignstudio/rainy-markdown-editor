@@ -241,7 +241,8 @@
       if (!paragraph && !candidate) continue;
       const values = screens.map(screen => screen[i]).filter(Boolean); if (!values.length || values.every(value => value.ignored) || !values.some(value => value.text || value.node.tagName === 'IMG')) continue;
       const overflow = values.some(value => value.overflow && !(p.excludeCenteredOverflow && value.centered));
-      const centerMismatch = candidate && values.some(value => value.centered !== values[0].centered);
+      const centers = values.filter(value => !value.fills);
+      const centerMismatch = candidate && centers.some(value => value.centered !== centers[0].centered);
       const widthDiff = values.some(value => Math.abs(value.width - values[0].width) > p.widthDifference);
       const ratiosDiffer = values.some(value => Math.abs(value.ratio - values[0].ratio) > (values.some(item => item.fills) ? 0 : p.ratioDifference));
       const normalResponsive = widthDiff && values.every(value => Math.abs(value.width - values[0].width) <= p.widthDifference || Math.abs(value.ratio - 1) < p.responsiveFillTolerance);

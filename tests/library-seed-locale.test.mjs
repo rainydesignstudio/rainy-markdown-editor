@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
-import { getDefaultContentLibrary, loadArticleSnippets, loadArticleTemplates } from '../src/lib/contentLibraries.ts';
+import { getDefaultContentLibrary, initializeContentLibraries, loadArticleSnippets, loadArticleTemplates, saveSnippetCategory, saveArticleSnippet } from '../src/lib/contentLibraries.ts';
 import { getBuiltinArticleThemes } from '../src/lib/themes.ts';
 import { getBuiltinEditorThemes } from '../src/lib/editorThemes.ts';
 import { initializeThemeDefaults, copyDefaultThemes } from '../src/lib/themeDefaults.ts';
-import { readLibrarySeedLocale, resolveSeedLocale } from '../src/lib/librarySeeds.ts';
+import { readLibrarySeedLocale, readLibrarySeedRecord, resolveSeedLocale } from '../src/lib/librarySeeds.ts';
+import { PUBLIC_PLATFORM_PRESETS } from '../src/lib/article-format/library.ts';
 import { createNamedDataDirectory, loadThemeLibrary } from '../src/lib/fileSystem.ts';
 import { parseArticle } from '../src/lib/frontMatter.ts';
 import { tree, snapshot } from './knowledge/fs-fixture.mjs';
@@ -16,7 +17,7 @@ test('both complete seeds preserve IDs, visual design, references and cursor pos
     assert.deepEqual(left.map(({ name, ...design }) => design), right.map(({ name, ...design }) => design));
   }
   const structure = source => [...source.matchAll(/<[^>]+>/g)].map(match => match[0]);
-  assert.equal(en.snippets.length, 21); assert.equal(en.templates.length, 5);
+  assert.equal(en.snippets.length, 23); assert.equal(en.templates.length, 5);
   for (let i = 0; i < en.snippets.length; i++) {
     const left = en.snippets[i], right = zh.snippets[i];
     assert.deepEqual([left.id, left.categoryId, left.trigger, left.icon], [right.id, right.categoryId, right.trigger, right.icon]);
@@ -45,13 +46,17 @@ test('both complete seeds preserve IDs, visual design, references and cursor pos
 });
 
 test('named library creation fixes the seed language independently of platform selection', async () => {
-  for (const locale of ['en-US', 'zh-CN', 'fr-FR']) {
-    const root = await createNamedDataDirectory(tree('parent'), locale, undefined, locale);
+  for (const locale of ['en-US', 'zh-CN', 'fr-FR']) for (const preset of ['wechat-article', 'empty']) {
+    const root = await createNamedDataDirectory(tree('parent'), locale, preset, locale);
     assert.equal(await readLibrarySeedLocale(root), resolveSeedLocale(locale));
     const snippets = await loadArticleSnippets(root), templates = await loadArticleTemplates(root), themes = await loadThemeLibrary(root);
     assert.equal(snippets.issues.length, 0); assert.equal(templates.issues.length, 0); assert.equal(themes.issues.length, 0);
-    assert.equal(snippets.snippets.find(item => item.id === 'callout').name, locale === 'zh-CN' ? '提示框' : 'Callout');
+    if (preset === 'empty') { assert.equal(snippets.snippets.length, 0); assert.equal(snippets.categories.length, 0); assert.equal(templates.templates.length, 3); assert.equal(templates.categories.length, 1); }
+    else { assert.equal(snippets.snippets.find(item => item.id === 'callout').name, locale === 'zh-CN' ? '提示框' : 'Callout'); assert.equal(templates.templates.length, 5); }
     assert.equal(templates.templates.find(item => item.id === 'markdown-guide').name, locale === 'zh-CN' ? 'Markdown 常用格式' : 'Common Markdown formats');
+    const format = await root.getDirectoryHandle('format');
+    const validator = JSON.parse(await (await (await format.getFileHandle('validator.json')).getFile()).text());
+    assert.equal(validator.meta.id, preset === 'empty' ? 'empty' : 'wechat-official');
     const before = snapshot(root);
     await initializeThemeDefaults(root, locale === 'zh-CN' ? 'en-US' : 'zh-CN');
     await copyDefaultThemes(root, 'article-themes');
@@ -63,6 +68,7 @@ test('named library creation fixes the seed language independently of platform s
 test('load defaults and empty directories reuse the persisted choice and keep edited objects', async () => {
   const root = tree('zh-library');
   await initializeThemeDefaults(root, 'zh-CN');
+  await initializeContentLibraries(root);
   const articleThemes = await (await root.getDirectoryHandle('themes')).getDirectoryHandle('article-themes');
   const basic = articleThemes.children.get('basic.json');
   basic.value = JSON.stringify({ ...JSON.parse(basic.value), name: '我的基础主题' });
@@ -98,8 +104,8 @@ test('legacy receipts remain byte-for-byte intact, while invalid receipts block 
   for (const value of ['{', '{"version":1,"locale":"fr-FR"}', '{"version":1,"initialized":"yes"}']) {
     const invalid = tree('invalid', { 'themes/default-themes.loaded': value });
     const original = snapshot(invalid);
-    await assert.rejects(loadArticleSnippets(invalid), /种子语言记录无效/);
-    await assert.rejects(initializeThemeDefaults(invalid, 'en-US'), /种子语言记录无效/);
+    await assert.rejects(loadArticleSnippets(invalid), /种子记录无效/);
+    await assert.rejects(initializeThemeDefaults(invalid, 'en-US'), /种子记录无效/);
     assert.equal(snapshot(invalid), original);
   }
 });
@@ -110,4 +116,67 @@ test('seed objects remain monolingual without per-object locale fields', async (
     assert.equal('locale' in basic || 'i18n' in basic || 'translations' in basic, false);
     assert.deepEqual(Object.keys(basic).sort(), Object.keys(getBuiltinArticleThemes(locale)[0]).sort());
   }
+});
+
+test('preset declarations select content independently of language and neutral starters contain no HTML bodies', () => {
+  for (const locale of ['en-US','zh-CN']) for (const preset of PUBLIC_PLATFORM_PRESETS) {
+    const content = getDefaultContentLibrary(locale,preset.contentSeed);
+    if (preset.contentSeed === 'markdown') {
+      assert.equal(content.snippets.length,0); assert.equal(content.snippetCategories.length,0);
+      assert.deepEqual(content.templates.map(item=>item.id),['markdown-guide','project-review','tutorial']);
+      assert.equal(content.templateCategories.length,1);
+      for (const item of content.templates) {
+        const parsed=parseArticle(item.source);assert.equal(parsed.canCopy,true);
+        assert.doesNotMatch(parsed.body,/<\/?[a-z][^>]*>/i);
+        if(locale==='en-US')assert.doesNotMatch(item.source,/\p{Script=Han}/u);
+      }
+    } else { assert.equal(content.snippets.length,23); assert.equal(content.templates.length,5); }
+  }
+});
+
+test('ordinary reads preserve deliberately empty content, while explicit defaults reuse the saved profile and retain authored files', async () => {
+  const root=await createNamedDataDirectory(tree('parent'),'neutral','empty','en-US');
+  assert.equal((await readLibrarySeedRecord(root)).contentSeed,'markdown');
+  const snippets=await root.getDirectoryHandle('snippets'),templates=await root.getDirectoryHandle('templates');
+  assert.deepEqual([...snippets.children.keys()],['index.json']);
+  snippets.children.clear();templates.children.clear();
+  const empty=snapshot(root);
+  for(let i=0;i<2;i++) {
+    assert.equal((await loadArticleSnippets(root)).snippets.length,0);
+    assert.equal((await loadArticleTemplates(root)).templates.length,0);
+  }
+  assert.equal(snapshot(root),empty,'reading a legitimate empty set never imports defaults');
+  await initializeContentLibraries(root);
+  assert.equal((await loadArticleSnippets(root)).categories.length,0);
+  assert.equal((await loadArticleTemplates(root)).templates.length,3);
+  await saveSnippetCategory(root,{id:'business',name:'My business',description:'Custom',order:1},null);
+  await saveArticleSnippet(root,{id:'business-note',categoryId:'business',name:'Business note',description:'Author supplied',trigger:'//business-note',content:'A business note.▌'},null);
+  const folder=await templates.getDirectoryHandle('default'),file=folder.children.get('tutorial.md');file.value+='\nMy authored notes.';
+  const index=snippets.children.get('index.json');index.value=JSON.stringify({...JSON.parse(index.value),custom:{keep:true}});
+  const before=snapshot(root);
+  await initializeContentLibraries(root);
+  assert.equal(snapshot(root),before,'explicit defaults never overwrite authors, custom categories or unknown index metadata');
+});
+
+test('partial initialization retains its chosen content profile and retries missing defaults without replacing authored data', async () => {
+  const root=tree('retry-content'),templates=await root.getDirectoryHandle('templates',{create:true});templates.failWrite=true;
+  await assert.rejects(initializeThemeDefaults(root,'zh-CN',{contentSeed:'markdown'}));
+  const saved=await readLibrarySeedRecord(root);assert.equal(saved.initialized,false);assert.equal(saved.contentSeed,'markdown');
+  const folder=await templates.getDirectoryHandle('default'),file=folder.children.get('tutorial.md');file.value+='\n用户补充。';const authored=file.value;
+  templates.failWrite=false;await initializeThemeDefaults(root,'en-US',{contentSeed:'rich'});
+  assert.equal((await readLibrarySeedRecord(root)).initialized,true);
+  assert.equal((await readLibrarySeedRecord(root)).contentSeed,'markdown');
+  assert.equal(await readLibrarySeedLocale(root),'zh-CN');
+  assert.equal((await loadArticleSnippets(root)).categories.length,0);
+  assert.equal((await loadArticleTemplates(root)).templates.length,3);
+  assert.equal(file.value,authored);
+});
+
+test('legacy empty libraries are read without refilling or rewriting their receipt', async () => {
+  const root=tree('legacy-empty',{'themes/default-themes.loaded':'{"version":1}'});
+  await root.getDirectoryHandle('snippets',{create:true});await root.getDirectoryHandle('templates',{create:true});
+  const before=snapshot(root);
+  assert.equal((await loadArticleSnippets(root)).snippets.length,0);
+  assert.equal((await loadArticleTemplates(root)).templates.length,0);
+  assert.equal(snapshot(root),before);
 });

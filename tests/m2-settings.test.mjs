@@ -100,6 +100,8 @@ test('missing settings load the defaults without creating data/settings.json', a
   const loaded = await loadArticleSettings(root);
 
   assert.deepEqual(loaded.settings, DEFAULT_ARTICLE_SETTINGS);
+  assert.equal(loaded.settings.autoSave.enabled, false);
+  assert.equal(loaded.settings.autoSnapshot.enabled, true);
   assert.equal(loaded.issue, null);
   assert.equal(loaded.fileExists, false);
   assert.deepEqual(root.writes, []);
@@ -112,6 +114,7 @@ test('settings save and reload preserve independent switches, intervals, and ret
     version: 1,
     autoSave: { enabled: false, intervalSeconds: 90 },
     autoSnapshot: { enabled: true, intervalMinutes: 45, maxCount: 12 },
+    trash: { enabled: false },
   };
 
   await saveArticleSettings(root, settings);
@@ -121,6 +124,13 @@ test('settings save and reload preserve independent switches, intervals, and ret
   assert.equal(loaded.issue, null);
   assert.equal(loaded.fileExists, true);
   assert.equal(root.writes.filter((name) => name === 'settings.json').length, 1);
+});
+
+test('explicitly enabled autosave remains enabled after the factory default changes', async () => {
+  const root = new MemoryDirectoryHandle('existing-autosave-library');
+  await saveArticleSettings(root, { ...DEFAULT_ARTICLE_SETTINGS, autoSave: { enabled: true, intervalSeconds: 75 } });
+  const loaded = await loadArticleSettings(root);
+  assert.equal(loaded.settings.autoSave.enabled, true); assert.equal(loaded.settings.autoSave.intervalSeconds, 75);
 });
 
 test('article theme default persists while older settings without it still load', async () => {

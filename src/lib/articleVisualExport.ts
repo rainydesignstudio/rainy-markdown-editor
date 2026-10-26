@@ -1,5 +1,6 @@
 import { ProductError } from "./i18n/productMessages";
 import { getFormatSnapshot, getArticleRenderSnapshot, assertCurrentFormat, assertFormatReady } from './article-format/runtime';
+import { packageDisplayDocument } from './article-format/packageRendering';
 
 function imageReady(image: HTMLImageElement): Promise<void> {
   if (image.complete && image.naturalWidth > 0) return Promise.resolve();
@@ -8,13 +9,14 @@ function imageReady(image: HTMLImageElement): Promise<void> {
   });
 }
 
-export async function renderArticleExportCanvas(article: HTMLElement): Promise<{ canvas: HTMLCanvasElement; blockEnds: number[] }> {
+export async function renderArticleExportCanvas(article: HTMLElement, capture?: { width: number; maxCanvasSide: number; background: string }): Promise<{ canvas: HTMLCanvasElement; blockEnds: number[] }> {
   const snapshot = getArticleRenderSnapshot(article); assertFormatReady(snapshot);
   const options = snapshot.bundle.formatter.output.visual;
-  const EXPORT_WIDTH = options.width;
-  const MAX_CANVAS_SIDE = options.maxCanvasSide;
+  const EXPORT_WIDTH = capture?.width ?? options.width;
+  const MAX_CANVAS_SIDE = capture?.maxCanvasSide ?? options.maxCanvasSide;
+  if (!Number.isInteger(EXPORT_WIDTH) || EXPORT_WIDTH < 1 || EXPORT_WIDTH > 10000 || !Number.isInteger(MAX_CANVAS_SIDE) || MAX_CANVAS_SIDE < 1 || MAX_CANVAS_SIDE > 32767 || capture && !CSS.supports('color', capture.background)) throw new Error('Invalid format capture parameters');
   const originalRoot = article.getRootNode();
-  const native = Boolean(snapshot.bundle.formatter.document || snapshot.bundle.formatter.stylesheets);
+  const native = Boolean(snapshot.renderer || snapshot.bundle.formatter.document || snapshot.bundle.formatter.stylesheets);
   if (!native && !(originalRoot instanceof ShadowRoot)) throw new ProductError("articleVisualExport.theArticlePreviewIsNotReadyAnImageCannotBeGenerated");
   const sourceStyle = native ? article.ownerDocument.querySelector<HTMLStyleElement>('style[data-article-style]') : (originalRoot as ShadowRoot).querySelector<HTMLStyleElement>('style[data-article-style]');
   if (!sourceStyle?.textContent) throw new ProductError("articleVisualExport.articleStylesAreNotReadyAnImageCannotBeGenerated");
@@ -26,14 +28,16 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
   host.style.pointerEvents = 'none';
   document.body.append(host);
   const frame = native ? document.createElement('iframe') : null;
+  let packageDocument: Promise<HTMLElement> | undefined;
   if (frame) {
     const viewport = snapshot.bundle.formatter.document?.viewport;
     frame.setAttribute('sandbox', 'allow-same-origin'); frame.style.border = '0';
     frame.style.width = (viewport?.width ?? EXPORT_WIDTH) + 'px'; frame.style.height = (viewport?.height ?? 959) + 'px';
+    if (snapshot.renderer) packageDocument = packageDisplayDocument(frame, snapshot);
     host.append(frame);
   }
-  const doc = frame?.contentDocument ?? document;
-  if (frame) { doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close(); }
+  const doc = packageDocument ? (await packageDocument.catch(error => { host.remove(); throw error; })).ownerDocument : frame?.contentDocument ?? document;
+  if (frame && !snapshot.renderer) { doc.open(); doc.write('<!doctype html><html><head></head><body></body></html>'); doc.close(); }
   const shadow = frame ? doc.body : host.attachShadow({ mode: 'open' });
   const style = doc.createElement('style');
   const preview = snapshot.bundle.formatter.preview;
@@ -65,7 +69,7 @@ export async function renderArticleExportCanvas(article: HTMLElement): Promise<{
       width: EXPORT_WIDTH,
       height,
       pixelRatio,
-      backgroundColor: options.pngBackground,
+      backgroundColor: capture?.background ?? options.pngBackground,
       skipAutoScale: true,
       onImageErrorHandler: () => { imageFailed = true; },
     });

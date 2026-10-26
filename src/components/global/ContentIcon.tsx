@@ -1,0 +1,31 @@
+export function ContentIcon({ name }: { name: 'more' | 'book' | 'upload' | 'download' | 'plus' | 'minus' | 'target' | 'lines' | 'quote' | 'edit' | 'apply' | 'info' | 'check' | 'save' | 'delete' | 'copy' | 'close' | 'code' | 'reset' | 'document' | 'collapse' | 'expand' | 'graph' | 'folder' | 'link' | 'changes' }) {
+  const paths = {
+    more: 'M5 12h.01M12 12h.01M19 12h.01',
+    document: 'M5 3h9l5 5v13H5V3ZM14 3v5h5M8 13h8M8 17h6',
+    collapse: 'm15 5-7 7 7 7',
+    expand: 'm9 5 7 7-7 7',
+    book: 'M12 5c-3-2-7-2-10-1v15c3-1 7-1 10 1m0-15c3-2 7-2 10-1v15c-3-1-7-1-10 1V5Z',
+    upload: 'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6',
+    download: 'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',
+    plus: 'M12 5v14M5 12h14',
+    minus: 'M5 12h14',
+    target: 'M12 2v4m0 12v4M2 12h4m12 0h4M19 12a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z',
+    lines: 'M3 4h1v5M3 12h3v2H3v3h3M10 6h11M10 14h11M10 21h11',
+    quote: 'M4 11h6v8H3v-7l4-7h4l-4 6m10 0h6v8h-7v-7l4-7h4l-4 6',
+    edit: 'm4 16 12-12 4 4L8 20H4v-4Zm10-10 4 4',
+    apply: 'M4 7h10m-4-4 4 4-4 4M4 13v7h16V7h-2',
+    info: 'M12 11v6M12 7h.01M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
+    check: 'm4 12 5 5L20 6',
+    save: 'M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6',
+    delete: 'M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7',
+    copy: 'M8 8h12v12H8V8ZM4 16V4h12',
+    close: 'm6 6 12 12M18 6 6 18',
+    code: 'm8 6-6 6 6 6m8-12 6 6-6 6',
+    reset: 'M4 10a8 8 0 1 1 1 8M4 4v6h6',
+    graph: 'M10 4h4v4h-4V4ZM3 16h4v4H3v-4Zm14 0h4v4h-4v-4ZM12 8v4M5 16v-4h14v4',
+    folder: 'M4 5h6l2 3h8v12H4V5ZM12 11v6m-3-3h6',
+    link: 'm10 13 4-4m-6 6-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0m2 3 1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0',
+    changes: 'M5 3h14v18H5V3ZM9 8h6m-3-3v6m-3 5h6',
+  };
+  return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
+}

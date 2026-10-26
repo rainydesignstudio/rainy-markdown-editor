@@ -29,7 +29,6 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
   const props = {
     root: { name: 'test-only-directory' }, directoryName: 'test-only-directory', rememberedDirectoryName: null,
     directoryRestoreState: 'idle', directoryBookmarkIssue: null, fileSystemReady: true,
-    directoryStatus: { label: '', tone: 'neutral' },
     settings: structuredClone(DEFAULT_ARTICLE_SETTINGS), issue: null, notice: { label: '', tone: 'neutral' }, busy: false,
     workspace: workspace.createDefaultEditorWorkspace(), workspaceIssue: null, workspaceBusy: false,
     editorThemes: [...editorThemes.BUILTIN_EDITOR_THEMES], editorThemeIssues: [],
@@ -47,8 +46,10 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
       if (id.endsWith('/PageHeading')) return { PageHeading: 'header' };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/ButtonBar')) return { ButtonBar: 'button-bar' };
+      if (id.endsWith('/ModeSwitch')) return { ModeSwitch: 'mode-switch' };
       if (id === 'react-dom') return { createPortal: (children) => children };
       if (id.endsWith('/DialogFrame')) { const Dialog = (props) => jsx('dialog', props); return { DialogFrame: Dialog, DialogHeader: Dialog, DialogActions: Dialog, DialogButton: Dialog }; }
+      if (id.endsWith('/FormatPackageControls')) return { FormatPackageControls: 'format-package-controls' };
       if (id.endsWith('/FontDownloadSettings')) return { FontDownloadSettings: 'font-download-settings' };
       if (id.endsWith('/EditorThemeDesigner')) return { EditorThemeDesigner: 'editor-theme-designer' };
       if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-changes-dialog' };
@@ -99,7 +100,8 @@ test('local-library policy summary follows the active snapshot and never labels 
   assert.match(summary(), /保留原色/);
   assert.doesNotMatch(summary(), /mp-darkmode|微信公众号/);
   page.format({ ...initial, source: 'invalid', error: '测试配置损坏' });
-  assert.match(summary(), /配置不可用.*测试配置损坏/);
+  assert.match(summary(), /配置不可用/);
+  assert.equal(page.find(node => node.type === 'operation-feedback' && node.props.id === 'format-status').props.notice, '测试配置损坏');
   assert.doesNotMatch(summary(), /mp-darkmode|微信公众号/);
   page.format({ ...initial, loading: true });
   assert.match(summary(), /正在载入/);
@@ -211,7 +213,23 @@ test('busy settings prevent tab changes and absent directory disables persisted 
   assert.equal(page.panel('library').props.hidden, false);
   page.props.busy = false; page.props.root = null; page.render();
   assert.equal(page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.disabled, true);
-  assert.equal(page.find((node) => node.type === 'input' && node.props['aria-label'] === '启用自动保存').props.disabled, true);
+  assert.equal(page.find((node) => node.type === 'mode-switch' && node.props.label === '启用自动保存').props.disabled, true);
+});
+
+test('workflow switches disable their own fields without discarding values or disabling re-enabling and save', () => {
+  const page = settingsPage(); page.switch('workflow');
+  for (const [label, max] of [['启用自动保存', '86400'], ['启用自动历史快照', '10080']]) {
+    let control = page.find(node => node.type === 'mode-switch' && node.props.label === label);
+    const original = page.find(node => node.type === 'input' && node.props.max === max).props.value;
+    if (control.props.checked) { control.props.onToggle(); page.render(); }
+    assert.equal(page.find(node => node.type === 'input' && node.props.max === max).props.disabled, true);
+    control = page.find(node => node.type === 'mode-switch' && node.props.label === label);
+    assert.equal(control.props.disabled, false); control.props.onToggle(); page.render();
+    const input = page.find(node => node.type === 'input' && node.props.max === max);
+    assert.equal(input.props.disabled, false); assert.equal(input.props.value, original);
+  }
+  assert.equal(page.find(node => node.type === 'button' && node.props.type === 'submit').props.disabled, false);
+  page.unmount();
 });
 
 test('theme selection previews without writing; cancel and unmount clear the preview', () => {

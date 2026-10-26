@@ -11,6 +11,7 @@ export function ArticleDocument({ snapshot, themeId, attach, media, children }: 
 }) {
   const policy = snapshot.bundle.formatter.document;
   const bind = useCallback((element: HTMLElement | null) => { if (element) bindArticleRenderSnapshot(element, snapshot); attach?.(element); }, [attach, snapshot]);
+  if (snapshot.renderer) return <div ref={bind} data-package-document="true">{children}</div>;
   const root = policy?.root ?? { tag: 'article', classes: ['article-preview'] };
   const body = policy ? policy.body : { tag: 'div', classes: ['article-body'] };
   const content = body ? createElement(body.tag, { id: body.id, className: body.classes.join(' '), 'data-article-content-body': '' }, children) : children;

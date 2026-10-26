@@ -32,7 +32,7 @@ function dialog(onCreate = async () => ({ status: 'created' })) {
   }) });
   const render = () => { cursor = 0; tree = nodes(module.exports.CreateLibraryDialog({ onCreate: (name, presetId) => { requests.push(name); presets.push(presetId); return onCreate(name, presetId); }, onClose: () => closes++ })); };
   const find = predicate => { const node = tree.find(predicate); assert.ok(node); return node; };
-  const result = { render, find, requests, presets, get closes() { return closes; }, input: () => find(node => node.type === 'input'),
+  const result = { render, find, all: () => tree, requests, presets, get closes() { return closes; }, input: () => find(node => node.type === 'input'),
     frame: () => find(node => node.type === 'frame'), submit: () => find(node => node.type === 'form').props.onSubmit({ preventDefault() {} }),
     button: label => find(node => node.type === 'dialog-button' && text(node) === label),
     name(value) { result.input().props.onChange({ target: { value } }); render(); },
@@ -43,9 +43,9 @@ function dialog(onCreate = async () => ({ status: 'created' })) {
 test('library creation reuses the dialog shell, focuses the name, previews the destination and validates before choosing a directory', async () => {
   const view = dialog();
   assert.equal(view.input().props.autoFocus, true);
-  const preset = view.find(node => node.type === 'select');
+  const preset = view.find(node => node.type === 'select-field');
   assert.equal(preset.props.value, 'wechat-article');
-  assert.deepEqual(nodes(preset.props.children).filter(node => node.type === 'option').map(node => node.props.value), ['wechat-article']);
+  assert.deepEqual(Array.from(preset.props.options, option => option.value), ['wechat-article', 'empty']);
   assert.equal(view.button('选择父目录并创建').props.disabled, true);
   for (const value of [' ', '../文稿', '..', '文稿.', 'a:']) {
     view.name(value); assert.equal(view.button('选择父目录并创建').props.disabled, true);
@@ -58,13 +58,28 @@ test('library creation reuses the dialog shell, focuses the name, previews the d
   assert.deepEqual(view.presets, ['wechat-article']);
 });
 
+test('the empty validator selection reaches creation without changing the default or losing a cancelled choice', async () => {
+  const responses = [{ status: 'cancelled' }, { status: 'created' }];
+  const view = dialog(async () => responses.shift()); view.name('空规则资料库');
+  view.find(node => node.type === 'select-field').props.onChange('empty'); view.render();
+  assert.equal(view.find(node => node.type === 'select-field').props.options.find(option => option.value === 'empty').label, '空校验器');
+  await view.submit(); view.render();
+  assert.equal(view.find(node => node.type === 'select-field').props.value, 'empty');
+  assert.equal(view.closes, 0);
+  await view.submit();
+  assert.deepEqual(view.presets, ['empty', 'empty']);
+  assert.equal(view.closes, 1);
+});
+
 test('pending directory creation blocks duplicate submissions, cancellation and dismissal', async () => {
   let finish;
   const view = dialog(() => new Promise(resolve => { finish = resolve; }));
   view.name('测试资料库'); const pending = view.submit(); view.render();
   assert.equal(view.frame().props.dismissible, false);
+  assert.equal(view.all().some(node => node.props.role === 'status'), false);
+  assert.equal(view.button('创建中…').props.disabled, true);
   assert.equal(view.input().props.disabled, true);
-  assert.equal(view.find(node => node.type === 'select').props.disabled, true);
+  assert.equal(view.find(node => node.type === 'select-field').props.disabled, true);
   assert.equal(view.button('取消').props.disabled, true);
   assert.equal(view.find(node => node.type === 'header').props.closeDisabled, true);
   await view.submit(); view.frame().props.onClose();
@@ -77,7 +92,7 @@ test('picker cancellation and a creation failure retain the name and permit retr
   const view = dialog(async () => responses.shift()); view.name('我的文稿');
   await view.submit(); view.render();
   assert.equal(view.closes, 0); assert.equal(view.input().props.value, '我的文稿');
-  assert.match(text(view.find(node => node.props.role === 'status')), /已取消选择父目录/);
+  assert.equal(view.all().some(node => node.props.role === 'status' || node.props.role === 'alert'), false);
   await view.submit(); view.render();
   assert.equal(text(view.find(node => node.props.role === 'alert')), '已有同名文件夹');
   assert.equal(view.input().props.value, '我的文稿'); assert.equal(view.button('选择父目录并创建').props.disabled, false);
@@ -101,6 +116,47 @@ function action(name, next, context) {
   return context.action;
 }
 
+test('opening and cancelling the library picker is silent; actual selection failures report once', async () => {
+  let operation, rejectPicker;
+  const statuses = [], notices = [], opened = [], root = { name: 'chosen-library' };
+  const context = { useCallback: callback => callback, DOMException, resumeIntentRef: { current: { active: false } }, directorySelectionRef: { current: 0 },
+    runAfterDraftDecision: value => { operation = value; }, pickDataDirectory: () => new Promise((_, reject) => { rejectPicker = reject; }),
+    assertExistingDataDirectory: async () => {}, rememberAuthorizedDirectory() {}, openAuthorizedDirectory: async (...args) => opened.push(args),
+    setStatus: value => statuses.push(value), notifyToast: value => notices.push(value),
+  };
+  const choose = action('authorizeDirectory', 'requestCreateDataDirectory', context);
+  choose(); const pending = operation.run();
+  assert.equal(statuses.length, 0); assert.equal(notices.length, 0);
+  rejectPicker(new DOMException('cancelled', 'AbortError')); await pending;
+  assert.equal(statuses.length, 0); assert.equal(notices.length, 0); assert.equal(opened.length, 0);
+  context.pickDataDirectory = async () => root;
+  context.assertExistingDataDirectory = async () => { throw new Error('not a library'); };
+  choose(); await operation.run();
+  assert.equal(notices.length, 1); assert.equal(notices[0].tone, 'error'); assert.match(notices[0].label, /not a library/);
+  assert.equal(statuses.at(-1).notify, false, 'the editor must not announce the same failure again');
+  context.assertExistingDataDirectory = async () => {};
+  choose(); await operation.run();
+  assert.equal(notices.length, 1); assert.equal(opened.length, 1); assert.equal(opened[0][2], true);
+});
+
+test('remembered-library permission failures keep their explicit feedback after removing the shared status relay', async () => {
+  const statuses = [], notices = [], opened = [], root = { name: 'remembered-library' };
+  let permission = Promise.resolve('denied');
+  const context = { useCallback: callback => callback, rememberedDirectory: root, directorySelectionRef: { current: 0 },
+    requestDirectoryReadWritePermission: () => permission, setDirectoryRestoreState() {}, openAuthorizedDirectory: async (...args) => opened.push(args),
+    setStatus: value => statuses.push(value), notifyToast: value => notices.push(value),
+  };
+  const reopen = action('reopenRememberedDirectory', 'confirmFormatCheck', context);
+  reopen(); await permission;
+  assert.equal(notices.length, 1); assert.equal(notices[0].tone, 'warning'); assert.equal(statuses[0].notify, false);
+  permission = Promise.reject(new Error('permission unavailable'));
+  reopen(); await permission.catch(() => {});
+  assert.equal(notices.length, 2); assert.equal(notices[1].tone, 'error'); assert.match(notices[1].label, /permission unavailable/);
+  permission = Promise.resolve('granted');
+  reopen(); await permission;
+  assert.equal(notices.length, 2); assert.equal(opened.length, 1); assert.equal(opened[0][2], true);
+});
+
 test('draft protection precedes the creation dialog and does not open the native picker until the form action', () => {
   let pending, opened = false;
   const request = action('requestCreateDataDirectory', 'createDataDirectory', {
@@ -111,7 +167,7 @@ test('draft protection precedes the creation dialog and does not open the native
 
 test('directory creation reports success, cancellation, stale selection and file collisions to the dialog', async () => {
   const statuses = [], opened = [], creates = [], root = { name: 'new-library' };
-  const context = { useCallback: callback => callback, DOMException, seedLocale: 'zh-CN', DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, directorySelectionRef: { current: 0 },
+  const context = { useCallback: callback => callback, DOMException, resumeIntentRef: { current: { active: false } }, seedLocale: 'zh-CN', DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, directorySelectionRef: { current: 0 },
     pickDataDirectory: async () => ({}), createNamedDataDirectory: async (...args) => { creates.push(args); return root; },
     setStatus: status => statuses.push(status), rememberAuthorizedDirectory: (handle, selection) => opened.push(['remember', handle, selection]),
     openAuthorizedDirectory: async (handle, selection) => opened.push(['open', handle, selection]),
@@ -130,4 +186,8 @@ test('directory creation reports success, cancellation, stale selection and file
   context.pickDataDirectory = async () => ({}); context.createNamedDataDirectory = async () => { throw new Error('已有同名目录'); };
   const failure = await create('new-library'); assert.equal(failure.status, 'error'); assert.equal(failure.message, '已有同名目录');
   assert.equal(statuses.at(-1).tone, 'error'); assert.equal(opened.length, 2);
+  context.createNamedDataDirectory = async (...args) => { creates.push(args); return root; };
+  assert.equal((await create('empty-library', 'empty')).status, 'created');
+  assert.equal(creates.at(-1)[2], 'empty');
+  assert.equal(opened.length, 4);
 });

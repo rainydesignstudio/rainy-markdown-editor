@@ -1,10 +1,12 @@
 'use client';
 
 import { ArticlesPage } from '../../components/articles/ArticlesPage';
+import { ArticleTrashPage } from '../../components/articles/ArticleTrashPage';
 import { useEditorControllerContext } from '../../components/global/AppProviders';
 
 export default function ArticlesRoute() {
   const controller = useEditorControllerContext();
+  if (controller.selectedArticleCollection === 'trash') return <ArticleTrashPage trash={controller.trash} directoryName={controller.directoryName} enabled={controller.articleSettings.trash.enabled} disabled={!controller.directory || Boolean(controller.settingsIssue)} />;
   return (
     <ArticlesPage
       articles={controller.articlesForOverview}

@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { clampEditorSourceRatio, editorSourceRatioFromPointer, getEditorSourceWidth, getEditorSplitLimits, resizeEditorSourceRatio } from '../lib/editorLayout';
 
-export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 64rem)', identity?: unknown) {
+export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 64rem)', identity?: unknown, axis: 'x' | 'y' = 'x') {
+  const minimumPanel = axis === 'y' ? 160 : 360;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
   const captureRef = useRef<{ target: HTMLButtonElement; pointerId: number } | null>(null);
@@ -40,10 +41,10 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
     if (!element) return;
     stopDrag();
     const update = () => {
-      const measured = element.getBoundingClientRect().width;
-      const enough = window.matchMedia(breakpoint).matches && getEditorSplitLimits(measured) !== null;
+      const measured = element.getBoundingClientRect()[axis === 'y' ? 'height' : 'width'];
+      const enough = (axis === 'y' || window.matchMedia(breakpoint).matches) && getEditorSplitLimits(measured, minimumPanel) !== null;
       setWidth(measured); setWideEnough(enough);
-      if (enough) setRatio(current => clampEditorSourceRatio(measured, current));
+      if (enough) setRatio(current => clampEditorSourceRatio(measured, current, minimumPanel));
       else stopDrag();
     };
     update();
@@ -51,7 +52,7 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
     observer?.observe(element);
     window.addEventListener('resize', update);
     return () => { draggingRef.current = false; releaseCapture(); observer?.disconnect(); window.removeEventListener('resize', update); };
-  }, [breakpoint, identity]);
+  }, [breakpoint, identity, axis, minimumPanel]);
   const startDrag = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0 || event.isPrimary === false || !wideEnough) return;
     releaseCapture();
@@ -63,15 +64,16 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
   const moveDrag = (event: PointerEvent<HTMLElement>) => {
     if (!draggingRef.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    setRatio(editorSourceRatioFromPointer(event.clientX, rect.left, rect.width));
+    setRatio(editorSourceRatioFromPointer(axis === 'y' ? event.clientY : event.clientX, axis === 'y' ? rect.top : rect.left, axis === 'y' ? rect.height : rect.width, minimumPanel));
   };
   const keyResize = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!containerRef.current) return;
-    const next = resizeEditorSourceRatio(containerRef.current.getBoundingClientRect().width, ratio, event.key);
+    if (!(axis === 'y' ? ['ArrowUp', 'ArrowDown', 'Home', 'End'] : ['ArrowLeft', 'ArrowRight', 'Home', 'End']).includes(event.key)) return;
+    const next = resizeEditorSourceRatio(containerRef.current.getBoundingClientRect()[axis === 'y' ? 'height' : 'width'], ratio, event.key, minimumPanel);
     if (next === null) return;
     event.preventDefault(); setRatio(next);
   };
-  const limits = getEditorSplitLimits(width);
-  const style = { '--editor-source-width': `${getEditorSourceWidth(width, ratio)}px` } as CSSProperties;
-  return { containerRef, wideEnough, dragging, ratio, style, minRatio: limits?.minimumRatio ?? 50, maxRatio: limits?.maximumRatio ?? 50, startDrag, moveDrag, stopDrag, keyResize };
+  const limits = getEditorSplitLimits(width, minimumPanel);
+  const style = { [axis === 'y' ? '--editor-reference-height' : '--editor-source-width']: `${getEditorSourceWidth(width, ratio, minimumPanel)}px` } as CSSProperties;
+  return { axis, containerRef, wideEnough, dragging, ratio, style, minRatio: limits?.minimumRatio ?? 50, maxRatio: limits?.maximumRatio ?? 50, startDrag, moveDrag, stopDrag, keyResize };
 }

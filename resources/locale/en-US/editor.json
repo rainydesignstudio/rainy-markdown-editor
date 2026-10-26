@@ -31,7 +31,6 @@
     "saved": "Saved",
     "unsaved": "Unsaved",
     "metadataReadOnly": "Body is read-only while metadata has errors",
-    "notStored": "This article is not saved in a library yet. No article file is created before saving.",
     "lineToggle": "{{action}} (⌘/ / Ctrl+/)",
     "diagnosticsUnavailable": "Authoring diagnostics unavailable: {{message}}",
     "saveRefreshPreview": "Save to refresh preview",
@@ -46,7 +45,8 @@
     "preview": "Preview",
     "metadataPaused": "Metadata has errors · body editing is paused",
     "resize": "Resize source and preview",
-    "diagnostics": "Article diagnostics"
+    "diagnostics": "Article diagnostics",
+    "resizeReference": "Resize reference material and article preview"
   },
   "empty": {
     "chooseArticle": "Open an article or create a manuscript",
@@ -88,8 +88,8 @@
     "replacementPlaceholder": "Replace with",
     "replacement": "Replacement text",
     "readOnly": "Source is read-only or unavailable",
-    "replace": "Replace current match",
-    "replaceAll": "Replace all matches, undo in one step",
+    "replace": "Replace current match (Enter)",
+    "replaceAll": "Replace all matches, undo in one step (⌘Enter / Ctrl+Enter)",
     "allTitle": "Replace all",
     "queryLabel": "Find",
     "deleteMatches": "Delete matched content",

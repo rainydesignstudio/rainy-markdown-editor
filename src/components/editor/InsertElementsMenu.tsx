@@ -56,8 +56,8 @@ const STANDARD_GROUPS: InsertGroup[] = [
   },
 ];
 
-function InsertIcon({ name }: { name: InsertIconName }) {
-  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+export function InsertIcon({ name, className }: { name: InsertIconName; className?: string }) {
+  const common = { className, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   if (name === 'heading') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M5 5v14M19 5v14M5 12h14" /></svg>;
   if (name === 'quote') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M5 6v12m0-9h5m-5 5h5m4-8v12m0-9h5m-5 5h5" /></svg>;
   if (name === 'link') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M9.5 14.5 14.5 9.5m-7 8H6a4 4 0 0 1 0-8h4m4-4h4a4 4 0 0 1 0 8h-1" /></svg>;

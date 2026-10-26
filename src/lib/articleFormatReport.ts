@@ -5,12 +5,14 @@ import type { ThemeConfig } from './types';
 import { articleSourceLayout, parseArticle } from './frontMatter';
 import { themeAuthoredCss } from './themes';
 import { articleFormatSeverity, standardFormatIssue, validateRenderedArticleCss, type ArticleFormatIssue } from './articleFormat';
-import { assertCurrentFormat, getFormatSnapshot } from './article-format/runtime';
+import { assertCurrentFormat, getFormatSnapshot, getArticleRenderSnapshot } from './article-format/runtime';
 import { inspectRenderedFormat, type RenderedResourceFinding } from './article-format/frame';
 import { articleImageFileNameFromSource } from './articleMedia';
 import { prepareInspectionAssets } from './article-format/inspectionAssets';
 import { compileArticleStyles } from './article-format/renderer';
 import { validateArticleAuthoringMarkdown } from './articleAuthoringFormat';
+import { invokeRenderer, rendererAction } from './article-format/package';
+import { packageMeasurementServices, awaitPackagePreview, packageAuthoredMarkup, packageInputFor, packageObservations } from './article-format/packageRendering';
 
 export type FormatCheckSection = { passed: string[]; issues: ArticleFormatIssue[] };
 export type ArticleFormatReport = { theme: FormatCheckSection; body: FormatCheckSection; complete?: boolean; formatId?: string; bodyLineOffset?: number };
@@ -56,6 +58,19 @@ export async function inspectArticleFormatReport(source: string, theme: ThemeCon
   const snapshot = getFormatSnapshot();
   const parsed = parseArticle(source);
   const body = parsed.body;
+  if (snapshot.renderer) {
+    if (preview && options.deep !== false) await awaitPackagePreview(preview, body, theme, getArticleRenderSnapshot(preview), options.signal);
+    const input = preview ? packageInputFor(preview) : undefined;
+    const result = await invokeRenderer(snapshot, rendererAction(snapshot, 'validate')!.id, {
+      source: body, theme, deep: options.deep !== false,
+      ...(input && preview ? { html: packageAuthoredMarkup(preview), css: input.css, observations: packageObservations(preview) } : {}),
+    }, options.signal, packageMeasurementServices(snapshot));
+    if (typeof result.complete !== 'boolean' || !Array.isArray(result.issues) || !Array.isArray(result.passed)) throw new Error('Format validator returned an incomplete report');
+    const issues: ArticleFormatIssue[] = (result.issues ?? []).map(issue => ({ kind: 'element', name: snapshot.renderer!.declaration.id, source: 'format', tier: issue.severity === 'info' ? 'safe' : issue.severity, message: issue.message, line: issue.line, domain: 'standard' }));
+    if (media) issues.push(...await inspectArticleResources(body, media, { signal: options.signal, output: Boolean(options.purpose) }));
+    options.signal?.throwIfAborted(); assertCurrentFormat(snapshot);
+    return { theme: { passed: [], issues: [] }, body: { passed: result.passed ?? [], issues }, complete: result.complete === true && !issues.some(i => i.resourceState === 'pending'), formatId: snapshot.id, bodyLineOffset: articleSourceLayout(parsed).bodyLineOffset };
+  }
   const bodyPassed = new Set<string>();
   const bodyIssues = await validateArticleAuthoringMarkdown(body, '当前文章正文', bodyPassed, theme);
   if (options.purpose && preview?.querySelector('[data-render-kind="math"]')) bodyIssues.push({ kind: 'engine', name: productText('math.name'), source: '当前文章正文', tier: 'warning', ...productMessage('math.platform'), domain: 'product' });

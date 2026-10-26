@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { parseFragment } from 'parse5';
 import ts from 'typescript';
 import vm from 'node:vm';
+import { localResourceReference } from '../src/lib/resources/references.ts';
 import { embedClipboardImages } from '../src/lib/clipboardImages.ts';
 import { isApplicationExampleImage } from '../src/lib/articleExamples.ts';
 
@@ -73,7 +74,7 @@ function copyFixture({ decision=true, getFile=async()=>file(), placeholder=false
   const snapshot={revision:7,source:'body',theme:{},directory:{},month:'2026-10',folder:'test'};
   const policy = { configuration: structuredClone(DEFAULT_LIBRARY_CONFIGURATION) };
   policy.configuration.capabilities.copyRichText.enabled = allowCopy;
-  const context={Blob,Promise,Error,requestAnimationFrame:callback=>callback(),useCallback:callback=>callback,
+  const context={Blob,Promise,Error,localResourceReference,requestAnimationFrame:callback=>callback(),useCallback:callback=>callback,
     capabilityAllowed: key => libraryCapability(policy, key).enabled, getFormatSnapshot: () => policy, assertLibraryCapability,
     copyRequestRef:{current:0},mediaRefreshRevisionRef:{current:0},mediaOperationRef:{current:null},articleRef:{current:{dirty:false}},previewRef:{current:{querySelector:selector=>placeholder&&selector.includes('data-local-asset-src')?{}:null}},
     setLoadInspectionRevision(){},isReadyToCopy:true,snapshotFor:()=>snapshot,matchesSnapshot:()=>current,compiledRevision:7,compileCurrent:async()=>true,
@@ -94,7 +95,7 @@ test('formal copy writes one complete HTML/plain payload after the existing repo
   assert.deepEqual(Object.keys(representations),['text/html','text/plain']);
   const html=await representations['text/html'].text();assert.equal((html.match(/data:image\/png;base64,/g)||[]).length,2);
   assert.equal(await representations['text/plain'].text(),'before\nmiddle\nafter');assert.equal(f.statuses.at(-1).tone,'success');
-  const cancelled=copyFixture({decision:false});await cancelled.copy();assert.equal(cancelled.reads,0);assert.equal(cancelled.writes.length,0);
+  const cancelled=copyFixture({decision:false});await cancelled.copy();assert.equal(cancelled.reads,0);assert.equal(cancelled.writes.length,0);assert.equal(cancelled.statuses.length,0, 'an explicit cancellation is silent');
   const failedSave=copyFixture();failedSave.context.articleRef.current.dirty=true;failedSave.context.saveSnapshot=async()=>({ok:false});await failedSave.copy();assert.equal(failedSave.reads,0);assert.equal(failedSave.writes.length,0);
 });
 
@@ -119,4 +120,17 @@ test('copy capabilities block direct controller calls and a late denial leaves t
   const blocked=copyFixture({allowCopy:false});await blocked.copy();assert.equal(blocked.reads,0);assert.equal(blocked.writes.length,0);
   let finish, reads=0;const pending=copyFixture({getFile:()=>++reads===1?new Promise(resolve=>{finish=resolve}):Promise.resolve(file())});const copying=pending.copy();
   await pending.readStarted;pending.denyCopy();finish(file());await copying;assert.equal(pending.writes.length,0);assert.match(pending.statuses.at(-1).label,/不支持/);
+});
+
+test('shared and article images with the same filename are distinct reads, including source-set references', async () => {
+  const reads = [];
+  const result = await embedClipboardImages(payload('<picture><source srcset="/shared/image/a.png 1x"><img src="/shared/image/a.png"></picture><img src="media/image/a.png">'), async (name, source) => { reads.push([name, source]); return file(); }, () => true);
+  assert.deepEqual(reads, [['a.png', '/shared/image/a.png'], ['a.png', 'media/image/a.png']]);
+  assert.equal(result.embeddedImageCount, 2); assert.doesNotMatch(result.html, /(?:src|srcset)="(?:\/shared|media)/);
+});
+
+test('copy uses retained package image bytes instead of current library files or application examples', async () => {
+  const sources = ['media/image/a.png', '/images/article-sample.png', '/custom/image.png'];
+  const result = await embedClipboardImages(payload(sources.map(source => `<img src="${source}">`).join('')), async () => { throw Error('current file must not be read'); }, () => true, async () => { throw Error('current sample must not be read'); }, source => sources.includes(source) ? file() : null);
+  assert.equal(result.embeddedImageCount, 3); assert.equal((result.html.match(/data:image\/png;base64,/g) ?? []).length, 3);
 });

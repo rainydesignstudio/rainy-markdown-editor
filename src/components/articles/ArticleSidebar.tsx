@@ -156,7 +156,7 @@ export function ArticleSidebar({
     };
   }, []);
 
-  const closeAndSelect = (collection: 'all' | 'unclassified' | 'archived' | `project:${string}`) => {
+  const closeAndSelect = (collection: 'all' | 'unclassified' | 'archived' | 'trash' | `project:${string}`) => {
     controller.setArticleCollection(collection);
     onCloseMobile();
   };
@@ -277,6 +277,7 @@ export function ArticleSidebar({
                   <CollectionIcon kind="archived" /><CollectionLabel name={t('articles:collections.archived')} count={controller.orderedArchivedArticles.length} />
                 </button>
                 <div id="archived-article-rows" hidden={!archivedExpanded}>{archivedExpanded ? controller.orderedArchivedArticles.map(item => renderArticle(item, getArticleOrganization(controller.editorWorkspace, item.id).projectId, true)) : null}</div>
+                <button className="article-sidebar-link group/collection hover:bg-hover" type="button" data-active={controller.selectedArticleCollection === 'trash'} onClick={() => closeAndSelect('trash')}><CollectionIcon kind="archived" /><CollectionLabel name={t('messages:trash.title')} count={controller.trash.available.length} /></button>
               </section>
 
               <div className="article-sidebar-divider" aria-hidden="true" />

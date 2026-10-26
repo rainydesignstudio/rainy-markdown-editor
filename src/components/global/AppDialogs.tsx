@@ -17,6 +17,7 @@ import { FormatCheckDialog } from './FormatCheckDialog';
 import { CreateLibraryDialog } from '../settings/CreateLibraryDialog';
 import { MarkdownImportDialog } from '../imports/MarkdownImportDialog';
 import { ImportTasksDialog } from '../imports/ImportTasksDialog';
+import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from './DialogFrame';
 
 export function AppDialogs() {
   const { t } = useUITranslation('messages');
@@ -85,6 +86,7 @@ export function AppDialogs() {
     : articleInfoDialogOpen ? 'info'
     : projectDeleteTarget ? 'project-delete'
     : deleteTargets.length ? 'delete'
+    : controller.trash.confirmation ? 'trash-cleanup'
     : copyTarget ? 'copy'
     : controller.showThemeDialog ? 'theme'
     : showTemplateDialog ? 'template'
@@ -161,7 +163,12 @@ export function AppDialogs() {
         }}
         onConfirm={confirmCopy}
       /> : null}
-      {activeDialog === 'delete' && deleteTargets.length ? <DeleteDialog articles={deleteTargets} archived={getArticleOrganization(editorWorkspace, deleteTargets[0].id).archived} onClose={() => setDeleteTargets([])} onConfirm={confirmDelete} /> : null}
+      {activeDialog === 'delete' && deleteTargets.length ? <DeleteDialog articles={deleteTargets} trashEnabled={controller.articleSettings.trash.enabled} disabled={Boolean(controller.settingsIssue) || controller.trash.busy} archived={getArticleOrganization(editorWorkspace, deleteTargets[0].id).archived} onClose={() => setDeleteTargets([])} onConfirm={confirmDelete} /> : null}
+      {activeDialog === 'trash-cleanup' && controller.trash.confirmation ? <DialogFrame titleId="trash-cleanup-title" descriptionId="trash-cleanup-copy" role="alertdialog" onClose={controller.trash.closeConfirmation}>
+        <DialogHeader titleId="trash-cleanup-title" eyebrow={t('messages:trash.eyebrow')} title={t('messages:trash.cleanupTitle')} onClose={controller.trash.closeConfirmation} />
+        <div className="grid gap-4 p-4"><p className="break-all text-sm font-semibold text-primary">{controller.directoryName}/_trash/</p><p id="trash-cleanup-copy" className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong">{t('messages:trash.cleanupWarning', { count: controller.trash.confirmation.ids.length })}</p></div>
+        <DialogFooter><DialogActions><DialogButton autoFocus onClick={controller.trash.closeConfirmation}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={controller.trash.busy || !controller.articleSettings.trash.enabled || Boolean(controller.settingsIssue)} onClick={() => void controller.trash.confirmCleanup()}>{t('messages:trash.confirmCleanup')}</DialogButton></DialogActions></DialogFooter>
+      </DialogFrame> : null}
       {activeDialog === 'project-delete' && projectDeleteTarget ? <ProjectDeleteDialog
         name={projectDeleteTarget.name}
         busy={editorWorkspaceBusy}
@@ -176,7 +183,6 @@ export function AppDialogs() {
         stored={currentStored}
         folderName={controller.articleFolderName}
         onFolderName={controller.setArticleFolderName}
-        onRenameFolder={() => void controller.renameCurrentArticleFolder(controller.articleFolderName)}
         workspace={editorWorkspace}
         archived={controller.currentArticleIsArchived}
         busy={mediaOperation !== null || historyBusy || editorWorkspaceBusy}

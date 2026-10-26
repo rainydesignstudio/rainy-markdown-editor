@@ -3,6 +3,7 @@ import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import selectorParser from 'postcss-selector-parser';
 import type { StylesheetsPolicy } from './styleTypes';
+import { resolveLibraryResource, assertDeclaredResource, type ResourceResolution } from './resourcePaths';
 
 export const STYLE_LIMITS = Object.freeze({ cssBytes: 8 * 1024 * 1024, cssFileBytes: 1024 * 1024, cssFiles: 256, depth: 32, assets: 2048, assetBytes: 256 * 1024 * 1024, sourceFiles: 256 });
 export type CssAsset = Readonly<{ path: string; hash: string; mime: string; blob: Blob; url: string }>;
@@ -16,6 +17,7 @@ export type StylesheetEnvironment = Readonly<{
   sources: readonly StyleSource[];
   candidates: readonly string[];
   fingerprint: string;
+  resolution?: ResourceResolution;
   resolveCss: (css: string, source: string) => Promise<string>;
   dispose: () => void;
 }>;
@@ -41,7 +43,7 @@ export function normalizeLibraryPath(input: string, base = ''): string {
   if (!parts.length) throw new ProductError("styles.aResourcePathCannotReferToTheLibraryRootDirectory");
   return parts.join('/');
 }
-export function stylesheetAssetPath(uri: string, file: string, publicRoot: string): { path: string; suffix: string } | null {
+export function stylesheetAssetPath(uri: string, file: string, publicRoot: string, resolution?: ResourceResolution): { path: string; suffix: string } | null {
   if (!uri || uri.startsWith('#')) return null;
   if (/^data:/i.test(uri)) {
     if (!/^data:(?:image\/(?:png|jpe?g|gif|webp|avif|svg\+xml)|font\/(?:woff2?|ttf|otf));/i.test(uri)) throw new ProductError("styles.theTypeOfTheInlineStylesheetResourceIsUnsupported");
@@ -50,8 +52,9 @@ export function stylesheetAssetPath(uri: string, file: string, publicRoot: strin
   if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(uri)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.stylesheetResourcesMustBeWithinTheAuthorizedLibrary"), uri]) });
   const match = /^([^?#]*)(.*)$/.exec(uri)!;
   const suffix = match[2].includes('#') ? match[2].slice(match[2].indexOf('#')) : '';
-  const path = uri.startsWith('/') ? normalizeLibraryPath(publicRoot + '/' + match[1].slice(1)) : normalizeLibraryPath(match[1], file.split('/').slice(0, -1).join('/'));
-  if (uri.startsWith('/') && !path.startsWith(normalizeLibraryPath(publicRoot) + '/')) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.resourcePathLeavesTheVirtualWebsiteRoot"), uri]) });
+  const path = resolution ? resolveLibraryResource(match[1], resolution) : uri.startsWith('/') ? normalizeLibraryPath(publicRoot + '/' + match[1].slice(1)) : normalizeLibraryPath(match[1], file.split('/').slice(0, -1).join('/'));
+  assertDeclaredResource(path, resolution);
+  if (!resolution && uri.startsWith('/') && !path.startsWith(normalizeLibraryPath(publicRoot) + '/')) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.resourcePathLeavesTheVirtualWebsiteRoot"), uri]) });
   return { path, suffix };
 }
 export async function readLibraryFile(root: FileSystemDirectoryHandle, path: string): Promise<File> {
@@ -101,13 +104,13 @@ export function assertPortableStyles(css: string) {
     });
   });
 }
-function sourcePattern(params: string, base: string): StyleSource | null {
+function sourcePattern(params: string, base: string, resolution?: ResourceResolution): StyleSource | null {
   const parsed = valueParser(params).nodes.filter(node => node.type !== 'space' && node.type !== 'comment');
   const negative = parsed[0]?.type === 'word' && parsed[0].value === 'not';
   const first = parsed[negative ? 1 : 0];
   if (first?.type === 'function' && first.value === 'inline') return null;
   if (first?.type !== 'string') throw new ProductError("styles.directorySourceRequiresAnExplicitPathWithinTheLibrary");
-  return { base, pattern: normalizeLibraryPath(first.value, base), negative };
+  return { base, pattern: resolution ? resolveLibraryResource(first.value, resolution) : normalizeLibraryPath(first.value, base), negative };
 }
 function globPattern(pattern: string): RegExp {
   let result = '';
@@ -163,7 +166,7 @@ async function sourceCandidates(root: FileSystemDirectoryHandle, sources: StyleS
   }
   return [...candidates];
 }
-export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle, policy: StylesheetsPolicy): Promise<StylesheetEnvironment> {
+export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle, policy: StylesheetsPolicy, resolution?: ResourceResolution): Promise<StylesheetEnvironment> {
   if (!/\.css$/i.test(policy.entry)) throw new ProductError("styles.theStyleEntryMustBeACssFile");
   const rawFiles: Record<string, string> = {}, files: Record<string, string> = {};
   const assetPaths = new Set<string>(), sources: StyleSource[] = [];
@@ -172,6 +175,7 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
   const assets: CssAsset[] = [];
   let cssBytes = 0, assetBytes = 0;
   const load = async (path: string, chain: string[]): Promise<void> => {
+    assertDeclaredResource(path, resolution);
     if (!/\.css$/i.test(path)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.onlyCssFilesCanBeImported"), path]) });
     if (visiting.has(path)) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.circularCssImport"), [...chain, path].join(' → ')]) });
     if (complete.has(path)) return;
@@ -192,17 +196,20 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
         const id = importId(rule.params);
         if (!isTailwindImport(id)) {
           if (/^[a-z][a-z\d+.-]*:|^\/\//i.test(id)) throw rule.error(productText("styles.cssImportsMustRemainWithinTheAuthorizedLibrary"));
-          imports.push(normalizeLibraryPath(id, path.split('/').slice(0, -1).join('/')));
+          const dependency = resolution ? resolveLibraryResource(id, resolution) : normalizeLibraryPath(id, path.split('/').slice(0, -1).join('/'));
+          assertDeclaredResource(dependency, resolution);
+          imports.push(dependency);
+          if (resolution) rule.params = rule.params.replace(id, dependency);
         }
       } else if (rule.name === 'source') {
-        const source = sourcePattern(rule.params, path.split('/').slice(0, -1).join('/'));
+        const source = sourcePattern(rule.params, path.split('/').slice(0, -1).join('/'), resolution);
         if (source) sources.push(source);
       }
     });
     sheet.walkDecls(declaration => {
       if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw declaration.error(productText("styles.cssContainsExecutableContent"));
       urls(declaration.value, uri => {
-        const asset = stylesheetAssetPath(uri, path, policy.publicRoot);
+        const asset = stylesheetAssetPath(uri, path, policy.publicRoot, resolution);
         if (asset) { assetPaths.add(asset.path); assetOrigins.set(asset.path, [...chain, path].join(' → ')); }
         return uri;
       });
@@ -212,7 +219,8 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
     visiting.delete(path); complete.add(path);
   };
   try {
-    await load(normalizeLibraryPath(policy.entry), []);
+    const effectivePolicy = resolution ? { ...policy, entry: resolveLibraryResource(policy.entry, resolution) } : policy;
+    await load(normalizeLibraryPath(effectivePolicy.entry), []);
     for (const path of assetPaths) {
       const mime = MIME[path.split('.').at(-1)?.toLowerCase() ?? ''];
       if (!mime) throw new ProductError('shared.compose', { parts: productJoin([productReference("styles.unsupportedStylesheetResourceType"), path]) });
@@ -231,14 +239,18 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
       const sheet = postcss.parse(css, { from: path });
       sheet.walkDecls(declaration => {
         declaration.value = urls(declaration.value, uri => {
-          const ref = stylesheetAssetPath(uri, path, policy.publicRoot);
+          const ref = stylesheetAssetPath(uri, path, policy.publicRoot, resolution);
           return ref ? byPath.get(ref.path)!.url + ref.suffix : uri;
         });
+      });
+      if (resolution) sheet.walkAtRules('import', rule => {
+        const id = importId(rule.params);
+        if (!isTailwindImport(id)) rule.params = rule.params.replace(id, resolveLibraryResource(id, resolution));
       });
       files[path] = sheet.toString();
       definedCssClasses(css).forEach(name => classes.add(name));
     }
-    const fingerprint = await contentHash(JSON.stringify({ policy, files: rawFiles, assets: assets.map(asset => ({ path: asset.path, hash: asset.hash })) }));
+    const fingerprint = await contentHash(JSON.stringify({ policy: effectivePolicy, ...(resolution ? { resolution } : {}), files: rawFiles, assets: assets.map(asset => ({ path: asset.path, hash: asset.hash })) }));
     const candidates = await sourceCandidates(root, sources);
     const pendingAssets = new Map<string, Promise<CssAsset>>();
     let disposed = false;
@@ -271,7 +283,7 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
         if (/^(?:behavior|-moz-binding)$/i.test(declaration.prop) || /expression\s*\(|(?:javascript|vbscript)\s*:/i.test(declaration.value)) throw declaration.error(productText("styles.cssContainsExecutableContent"));
         urls(declaration.value, uri => {
           if (assets.some(asset => uri === asset.url || uri.startsWith(asset.url + '#'))) return uri;
-          const ref = stylesheetAssetPath(uri, source, policy.publicRoot);
+          const ref = stylesheetAssetPath(uri, source, policy.publicRoot, resolution);
           if (ref) references.set(uri, ref); return uri;
         });
       });
@@ -279,7 +291,7 @@ export async function loadStylesheetEnvironment(root: FileSystemDirectoryHandle,
       sheet.walkDecls(declaration => { declaration.value = urls(declaration.value, uri => { const ref = references.get(uri); return ref ? byPath.get(ref.path)!.url + ref.suffix : uri; }); });
       return sheet.toString();
     };
-    return Object.freeze({ policy: Object.freeze({ ...policy }), rawFiles: Object.freeze(rawFiles), files: Object.freeze(files), get assets() { return Object.freeze([...assets]); }, classes, sources: Object.freeze(sources), candidates: Object.freeze(candidates), fingerprint, resolveCss,
+    return Object.freeze({ policy: Object.freeze(effectivePolicy), ...(resolution ? { resolution } : {}), rawFiles: Object.freeze(rawFiles), files: Object.freeze(files), get assets() { return Object.freeze([...assets]); }, classes, sources: Object.freeze(sources), candidates: Object.freeze(candidates), fingerprint, resolveCss,
       dispose: () => { disposed = true; for (const asset of assets) URL.revokeObjectURL(asset.url); } });
   } catch (error) {
     for (const asset of assets) URL.revokeObjectURL(asset.url);

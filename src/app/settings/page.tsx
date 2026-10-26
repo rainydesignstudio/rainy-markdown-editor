@@ -9,16 +9,19 @@ export default function SettingsRoute() {
     <SettingsPanel
       key={controller.contentLibraryRootSession}
       root={controller.directory}
+      libraryReady={controller.editorAppearanceReady && controller.contentLibrariesState !== 'loading'}
       directoryName={controller.directoryName}
       rememberedDirectoryName={controller.rememberedDirectoryName}
       directoryRestoreState={controller.directoryRestoreState}
       directoryBookmarkIssue={controller.directoryBookmarkIssue}
-      directoryStatus={controller.status}
       fileSystemReady={controller.fileSystemReady}
       settings={controller.articleSettings}
       issue={controller.settingsIssue}
       notice={controller.settingsNotice}
       busy={controller.settingsBusy}
+      trashCount={controller.trash.available.length}
+      trashBusy={controller.trash.busy}
+      onClearTrash={() => controller.trash.requestCleanup()}
       workspace={controller.editorWorkspace}
       workspaceIssue={controller.editorWorkspaceIssue}
       workspaceBusy={controller.editorWorkspaceBusy}

@@ -67,7 +67,7 @@ test('designer independently edits 34 colors per mode and eight fonts without mu
   const view = designer(); const original = JSON.stringify(themes.BASE_EDITOR_THEME);
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 68);
   assert.equal(view.nodes().filter(node => node.type === 'button' && 'aria-expanded' in node.props).length, 2);
-  assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 8);
+  assert.equal(view.fontNodes().filter(node => node.type === 'select-field').length, 8);
   assert.equal(view.fontNodes().some(node => node.type === 'input' && ['number', 'range'].includes(node.props.type)), false);
   const before = view.preview();
   view.find(node => node.props['aria-label'] === 'light.canvas').props.onClick(); view.render();
@@ -96,10 +96,10 @@ test('designer keeps collapsible group headings outside independently scrolling 
   assert.equal(colors().props['aria-expanded'], false);
   assert.equal(fonts().props['aria-expanded'], true);
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 0);
-  assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 8);
+  assert.equal(view.fontNodes().filter(node => node.type === 'select-field').length, 8);
   colors().props.onClick(); fonts().props.onClick(); view.render();
   assert.equal(view.nodes().filter(node => node.props['data-color-swatch']).length, 68);
-  assert.equal(view.fontNodes().filter(node => node.type === 'select').length, 0);
+  assert.equal(view.fontNodes().filter(node => node.type === 'select-field').length, 0);
 });
 
 test('designer preview renders highlighted React nodes as content rather than serializing objects into HTML', () => {
@@ -118,8 +118,8 @@ test('designer preview renders highlighted React nodes as content rather than se
 
 test('each font setting has a visible preview consumer, including independent serif and subheading samples', () => {
   const view = designer();
-  view.find(node => node.props['aria-label'] === '字体：衬线文字').props.onChange({ target: { value: 'SampleSerif, serif' } }); view.render();
-  view.find(node => node.props['aria-label'] === '字体：列表与次级标题').props.onChange({ target: { value: 'SampleSubHeading, sans-serif' } }); view.render();
+  view.find(node => node.type === 'select-field' && node.props.label === '字体：衬线文字').props.onChange('SampleSerif, serif'); view.render();
+  view.find(node => node.type === 'select-field' && node.props.label === '字体：列表与次级标题').props.onChange('SampleSubHeading, sans-serif'); view.render();
   const preview = view.find(node => node.type?.name === 'Preview');
   const walk = node => Array.isArray(node) ? node.flatMap(walk) : node?.props ? [node, ...walk(node.props.children)] : [];
   const tree = preview.type(preview.props), nodes = walk(tree);
@@ -134,14 +134,14 @@ test('each font setting has a visible preview consumer, including independent se
 
 test('Songti writing and code-font selections remain independent in draft and preview', () => {
   const view = designer();
-  const writing = view.find(node => node.props['aria-label'] === '字体：文章写作源码');
+  const writing = view.find(node => node.type === 'select-field' && node.props.label === '字体：文章写作源码');
   const songti = fontCatalog.SYSTEM_SERIF_FONT;
   const previousCode = view.preview().fonts.editorSource;
-  writing.props.onChange({ target: { value: songti } }); view.render();
-  const code = view.find(node => node.props['aria-label'] === '字体：代码源码');
+  writing.props.onChange(songti); view.render();
+  const code = view.find(node => node.type === 'select-field' && node.props.label === '字体：代码源码');
   assert.equal(view.preview().fonts.articleSource, songti);
   assert.equal(view.preview().fonts.editorSource, previousCode);
-  assert.ok(code.props.children.every(option => /monospace/.test(option.props.value)));
+  assert.ok(code.props.options.every(option => /monospace/.test(option.value)));
   const preview = view.find(node => node.type?.name === 'Preview');
   const tree = preview.type(preview.props);
   assert.equal(tree.props.children.props.style['--font-article-source'], songti);

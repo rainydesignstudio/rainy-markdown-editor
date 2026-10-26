@@ -94,7 +94,8 @@
     "placeholder": "Enter an article title",
     "month": "Saved month",
     "allMonths": "All months",
-    "clear": "Clear filters"
+    "clear": "Clear filters",
+    "sort": "Sort"
   },
   "categories": {
     "title": "Categories",
@@ -113,7 +114,8 @@
     "scope_one": "Scope: filtered results in {{name}}; {{count}} article affected.",
     "scope_other": "Scope: filtered results in {{name}}; {{count}} articles affected.",
     "query": "Search: {{query}}.",
-    "month": "Month: {{month}}."
+    "month": "Month: {{month}}.",
+    "more": "More tags"
   },
   "selection": {
     "enter": "Enter selection mode",
@@ -172,5 +174,13 @@
     "version": "Theme “{{name}}” version {{version}}"
   },
   "documentUnit_one": "manuscript",
-  "documentUnit_other": "manuscripts"
+  "documentUnit_other": "manuscripts",
+  "sort": {
+    "updated-desc": "Updated: newest first",
+    "updated-asc": "Updated: oldest first",
+    "created-desc": "Created: newest first",
+    "created-asc": "Created: oldest first",
+    "title-asc": "Title: A–Z",
+    "title-desc": "Title: Z–A"
+  }
 }

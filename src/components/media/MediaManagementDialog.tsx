@@ -1,5 +1,7 @@
 'use client';
 
+import { OperationFeedback } from '../global/OperationFeedback';
+import { SelectField } from '../global/SelectField';
 import { formatProductMessage, productCause, productDiagnosticReference, productErrorMessage, productJoin, productMessage } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
@@ -12,7 +14,8 @@ import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } 
 import { MediaIcon, mediaAssetKey } from './MediaGallery';
 import { useDraftLocation, useEditingDraft } from '../global/EditingDrafts';
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
-export function MediaManagementDialog({ request, articles, busy, isCurrent, currentReferences, scanReferences, onSubmit, onClose }: {
+export function MediaManagementDialog({ feedbackId = 'media-management', request, articles, busy, isCurrent, currentReferences, scanReferences, onSubmit, onClose }: {
+  feedbackId?: string;
   request: MediaEditRequest; articles: ArticleSummary[]; busy: boolean; isCurrent: () => boolean;
   currentReferences: number | null;
   scanReferences: (assets: LibraryMediaAsset[], signal: AbortSignal) => Promise<MediaReferenceScan>;
@@ -74,16 +77,15 @@ export function MediaManagementDialog({ request, articles, busy, isCurrent, curr
   };
   const disabled = locked || scanning || !isCurrent() || request.type === 'rename' && !name.trim() || request.type === 'replace' && !file || request.type === 'transfer' && !destination;
   return <><DialogFrame titleId="media-management-title" focusActive={!departure} onClose={close} dismissible={!locked} role={request.type === 'delete' ? 'alertdialog' : 'dialog'}>
-    <DialogHeader titleId="media-management-title" eyebrow={t(hasFiles ? 'messages:resources.managementEyebrow' : 'common:eyebrows.imageManagement')} title={t((hasFiles ? 'messages:resources.managementTitles.' : 'dialogs:mediaTitles.') + request.type)} onClose={close} closeDisabled={locked} />
+    <DialogHeader actions={<OperationFeedback id={feedbackId} notice={notice} tone={notice?.tone} />} titleId="media-management-title" eyebrow={t(hasFiles ? 'messages:resources.managementEyebrow' : 'common:eyebrows.imageManagement')} title={t((hasFiles ? 'messages:resources.managementTitles.' : 'dialogs:mediaTitles.') + request.type)} onClose={close} closeDisabled={locked} />
     <div className="grid min-w-0 gap-4 p-4">
       <p className="break-all text-sm text-secondary">{request.assets.length === 1 ? asset.fileName : t(hasFiles ? 'messages:resources.selectedFiles' : 'dialogs:templates.selectedImages', { count: request.assets.length })}</p>
       {request.assets.length > 1 ? <ul className="max-h-28 overflow-x-clip overflow-y-auto break-all text-xs text-muted">{request.assets.map(asset => <li key={`${asset.kind}:${asset.kind === 'article' ? asset.articleId : 'shared'}:${asset.fileName}`}>{asset.fileName}</li>)}</ul> : null}
       {request.type === 'rename' ? <label className="field-stack"><span className="field-label">{t('dialogs:ui.filenameWithoutExtension')}</span><input autoFocus className="field" value={name} onChange={event => setName(event.target.value)} disabled={locked} /><span className="text-xs text-muted">{asset.storage === 'file' ? t(asset.kind === 'article' ? 'messages:resources.renameHelp' : 'messages:resources.sharedRenameHelp') : asset.kind === 'article' ? t('dialogs:ui.updateCurrentBodyReferencesAndRetainOriginalFiles') : t('dialogs:ui.renameTheSharedFileExistingAdoptedArticleCopies')}</span></label> : null}
       {request.type === 'describe' ? <label className="field-stack"><span className="field-label">{t('dialogs:ui.descriptionAlternative')}</span><textarea className="field min-h-28" value={description} onChange={event => setDescription(event.target.value)} disabled={locked} placeholder={t('dialogs:ui.optional')} /><span className="text-xs text-muted">{t('dialogs:ui.savedAsAssetMetadataExistingBodyAltText')}</span></label> : null}
       {request.type === 'replace' ? <><label className="field-stack"><span className="field-label">{t(asset.storage === 'file' ? 'messages:resources.chooseReplacementFile' : 'dialogs:ui.chooseReplacementImage')}</span><input className="field" type="file" accept={asset.storage === 'file' ? undefined : 'image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif'} disabled={locked} onChange={event => setFile(event.target.files?.[0])} /></label><p className="text-xs text-muted">{asset.kind === 'article' ? t('dialogs:ui.updateCurrentArticleImageReferencesAndRetainHistorical') : t('dialogs:ui.replaceTheSharedOriginalAdoptedArticleCopiesRemain')}</p></> : null}
-      {request.type === 'transfer' ? <label className="field-stack"><span className="field-label">{t('dialogs:ui.destination')}</span><select className="field" value={destination} disabled={locked} onChange={event => setDestination(event.target.value)}><option value="">{t('dialogs:ui.choose')}</option><option value="shared">{t('dialogs:ui.sharedAssets')}</option>{articles.map(article => <option key={article.id} value={article.id}>{article.parse.metadata.title}</option>)}</select><span className="text-xs text-muted">{t('dialogs:ui.unreferencedFilesAreMovedReferencedFilesAreCopied')}</span></label> : null}
+      {request.type === 'transfer' ? <label className="field-stack"><span className="field-label">{t('dialogs:ui.destination')}</span><SelectField label={t('dialogs:ui.destination')} value={destination} disabled={locked} onChange={nextValue => setDestination(nextValue)} options={[{ value: "", label: t('dialogs:ui.choose') }, { value: "shared", label: t('dialogs:ui.sharedAssets') }, ...(articles.map(article => ({ value: article.id, label: article.parse.metadata.title })) ?? [])]} /><span className="text-xs text-muted">{t('dialogs:ui.unreferencedFilesAreMovedReferencedFilesAreCopied')}</span></label> : null}
       {request.type === 'delete' ? <p className="rounded-lg border border-danger bg-danger-surface p-3 text-sm text-danger">{t(hasFiles ? 'messages:resources.confirmDelete' : 'dialogs:ui.confirmationPermanentlyDeletesSelectedImageFilesTheWorkspace')}</p> : null}
-      {notice ? <p className="status-copy break-words text-sm" data-tone={notice.tone} role="status">{formatProductMessage(notice, t)}</p> : null}
     </div>
     <DialogFooter><DialogActions>
       {showReferences ? <><p className="mr-auto min-w-0 basis-full self-center text-xs text-muted md:flex-1" role="status">{scanning ? t('dialogs:ui.scanningPleaseWait') : scanned ? t('dialogs:templates.workspaceReferences', { current: scanned.current === null ? t('dialogs:ui.noCurrentManuscriptOpen') : t('dialogs:templates.currentReferences', { count: scanned.current }), count: scanned.workspace, warning: scanned.issues.length ? t('dialogs:ui.someReferencesUnchecked') : '' }) : t('dialogs:templates.notScanned', { current: currentReferences === null ? t('dialogs:ui.noCurrentManuscriptOpen') : t('dialogs:templates.currentBodyReferences', { count: currentReferences }) })}</p><DialogButton disabled={locked || scanning} title={t('dialogs:ui.thisArticleUsesTheCurrentDraftWorkspaceCounts')} onClick={() => void scan()}><MediaIcon name="search" />{t('dialogs:ui.scanReferences')}</DialogButton></> : null}

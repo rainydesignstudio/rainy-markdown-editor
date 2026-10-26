@@ -8,7 +8,7 @@ import { JSDOM } from 'jsdom';
 import { DEFAULT_FORMAT_BUNDLE, canonicalFormatJson, compileFormatBundle } from '../src/lib/article-format/config.ts';
 import { DEFAULT_ALGORITHMS, algorithmHash, readLibraryAlgorithms, initializeLibraryAlgorithms, validateAlgorithmPackage, validateAlgorithmManifest } from '../src/lib/article-format/algorithms.ts';
 import { activateFormatBundle, assertCurrentFormat, getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
-import { activateLibraryFormat, initializeLibraryFormat, readLibraryFormat } from '../src/lib/article-format/library.ts';
+import { activateLibraryFormat, initializeLibraryFormat, readLibraryFormat, getPublicPlatformPreset } from '../src/lib/article-format/library.ts';
 
 function library() {
   const files = new Map(), dirs = new Set(['']), reads = [], writes = [];
@@ -65,6 +65,42 @@ test('old-library fallback is explicit, read-only and unavailable capabilities r
   await assert.rejects(readLibraryAlgorithms(fixture.root, compileFormatBundle(DEFAULT_FORMAT_BUNDLE)), /missing/);
 });
 
+test('empty initialization includes a pinned interpreter, trio and empty algorithms without fallback', async t => {
+  t.after(() => activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), null, 'built-in'));
+  const fixture = library(), preset = getPublicPlatformPreset('empty');
+  await initializeLibraryFormat(fixture.root, 'empty');
+  assert.deepEqual([...fixture.files.keys()].sort(), ['format/LICENSES.txt', 'format/algorithms/manifest.json', 'format/config.json', 'format/engine.js', 'format/format-support.json', 'format/formatter.json', 'format/renderer.js', 'format/validator.json']);
+  assert.deepEqual(JSON.parse(fixture.files.get('format/algorithms/manifest.json')), { schemaVersion: 2, components: [] });
+  assert.deepEqual((await readLibraryFormat(fixture.root)).bundle, preset.bundle);
+  const result = await activateLibraryFormat(fixture.root, () => true);
+  assert.equal(result.message, null); assert.equal(result.snapshot.error, null);
+  assert.equal(result.snapshot.algorithmSource, 'library');
+  assert.deepEqual(result.snapshot.algorithms.manifest.components, []);
+  assert.deepEqual(result.snapshot.algorithms.files, {});
+  assert.equal(result.snapshot.algorithms.fingerprint, preset.algorithms.fingerprint);
+  assert.equal(result.snapshot.bundle.formatter.preview.dark.transform, 'preserve');
+});
+
+test('empty configuration errors never pass, and selecting another preset never overwrites either existing library', async t => {
+  t.after(() => activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), null, 'built-in'));
+  for (const [first, second] of [['empty', 'wechat-article'], ['wechat-article', 'empty']]) {
+    const fixture = library(); await initializeLibraryFormat(fixture.root, first);
+    const before = [...fixture.files];
+    await initializeLibraryFormat(fixture.root, second);
+    assert.deepEqual([...fixture.files], before);
+  }
+  const fixture = library(); await initializeLibraryFormat(fixture.root, 'empty');
+  const manifestPath = 'format/algorithms/manifest.json', original = fixture.files.get(manifestPath);
+  for (const value of [undefined, '{', '{"schemaVersion":9,"components":[]}']) {
+    if (value === undefined) fixture.files.delete(manifestPath); else fixture.files.set(manifestPath, value);
+    const result = await activateLibraryFormat(fixture.root, () => true);
+    assert.equal(result.snapshot.source, 'invalid'); assert.ok(result.message);
+  }
+  fixture.files.set(manifestPath, original);
+  fixture.files.delete('format/formatter.json');
+  assert.equal((await activateLibraryFormat(fixture.root, () => true)).snapshot.source, 'invalid');
+});
+
 test('static hosting confines Blob script permission to the opaque component runner', async () => {
   const source = await readFile(new URL('../scripts/start-static.mjs', import.meta.url), 'utf8');
   const methods = source.slice(source.indexOf('function inlineScriptHashes'), source.indexOf('const server ='));
@@ -95,7 +131,7 @@ test('library code loads only as inert data; component changes invalidate snapsh
   assert.throws(() => { first.algorithms.files['mp-darkmode.js'] = 'changed'; });
 });
 test('bad files or missing declared capabilities invalidate activation instead of passing with defaults', async () => {
-  const fixture = library(); await initializeLibraryFormat(fixture.root);
+  const fixture = library(); await initializeLibraryFormat(fixture.root); fixture.files.delete('format/config.json');
   fixture.files.set('format/algorithms/mp-darkmode.js', 'tampered');
   const activated = await activateLibraryFormat(fixture.root, () => true);
   assert.equal(activated.snapshot.source, 'invalid'); assert.match(activated.message, /校验失败/);
@@ -107,7 +143,7 @@ test('bad files or missing declared capabilities invalidate activation instead o
 });
 
 test('disabled standards still load the full trio and validate algorithm hashes; formatter transforms stay independent', async () => {
-  const fixture = library(); await initializeLibraryFormat(fixture.root);
+  const fixture = library(); await initializeLibraryFormat(fixture.root); fixture.files.delete('format/config.json');
   const raw = structuredClone(DEFAULT_FORMAT_BUNDLE); raw.validator.meta.enabled = false;
   fixture.files.set('format/validator.json', JSON.stringify(raw.validator));
   const first = await activateLibraryFormat(fixture.root, () => true);

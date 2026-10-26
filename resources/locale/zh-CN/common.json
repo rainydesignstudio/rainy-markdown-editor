@@ -5,7 +5,11 @@
   },
   "loading": {
     "label": "正在载入资料库",
-    "message": "首次打开需加载应用和字体，请稍候……"
+    "message": "正在载入应用与资料库，请稍候……",
+    "failed": "资料库载入未完成",
+    "retry": "重试载入",
+    "choose": "选择资料库",
+    "continue": "继续查看"
   },
   "language": {
     "title": "界面语言",
@@ -43,7 +47,23 @@
     "invalid": "时间无效"
   },
   "feedback": {
-    "dismiss": "关闭提示"
+    "locked": "问题解决后可关闭",
+    "actionFailed": "操作未完成，请查看详情",
+    "dismiss": "关闭提示",
+    "details": "详情",
+    "optionUnavailable": "选项不可用",
+    "noDetails": "暂无操作详情",
+    "retryRefresh": "重试刷新",
+    "operationDetails": "操作详情",
+    "indexDiagnostics": "索引诊断",
+    "libraryDiagnostics": "资料库诊断",
+    "formatDiagnostics": "格式诊断",
+    "showDetails": "查看详情",
+    "hideDetails": "收起详情",
+    "emptyContent": "内容为空",
+    "previewProblems": "预览问题",
+    "fileProblems": "文件问题（{{count}}）",
+    "configProblems": "配置问题"
   },
   "eyebrows": {
     "forkManuscript": "FORK MANUSCRIPT",
@@ -75,5 +95,17 @@
     "templateCategory": "TEMPLATE CATEGORY",
     "releaseNotes": "RELEASE NOTES",
     "theme": "THEME"
+  },
+  "selection": {
+    "back": "返回上一级",
+    "empty": "没有可选项",
+    "groups": {
+      "images": "图像与设计",
+      "documents": "文档与阅读",
+      "data": "数据与表格",
+      "development": "开发文件",
+      "media": "影音",
+      "other": "其他"
+    }
   }
 }

@@ -11,11 +11,11 @@ export function cachedArticleImage(root: FileSystemDirectoryHandle, articleId: s
   return roots.get(root)?.get(cacheKey(articleId, name, scope))?.value ?? null;
 }
 /** Bounded immutable File snapshots; object URLs remain owned by each existing preview. */
-export async function readArticleImage(root: FileSystemDirectoryHandle, destination: ResourceDestination & { kind: 'article' }, name: string, scope: string | number, current: () => boolean): Promise<CachedArticleImage> {
+export async function readArticleImage(root: FileSystemDirectoryHandle, destination: ResourceDestination, name: string, scope: string | number, current: () => boolean): Promise<CachedArticleImage> {
   if (!current()) throw new ProductError('resources.changed');
   if (await queryDirectoryReadWritePermission(root) !== 'granted') throw new ProductError('resources.libraryRequired');
   let cache = roots.get(root); if (!cache) { cache = new Map(); roots.set(root, cache); }
-  const key = cacheKey(destination.articleId, name, scope); let entry = cache.get(key);
+  const key = cacheKey(destination.kind === 'shared' ? '@shared' : destination.articleId, name, scope); let entry = cache.get(key);
   if (entry) { cache.delete(key); cache.set(key, entry); }
   else {
     const row = {} as Entry;
@@ -23,7 +23,8 @@ export async function readArticleImage(root: FileSystemDirectoryHandle, destinat
       const directory = await getResourceDirectory(root, destination, 'image', false, current);
       if (!directory) throw new DOMException('Missing image directory', 'NotFoundError');
       const handle = await directory.getFileHandle(name), path = await root.resolve(handle);
-      if (path?.join('/') !== ['articles', destination.month, destination.folder, 'media', 'image', name].join('/')) throw new ProductError('resources.unsafeTarget');
+      const expected = destination.kind === 'shared' ? ['shared', 'image', name] : ['articles', destination.month, destination.folder, 'media', 'image', name];
+      if (path?.join('/') !== expected.join('/')) throw new ProductError('resources.unsafeTarget');
       const file = await handle.getFile(), format = await inspectArticleImage(file);
       if (!current()) throw new ProductError('resources.changed');
       row.value = { handle, file, mimeType: format.mimeType, size: file.size }; return row.value;

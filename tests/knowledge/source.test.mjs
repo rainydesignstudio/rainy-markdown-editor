@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { connectKnowledgeSource, restoreKnowledgeSource, readKnowledgeBinding, knowledgePath, validKnowledgeBinding } from '../../src/lib/knowledge/source.ts';
+import { connectKnowledgeSource, reconnectKnowledgeSource, restoreKnowledgeSource, readKnowledgeBinding, knowledgePath, validKnowledgeBinding } from '../../src/lib/knowledge/source.ts';
 import { tree, snapshot, allCounts, bookmarks } from './fs-fixture.mjs';
 
 test('binding writes only library metadata; browsing returns read-only data with zero source changes', async () => {
@@ -112,4 +112,23 @@ test('a canonical-looking source alias cannot read a file outside the granted so
   await assert.rejects(reader.readFile('file-alias.md'), error => error.messageKey === 'knowledge.invalidPath');
   await assert.rejects(Array.fromAsync(reader.list()), error => error.messageKey === 'knowledge.invalidPath');
   assert.equal(allCounts(outside).reads, 0); assert.equal(allCounts(outside).writes, 0);
+});
+
+test('relocating the same source after bookmark loss retains its ID and all research bytes', async () => {
+  const library = tree('library'), original = tree('notes', { 'a.md': 'A' }), store = bookmarks();
+  const first = await connectKnowledgeSource(library, original, store), id = first.binding.sourceId;
+  library.seed('knowledge/research-' + id + '.json', 'saved topics and citation origins'); const before = snapshot(library);
+  await store.remove(id); assert.equal((await restoreKnowledgeSource(library, store)).status, 'needs-source');
+  const restored = await reconnectKnowledgeSource(library, original, store); assert.equal(restored.binding.sourceId, id);
+  assert.equal(snapshot(library), before); assert.equal((await restoreKnowledgeSource(library, store)).status, 'ready');
+  await assert.rejects(reconnectKnowledgeSource(library, tree('other'), store), error => error.messageKey === 'knowledge.relocateMismatch');
+  assert.equal(snapshot(library), before); assert.equal(allCounts(original).writes, 0);
+});
+test('relocation rejects copied-library bookmarks, denied reads, overlaps and stale sessions', async () => {
+  const root = tree('library'), original = tree('notes'), store = bookmarks(); const first = await connectKnowledgeSource(root, original, store);
+  const copy = tree('copied', { 'knowledge/binding.json': JSON.stringify(first.binding) }); const before = snapshot(copy);
+  await assert.rejects(reconnectKnowledgeSource(copy, original, store)); assert.equal(snapshot(copy), before);
+  original.permission = 'denied'; await assert.rejects(reconnectKnowledgeSource(root, original, store)); original.permission = 'granted';
+  await assert.rejects(reconnectKnowledgeSource(root, root, store)); await assert.rejects(reconnectKnowledgeSource(root, original, store, () => false));
+  assert.equal((await restoreKnowledgeSource(root, store)).binding.sourceId, first.binding.sourceId);
 });

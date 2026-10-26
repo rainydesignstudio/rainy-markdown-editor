@@ -13,5 +13,6 @@ test-results/
 /data/
 /resources/presets/platform/*
 !/resources/presets/platform/wechat-article/
+!/resources/presets/platform/empty/
 /*.zip
 /resources/changelog/local.md

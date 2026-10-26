@@ -72,10 +72,12 @@ test('swatches expose name above HEX, omit unmatched names, and keep child contr
   assert.equal(tree.props['aria-label'], 'light.canvas');
   assert.equal(tree.props.title, undefined);
   assert.deepEqual(walk(tree.props.tooltip).filter(node => node.props['data-tailwind-color-name'] || node.props['data-color-hex']).map(node => node.props.children), ['slate-100', '#F1F5F9']);
-  h.setProps({ ...props, color: '#123456' }); tree = h.render('ColorSwatchButton');
+  h.setProps({ ...props, color: '#123456', description: 'This color is not used in the current preview sample.' }); tree = h.render('ColorSwatchButton');
   assert.deepEqual(walk(tree.props.tooltip).filter(node => node.props['data-tailwind-color-name'] || node.props['data-color-hex']).map(node => node.props.children), ['#123456'], 'stale matches disappear before the effect runs');
   h.flush(); tree = h.render('ColorSwatchButton');
   assert.equal(tree.props.style.backgroundColor, '#123456');
+  assert.equal(walk(tree.props.tooltip).at(-1).props.children, 'This color is not used in the current preview sample.');
+  assert.equal(tree.props.description, undefined, 'description belongs to the popup rather than leaking to the button');
   h.setProps({ color: '#000000', colorName: 'black', children: '纯黑' });
   h.render('ColorSwatchButton'); h.flush(); tree = h.render('ColorSwatchButton');
   assert.equal(tree.props.children, '纯黑');

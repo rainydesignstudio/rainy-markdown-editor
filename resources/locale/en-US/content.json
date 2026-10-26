@@ -63,7 +63,8 @@
     "localLibrary": "Local library",
     "loading": "Loading",
     "editingUnavailable": "Editing unavailable",
-    "unnamed": "Unnamed"
+    "unnamed": "Unnamed",
+    "snippetCopyName": "{{name}} copy"
   },
   "templates": {
     "articleCategories": "Article categories: {{categories}}",

@@ -5,15 +5,16 @@ import { formatUINumber } from '../../lib/i18n/formatters';
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export function PanelHeading({ title, icon, count, expanded, reserveAction = false, details, className = '', children, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'title'> & {
-  title: ReactNode; icon?: ReactNode; count?: number; expanded?: boolean; reserveAction?: boolean; details?: ReactNode;
+export function PanelHeading({ title, icon, count, expanded, reserveAction = false, details, compact = false, variant = 'panel', as: Trigger = 'button', className = '', children, ...props }: Omit<ButtonHTMLAttributes<HTMLElement>, 'title'> & {
+  title: ReactNode; icon?: ReactNode; count?: number; expanded?: boolean; reserveAction?: boolean; details?: ReactNode; compact?: boolean; variant?: 'panel' | 'choice'; as?: 'button' | 'summary';
 }) {
   const { locale } = useUILocale();
-  const heading = <>{icon}<span className="min-w-0 flex-1 truncate">{title}</span>{reserveAction ? <span className="size-8 shrink-0" aria-hidden="true" /> : null}{count !== undefined ? <span className="w-6 shrink-0 text-center font-mono text-xs font-normal text-faint">{formatUINumber(count, locale)}</span> : null}
-    {expanded !== undefined ? <svg className="size-4 shrink-0 text-faint group-aria-expanded/panel:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg> : children}</>;
-  return <button {...props} type="button" className={`panel-heading group/panel ${className}`} aria-expanded={expanded}>
+  const chevron = expanded !== undefined || Trigger === 'summary' ? <svg className={`${compact ? 'size-3' : 'size-4'} shrink-0 text-faint transition-transform group-aria-expanded/panel:rotate-90 group-open/panel:rotate-90 motion-reduce:transition-none`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg> : null;
+  const heading = <>{compact && variant !== 'choice' ? chevron : icon}<span className="min-w-0 flex-1 truncate">{title}</span>{reserveAction ? <span className="size-8 shrink-0" aria-hidden="true" /> : null}{count !== undefined ? <span className="w-6 shrink-0 text-center font-mono text-xs font-normal text-faint">{formatUINumber(count, locale)}</span> : null}
+    {variant === 'choice' ? <>{children}{chevron}</> : compact ? children : chevron ?? children}</>;
+  return <Trigger {...props} type={Trigger === 'button' ? 'button' : undefined} className={`panel-heading group/panel ${variant === 'choice' ? 'min-h-9 gap-2 rounded-md px-2 py-2 font-sans text-xs font-normal text-popup-text' : compact ? 'list-none gap-2 rounded-none py-2 font-sans text-xs font-normal text-muted' : ''} ${className}`} aria-expanded={expanded}>
     {details ? <><span className="flex w-full min-w-0 items-center gap-2">{heading}</span>{details}</> : heading}
-  </button>;
+  </Trigger>;
 }
 
 export function PanelIcon({ kind }: { kind: 'colors' | 'fonts' | 'nodes' | 'issues' }) {

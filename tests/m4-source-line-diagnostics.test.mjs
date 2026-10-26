@@ -38,6 +38,7 @@ test('source editor renders one gutter number per logical line and exposes issue
     if (id.endsWith('/sourceSearch')) return sourceSearch;
     if (id.endsWith('/sourceViewport')) return sourceViewport;
     if (id.endsWith('/SourceFindBar')) return { SourceFindBar: 'source-find', FindIcon: 'find-icon' };
+    if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
     if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
     if (id === 'react') return { forwardRef: render => render, useRef: initial => ({ current: initial }), useState: initial => [initial, () => {}], useMemo: calculate => calculate(), useLayoutEffect() {} };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
@@ -59,4 +60,21 @@ test('source editor renders one gutter number per logical line and exposes issue
   assert.match(numbers[0].props['aria-label'], /第 2 行错误：div：不支持/);
   assert.equal(nodes.filter(node => node.type === 'span' && node.props['aria-hidden'] === 'true' && [1, 3].includes(node.props.children)).length, 2);
   assert.equal(nodes.find(node => node.type === 'textarea').props.value, '甲\n\n乙');
+
+  const long = '  - 模块：社媒、联络、导航、页尾、十至二十来个模块（横向滚动栏；图片栏；服务/博客/产品/FAQ卡片等等）';
+  for (const eol of ['\n', '\r\n']) for (const lineOffset of [0, 11]) {
+    const value = [long, '  - 页面：条例条款、用户隐私、品牌/公司简介等等', '下一行'].join(eol);
+    const rendered = all(module.exports.SnippetTextarea({ value, snippets: [], showLineNumbers: true, lineOffset, onChange() {} }, null));
+    const gutter = rendered.find(node => node.type === 'pre' && Array.isArray(node.props.children) && node.props.children[0]?.props?.className === 'relative');
+    assert.ok(gutter, 'gutter shares the preformatted flow instead of separate wrapping blocks');
+    assert.equal(gutter.props.children.length, 3);
+    const emitted = gutter.props.children.map((row, index) => {
+      assert.equal(row.type, 'span');
+      assert.equal(row.props.children[0].props.children, lineOffset + index + 1);
+      const text = all(row).find(node => node.props.className === 'invisible').props.children;
+      return text + (row.props.children.at(-1) ?? '');
+    }).join('');
+    assert.equal(emitted, value.replaceAll('\r\n', '\n'), 'real line breaks and indentation survive the mirror');
+    assert.equal(rendered.find(node => node.type === 'textarea').props.value, value, 'source text stays untouched');
+  }
 });

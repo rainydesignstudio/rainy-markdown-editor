@@ -5,7 +5,11 @@
   },
   "loading": {
     "label": "Loading library",
-    "message": "The first load includes the app and fonts. Please wait…"
+    "message": "Loading the app and library. Please wait…",
+    "failed": "Library loading did not complete",
+    "retry": "Retry loading",
+    "choose": "Choose library",
+    "continue": "Continue viewing"
   },
   "language": {
     "title": "Interface language",
@@ -43,7 +47,23 @@
     "invalid": "Invalid date"
   },
   "feedback": {
-    "dismiss": "Dismiss notification"
+    "locked": "Available after the issue is resolved",
+    "actionFailed": "Action incomplete; review details",
+    "dismiss": "Dismiss notification",
+    "details": "Details",
+    "optionUnavailable": "Option unavailable",
+    "noDetails": "No action details",
+    "retryRefresh": "Retry refresh",
+    "operationDetails": "Action details",
+    "indexDiagnostics": "Index diagnostics",
+    "libraryDiagnostics": "Library diagnostics",
+    "formatDiagnostics": "Format diagnostics",
+    "showDetails": "Show details",
+    "hideDetails": "Hide details",
+    "emptyContent": "No content",
+    "previewProblems": "Preview problems",
+    "fileProblems": "File problems ({{count}})",
+    "configProblems": "Configuration problems"
   },
   "eyebrows": {
     "forkManuscript": "FORK MANUSCRIPT",
@@ -75,5 +95,17 @@
     "templateCategory": "TEMPLATE CATEGORY",
     "releaseNotes": "RELEASE NOTES",
     "theme": "THEME"
+  },
+  "selection": {
+    "back": "Back",
+    "empty": "No options available",
+    "groups": {
+      "images": "Images and design",
+      "documents": "Documents and reading",
+      "data": "Data and tables",
+      "development": "Development",
+      "media": "Audio and video",
+      "other": "Other"
+    }
   }
 }
