@@ -2,6 +2,8 @@
 
 简体中文 · [English](../en-US/THEME.md) · [项目入口](../../../README.md)
 
+Agent执行任务前，按[持续查阅要求](AGENT-GUIDE.md#doc-manual-use)核对本手册的必读范围。
+
 面向为 Rainy 文稿台制作内容的 Agent 和作者。安装与编号教程见 [AGENT-GUIDE.md](AGENT-GUIDE.md)，项目入口见 [README.md](README.md)。
 
 ## 先分清产物

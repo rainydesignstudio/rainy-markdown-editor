@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -90,7 +90,9 @@ Copy this request into a clean Agent conversation with little unrelated context:
 
 > Read this project's README.md, docs/locale/en-US/README.md and docs/locale/en-US/AGENT-GUIDE.md, then help me install and use Rainy Manuscript Workspace. Explain the application/library distinction. Before installing dependencies, building or starting, verify that I can provide an external desktop browser you can actually control, with local-directory read/write support, and obtain browser-control authorization. If unavailable, stop subsequent steps and explain recovery; do not substitute a built-in browser. Reuse valid existing authorization, agree on installation directory and port, then use the README's npm commands. Print the actual directory and restart command without creating extra startup scripts. I separately grant directory access in the page. After the library passes save/reopen, offer step-by-step tutorials or direct use and briefly list the four numbered tutorials. Follow environment permissions; do not use maintainer-machine paths.
 
-**Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); read [THEME.md](THEME.md) when creating content.** Use the repository and branch you confirm for the installation source and version.
+**Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); consult the manuals for later operations under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).** Use the repository and branch you confirm for the installation source and version.
+
+This public package is documentation revision `0.3.2.1.1`; the app still displays `0.3.2.1`, and the package version is `0.3.2+patch.1`.
 
 <a name="doc-run-yourself"></a>
 

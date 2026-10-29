@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -90,7 +90,9 @@
 
 > 请先阅读这个项目的 README.md、docs/locale/zh-CN/README.md 和 docs/locale/zh-CN/AGENT-GUIDE.md，帮我安装并使用 Rainy 文稿台。先解释应用与资料库的区别；安装依赖、构建、启动之前，核实我能提供支持本地目录读写、可由你实际控制的外部桌面浏览器，并取得控制授权。不满足就暂停后续步骤，说明恢复条件，不用内置浏览器替代。沿用已有有效授权，与我对齐安装目录、端口；确认后按 README 的 npm 方法安装，打印实际目录和启动命令，不另造启动脚本。网页内目录选择由我另行授权；资料库保存重开通过后，让我选择分步教程或直接使用，简短介绍四个编号教程。遵循当前环境权限，不采用维护者机器路径。
 
-**Agent Readable：先读 [AGENT-GUIDE.md](AGENT-GUIDE.md)，制作内容时再读 [THEME.md](THEME.md)。** 安装来源与版本以你确认的仓库和分支为准。
+**Agent Readable：先读 [AGENT-GUIDE.md](AGENT-GUIDE.md)；后续操作按[持续查阅要求](AGENT-GUIDE.md#doc-manual-use)取用说明书。** 安装来源与版本以你确认的仓库和分支为准。
+
+本次公开包为文档修订 `0.3.2.1.1`；应用界面仍显示 `0.3.2.1`，package 为 `0.3.2+patch.1`。
 
 <a name="doc-run-yourself"></a>
 

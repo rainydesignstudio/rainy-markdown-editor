@@ -2,6 +2,8 @@
 
 English · [简体中文](../zh-CN/THEME.md) · [Project home](../../../README.md)
 
+Before executing an Agent task, check required reading for this manual under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).
+
 For Agents and authors creating Rainy Manuscript Workspace content. See [AGENT-GUIDE.md](AGENT-GUIDE.md) for installation/tutorials and [README.md](README.md) for the project introduction.
 
 ## Identify the deliverable

@@ -2,13 +2,13 @@
 
 English · [简体中文](../zh-CN/AGENT-GUIDE.md) · [Project home](../../../README.md)
 
-This guide is for Agents working on installation, configuration, teaching, content creation, verification, diagnosis, recovery, and explicitly authorized application repair or deployment. Use this language's [README](README.md) for introduction and startup; the repository-root README is bilingual navigation. Fields and complete examples belong to [THEME.md](THEME.md); platform, rendering-package and migration contracts belong to [FORMAT.md](FORMAT.md). Read the cold-start contract and task index first, then load the selected modules and dependencies. Send humans only the necessary guidance, questions and result summaries.
+This guide is for Agents working on installation, configuration, teaching, content creation, verification, diagnosis, recovery, and explicitly authorized application repair or deployment. Use this language's [README](README.md) for introduction and startup; the repository-root README is bilingual navigation. Fields and complete examples belong to [THEME.md](THEME.md); platform, rendering-package and migration contracts belong to [FORMAT.md](FORMAT.md). Follow the [ongoing manual-use rules](#doc-manual-use) to identify required reading, read the cold-start contract and task index, then load selected modules and dependencies. Send humans only the necessary guidance, questions and result summaries.
 
 For public use, unless developer mode is explicitly requested, the external Agent acts as a coding-capable manuscript editor for initialization and writing. The maintenance repository retains its developer governance; the public entry does not replace it. The app has no built-in AI Agent and does not require an Agent to run; it provides a complete Agent integration guide. The browser interface is for human users, while an Agent can also manage the library directly by following this guide. Both work with the user's authorized local documents.
 
 ## Reading order and scope
 
-Use the following four steps for first installation/initialization. For other tasks, verify existing state and load modules from the cold-start task index.
+Use the following four steps for first installation/initialization. For other tasks, verify existing state and load modules under the [ongoing manual-use requirements](#doc-manual-use) and cold-start task index.
 
 1. Read the README and this guide, then complete the browser prerequisite below.
 2. Confirm local installation or online use, directory/port for local installation, new or existing library, and step-by-step tutorials or direct use.
@@ -16,6 +16,20 @@ Use the following four steps for first installation/initialization. For other ta
 4. Check initialization and save/reopen. Once the library is usable, briefly offer all four tutorial numbers and expand only the selected one.
 
 This guide does not depend on the maintainer's absolute paths, private knowledge or conversation history. Maintainer governance paths are not the customer's installation directory. Follow the current environment's permissions/workspace rules; explain machine-specific gaps during initial alignment and confirm their applicable paths/scope. Do not modify governance files on your own.
+
+<a name="doc-manual-use"></a>
+
+### Ongoing manual use
+
+README.md, AGENT-GUIDE.md, THEME.md and FORMAT.md are ongoing references for library operations. Select the matching language manuals for the actual app version; an earlier reading, old excerpts or conversation memory does not waive later consultation.
+
+- For everyday writing or management that needs operational details, first search these four manuals for task keywords, then read the complete matching sections and related constraints. Expand the reading scope when information is insufficient.
+- Before each start or resumption of a format-area customization, modification or repair task, read FORMAT.md in full, together with the complete corresponding execution modules in this guide and related documentation.
+- Before each start or resumption of editor-theme, article-theme, snippet or starter-template customization or repair, read THEME.md in full, together with the complete corresponding tutorial and verification requirements. Also read FORMAT.md in full when format or rendering contracts are involved.
+- Finish required reading before deciding the technical approach or writing files. Recheck and reread relevant documentation when the target, rendering route or manual version changes. Summaries and keyword-match lines do not replace a required full reading.
+- Perform library operations through documented file contracts or application entries; no additional CLI is required. Investigate implementation selectively only when the manuals cannot answer or diagnosis requires it, distinguishing documented contracts, actual capabilities and unresolved gaps.
+
+Authorization, browser prerequisites and verification requirements remain governed by their corresponding sections; follow [human-facing interaction output](#doc-human-output) when communicating with users.
 
 <a name="doc-agent-runtime"></a>
 
@@ -74,7 +88,7 @@ On failure, distinguish no write, successful write with later failure, partial w
 
 ## Confirm the task and deliver its artifacts
 
-1. Before creation, read the relevant tutorial here, [THEME's artifact contract](THEME.md#doc-design-assets), and [FORMAT's configuration responsibilities](FORMAT.md#doc-policy-responsibilities) and selected rendering route. State the project version and manual sections used in the delivery.
+1. Before creation, complete this task’s required reading under the [ongoing manual-use requirements](#doc-manual-use), then read the relevant tutorial here, [THEME's artifact contract](THEME.md#doc-design-assets), and [FORMAT's configuration responsibilities](FORMAT.md#doc-policy-responsibilities) and selected rendering route. State the project version and manual sections used in the delivery.
 2. Establish the target business, output types, rendering route, write scope and verification method before selecting themes, samples, snippets, starters and configuration to create.
 3. The theme route delivers an article theme, a representative sample and its adoption relationship. Library-CSS or self-contained package routes deliver their styles, declarations, dependencies and invocation relationships.
 4. Use the same representative content to check relevant previews, save/reopen and applicable output. Record original source, preview, clipboard receipt and target-platform results separately, identifying passed, failed and unobserved stages.

@@ -969,6 +969,24 @@
           ]
         }
       ]
+    },
+    "v0_3_2_1_1": {
+      "summary": "Documentation revision: ongoing manual consultation and full reading before customization; app 0.3.2.1 and package 0.3.2+patch.1 remain unchanged.",
+      "sections": [
+        {
+          "title": "Manual-use rules",
+          "items": [
+            "Search and read relevant sections for everyday library operations. Read FORMAT in full before format customization or repair, and THEME in full before editor-theme, article-theme, snippet or starter-template customization or repair; also read FORMAT in full when format or rendering contracts are involved.",
+            "Recheck when starting or resuming tasks or when targets, routes or manual versions change. Earlier reading or summaries do not waive requirements; root and bilingual manuals and the public Agent entry link to the same rules."
+          ]
+        },
+        {
+          "title": "Snippet correction",
+          "items": [
+            "Corrects the default code snippets to match the finalized library sources. Please download the packages again if you obtained an earlier copy."
+          ]
+        }
+      ]
     }
   }
 }

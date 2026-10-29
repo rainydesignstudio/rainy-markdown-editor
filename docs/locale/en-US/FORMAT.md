@@ -2,6 +2,8 @@
 
 English · [简体中文](../zh-CN/FORMAT.md) · [Project home](../../../README.md)
 
+Before executing an Agent task, check required reading for this manual under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).
+
 Each library binds one format policy. Opening another library switches support rules, validation and formatting together. Article themes control article layout; editor themes control the workspace interface.
 
 First inspect `format/config.json.renderer`: a declared package follows its host protocol and its own business implementation; a legacy library without renderer uses trio compatibility. Operator and platform-switch sections below describe the bundled interpreter/legacy route, not every custom package.
