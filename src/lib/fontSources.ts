@@ -1,3 +1,4 @@
+import { appAssetPath } from './appBasePath';
 import manifest from '../../resources/font-sources.json' with { type: 'json' };
 import { ProductError } from './i18n/productMessages';
 
@@ -38,7 +39,7 @@ export function fontFileRequest(asset: typeof manifest.fonts[number], source = g
   return { name: asset.file, url: asset.urls[source], size: asset.size, sha256: asset.sha256 };
 }
 export function fontLicenseRequest(asset: typeof manifest.fonts[number]): FontFileRequest {
-  return { name: asset.license, url: `/fonts/${asset.license}`, size: asset.licenseSize, sha256: asset.licenseSha256 };
+  return { name: asset.license, url: appAssetPath(`/fonts/${asset.license}`), size: asset.licenseSize, sha256: asset.licenseSha256 };
 }
 
 /** Shared by library initialization and the README exporter. Nothing is written before verification. */

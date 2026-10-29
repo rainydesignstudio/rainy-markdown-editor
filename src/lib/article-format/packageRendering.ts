@@ -1,3 +1,4 @@
+import { appAssetPath } from '../appBasePath';
 import DOMPurify from 'dompurify';
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
@@ -97,7 +98,7 @@ export function packageDisplayDocument(frame: HTMLIFrameElement, snapshot: Forma
       const target = doc.createElement('div'); doc.body.append(target); resolve(target);
     };
     frame.onerror = fail;
-    frame.src = '/format/article-package-preview.html';
+    frame.src = appAssetPath('/format/article-package-preview.html');
   });
 }
 export function packageAuthoredMarkup(root: HTMLElement): string {

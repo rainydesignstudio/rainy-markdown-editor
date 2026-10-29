@@ -145,7 +145,7 @@ test('article rename removes an unreferenced original, preserves its description
   const context = managementContext(f.root);
   context.articleRef.current = { source, folder: f.asset.folder, month: f.asset.month, theme: BASIC_THEME, dirty: false };
   const token = { root: f.root, articleId: f.asset.articleId };
-  Object.assign(context, { documentTokenRef: { current: token }, articleId: () => f.asset.articleId, getArticleMediaDirectory, copyArticleImageAs, importArticleImage, readMediaMetadata, saveMediaDescription, removeMediaDescription, inspectMediaUsage, rewriteArticleImageReferences, parseArticle, performSaveSnapshot() { throw new Error('source must stay unchanged'); }, updateArticle() { throw new Error('source must stay unchanged'); }, snapshotFor() {} });
+  Object.assign(context, { documentTokenRef: { current: token }, articleId: () => f.asset.articleId, getArticleMediaDirectory, copyArticleImageAs, importArticleImage, readMediaMetadata, saveMediaDescription, removeMediaDescription, inspectMediaUsage, rewriteArticleImageReferences, parseArticle, finishSavedSnapshot() { throw new Error('source must stay unchanged'); }, performSaveSnapshot() { throw new Error('source must stay unchanged'); }, updateArticle() { throw new Error('source must stay unchanged'); }, snapshotFor() {} });
   context.mutationQueueRef.current.canSave = () => true;
   const result = await controllerAction('renameMediaImage', context)(f.asset, 'renamed');
   assert.equal(result.tone, 'success'); assert.equal(f.images.children.has('cover.png'), false); assert.equal(f.images.children.has('renamed.png'), true); assert.equal((await readMediaMetadata(f.images)).images['renamed.png'].description, 'a picture'); assert.equal(context.articleRef.current.source, source);

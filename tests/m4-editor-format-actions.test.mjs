@@ -23,6 +23,7 @@ const report = {
 const nodes = node => Array.isArray(node) ? node.flatMap(nodes) : node?.props ? [node, ...nodes(node.props.children)] : [];
 const text = node => Array.isArray(node) ? node.map(text).join('') : node?.props ? text(node.props.children) : typeof node === 'string' ? node : '';
 function action(name, _next, context) {
+  context.compileIssueRef ??= { current: null };
   context.getFormatSnapshot ??= formatRuntime.getFormatSnapshot;
   context.awaitPackagePreview ??= awaitPackagePreview;
   context.parseArticle ??= parseArticle;
@@ -126,6 +127,16 @@ test('compilation commits preview styles before inspecting and stores one report
   assert.equal(fixture.events.at(-1)[1], false);
 });
 
+test('a terminal save notice does not erase the current format counters in the source footer', () => {
+  let expression;
+  const visit = node => { if (ts.isVariableDeclaration(node) && node.name.getText(controllerTree) === 'sourceStatus') expression = node.initializer; ts.forEachChild(node, visit); };
+  visit(controllerTree); assert.ok(expression);
+  const context = { status: { label: 'Saved', tone: 'success' }, renderedFormat: { snapshot: { revision: 8 }, report, classes: 56 }, matchesSnapshot: () => true, compiledArticleFormatStatus: reports.compiledArticleFormatStatus };
+  vm.runInNewContext(ts.transpileModule('globalThis.value = ' + expression.getText(controllerTree), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
+  assert.equal(context.value.formatRevision, 8); assert.match(context.value.label, /56/);
+  assert.equal(context.status.label, 'Saved');
+});
+
 test('a late format inspection cannot replace the status of a changed article', async () => {
   const fixture = compileFixture(); let finish;
   fixture.context.inspectArticleFormatReport = () => new Promise(resolve => { finish = resolve; });
@@ -200,7 +211,7 @@ test('manual save report preference only changes presentation, including an all-
     const clean = { complete: true, theme: { passed: ['theme'], issues: [] }, body: { passed: ['body'], issues: [] } };
     const context = { ...fixture.context, getPreviewPreferences: () => ({ saveReport: enabled }),
       mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
-      saveSnapshot: async () => ({ ok, current: true, savedSnapshot: fixture.snapshot, result: { article: { parse: { canCopy: true } } } }),
+      saveSnapshot: async () => { events.push('save'); fixture.cache.current = { snapshot: fixture.snapshot, report: clean }; return { ok, rendered: ok, current: true, savedSnapshot: fixture.snapshot, result: { article: { parse: { canCopy: true } } } }; },
       compileCurrent: async () => { events.push('compile'); fixture.cache.current = { snapshot: fixture.snapshot, report: clean }; return true; },
       captureSavedRender: async () => events.push('capture'),
       inspectArticleFormatReport: async () => { events.push('inspect'); return clean; },
@@ -209,25 +220,26 @@ test('manual save report preference only changes presentation, including an all-
     assert.equal(await action('saveCurrent', 'checkCurrentFormat', context)(), ok);
     assert.equal(dialogs.length, ok && enabled ? 1 : 0);
     assert.equal(context.sourceReports.length, ok ? 1 : 0, 'the gutter report is published independently of dialog preference');
-    assert.deepEqual(events, ok ? ['compile', 'capture'] : []);
+    assert.deepEqual(events, ['save'], 'manual save does not recompile or recapture the completed save receipt');
     if (dialogs.length) { assert.equal(dialogs[0].mode, 'save'); assert.equal(dialogs[0].report, clean); }
   }
 });
 
 
 
-test('save-only mode compiles each successful current save once, including implicit pre-copy and draft saves', async () => {
+test('every preview mode compiles each successful current save once, including implicit pre-copy and draft saves', async () => {
   for (const enabled of [false, true]) for (const ok of [false, true]) for (const current of [false, true]) {
     let writes = 0, renders = 0;
     const root = {}, token = { root, articleId: 'draft' };
-    const snapshot = { directory: root, articleId: 'draft', documentToken: token };
+    const snapshot = { directory: root, articleId: 'draft', documentToken: token, themeValid: true };
     const result = { ok, current, savedSnapshot: snapshot, result: { article: { parse: { canCopy: true } } } };
     const context = { useCallback: fn => fn, getPreviewPreferences: () => ({ saveOnly: enabled }),
       mutationQueueRef: { current: { run: fn => fn(), canSave: () => true } }, matchesSnapshot: () => current,
       performSaveSnapshot: async () => { writes++; return result; }, setStatus() {},
-      compileCurrent: async () => { renders++; return true; } };
+      compileCurrent: async () => { renders++; return true; }, captureSavedRender: async () => ({ ok: true }) };
+    context.finishSavedSnapshot = action('finishSavedSnapshot', null, context);
     const actual = await action('saveSnapshot', 'captureSavedRender', context)(snapshot);
-    assert.equal(writes, 1); assert.equal(renders, enabled && ok && current ? 1 : 0);
+    assert.equal(writes, 1); assert.equal(renders, ok && current ? 1 : 0);
     assert.equal(actual.rendered, renders ? true : undefined);
   }
 });

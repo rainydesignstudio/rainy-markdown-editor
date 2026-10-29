@@ -65,7 +65,7 @@ async function startupPanel() {
   const source=file.slice(file.indexOf('function StartupLoading('),file.indexOf('export function useEditorControllerContext'))+'\nglobalThis.component = StartupLoading;';
   let cursor=0,previous,cleanup,timerId=0,localeReady=false,retries=0,choices=0;
   const cells=[],effects=[],timers=new Map(),readiness=[];
-  const context={...productMessages,exports:{},require:()=>({jsx,jsxs}),useUITranslation:()=>({t:key=>key}),useUILocale:()=>({ready:localeReady}),
+  const context={...productMessages,ContentIcon:()=>null,exports:{},require:()=>({jsx,jsxs}),useUITranslation:()=>({t:key=>key}),useUILocale:()=>({ready:localeReady}),
     useState(initial){const i=cursor++;if(!(i in cells))cells[i]=initial;return[cells[i],value=>{cells[i]=value;}];},
     useEffect(effect,deps){if(!previous||deps.some((v,i)=>v!==previous[i]))effects.push(()=>{cleanup?.();previous=deps;cleanup=effect();});},
     window:{setTimeout(fn,ms){assert.equal(ms,300);timers.set(++timerId,fn);return timerId;},clearTimeout(id){timers.delete(id);}}};
@@ -93,7 +93,9 @@ test('a failed startup stays at the loading location with recovery actions and a
   let tree=f.render(false,{label:'directory denied'});tree=f.render(false,{label:'directory denied'});
   assert.equal(f.timers.size,0);assert.equal(f.readiness.at(-1),false);
   assert.ok(f.walk(tree).some(n=>n.type==='p'&&n.props.children==='directory denied'));
-  const button=key=>f.walk(tree).find(n=>n.type==='button'&&n.props.children===key);
+  assert.equal(f.walk(tree).some(n=>n.type==='details'),false);
+  assert.deepEqual(f.walk(tree).filter(n=>n.props.name).map(n=>n.props.name),['reset','folder','expand']);
+  const button=key=>f.walk(tree).find(n=>n.type==='button'&&[].concat(n.props.children).includes(key));
   button('loading.retry').props.onClick();button('loading.choose').props.onClick();assert.equal(f.retries,1);assert.equal(f.choices,1);
   button('loading.continue').props.onClick();f.render(false,{label:'directory denied'});assert.equal(f.timers.size,1);
   [...f.timers.values()][0]();assert.equal(f.render(false,{label:'directory denied'}),null);assert.equal(f.readiness.at(-1),true);

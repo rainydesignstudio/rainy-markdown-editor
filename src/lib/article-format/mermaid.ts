@@ -1,3 +1,4 @@
+import { appAssetPath } from '../appBasePath';
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import type { Root, Element } from 'hast';
@@ -48,7 +49,7 @@ const scriptJson = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u0
 export function mermaidFrameDocument(hostToken: string, origin: string): string {
   const url = new URL(origin); if (!['http:', 'https:'].includes(url.protocol) || url.origin !== origin) throw new ProductError('mermaid.invalidOutput');
   const config = scriptJson({ hostToken, origin });
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${origin}; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><style>body{margin:0;font-family:system-ui,sans-serif}</style><script type="application/json" data-mermaid-host>${config}</script><script defer src="${origin}/algorithm/mermaid/mermaid.min.js"></script><script defer src="${origin}/format/article-mermaid-bootstrap.js"></script></head><body><div id="diagram"></div></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${origin}; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"><style>body{margin:0;font-family:system-ui,sans-serif}</style><script type="application/json" data-mermaid-host>${config}</script><script defer src="${origin}${appAssetPath('/algorithm/mermaid/mermaid.min.js')}"></script><script defer src="${origin}${appAssetPath('/format/article-mermaid-bootstrap.js')}"></script></head><body><div id="diagram"></div></body></html>`;
 }
 export function validMermaidImage(value: unknown): value is MermaidImage {
   if (!value || typeof value !== 'object') return false;

@@ -5,6 +5,41 @@ import { formatProductMessage, isProductMessage, legacyProductMessage, type Prod
 
 type Tone = 'success' | 'warning' | 'error' | 'info';
 const summaries: Record<string, [string, Tone]> = {
+  'controller.sourceSaved': ['articleSaved', 'success'],
+  'controller.styleGenerationFailed': ['failed', 'error'],
+  'controller.formatCheckingIsIncomplete': ['checkIncomplete', 'warning'],
+  'controller.savingSettingsJson': ['saving', 'info'],
+  'controller.settingsSavedTimersRestartedWithTheNewConfiguration': ['saved', 'success'],
+  'controller.importantVersionSavedButTheHistoryListCouldNotRefreshRetryRefresh': ['refreshPending', 'warning'],
+  'controller.protectionWasSavedButTheHistoryListCouldNotRefreshRetryRefresh': ['refreshPending', 'warning'],
+  'controller.selectedVersionRestoredContentFromBeforeRestoreIsRetainedIn': ['restored', 'success'],
+  'controller.historicalVersionRestoredContentFromBeforeRestoreIsRetainedIn': ['restored', 'success'],
+  'controller.savedAnIndependentArticleItsBodyUsesTheSelectedHistoricalVersionAssets': ['forkCreated', 'success'],
+  'controller.currentRangeCheckedArticlesSeeEachArticleSRecordForDetails': ['checkedArticles', 'success'],
+  'controller.settingsCouldNotBeReadAutoSaveAndSnapshotsArePaused': ['settingsReadFailed', 'warning'],
+  'controller.newDraftThemeSwitchedToItsArticleThemeSnapshotIsWrittenWhen': ['themeChanged', 'success'],
+  'controller.checkpointSavedThemeSwitchedToSaveTheArticleToWriteItsSource': ['themeChanged', 'success'],
+  'controller.forkCreatedTheOriginalManuscriptIsUnchanged': ['forkCreated', 'success'],
+  'controller.forkFailedTheOriginalManuscriptAndUnsavedStateAreRetained': ['forkFailed', 'error'],
+  'controller.loadedResolveDiagnosticsFirst': ['articleOpenedReview', 'warning'],
+  'controller.loaded': ['articleOpened', 'info'],
+  'controller.completeVersionsLoadedDamagedOrIncompleteRecordsExcludedFromRestore': ['historyReview', 'warning'],
+  'controller.importantVersionSaved': ['saved', 'success'],
+  'controller.contentMatchesAnExistingVersionNoDuplicateWasWritten': ['versionExists', 'info'],
+  'controller.projectDeletedArticlesMovedToUnclassifiedTheirContentIsUnchanged': ['deleted', 'success'],
+  'controller.archivedOriginalSourceAndAssetsAreRetained': ['archived', 'success'],
+  'controller.unarchived': ['unarchived', 'success'],
+  'controller.completeRichTextArticleCopiedEmbeddedImageReferencesReadyToPaste': ['copied', 'success'],
+  'controller.richTextCopiedPasteIntoTheReceivingAreaBelow': ['copied', 'success'],
+  'controller.clipboardPastedTextHtmlTextPlain': ['pasted', 'success'],
+  'controller.clipboardPastedTextPlain': ['pasted', 'success'],
+  'libraryCss.partial': ['savePartial', 'warning'],
+  'libraryCss.saved': ['cssSaved', 'success'],
+  'libraryCss.reloadFailed': ['cssReloadFailed', 'warning'],
+  'controller.sourceSavedTheIndexWasNotUpdated': ['savedNeedsReview', 'warning'],
+  'controller.sourceSavedTheMonthlyIndexWasRebuilt': ['savedNeedsReview', 'warning'],
+  'controller.sourceSavedTheRenderRecordWasNotUpdated': ['renderRecordPending', 'warning'],
+  'controller.sourceSavedFormatCheckingIsIncomplete': ['savedNeedsReview', 'warning'],
   'mediaLibrary.selectedAssetsIncludeArchivedArticlesUnarchiveThemBeforeMakingChanges': ['unarchive', 'warning'],
   'mediaLibrary.sharedImageImportFailed': ['importFailed', 'error'],
   'mediaLibrary.dropContainsNoFiles': ['noFiles', 'warning'],
@@ -46,7 +81,6 @@ const summaries: Record<string, [string, Tone]> = {
   'themeLibrary.importFailed': ['importFailed', 'error'],
   'themeLibrary.setAnotherThemeAsTheDefaultBeforeDeletingThisTheme': ['defaultRequired', 'warning'],
   'themeLibrary.deletedFromTheThemeLibraryExistingArticleSnapshotsAreRetained': ['themeDeleted', 'success'],
-  'themeLibrary.deleteFailed': ['deleteFailed', 'error'],
   'themeLibrary.exportedJson': ['themeExported', 'success'],
   'themeLibrary.theOpenArticleBelongsToAnotherLibrarySwitchBackToItsLibrary': ['articleLibraryRequired', 'warning'],
   'themeLibrary.setAsTheDefaultForNewArticlesAndTemplatePreviewsExistingArticle': ['defaultSaved', 'success'],
@@ -76,7 +110,6 @@ const summaries: Record<string, [string, Tone]> = {
   'contentLibrary.deletedExistingArticlesAreUnaffected': ['contentDeleted', 'success'],
   'contentLibrary.listReloadedSavingOrDeletionWasNotRepeated': ['refreshed', 'success'],
   'contentLibrary.theBodyChangedValidateItBeforeSaving': ['modified', 'warning'],
-  'contentLibrary.categorySaved': ['categorySaved', 'success'],
   'contentLibrary.invalidFilenameFormatUseLowercaseLettersNumbersAndHyphens': ['filenameRequired', 'warning'],
   'contentLibrary.informationConfirmedContinueEditingTheBodyThenClickSaveContentToCreate': ['infoConfirmed', 'success'],
   'contentLibrary.editingCancelledUnsavedContentWasDiscarded': ['cancelled', 'success'],
@@ -99,6 +132,13 @@ export function feedbackNotice(value: unknown, tone?: Tone | 'neutral'): { summa
   const literal = typeof value === 'string' ? value : value && typeof value === 'object' && 'label' in value ? String(value.label) : '';
   const message = isProductMessage(value) ? value : legacyProductMessage(literal);
   let choice = message ? summaries[message.messageKey] : undefined;
+  if (message?.messageKey === 'shared.compose') {
+    const parts = message.messageParams?.parts;
+    const entries = parts && typeof parts === 'object' && 'messageParts' in parts && Array.isArray(parts.messageParts) ? parts.messageParts : [];
+    if (entries.some(part => isProductMessage(part) && part.messageKey === 'controller.sourceSavedTheRenderRecordWasNotUpdated')) choice = ['renderRecordPending', 'warning'];
+    else if (entries.some(part => isProductMessage(part) && part.messageKey === 'controller.sourceSavedTheIndexWasNotUpdated')) choice = ['savedNeedsReview', 'warning'];
+    else { const known = entries.find(part => isProductMessage(part) && summaries[part.messageKey]); if (isProductMessage(known)) choice = summaries[known.messageKey]; }
+  }
   if (message?.messageKey.startsWith('feedback.')) choice = [message.messageKey.slice(9), tone === 'neutral' ? 'info' : tone ?? 'info'];
   if (message?.messageKey === 'contentLibrary.editingANewSaveItToReuseIt') choice = [typeof message.messageParams?.name === 'object' && message.messageParams.name && 'messageKey' in message.messageParams.name && message.messageParams.name.messageKey === 'snippetCategoryIcons.snippet' ? 'newSnippet' : 'newTemplate', 'info'];
   if (message?.messageKey === 'mediaManagement.imageOperationCompletedTheIndependentArticleCopyIsUnchanged') choice = [isProductMessage(message.messageParams?.value) && message.messageParams.value.messageKey === 'mediaManagement.replacedWith' ? 'replaced' : 'renamed', 'success'];

@@ -12,6 +12,7 @@ import type { parseArticle } from '../../lib/frontMatter';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
+import { EditableArticleTitle } from './EditableArticleTitle';
 
 type Props = {
   article: WorkingArticle; parsed: ReturnType<typeof parseArticle>; stored: ArticleSummary | null;
@@ -43,12 +44,12 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
   return <DialogFrame className="flex min-h-0 max-w-5xl flex-col overflow-hidden" titleId="article-info-title" descriptionId="article-info-description" onClose={onClose} dismissible={!busy}>
     <DialogHeader titleId="article-info-title" eyebrow={t('common:eyebrows.manuscriptDetails')} title={t('dialogs:ui.manuscriptInformation')} onClose={onClose} closeDisabled={busy} />
     <form {...location.props} id="article-info-form" className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" onSubmit={handleSubmit}>
-      <strong className="block shrink-0 break-words font-mono font-semibold text-primary">{article.folder ?? t('dialogs:ui.unsavedManuscript')}</strong>
+      <EditableArticleTitle value={parsed.metadata.title} onChange={value => onChangeField('title', value)} disabled={disabled} />
       <div className="mt-2 mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-list/50 p-4">
         <div className="flex min-w-0 flex-1 items-center gap-3"><span className="information-badge"><InformationIcon /></span><div className="min-w-0 flex-1">
           {article.month && article.folder ? <div className="flex min-w-0 flex-wrap items-center gap-2 font-mono text-xs text-muted">
             <span>{`articles/${article.month}/`}</span>
-            <label className="min-w-0 basis-full md:flex-1 md:basis-0"><span className="sr-only">{t('dialogs:ui.articleFolderName')}</span><input className="field min-w-0 font-mono text-xs" name="article-folder" value={folderName} maxLength={80} disabled={readOnly} onChange={event => onFolderName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (!event.nativeEvent.isComposing && !disabled && article.dirty) onSave(); } }} /></label>
+            <label className="min-w-0 max-w-full basis-full md:basis-auto"><span className="sr-only">{t('dialogs:ui.articleFolderName')}</span><textarea rows={1} className="field field-sizing-content w-auto min-h-0 min-w-0 max-w-full resize-none overflow-hidden font-mono text-xs" name="article-folder" value={folderName} maxLength={80} disabled={readOnly} onChange={event => onFolderName(event.target.value.replace(/[\r\n]/g, ' '))} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (!event.nativeEvent.isComposing && !disabled && article.dirty) onSave(); } }} /></label>
             <span>/article.md</span>
           </div> : <p className="mt-1 break-all font-mono text-xs text-muted">{t('dialogs:ui.writtenToTheLibraryAfterSaving')}</p>}
         </div></div>
@@ -59,7 +60,6 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
         <section className="min-w-0 rounded-lg border border-line bg-list/50 p-4 md:col-span-2" aria-labelledby="article-fields-heading">
           <h3 id="article-fields-heading" className="mb-4 font-sub-heading text-sm font-semibold text-primary">{t('dialogs:ui.basicInformation')}</h3>
           <div className="grid min-w-0 gap-4 md:grid-cols-2">
-            <label className="field-stack min-w-0 md:col-span-2"><span className="field-label">{t('dialogs:ui.articleTitle')}</span><input name="article-title" className="field" value={parsed.metadata.title} onChange={event => onChangeField('title', event.target.value)} disabled={disabled} /></label>
             <label className="field-stack min-w-0 md:col-span-2"><span className="field-label">{t('dialogs:ui.summary')}</span><textarea name="article-description" className="field min-h-32" value={parsed.metadata.description} onChange={event => onChangeField('description', event.target.value)} disabled={disabled} placeholder={t('dialogs:ui.brieflyDescribeThisArticle')} /></label>
             <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.author')}</span><input name="article-author" className="field" value={parsed.metadata.author} onChange={event => onChangeField('author', event.target.value)} disabled={disabled} /></label>
             <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.articleCategories')}</span><input name="article-categories" className="field" value={parsed.metadata.categories.join(', ')} onChange={event => onChangeField('categories', event.target.value)} disabled={disabled} placeholder={t('dialogs:ui.separateCategoriesWithCommas')} /></label>

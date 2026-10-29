@@ -2,8 +2,8 @@
   "id": "rainy-section",
   "name": "Rainy Design · Section",
   "trigger": "//rainy-section",
-  "description": "A section heading and introduction organized with a fine rule and a clear text hierarchy.",
-  "content": "<section class=\"my-8\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">▌You say: I prefer writing the traditional way.</h2>\n  <p class=\"m-0 text-base text-article-ink\">Then you will want to know either Markdown syntax or HTML.</p>\n</section>\n",
+  "description": "An H3 subsection within a chapter, with an English eyebrow and introduction. Pair it with rainy-chapter to distinguish chapter and subsection levels.",
+  "content": "<section class=\"my-8 pb-4 border-b border-article-accent\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 | LOREM IPSUM</p>\n  <h3 class=\"mt-0 mb-2 text-xl font-semibold text-article-heading\">Here is what I really mean</h3>\n  <i class=\"m-0 text-base text-article-muted\">You do not have to write every article yourself. Try ghost-writer; use eli5 or teach when you need an explanation.</i>\n</section>",
   "icon": "layers",
   "categoryId": "rainy-design"
 }

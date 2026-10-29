@@ -334,7 +334,7 @@
   }
 
   .title-trigger > span:first-child {
-    @apply truncate text-base font-semibold;
+    @apply min-w-0 whitespace-normal break-words text-base font-semibold;
   }
 
   .title-edit-icon {

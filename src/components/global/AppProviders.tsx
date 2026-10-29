@@ -10,6 +10,7 @@ import { useUILocale, useUITranslation } from './UILocaleProvider';
 import { EditingDraftsProvider } from './EditingDrafts';
 import { ToastReadiness } from './Toast';
 import { formatProductMessage } from '../../lib/i18n/productMessages';
+import { ContentIcon } from './ContentIcon';
 
 type EditorController = ReturnType<typeof useEditorController> & {
   editorAppearancePreview: EditorAppearance | null;
@@ -113,7 +114,18 @@ function StartupLoading({ loading, issue, onReady, onRetry, onChoose }: { loadin
   if (!present && !loading) return null;
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas font-loading text-primary opacity-100 transition-opacity duration-300 ease-out data-[fading=true]:opacity-0 motion-reduce:transition-none" data-fading={!loading && fading} role="status" aria-live="polite" aria-label={ready ? t('loading.label') : undefined}>
     <div className="flex flex-col items-center gap-4 p-4">
-      {failure && !loading ? <><p className="text-sm font-medium text-danger">{t('loading.failed')}</p><p className="max-h-48 max-w-xl overflow-x-clip overflow-y-auto whitespace-pre-wrap break-words text-sm text-muted">{failure}</p><div className="flex flex-wrap justify-center gap-2">{onRetry ? <button className="button button-primary" onClick={onRetry}>{t('loading.retry')}</button> : null}<button className="button button-quiet" onClick={onChoose}>{t('loading.choose')}</button><button className="button button-quiet" onClick={() => setDismissed(true)}>{t('loading.continue')}</button></div></> : <><svg className="size-8 animate-spin text-accent motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3a9 9 0 0 1 9 9" /></svg><p className="text-sm text-muted" hidden={!ready}>{t('loading.message')}</p></>}
+      {failure && !loading ? <>
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-lg border border-danger/30 bg-danger-surface text-danger" aria-hidden="true"><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 7h7l2 2h9v11H3ZM3 7V4h7l2 3M12 12v3m0 2v1" /></svg></span>
+          <p className="text-sm font-medium text-danger">{t('loading.failed')}</p>
+        </div>
+        <p className="max-h-48 max-w-xl overflow-x-clip overflow-y-auto whitespace-pre-wrap break-words text-center text-sm text-muted">{failure}</p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {onRetry ? <button className="button button-primary" onClick={onRetry}><ContentIcon name="reset" />{t('loading.retry')}</button> : null}
+          <button className="button button-quiet" onClick={onChoose}><ContentIcon name="folder" />{t('loading.choose')}</button>
+          <button className="button button-quiet" onClick={() => setDismissed(true)}><ContentIcon name="expand" />{t('loading.continue')}</button>
+        </div>
+      </> : <><svg className="size-8 animate-spin text-accent motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3a9 9 0 0 1 9 9" /></svg><p className="text-sm text-muted" hidden={!ready}>{t('loading.message')}</p></>}
     </div>
   </div>;
 }

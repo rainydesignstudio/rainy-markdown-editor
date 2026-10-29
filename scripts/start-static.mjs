@@ -22,6 +22,7 @@ if (options.help) {
 const { port } = options;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'out');
+const basePath = (process.env.NEXT_PUBLIC_ARTICLE_BASE_PATH || '').replace(/\/+$/, '');
 
 if (!fs.existsSync(path.join(output, 'index.html'))) {
   console.error(t('cli.missingBuild'));
@@ -90,7 +91,10 @@ function contentSecurityPolicy(filePath) {
 
 const server = http.createServer((request, response) => {
   const requestUrl = new URL(request.url ?? '/', `http://${host}:${port}`);
-  const requested = decodeURIComponent(requestUrl.pathname);
+  if (basePath && requestUrl.pathname !== basePath && !requestUrl.pathname.startsWith(basePath + '/')) {
+    response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }); response.end('Not found'); return;
+  }
+  const requested = decodeURIComponent(requestUrl.pathname.slice(basePath.length) || '/');
   const relative = requested === '/' ? '/index.html' : requested;
   const requestedPath = path.resolve(output, `.${relative}`);
   if (!requestedPath.startsWith(`${output}${path.sep}`) && requestedPath !== output) {

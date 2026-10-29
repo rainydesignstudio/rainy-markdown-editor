@@ -15,7 +15,7 @@ import { currentImportResource } from '../resources/inspection';
 import { resourceState } from '../resources/state';
 import { useResourceDocumentVersion } from '../../hooks/imports/useResourceVersion';
 import { downloadArticleBlob } from '../articleExport';
-import { ARTICLE_EXAMPLE_IMAGE, isApplicationExampleImage } from '../articleExamples';
+import { ARTICLE_EXAMPLE_ASSET_URL, isApplicationExampleImage } from '../articleExamples';
 import { ProductError } from '../i18n/productMessages';
 
 export function PackagePreview({ source, snapshot, theme, media }: { source: string; snapshot: FormatSnapshot; theme: ThemeConfig; media?: ArticleMediaContext | null }) {
@@ -81,7 +81,7 @@ export function PackagePreview({ source, snapshot, theme, media }: { source: str
             let file: Blob;
             const retained = snapshot.resources?.find(asset => asset.path === path) ?? snapshot.environment?.assets.find(asset => asset.path === path);
             if (retained) file = retained.blob;
-            else if (isApplicationExampleImage(url)) { const response = await fetch(ARTICLE_EXAMPLE_IMAGE); if (!response.ok) throw new ProductError('resources.linkUnavailable'); file = await response.blob(); }
+            else if (isApplicationExampleImage(url)) { const response = await fetch(ARTICLE_EXAMPLE_ASSET_URL); if (!response.ok) throw new ProductError('resources.linkUnavailable'); file = await response.blob(); }
             else if (!media?.root) throw new ProductError('resources.linkUnavailable');
             else if (reference && (reference.shared || media.article)) {
               const destination = reference.shared ? { kind: 'shared' as const } : { kind: 'article' as const, articleId: media.article!.id, month: media.article!.month, folder: media.article!.folder, title: media.articleTitle };

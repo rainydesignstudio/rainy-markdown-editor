@@ -1,0 +1,9 @@
+{
+  "id": "rainy-chapter-2",
+  "name": "Rainy Design · Chapter II",
+  "trigger": "//rainy-chapter-2",
+  "description": "An H2 chapter with a number, English eyebrow and introduction. Choose this or rainy-chapter consistently; prefer rainy-chapter when the article also uses H3 subsections.",
+  "content": "<section class=\"my-8 pb-4 border-b border-article-accent\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-2 pl-0 pb-0 text-2xl font-semibold text-article-heading border-none\">▌You say: I prefer writing the traditional way.</h2>\n  <i class=\"m-0 text-base text-article-muted\">Then you will want to know either Markdown syntax or HTML.</i>\n</section>",
+  "icon": "book",
+  "categoryId": "rainy-design"
+}

@@ -139,12 +139,15 @@ test('mac-style snippets keep SVG decoration outside editable HTML code and pres
 
 test('mac-style snippet validates in every built-in theme without theme-specific registration', async () => {
   for (const locale of ['zh-CN', 'en-US']) {
-    const snippet = getDefaultContentLibrary(locale).snippets.find(item => item.id === 'mac-style-code-block');
-    for (const theme of getBuiltinArticleThemes(locale)) {
+    for (const id of ['mac-style-code-block', 'mac-style-code-block-nowrap']) {
+      const snippet = getDefaultContentLibrary(locale).snippets.find(item => item.id === id);
+      assert.doesNotMatch(snippet.content, /whitespace-pre-nowrap/);
+      for (const theme of getBuiltinArticleThemes(locale)) {
       assert.equal(Object.keys(theme.tokens).length, 11);
       assert.doesNotMatch(theme.css, /\.mac-style-code-block/);
       const issues = await validateArticleAuthoringMarkdown(prepareSnippetInsertion(snippet.content).text, 'Mac code', undefined, theme);
       assert.deepEqual(issues.filter(issue => articleFormatBlocks(issue.tier) || issue.tier === 'unknown'), [], `${locale}/${theme.id}`);
+      }
     }
   }
 });

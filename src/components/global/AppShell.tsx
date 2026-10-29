@@ -118,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onCompile={() => void controller.updateCurrentStyles()}
             onCheckFormat={() => void controller.checkCurrentFormat()}
           />
-          <OperationFeedback hideTrigger id="editor-operation" revision={statusEvent.current} announce={controller.view === 'articles' && controller.articleMode === 'editor' && controller.status.formatRevision === undefined && controller.status.tone !== 'neutral' && controller.status.notify !== false} notice={controller.status} tone={controller.status.tone} />
+          <OperationFeedback hideTrigger id="editor-operation" revision={statusEvent.current} onRetry={controller.status.retrySave ? controller.retrySaveCurrent : undefined} retryLabel={{ messageKey: 'feedback.retrySave' }} retryDisabled={controller.isCompiling || controller.historyBusy || Boolean(controller.mediaOperation)} announce={controller.view === 'articles' && controller.articleMode === 'editor' && controller.status.formatRevision === undefined && controller.status.tone !== 'neutral' && controller.status.notify !== false} notice={controller.status} tone={controller.status.tone} />
           <OperationFeedback hideTrigger id="workflow-settings" announce={controller.settingsNotice.notify !== false} notice={controller.directory ? controller.settingsNotice : null} tone={controller.settingsNotice.tone} lifetime={controller.settingsBusy ? { mode: 'locked' } : undefined} />
 
           <div className="workspace-main" hidden={historyViewOpen}>{children}</div>

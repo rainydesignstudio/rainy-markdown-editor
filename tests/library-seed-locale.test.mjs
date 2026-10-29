@@ -17,7 +17,7 @@ test('both complete seeds preserve IDs, visual design, references and cursor pos
     assert.deepEqual(left.map(({ name, ...design }) => design), right.map(({ name, ...design }) => design));
   }
   const structure = source => [...source.matchAll(/<[^>]+>/g)].map(match => match[0]);
-  assert.equal(en.snippets.length, 23); assert.equal(en.templates.length, 5);
+  assert.equal(en.snippets.length, 24); assert.equal(en.templates.length, 5);
   for (let i = 0; i < en.snippets.length; i++) {
     const left = en.snippets[i], right = zh.snippets[i];
     assert.deepEqual([left.id, left.categoryId, left.trigger, left.icon], [right.id, right.categoryId, right.trigger, right.icon]);
@@ -130,7 +130,7 @@ test('preset declarations select content independently of language and neutral s
         assert.doesNotMatch(parsed.body,/<\/?[a-z][^>]*>/i);
         if(locale==='en-US')assert.doesNotMatch(item.source,/\p{Script=Han}/u);
       }
-    } else { assert.equal(content.snippets.length,23); assert.equal(content.templates.length,5); }
+    } else { assert.equal(content.snippets.length,24); assert.equal(content.templates.length,5); }
   }
 });
 

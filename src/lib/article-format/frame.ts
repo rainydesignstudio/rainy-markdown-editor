@@ -1,3 +1,4 @@
+import { appAssetPath } from '../appBasePath';
 import { enabledFormatRules } from './config';
 import { ProductError } from "../i18n/productMessages";
 import { articlePreviewStyle } from './preview';
@@ -13,7 +14,7 @@ export function formatPreviewDocument(css: string, html: string, dark: boolean, 
   const safeCss = articlePreviewStyle(css, snapshot).replace(/<\/style/gi, '<\\/style');
   const viewport = snapshot.bundle.formatter.document?.viewport;
   if (viewport) html = '<div style="width:' + viewport.contentWidth + 'px;margin-left:' + (viewport.width - viewport.contentWidth) + 'px">' + html + '</div>';
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:${dark ? preview.dark.background : preview.light.background};color:${preview.color};font-family:${preview.fontFamily}}html,body{min-height:100%}${safeCss}</style><script type="application/json" data-article-format-config>${payload}</script><script src="/algorithm/article-algorithm-host.js"></script><script src="/format/article-format-engine.js"></script><script defer src="/format/article-format-bootstrap.js"></script></head><body>${html}</body></html>`;
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;background:${dark ? preview.dark.background : preview.light.background};color:${preview.color};font-family:${preview.fontFamily}}html,body{min-height:100%}${safeCss}</style><script type="application/json" data-article-format-config>${payload}</script><script src="${appAssetPath('/algorithm/article-algorithm-host.js')}"></script><script src="${appAssetPath('/format/article-format-engine.js')}"></script><script defer src="${appAssetPath('/format/article-format-bootstrap.js')}"></script></head><body>${html}</body></html>`;
 }
 export async function inspectRenderedFormat(root: HTMLElement, css: string, snapshot: FormatSnapshot = getFormatSnapshot(), signal?: AbortSignal): Promise<RenderedInspection> {
   assertFormatReady(snapshot); signal?.throwIfAborted();
@@ -47,7 +48,7 @@ export async function inspectRenderedFormat(root: HTMLElement, css: string, snap
     unsubscribe = subscribeFormatSnapshot(() => { if (getFormatSnapshot().id !== snapshot.id) finish(new ProductError("runtime.inspectionFormatChanged")); });
     signal?.addEventListener('abort', abort, { once: true });
     window.addEventListener('message', receive);
-    frame.srcdoc = `<!doctype html><html><head><style>${fullCss.replace(/<\/style/gi, '<\\/style')}</style><script type="application/json" data-article-format-config>${payload}</script><script src="/algorithm/article-algorithm-host.js"></script><script src="/format/article-format-engine.js"></script><script defer src="/format/article-format-bootstrap.js"></script></head><body>${html}</body></html>`;
+    frame.srcdoc = `<!doctype html><html><head><style>${fullCss.replace(/<\/style/gi, '<\\/style')}</style><script type="application/json" data-article-format-config>${payload}</script><script src="${appAssetPath('/algorithm/article-algorithm-host.js')}"></script><script src="${appAssetPath('/format/article-format-engine.js')}"></script><script defer src="${appAssetPath('/format/article-format-bootstrap.js')}"></script></head><body>${html}</body></html>`;
     document.body.append(frame);
   });
 }

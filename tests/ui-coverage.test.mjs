@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { localeCoverage } from './locale-coverage.mjs';
+import { localeCoverage, messageCatalogContracts } from './locale-coverage.mjs';
 import { UI_RESOURCES, createUII18n } from '../src/lib/i18n/runtime.ts';
 import { inspectEditorTheme, validateEditorTheme, parseEditorThemeJson, BASE_EDITOR_THEME } from '../src/lib/editorThemes.ts';
 import { formatDiagnosticMessage, formatProductMessage, productDiagnosticReference, productErrorMessage, productJoin, productMessage, productReference } from '../src/lib/i18n/productMessages.ts';
@@ -17,6 +17,32 @@ test('source translation references exist in both locales and supply declared pa
   assert.ok(result.references > 1500);
   assert.deepEqual(result.missing, []);
   assert.deepEqual(result.parameters, []);
+});
+
+test('all message keys and interpolation contracts agree across locales, including indirect and legacy entries', () => {
+  const result = messageCatalogContracts();
+  assert.deepEqual(result.missing, []); assert.deepEqual(result.parameters, []);
+  // Keep reviewed legacy IDs and distinct enum/field meanings; new duplicate groups require a reason.
+  const reviewed = [
+    ['bootstrap.layoutCheckingParametersAreMissing', 'frame.parametersMissing'],
+    ['bootstrap.theArticlePreviewRootIsMissing', 'frame.rootMissing'],
+    ['bootstrap.unknownArticleFrameType', 'frame.unknownKind'],
+    ['colors.theBrowserCouldNotParseTheArticleColor', 'frame.colorParseFailed'],
+    ['contentFileLabels.snippet', 'snippetCategoryIcons.snippet'],
+    ['controller.formatCheckEngine', 'diagnostic.names.formatEngine'],
+    ['diagnostic.names.manualReview', 'diagnostic.sources.manualReview'],
+    ['diagnostic.sources.themeNodes', 'locations.themeNodes'],
+    ['resources.typeNames.code', 'snippetCategoryIcons.code'],
+    ['trash.clear', 'trash.confirmCleanup'],
+  ].map(group => group.join('|'));
+  assert.deepEqual(result.duplicates.filter(group => !reviewed.includes(group.join('|'))), [], 'review new bilingual duplicates for semantic reuse before registering a necessary exception');
+  const sample = messageCatalogContracts({
+    'zh-CN': { messages: { a: '{{name}}', b: '完成', c: '完成', d: '完成', old: '保留' } },
+    'en-US': { messages: { a: '{{path}}', b: 'Done', c: 'Done', d: 'Complete' } },
+  });
+  assert.deepEqual(sample.missing, [{ locale: 'en-US', key: 'old' }]);
+  assert.deepEqual(sample.parameters, [{ key: 'a', zh: ['name'], en: ['path'] }]);
+  assert.deepEqual(sample.duplicates, [['b', 'c']], 'same Chinese text alone does not justify merging');
 });
 
 test('English product catalogs have no Chinese prose except the language option endonym', () => {

@@ -24,6 +24,7 @@ export function withUILocaleImports(resolve) {
     if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
     if (id.endsWith('/LibraryCard')) return { LibraryCard: 'button', LibraryCardFrame: 'article', LibraryCardGrid: 'div' };
     if (id.endsWith('/ContentIcon')) return { ContentIcon: 'svg' };
+    if (id.endsWith('/EditableArticleTitle')) return { EditableArticleTitle: 'editable-article-title' };
     if (id.endsWith('/UILocaleProvider')) return {
       useUITranslation: (namespace = 'common') => ({ t: instance.getFixedT('zh-CN', namespace) }),
       useUILocale: () => ({ locale: 'zh-CN', ready: true }),

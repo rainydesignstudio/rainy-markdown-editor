@@ -952,6 +952,23 @@
           ]
         }
       ]
+    },
+    "v0_3_2_1": {
+      "summary": "Fixes subpath render assets and article-save record timing; simplifies feedback, unifies title editing and load recovery, and updates themes and snippets.",
+      "sections": [
+        {
+          "title": "Fixes and usability",
+          "items": [
+            "Host sandboxes, previews and scripts support an explicit deployment prefix while retaining isolation, cancellation and timeout protection.",
+            "Article saving completes folder handling, rendering and record persistence in one flow, reporting complete or partial results without rolling back saved source.",
+            "Operation notices use concise headings with paths and failure causes in additional details; redundant transitional messages are removed.",
+            "Article titles share an editable component; titles and folders size to content within their containers. Load failures retain the centered message and recovery actions, with icons using theme colors.",
+            "Syncs Rainy theme 1.0.61, chapter and H3 snippets, callout opacity and a new chapter style; both code snippets follow the finalized wechat library source while preserving existing libraries and historical snapshots.",
+            "Cleans up obsolete and duplicate bilingual messages and adds key, parameter and historical-record compatibility checks, preserving existing notice wording and library records.",
+            "Corrects the default code snippets to match the finalized library sources. Please download the packages again if you obtained an earlier copy."
+          ]
+        }
+      ]
     }
   }
 }

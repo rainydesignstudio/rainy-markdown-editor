@@ -44,6 +44,20 @@ test('old product records translate through full-message matching and unknown te
   assert.equal(formatProductMessage('前缀：深色转换已取消。', en), '前缀：深色转换已取消。');
 });
 
+test('catalog cleanup retains legacy core IDs and raw diagnostics while UI duplicates reuse the same wording', () => {
+  const en = createUII18n('en-US').getFixedT('en-US', 'messages');
+  for (const key of ['bootstrap.theArticlePreviewRootIsMissing', 'frame.rootMissing']) {
+    const record = { messageKey: key }, before = JSON.stringify(record);
+    assert.equal(formatProductMessage(record, en), 'The article preview root is missing.');
+    assert.equal(JSON.stringify(record), before);
+  }
+  for (const [raw, translated] of [['分类已保存', 'Category saved'], ['删除失败：offline', 'Deletion failed: offline'], ['文章预览根节点缺失。', 'The article preview root is missing.']]) {
+    assert.equal(formatProductMessage({ message: raw }, en), translated);
+  }
+  assert.equal(formatProductMessage(productReference('controller.formatCheckEngine'), en), 'Format check engine');
+  assert.equal(productText('controller.formatCheckEngine'), productText('diagnostic.names.formatEngine'));
+});
+
 test('CLI locale selection uses locale precedence and unsupported languages fall back to Chinese', () => {
   assert.equal(cliLocale({ LC_ALL: 'zh_CN.UTF-8', LANG: 'en_US.UTF-8' }), 'zh-CN');
   assert.equal(cliLocale({ LC_MESSAGES: 'en_GB.UTF-8', LANG: 'zh_CN.UTF-8' }), 'en-US');

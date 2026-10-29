@@ -15,7 +15,7 @@ import {
 import type { StoredArticle } from '../types';
 import { ArticleImagePreview } from '../../components/media/ArticleImagePreview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
-import { ARTICLE_EXAMPLE_IMAGE } from '../articleExamples';
+import { ARTICLE_EXAMPLE_ASSET_URL, ARTICLE_EXAMPLE_IMAGE } from '../articleExamples';
 import type { FormatSnapshot } from './runtime';
 import { ArticleCodeBlock } from './ArticleCodeBlock';
 import { LibraryArticleImage } from './LibraryArticleImage';
@@ -263,7 +263,7 @@ function MarkdownPreviewContent({
         if (resourceReferenceIntent(originalSrc) === 'file') return <span role="img" data-local-asset-src={originalSrc} data-asset-state="error">{translationRef.current('messages:resources.imageInFileStorage')}</span>;
         // Application sample assets keep their own namespace in stylesheet libraries.
         if (originalSrc === ARTICLE_EXAMPLE_IMAGE) {
-          return <img {...imageProps} src={ARTICLE_EXAMPLE_IMAGE} alt={alt || '示例图片'} data-example-image="true" />;
+          return <img {...imageProps} src={ARTICLE_EXAMPLE_ASSET_URL} alt={alt || '示例图片'} data-example-image="true" />;
         }
         if (format.bundle.formatter.stylesheets && originalSrc && !/^(?:[a-z][a-z0-9+.-]*:|#|\/\/)/i.test(originalSrc)) {
           const base = currentLibrary?.article ? 'articles/' + currentLibrary.article.month + '/' + currentLibrary.article.folder : '';

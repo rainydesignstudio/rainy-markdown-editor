@@ -4,7 +4,8 @@ import { useUITranslation } from './UILocaleProvider';
 import { useLibraryCapabilities } from '../../hooks/useLibraryCapability';
 import { EXPORT_CAPABILITIES } from '../../lib/article-format/libraryConfiguration';
 
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import type { MouseEvent } from 'react';
+import { EditableArticleTitle } from '../editor/EditableArticleTitle';
 import type { ArticleMode, ViewKey } from '../../hooks/useEditorController';
 import type { WorkingArticle } from '../../lib/types';
 
@@ -90,24 +91,8 @@ export function EditorTopbar({
   const exportCapabilities = Object.values(EXPORT_CAPABILITIES).map(key => capabilities.get(key));
   const canExport = exportCapabilities.some(state => state.enabled);
   const exportReason = canExport ? undefined : exportCapabilities[0].reason;
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(currentTitle);
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
-  const suppressBlurCommitRef = useRef(false);
   const disabled = mediaOperation !== null || historyBusy || currentArticleIsArchived;
   const isEditor = view === 'articles' && articleMode === 'editor';
-
-  useEffect(() => setTitleDraft(currentTitle), [currentTitle]);
-  useEffect(() => { if (currentArticleIsArchived) setEditingTitle(false); }, [currentArticleIsArchived]);
-  useEffect(() => {
-    if (editingTitle) titleInputRef.current?.focus();
-  }, [editingTitle]);
-
-  const finishTitleEdit = (commit: boolean) => {
-    if (commit && titleDraft.trim()) onChangeTitle(titleDraft.trim());
-    else setTitleDraft(currentTitle);
-    setEditingTitle(false);
-  };
 
   const viewTitle = view === 'articles' ? articleCollectionTitle : t('shell:views.' + view);
 
@@ -126,27 +111,7 @@ export function EditorTopbar({
             </button>
             {currentArticleIsArchived ? (
               <div className="flex min-w-0 items-center gap-2"><h1 className="font-heading truncate text-base font-semibold text-primary">{currentTitle}</h1><span className="shrink-0 rounded-md border border-line bg-rail px-2 py-0.5 text-xs font-semibold text-faint">{t('articles:readOnly')}</span></div>
-            ) : editingTitle ? (
-              <input
-                ref={titleInputRef}
-                className="title-edit-input font-heading"
-                aria-label={t('editor:title.edit')}
-                value={titleDraft}
-                onChange={(event) => setTitleDraft(event.target.value)}
-                onBlur={() => {
-                  if (suppressBlurCommitRef.current) { suppressBlurCommitRef.current = false; return; }
-                  finishTitleEdit(true);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') { event.preventDefault(); finishTitleEdit(true); }
-                  if (event.key === 'Escape') { event.preventDefault(); suppressBlurCommitRef.current = true; finishTitleEdit(false); }
-                }}
-              />
-            ) : (
-              <button className="title-trigger font-heading" type="button" onClick={() => setEditingTitle(true)} data-tooltip={t('editor:title.change')} disabled={!directory || currentArticleIsArchived || !metadataWritable}>
-                <span>{currentTitle}</span><span className="title-edit-icon" aria-hidden="true"><Icon name="edit" /></span>
-              </button>
-            )}
+            ) : <EditableArticleTitle value={currentTitle} onChange={onChangeTitle} disabled={!directory || disabled || !metadataWritable} />}
           </div>
         ) : (
           <div className="toolbar-title">

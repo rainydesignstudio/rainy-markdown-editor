@@ -358,7 +358,7 @@ export function ThemeLibrary({ root, themes: storedThemes, editorThemes = [], is
       }
     } catch (error) {
       if (!isSessionCurrent(operationRoot)) return;
-      const message = productReference('themeLibrary.deleteFailed', { cause: productCause(error) });
+      const message = productReference('controller.deletionFailed', { cause: productCause(error) });
       setDeleteError(message);
       setNotice(message);
     } finally {

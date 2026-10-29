@@ -1,5 +1,5 @@
 import { ProductError } from '../i18n/productMessages';
-import { ARTICLE_EXAMPLE_IMAGE } from '../articleExamples';
+import { ARTICLE_EXAMPLE_ASSET_URL, ARTICLE_EXAMPLE_IMAGE } from '../articleExamples';
 import type { ImportResource } from './model';
 import type { ReadonlyImportSource } from './source';
 
@@ -29,7 +29,7 @@ export async function openImportResource(resource: ImportResource, source: Reado
     }
   }
   const builtin = resource.source === ARTICLE_EXAMPLE_IMAGE && resource.location === 'local';
-  const url = builtin ? ARTICLE_EXAMPLE_IMAGE : resourceDownloadURL(resource.source).href;
+  const url = builtin ? ARTICLE_EXAMPLE_ASSET_URL : resourceDownloadURL(resource.source).href;
   let response: Response;
   try { response = await fetcher(url, { method: 'GET', mode: 'cors', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer', cache: 'no-store', signal }); }
   catch (error) { if (signal.aborted) throw signal.reason; throw new ProductError('imports.downloadFailed'); }

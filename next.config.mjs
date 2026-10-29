@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  basePath: (process.env.NEXT_PUBLIC_ARTICLE_BASE_PATH || '').replace(/\/+$/, ''),
   // Isolate validation/build output while the user's development server is running.
   distDir: process.env.ARTICLE_BUILD_DIR || '.next',
   agentRules: false,

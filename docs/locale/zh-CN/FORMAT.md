@@ -209,6 +209,8 @@ JS
 
 ### 部署前置
 
+根路径部署无需配置前缀；部署到子路径时，构建与启动须使用相同的 `NEXT_PUBLIC_ARTICLE_BASE_PATH`（如 `/lab/rainy-markdown-editor`）。宿主沙箱、预览及脚本资源使用此前缀，资料库自身的相对路径不变；根路径和子路径须分别验证加载、失败恢复及保存重开。
+
 使用其他静态服务器时，须为 `format/article-package-sandbox.html` 和 `format/article-package-preview.html` 保留随应用服务器提供的隔离/CSP策略；浏览器或部署层更严格的策略不能由 format 文件绕过。默认 `npm start` 已提供这两条专用规则。公众号、eBay线上及实体手机仍分别点验。
 
 <a name="doc-bundled-resources"></a>

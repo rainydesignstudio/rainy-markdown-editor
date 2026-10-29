@@ -1,8 +1,8 @@
 {
   "id": "rainy-chapter",
-  "name": "Rainy Design · 编号章节",
+  "name": "Rainy Design · 章节",
   "trigger": "//rainy-chapter",
-  "description": "较正后的编号章节，能实现确切的对齐效果。",
+  "description": "带独立编号与英文眉题的 H2 章节标题。同篇文章的 H2 在本片段与 rainy-chapter-2 中二选一并保持统一；另设 rainy-section（H3）时，推荐选用本片段。",
   "content": "<section class=\"mt-8 mb-6 border-b border-article-line pb-4.5\">\n  <span class=\"my-0 text-[24px]/[1.3] font-bold tracking-[0.12em] text-article-accent\">01</span>\n  <p class=\"my-0 text-[11px]/[1.7] font-bold tracking-[0.12em] text-article-accent indent-6\">PREMISE</p>\n  <h2 class=\"m-0 pl-11 border-0 p-0 text-[22px]/[1.5] font-bold text-article-heading\">▌这里写章节标题</h2>\n</section>\n",
   "icon": "snippet",
   "categoryId": "rainy-design"

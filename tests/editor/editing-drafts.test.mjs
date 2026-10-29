@@ -79,7 +79,7 @@ test('the actual article update path tracks the current edit owner and clears so
 
 test('a completed older save advances only its still-open stored document baseline and keeps new typing', async () => {
   const source = await readFile(new URL('../../src/hooks/useEditorController.ts', import.meta.url), 'utf8');
-  const start = source.indexOf('  const performSaveSnapshot = useCallback('), end = source.indexOf('  const saveSnapshot', start);
+  const start = source.indexOf('  const performSaveSnapshot = useCallback('), end = source.indexOf('  const captureSavedRender', start);
   const code = ts.transpileModule(source.slice(start, end) + '\nglobalThis.save = performSaveSnapshot;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   for (const scenario of ['same', 'reverted-while-saving', 'other-document', 'other-library', 'other-format', 'new-document']) {
     const root = {}, token = { root, articleId: 'stored' }, theme = { id: 'basic', version: '1' };

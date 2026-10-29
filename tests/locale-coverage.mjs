@@ -11,6 +11,25 @@ const files = directory => fs.readdirSync(directory, { withFileTypes: true }).fl
 const at = (value, key) => key.split('.').reduce((item, part) => item?.[part], value);
 const productCalls = new Set(['ProductError', 'productMessage', 'productText', 'productLabel', 'productReference']);
 
+/** Duplicate text is a review candidate, not proof that two business meanings are interchangeable. */
+export function messageCatalogContracts(resources = UI_RESOURCES) {
+  const entries = (object, prefix = '') => Object.entries(object).flatMap(([key, value]) => typeof value === 'string' ? [[prefix + key, value]] : entries(value, prefix + key + '.'));
+  const catalogs = Object.fromEntries(['zh-CN', 'en-US'].map(locale => [locale, new Map(entries(resources[locale].messages))]));
+  const keys = [...new Set(Object.values(catalogs).flatMap(catalog => [...catalog.keys()]))].sort();
+  const missing = [], parameters = [], groups = new Map();
+  const slots = value => [...new Set([...value.matchAll(/{{\s*([^},\s]+)/g)].map(match => match[1]))].sort();
+  for (const key of keys) {
+    for (const locale of ['zh-CN', 'en-US']) if (!catalogs[locale].has(key)) missing.push({ locale, key });
+    if (!catalogs['zh-CN'].has(key) || !catalogs['en-US'].has(key)) continue;
+    const zh = catalogs['zh-CN'].get(key), en = catalogs['en-US'].get(key);
+    if (JSON.stringify(slots(zh)) !== JSON.stringify(slots(en))) parameters.push({ key, zh: slots(zh), en: slots(en) });
+    const pair = JSON.stringify([zh, en]);
+    if (!groups.has(pair)) groups.set(pair, []);
+    groups.get(pair).push(key);
+  }
+  return { keys: keys.length, missing, parameters, duplicates: [...groups.values()].filter(group => group.length > 1) };
+}
+
 /** Check source references, not just equality between the two dictionaries. */
 export function localeCoverage() {
   const missing = [], parameters = [], dynamic = [], uncheckedParameters = [];

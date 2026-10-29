@@ -1,0 +1,47 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+
+for (const prefix of ['', '/lab/rainy-markdown-editor']) test(`host render assets respect deployment prefix ${prefix || '/'}`, () => {
+  const child = spawnSync(process.execPath, ['--experimental-strip-types', '--experimental-loader', './tests/ts-loader.mjs', '--input-type=module', '-e', `
+    import assert from 'node:assert/strict';
+    import { JSDOM } from 'jsdom';
+    const dom = new JSDOM('<!doctype html><html><body></body></html>', { url: 'http://localhost:3500/' });
+    globalThis.window = dom.window; globalThis.document = dom.window.document; globalThis.location = dom.window.location;
+    window.setTimeout = setTimeout; window.clearTimeout = clearTimeout;
+    const { appAssetPath } = await import('./src/lib/appBasePath.ts');
+    const prefix = process.env.NEXT_PUBLIC_ARTICLE_BASE_PATH;
+    assert.equal(appAssetPath('/format/article-package-sandbox.html'), prefix + '/format/article-package-sandbox.html');
+    const { invokeRenderer } = await import('./src/lib/article-format/package.ts');
+    const snapshot = { id: 'paths', renderer: { fingerprint: 'paths', declaration: { protocol: 'rainy-format/2', actions: [{ id: 'render', kind: 'render' }], permissions: { images: [], styles: [], fonts: [] } } } };
+    const abort = new AbortController(), render = invokeRenderer(snapshot, 'render', {}, abort.signal);
+    const runner = document.querySelector('iframe');
+    assert.equal(runner.getAttribute('src'), prefix + '/format/article-package-sandbox.html');
+    assert.equal(runner.getAttribute('sandbox'), 'allow-scripts');
+    abort.abort(); await assert.rejects(render); assert.equal(document.querySelector('iframe'), null);
+    let expire;
+    window.setTimeout = callback => { expire = callback; return 0; };
+    const stalled = invokeRenderer(snapshot, 'render', {}), rejected = assert.rejects(stalled);
+    expire(); await rejected; assert.equal(document.querySelector('iframe'), null, 'a missing sandbox handshake settles and removes the runner');
+    window.setTimeout = setTimeout;
+    const recoveredAbort = new AbortController(), recovered = invokeRenderer(snapshot, 'render', {}, recoveredAbort.signal);
+    assert.equal(document.querySelector('iframe').getAttribute('src'), prefix + '/format/article-package-sandbox.html');
+    recoveredAbort.abort(); await assert.rejects(recovered);
+    const { packageDisplayDocument } = await import('./src/lib/article-format/packageRendering.ts');
+    const frame = document.createElement('iframe'); document.body.append(frame);
+    const preview = packageDisplayDocument(frame, snapshot);
+    assert.equal(frame.getAttribute('src'), prefix + '/format/article-package-preview.html');
+    frame.onerror(); await assert.rejects(preview); frame.remove();
+    const { formatPreviewDocument } = await import('./src/lib/article-format/frame.ts');
+    const { getFormatSnapshot } = await import('./src/lib/article-format/runtime.ts');
+    const html = formatPreviewDocument('', '<p>Sample</p>', false, getFormatSnapshot());
+    for (const path of ['/algorithm/article-algorithm-host.js', '/format/article-format-engine.js', '/format/article-format-bootstrap.js']) assert.ok(html.includes('src="' + prefix + path + '"'));
+    const { mermaidFrameDocument } = await import('./src/lib/article-format/mermaid.ts');
+    assert.ok(mermaidFrameDocument('token', location.origin).includes(location.origin + prefix + '/algorithm/mermaid/mermaid.min.js'));
+    const { ARTICLE_EXAMPLE_IMAGE, ARTICLE_EXAMPLE_ASSET_URL } = await import('./src/lib/articleExamples.ts');
+    assert.equal(ARTICLE_EXAMPLE_IMAGE, '/images/article-sample.png');
+    assert.equal(ARTICLE_EXAMPLE_ASSET_URL, prefix + ARTICLE_EXAMPLE_IMAGE);
+    dom.window.close();
+  `], { cwd: new URL('..', import.meta.url), env: { ...process.env, NEXT_PUBLIC_ARTICLE_BASE_PATH: prefix }, encoding: 'utf8', timeout: 15000 });
+  assert.equal(child.status, 0, child.stderr || child.stdout);
+});

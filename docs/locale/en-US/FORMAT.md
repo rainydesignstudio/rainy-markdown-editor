@@ -209,6 +209,8 @@ Reload affects the current library only. Invalid packages fail explicitly withou
 
 ### Deployment prerequisites
 
+Root deployment needs no prefix. For a subpath, use the same `NEXT_PUBLIC_ARTICLE_BASE_PATH` at build and start time, such as `/lab/rainy-markdown-editor`. Host sandbox, preview and script assets use this prefix; library-relative paths remain unchanged. Verify loading, failure recovery, saving and reopening separately for root and subpath deployments.
+
 Other static servers must retain the isolation/CSP rules supplied by the application server for format/article-package-sandbox.html and format/article-package-preview.html. Format files cannot bypass stricter browser/deployment restrictions. The default npm start server supplies both dedicated policies. WeChat, live eBay and physical phones still require separate acceptance.
 
 <a name="doc-bundled-resources"></a>

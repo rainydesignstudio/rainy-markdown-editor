@@ -3,7 +3,7 @@
   "name": "Callout",
   "trigger": "//callout",
   "description": "A theme-colored note with body text and emphasis.",
-  "content": "<section class=\"block rounded-xl border border-article-line bg-article-tint p-4 mb-6\">\n  <p class=\"m-0\"><span>💡 </span><strong class=\"text-article-accent\">Note: </strong>▌This is a helpful note.</p>\n</section>",
+  "content": "<section class=\"block rounded-xl border border-article-line bg-article-tint/67 p-4 mb-6\">\n  <p class=\"m-0\"><span>💡 </span><strong class=\"text-article-accent\">Note: </strong>▌This is a helpful note.</p>\n</section>",
   "icon": "sparkles",
   "categoryId": "default"
 }

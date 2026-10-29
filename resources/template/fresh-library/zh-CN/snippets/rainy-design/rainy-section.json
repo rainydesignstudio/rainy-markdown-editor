@@ -2,8 +2,8 @@
   "id": "rainy-section",
   "name": "Rainy Design · 小节",
   "trigger": "//rainy-section",
-  "description": "小节标题与引言，以细线和文字层级组织内容。",
-  "content": "<section class=\"my-8\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-4 text-2xl font-semibold text-article-heading\">▌你说：我就喜欢 “古法写作”</h2>\n  <p class=\"m-0 text-base text-article-ink\">那还说啥呢？Markdown 语法和 HTML 你总得懂一个。</p>\n</section>\n",
+  "description": "用于章节内部的 H3 小节，含英文眉题、小节标题与引言。推荐与 rainy-chapter 配合使用，以保持章节与小节的视觉区分。",
+  "content": "<section class=\"my-8 pb-4 border-b border-article-accent\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 | LOREM IPSUM</p>\n  <h3 class=\"mt-0 mb-2 text-xl font-semibold text-article-heading\">我不装了我真摊牌了</h3>\n  <i class=\"m-0 text-base text-article-muted\">其实写文章都不该你自己写的。你可以试试好用的 ghost-writer，如果不太懂的话有 eli5 和 teach skill 可以用。</i>\n</section>",
   "icon": "layers",
   "categoryId": "rainy-design"
 }

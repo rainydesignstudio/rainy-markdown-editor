@@ -86,7 +86,7 @@ import { awaitPackagePreview, packageClipboard, packageInputFor, packageResource
 import { buildClipboardPayload, extractMarkdownClassCandidates } from '../lib/article-format/output';
 import { localResourceReference } from '../lib/resources/references';
 import { embedClipboardImages } from '../lib/clipboardImages';
-import { ARTICLE_EXAMPLE_IMAGE } from '../lib/articleExamples';
+import { ARTICLE_EXAMPLE_ASSET_URL } from '../lib/articleExamples';
 import { compiledArticleFormatStatus, inspectArticleFormatReport, type ArticleFormatReport } from '../lib/articleFormatReport';
 import { getPreviewPreferences } from './usePreviewPreferences';
 import { compileArticleStyles } from '../lib/article-format/renderer';
@@ -184,6 +184,9 @@ type SaveSnapshotResult = {
   ok: boolean;
   current: boolean;
   rendered?: boolean;
+  renderSaved?: boolean;
+  saveIssue?: ProductMessageValue;
+  notice?: ReturnType<typeof productLabel> & { tone: Tone; retrySave?: boolean };
   savedSnapshot?: ArticleSnapshot;
   result?: Awaited<ReturnType<typeof saveStoredArticle>>;
 };
@@ -310,7 +313,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const [compiledRevision, setCompiledRevision] = useState<number | null>(null);
   const [compiledCss, setCompiledCss] = useState('');
   const [savedPreviewRevision, setSavedPreviewRevision] = useState(0);
-  const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number; notify?: boolean }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
+  const [status, setStatus] = useState<{ label: string; tone: Tone; formatRevision?: number; notify?: boolean; retrySave?: boolean }>({ ...productLabel("controller.chooseALibraryToStartWriting"), tone: 'neutral' });
   const capabilityAllowed = useCallback((key: LibraryCapability) => {
     try { assertLibraryCapability(getFormatSnapshot(), key); return true; }
     catch (error) { setStatus({ ...productErrorLabel(error), tone: 'warning' }); return false; }
@@ -369,6 +372,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const sourceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const compileRequestRef = useRef(0);
   const compiledFormatRef = useRef<{ snapshot: ArticleSnapshot; css: string; report: ArticleFormatReport; classes: number; preview: HTMLElement | null; requestId: number } | null>(null);
+  const compileIssueRef = useRef<ProductMessageValue | null>(null);
   const savedPreviewPendingRef = useRef<ArticleSnapshot | null>(null);
   const formatInspectionRef = useRef(false);
   const articleRef = useRef(article);
@@ -626,6 +630,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     if (!mounted) return false;
     const snapshot = given ?? snapshotFor();
     const requestId = ++compileRequestRef.current;
+    compileIssueRef.current = null;
     setIsCompiling(true);
     try {
       if (snapshot.renderIssue) throw new Error(snapshot.renderIssue);
@@ -638,7 +643,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       const preview = previewRef.current;
       if (preview) await awaitPackagePreview(preview, parseArticle(snapshot.source).body, snapshot.theme, snapshot.renderSnapshot ?? getFormatSnapshot());
       const report = await inspectArticleFormatReport(snapshot.source, snapshot.theme, preview, { root: snapshot.directory, month: snapshot.month, folder: snapshot.folder }, { deep: false }).catch((cause): ArticleFormatReport => ({
-        theme: { passed: [], issues: [{ kind: 'engine', name: productText("controller.formatCheckEngine"), source: productText("controller.currentArticleFormatCheck"), tier: 'unknown', ...productMessage("controller.theCurrentFormatCouldNotBeChecked", { "cause": productCause(cause) }) }] },
+        theme: { passed: [], issues: [{ kind: 'engine', name: productText("diagnostic.names.formatEngine"), source: productText("controller.currentArticleFormatCheck"), tier: 'unknown', ...productMessage("controller.theCurrentFormatCouldNotBeChecked", { "cause": productCause(cause) }) }] },
         body: { passed: [], issues: [] },
       }));
       if (requestId !== compileRequestRef.current || !matchesSnapshot(snapshot)) return false;
@@ -654,6 +659,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       return true;
     } catch (error) {
       if (requestId === compileRequestRef.current && matchesSnapshot(snapshot)) {
+        compileIssueRef.current = productCause(error);
         setStatus({ ...productLabel("controller.styleGenerationFailed", { "cause": productCause(error) }), tone: 'error', formatRevision: snapshot.revision });
       }
       return false;
@@ -675,7 +681,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     mutationQueueRef.current.run(() => loadStoredArticles(root))
   ), [loadStoredArticles]);
 
-  const applyStoredArticle = useCallback(async (stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current, isAllowed: () => boolean = () => true) => {
+  const applyStoredArticle = useCallback(async (stored: StoredArticle, navigateToEditor = false, root: FileSystemDirectoryHandle | null = directoryRef.current, isAllowed: () => boolean = () => true, render = true) => {
     if (!isAllowed()) return false;
     const documentToken = openDocument(root, stored.id);
     if (!documentToken) {
@@ -712,7 +718,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     const legacyAlgorithm = restored?.snapshot.algorithmSource === 'legacy' && restored.snapshot.bundle.formatter.preview.dark.transform !== 'preserve';
     setStatus({ ...productLabel('shared.compose', { parts: productJoin(legacyAlgorithm ? [loadedMessage, productReference('algorithms.legacyHistory')] : [loadedMessage], '；') }), tone: stored.parse.diagnostics.length > 0 || legacyAlgorithm ? 'warning' : 'neutral' });
     if (navigateToEditor) navigateArticleMode('editor');
-    void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
+    if (render) void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
     return true;
   }, [compileCurrent, navigateArticleMode, openDocument, snapshotFor]);
 
@@ -721,7 +727,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     window.requestAnimationFrame(() => sourceTextareaRef.current?.focus());
   }, []);
 
-  const renameSavedArticleFolder = useCallback(async (target: ArticleSnapshot, name: string): Promise<ArticleSnapshot | null> => {
+  const renameSavedArticleFolder = useCallback(async (target: ArticleSnapshot, name: string): Promise<(ArticleSnapshot & { saveIssue?: string }) | null> => {
     const root = target.directory, month = target.month, folder = target.folder, id = target.articleId;
     if (!root || !month || !folder || mediaOperationRef.current || editorWorkspaceIssue || !matchesSnapshot(target)) return null;
     if (getArticleOrganization(editorWorkspaceRef.current, id).archived) return null;
@@ -756,11 +762,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       let loaded = moved.article, rereadIssue: string | null = loadedWorkspace.issue;
       try { loaded = await readStoredArticleById(root, month, moved.article.folder); }
       catch (error) { rereadIssue = error instanceof Error ? error.message : String(error); }
-      if (!matchesSnapshot(target) || !await applyStoredArticle(loaded, false, root)) return null;
+      if (!matchesSnapshot(target) || !await applyStoredArticle(loaded, false, root, () => directoryRef.current === root, false)) return null;
       setMediaRefreshRevision(value => value + 1);
       const issue = moved.cleanupIssue ?? rereadIssue;
-      if (issue) setStatus({ label: issue, tone: 'warning' });
-      return snapshotFor();
+      return issue ? { ...snapshotFor(), saveIssue: issue } : snapshotFor();
     } catch (error) {
       if (blocked) { mutationQueueRef.current.failDelete(blocked); blocked = null; }
       if (directoryRef.current === root && (articleId(articleRef.current) === id || moved && articleId(articleRef.current) === moved.article.id)) {
@@ -789,7 +794,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     return () => { cancelled = true; };
   }, [articleMode, cacheLoadedArticleReport, compiledRevision, isCompiling, loadInspectionRevision, matchesSnapshot, previewElement, snapshotFor]);
 
-  const performSaveSnapshot = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true, quiet = false): Promise<SaveSnapshotResult> => {
+  const performSaveSnapshot = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true): Promise<SaveSnapshotResult> => {
     const root = snapshot.directory;
     if (!root) {
       setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeSaving"), tone: 'warning' });
@@ -809,26 +814,8 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           ...(preserveThemeSnapshot ? {} : { theme: { id: snapshot.theme.id, version: snapshot.theme.version } }),
         });
     try {
-      let prepared: Awaited<ReturnType<typeof prepareRenderRecord>> | undefined, renderIssue: string | undefined;
-      const compiled = compiledFormatRef.current;
-      const preview = previewRef.current;
-      if (!hasErrors && !preserveThemeSnapshot && matchesSnapshot(snapshot) && preview && compiled?.snapshot.revision === snapshot.revision) {
-        try {
-          prepared = await prepareRenderRecord(nextSource, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: snapshot.folder && snapshot.month ? 'articles/' + snapshot.month + '/' + snapshot.folder : undefined });
-        } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
-      } else renderIssue = productText("controller.theCurrentRenderIsNotReadyUpdateStylesAndSaveAgain");
       if (!isAllowed()) return { ok: false, current: matchesSnapshot(snapshot) };
       const result = await saveStoredArticle(root, nextSource, snapshot.theme, snapshot.folder, snapshot.month, { writeTheme: !preserveThemeSnapshot });
-      if (isAllowed() && prepared && result.article.themeValid) {
-        try {
-          const savedDirectory = await getStoredArticleDirectory(root, result.article.month, result.article.folder);
-          if (isAllowed()) {
-            await persistRenderRecord(root, savedDirectory, prepared);
-            result.article.renderRecord = prepared.record;
-          }
-        } catch (error) { renderIssue = error instanceof Error ? error.message : String(error); }
-      }
-      if (renderIssue) result.article.renderIssue = renderIssue;
       const currentDocument = matchesSnapshot(snapshot) && mutationQueueRef.current.canSave(snapshot.documentToken);
       const nextDocumentToken = currentDocument
         ? result.article.id === snapshot.documentToken.articleId
@@ -849,7 +836,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       if (current) {
         documentTokenRef.current = nextDocumentToken;
         setStoredArticles((items) => upsertStoredArticle(items, result.article));
-        const savedArticle: WorkingArticle = { folderNameDraft: snapshot.folderNameDraft, source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false, renderSnapshot: snapshot.renderSnapshot, renderCss: prepared ? compiled?.css : undefined, renderRecord: result.article.renderRecord, renderIssue: snapshot.renderIssue };
+        const savedArticle: WorkingArticle = { folderNameDraft: snapshot.folderNameDraft, source: nextSource, folder: result.article.folder, month: result.article.month, theme: result.article.theme, themeValid: result.article.themeValid, dirty: false, renderSnapshot: snapshot.renderSnapshot, renderCss: snapshot.renderCss, renderRecord: result.article.renderRecord, renderIssue: snapshot.renderIssue };
         articleBaselineRef.current = articleDraftBaseline(savedArticle);
         savedArticle.dirty = articleDraftChanged(savedArticle, articleBaselineRef.current);
         articleSourceLocationRef.current = null; articleInfoLocationRef.current = null;
@@ -865,10 +852,6 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           };
         }
         setCompiledRevision(null);
-        if (result.indexUpdated && result.indexError) setStatus({ ...productLabel("controller.sourceSavedTheMonthlyIndexWasRebuilt", { "resultIndexError": result.indexError }), tone: 'warning' });
-        else if (result.indexUpdated) { if (!quiet) setStatus({ ...productLabel("controller.sourceSaved", { "result_articleFilePath": result.article.filePath }), tone: 'success' }); }
-        else setStatus({ ...productLabel("controller.sourceSavedTheIndexWasNotUpdated", { "value": (result.indexError ?? productReference("controller.unknownError")) }), tone: 'warning' });
-        if (renderIssue) setStatus({ ...productLabel("shared.compose", { parts: productJoin([productReference("controller.sourceSavedTheRenderRecordWasNotUpdated"), renderIssue]) }), tone: 'warning' });
       } else if (result.sourceSaved && snapshot.folder && snapshot.month && directoryRef.current === root &&
         documentTokenRef.current === snapshot.documentToken && getFormatSnapshot().id === snapshot.formatId &&
         mutationQueueRef.current.canSave(snapshot.documentToken)) {
@@ -885,6 +868,52 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       return { ok: false, current: matchesSnapshot(snapshot) };
     }
   }, [matchesSnapshot, openDocument]);
+
+  const captureSavedRender = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true) => {
+    const root = snapshot.directory, preview = previewRef.current, compiled = compiledFormatRef.current;
+    if (!isAllowed() || !root || !snapshot.month || !snapshot.folder || !preview || !compiled || !matchesSnapshot(snapshot) || !matchesSnapshot(compiled.snapshot) || compiled.snapshot.source !== snapshot.source) return { ok: false };
+    try {
+      const prepared = await prepareRenderRecord(snapshot.source, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: 'articles/' + snapshot.month + '/' + snapshot.folder });
+      if (!isAllowed() || !matchesSnapshot(snapshot)) return { ok: false };
+      const persisted = await mutationQueueRef.current.run(async () => {
+        if (!isAllowed()) return false;
+        if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new ProductError("controller.theArticleSessionChangedTheRenderRecordWasNotUpdated");
+        const savedDirectory = await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!);
+        if (!isAllowed()) return false;
+        await persistRenderRecord(root, savedDirectory, prepared);
+        return true;
+      });
+      if (!persisted) return { ok: false };
+      if (matchesSnapshot(snapshot)) {
+        const next = { ...articleRef.current, renderRecord: prepared.record, renderCss: compiled.css, renderIssue: undefined };
+        articleRef.current = next; setArticle(next);
+      }
+      return { ok: true };
+    } catch (error) {
+      return { ok: false, issue: productCause(error) };
+    }
+  }, [matchesSnapshot]);
+
+  const finishSavedSnapshot = useCallback(async (result: SaveSnapshotResult, isAllowed: () => boolean = () => true, quiet = false): Promise<SaveSnapshotResult> => {
+    const snapshot = result.savedSnapshot;
+    if (!result.ok || !result.current || !snapshot || !result.result || !isAllowed()) return result;
+    const eligible = result.result.article.parse.canCopy && snapshot.themeValid;
+    result.rendered = eligible ? await compileCurrent(snapshot) : false;
+    if (!isAllowed() || !matchesSnapshot(snapshot)) return { ...result, ok: false, current: false };
+    const rendered = result.rendered ? await captureSavedRender(snapshot, isAllowed) : { ok: false };
+    if (!isAllowed() || !matchesSnapshot(snapshot)) return { ...result, ok: false, current: false };
+    result.renderSaved = rendered.ok;
+    result.ok = rendered.ok;
+    const issues: ProductMessageValue[] = [];
+    if (!rendered.ok) issues.push(productReference('controller.sourceSavedTheRenderRecordWasNotUpdated'), rendered.issue ?? compileIssueRef.current ?? snapshot.renderIssue ?? productReference(eligible ? 'controller.renderUpdateFailed' : 'controller.repairMetadataOrTheThemeSnapshotBeforeCheckingTheCurrentArticle'));
+    if (result.result.indexError) issues.push(productReference('controller.sourceSavedTheIndexWasNotUpdated', { value: result.result.indexError }));
+    if (result.saveIssue) issues.push(result.saveIssue);
+    result.notice = issues.length
+      ? { ...productLabel('shared.compose', { parts: productJoin(issues, '；') }), tone: 'warning', retrySave: !rendered.ok }
+      : { ...productLabel('controller.sourceSaved', { result_articleFilePath: `articles/${snapshot.month}/${snapshot.folder}/article.md` }), tone: 'success' };
+    if (issues.length || !quiet) setStatus(result.notice);
+    return result;
+  }, [captureSavedRender, compileCurrent, matchesSnapshot]);
 
   const saveSnapshot = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true, quiet = false): Promise<SaveSnapshotResult> => {
     let folderName: string | undefined;
@@ -903,56 +932,28 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         if (current) setStatus({ ...productLabel("controller.savingCancelledThisArticleIsBeingDeletedOrHasBeenDeletedOpen"), tone: 'warning' });
         return { ok: false, current };
       }
-      return performSaveSnapshot(snapshot, isAllowed, quiet);
+      return performSaveSnapshot(snapshot, isAllowed);
     });
     if (isAllowed() && result.ok && result.current && result.savedSnapshot && folderName !== undefined) {
       const renamed = await renameSavedArticleFolder(result.savedSnapshot, folderName);
       if (!renamed) return { ...result, ok: false, current: matchesSnapshot(result.savedSnapshot) };
+      result.saveIssue = renamed.saveIssue;
       result.savedSnapshot = renamed;
+      savedPreviewPendingRef.current = renamed;
       result.current = matchesSnapshot(renamed);
     }
-    if (isAllowed() && getPreviewPreferences().saveOnly && result.ok && result.current && result.savedSnapshot &&
-      result.result?.article.parse.canCopy) {
-      result.rendered = await compileCurrent(result.savedSnapshot);
-    }
-    return result;
-  }, [matchesSnapshot, performSaveSnapshot, compileCurrent, renameSavedArticleFolder]);
-
-  const captureSavedRender = useCallback(async (snapshot: ArticleSnapshot, isAllowed: () => boolean = () => true) => {
-    const root = snapshot.directory, preview = previewRef.current, compiled = compiledFormatRef.current;
-    if (!isAllowed() || !root || !snapshot.month || !snapshot.folder || !preview || !compiled || !matchesSnapshot(snapshot)) return false;
-    try {
-      const prepared = await prepareRenderRecord(snapshot.source, snapshot.theme, preview, compiled.css, { snapshot: snapshot.renderSnapshot ?? getFormatSnapshot(), root, articlePath: 'articles/' + snapshot.month + '/' + snapshot.folder });
-      if (!isAllowed() || !matchesSnapshot(snapshot)) return false;
-      const persisted = await mutationQueueRef.current.run(async () => {
-        if (!isAllowed()) return false;
-        if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new ProductError("controller.theArticleSessionChangedTheRenderRecordWasNotUpdated");
-        const savedDirectory = await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!);
-        if (!isAllowed()) return false;
-        await persistRenderRecord(root, savedDirectory, prepared);
-        return true;
-      });
-      if (!persisted) return false;
-      if (matchesSnapshot(snapshot)) {
-        const next = { ...articleRef.current, renderRecord: prepared.record, renderCss: compiled.css, renderIssue: undefined };
-        articleRef.current = next; setArticle(next);
-      }
-      return true;
-    } catch (error) {
-      if (matchesSnapshot(snapshot)) setStatus({ ...productLabel("shared.compose", { parts: productJoin([productReference("controller.sourceSavedTheRenderRecordWasNotUpdated"), productCause(error)]) }), tone: 'warning' });
-      return false;
-    }
-  }, [matchesSnapshot]);
+    return finishSavedSnapshot(result, isAllowed, quiet);
+  }, [matchesSnapshot, performSaveSnapshot, finishSavedSnapshot, renameSavedArticleFolder]);
 
   const saveCurrent = useCallback(async (): Promise<boolean> => {
     if (mediaOperationRef.current || historyOperationRef.current) return false;
     const showReport = getPreviewPreferences().saveReport;
     const snapshot = snapshotFor();
     setLoadInspectionRevision(null);
-    const result = await saveSnapshot(snapshot);
+    const result = await saveSnapshot(snapshot, () => true, true);
+    let checkFailed = false;
     if (result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy) {
-      const compiled = result.rendered ?? await compileCurrent(result.savedSnapshot);
-      if (compiled) await captureSavedRender(result.savedSnapshot);
+      const compiled = result.rendered;
       const checked = compiledFormatRef.current;
       try {
       const report = compiled && checked?.report.complete && matchesSnapshot(checked.snapshot)
@@ -962,11 +963,19 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         setFormatCheck({ mode: 'save', report });
       }
       } catch (error) {
+        checkFailed = true;
         if (matchesSnapshot(result.savedSnapshot)) setStatus({ ...productLabel("controller.sourceSavedFormatCheckingIsIncomplete", { "cause": productCause(error) }), tone: 'warning' });
       }
     }
-    return result.ok;
-  }, [captureSavedRender, compileCurrent, matchesSnapshot, publishSourceFormatReport, saveSnapshot, snapshotFor]);
+    if (result.ok && result.current && result.savedSnapshot && matchesSnapshot(result.savedSnapshot) && result.notice && !checkFailed) setStatus(result.notice);
+    return result.ok && result.current;
+  }, [matchesSnapshot, publishSourceFormatReport, saveSnapshot, snapshotFor]);
+
+  const retrySaveToken = documentTokenRef.current;
+  const retrySaveCurrent = useCallback(async () => {
+    if (documentTokenRef.current !== retrySaveToken) return false;
+    return saveCurrent();
+  }, [retrySaveToken, saveCurrent]);
 
   const checkCurrentFormat = useCallback(async (): Promise<boolean> => {
     if (formatInspectionRef.current || formatCheckResolveRef.current || mediaOperationRef.current || historyOperationRef.current) return false;
@@ -1650,6 +1659,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     setStatus({ ...productLabel("controller.creatingANewFileForAndUpdatingArticleReferences", { "assetFileName": asset.fileName }), tone: 'warning' });
     const createdRef: { value: Awaited<ReturnType<typeof copyArticleImageAs>> | null } = { value: null };
     const removedSourceRef = { value: false };
+    let savedCurrent: SaveSnapshotResult | undefined;
     try {
       const result = await mutationQueueRef.current.run(async () => {
         const isRootCurrent = () => directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession;
@@ -1711,6 +1721,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           }
           updateArticle(nextSource);
           const saveResult = await performSaveSnapshot(snapshotFor());
+          savedCurrent = saveResult;
           const sourceSaved = saveResult.ok && saveResult.current && Boolean(saveResult.savedSnapshot);
           const indexNote = saveResult.result?.indexError ? productReference("controller.monthlyIndexStatus", { "saveResult_resultIndexError": saveResult.result.indexError }) : '';
           const messageInfo = sourceSaved
@@ -1733,6 +1744,10 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         if (isRootCurrent()) setStatus({ ...messageInfo, label: messageInfo.message, tone: saved.sourceSaved && !saved.indexError ? 'success' : 'warning' });
         return { fileCreated: true, fileName: created.fileName, ...messageInfo, tone: saved.sourceSaved && !saved.indexError ? 'success' as const : 'warning' as const };
       });
+      if (savedCurrent?.current && directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession) {
+        const completed = await finishSavedSnapshot(savedCurrent, () => directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession, true);
+        if (!completed.ok) return { ...result, ...productMessage('shared.compose', { parts: productJoin([result.message, productReference('controller.sourceSavedTheRenderRecordWasNotUpdated')], '；') }), tone: 'warning' as const };
+      }
       return result;
     } catch (error) {
       if (createdRef.value) {
@@ -1746,7 +1761,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       mediaOperationRef.current = false;
       setMediaOperation(null);
     }
-  }, [performSaveSnapshot, snapshotFor, updateArticle]);
+  }, [finishSavedSnapshot, performSaveSnapshot, snapshotFor, updateArticle]);
 
   const runAfterDraftDecision = useCallback((action: PendingAction, protectDraft = true) => {
     if (protectDraft && articleRef.current.dirty) {
@@ -2497,7 +2512,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       setStatus({ ...productLabel("controller.thisManuscriptCannotBeCopiedYetRepairYamlOrTheThemeSnapshot"), tone: 'error' });
       return;
     }
-    const saved = initial.directory && articleRef.current.dirty ? await saveSnapshot(initial) : { ok: true, current: matchesSnapshot(initial), savedSnapshot: initial, rendered: undefined };
+    const saved = initial.directory && articleRef.current.dirty ? await saveSnapshot(initial, () => true, true) : { ok: true, current: matchesSnapshot(initial), savedSnapshot: initial, rendered: undefined };
     if (!saved.ok) return;
     if (!saved.current || !saved.savedSnapshot || !matchesSnapshot(saved.savedSnapshot) || copyRequestRef.current !== requestId) {
       setStatus({ ...productLabel("controller.theManuscriptChangedDuringSavingTheOldRevisionWasDiscardedCopyThe"), tone: 'error' });
@@ -2547,7 +2562,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         if (!current()) throw new ProductError("controller.theManuscriptOrLibraryChangedCopyingThePreviousDraftWasCancelled");
         return (await directory.getFileHandle(fileName)).getFile();
       }, outputCurrent, async () => {
-        const response = await fetch(ARTICLE_EXAMPLE_IMAGE);
+        const response = await fetch(ARTICLE_EXAMPLE_ASSET_URL);
         if (!response.ok) throw new ProductError("controller.theSampleImageCouldNotBeReadRefreshAndTryAgain");
         return response.blob();
       }, outputSnapshot.renderer ? source => {
@@ -3126,17 +3141,14 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         autoSaveBusyRef.current = true;
         try {
           const snapshot = snapshotFor(current);
-          const result = await saveSnapshot(snapshot, () => editorPageRef.current, true);
-          if (editorPageRef.current && result.ok && result.current && result.savedSnapshot && result.result?.article.parse.canCopy && result.savedSnapshot.documentToken.root === root) {
-            if (result.rendered ?? await compileCurrent(result.savedSnapshot)) { if (editorPageRef.current) await captureSavedRender(result.savedSnapshot, () => editorPageRef.current); }
-          }
+          await saveSnapshot(snapshot, () => editorPageRef.current, true);
         } finally {
           autoSaveBusyRef.current = false;
         }
       })();
     }, articleSettings.autoSave.intervalSeconds * 1000);
     return () => window.clearInterval(timer);
-  }, [view, articleMode, articleSettings.autoSave.enabled, articleSettings.autoSave.intervalSeconds, article.dirty, article.folder, article.month, captureSavedRender, compileCurrent, currentDocumentGeneration, directory, editorWorkspace, saveSnapshot, settingsIssue, snapshotFor]);
+  }, [view, articleMode, articleSettings.autoSave.enabled, articleSettings.autoSave.intervalSeconds, article.dirty, article.folder, article.month, currentDocumentGeneration, directory, editorWorkspace, saveSnapshot, settingsIssue, snapshotFor]);
 
   useEffect(() => {
     const root = directory;
@@ -3286,6 +3298,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   });
   importCancelRef.current = markdownImport.cancelArticle;
   importFolderRef.current = { isBusy: markdownImport.articleFolderIsBusy, moved: markdownImport.articleFolderMoved };
+  const renderedFormat = compiledFormatRef.current;
+  const sourceStatus = status.formatRevision === undefined && renderedFormat && matchesSnapshot(renderedFormat.snapshot)
+    ? compiledArticleFormatStatus(renderedFormat.report, renderedFormat.snapshot.revision, renderedFormat.classes) : status;
   return {
     mounted, fileSystemReady, view, articleMode, navigateView, navigateArticleMode, registerNavigationGuard, markdownImport, trash,
     directory, setDirectory, contentLibraryRootSession, contentLibrariesState, setContentLibrariesState,
@@ -3305,8 +3320,8 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     historyDialogOpen, setHistoryDialogOpen, historySnapshots, setHistorySnapshots, historyIssues,
     setHistoryIssues, historySelectedId, setHistorySelectedId, historyBusy, historyRefreshPending,
     setHistoryRefreshPending, historyNotice, setHistoryNotice, deleteHistorySnapshot,
-    revision, compiledRevision, setCompiledRevision, compiledCss, savedPreviewRevision, currentDocumentGeneration, sourceHistoryKey: sourceHistoryKeyRef.current, sourceFormatIssues, status, setStatus,
-    mobilePane, setMobilePane, showThemeDialog, setShowThemeDialog, showTemplateDialog,
+    revision, compiledRevision, setCompiledRevision, compiledCss, savedPreviewRevision, currentDocumentGeneration, sourceHistoryKey: sourceHistoryKeyRef.current, sourceFormatIssues, sourceStatus, status, setStatus,
+    retrySaveCurrent, mobilePane, setMobilePane, showThemeDialog, setShowThemeDialog, showTemplateDialog,
     setShowTemplateDialog, showUnsavedDialog, setShowUnsavedDialog, pendingActionLabel,
     setPendingActionLabel,
     copyTarget, setCopyTarget, copyOpenerRef, copyTitle, setCopyTitle, copyMonth, setCopyMonth,

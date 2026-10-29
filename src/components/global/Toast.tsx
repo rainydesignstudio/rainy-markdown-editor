@@ -166,6 +166,28 @@ export function ToastCard({ item, dismiss, remove = dismiss, enterFrom = 'top', 
   const details = [additionalFeedback(item.details, heading, t), additionalFeedback(actionError, heading, t)].filter(Boolean).join('\n');
   const expanded = Boolean(details && open);
   const { surfaceRef: card, bodyRef, size } = useAnimatedSize(JSON.stringify([label, details, expanded]));
+  const statusAnchor = useRef<HTMLSpanElement>(null), actionsAnchor = useRef<HTMLDivElement>(null);
+  const anchorPositions = useRef(new Map<HTMLElement, { left: number; top: number }>()), anchorAnimations = useRef(new Map<HTMLElement, Animation>());
+  useLayoutEffect(() => {
+    const surface = card.current;
+    if (!surface) return;
+    const motion = window.getComputedStyle(surface), durationText = motion.transitionDuration.split(',')[0].trim();
+    const duration = parseFloat(durationText) * (durationText.endsWith('ms') ? 1 : 1000), easing = motion.transitionTimingFunction.split(/,(?![^(]*\))/)[0].trim();
+    for (const anchor of [statusAnchor.current, actionsAnchor.current]) {
+      if (!anchor) continue;
+      const moving = anchor.getBoundingClientRect();
+      anchorAnimations.current.get(anchor)?.cancel();
+      const target = anchor.getBoundingClientRect(), origin = surface.getBoundingClientRect();
+      const next = { left: target.left - origin.left, top: target.top - origin.top }, previous = anchorPositions.current.get(anchor);
+      if (previous && duration > 0 && !reducedMotion() && anchor.animate) {
+        // Preserve an interrupted offset while the natural body reflows inside the 500ms surface transition.
+        const x = previous.left + moving.left - target.left - next.left, y = previous.top + moving.top - target.top - next.top;
+        if (x || y) anchorAnimations.current.set(anchor, anchor.animate([{ translate: `${x}px ${y}px` }, { translate: '0px 0px' }], { duration, easing }));
+      }
+      anchorPositions.current.set(anchor, next);
+    }
+  }, [label, details, expanded, size?.width, size?.height, card]);
+  useLayoutEffect(() => () => { for (const animation of anchorAnimations.current.values()) animation.cancel(); }, []);
   const returnFocus = useRef<HTMLElement | null>(null), ring = useRef<SVGCircleElement>(null), pauseOwner = useRef(Symbol('toast-reading')), enteredRef = useRef(false), origin = useRef(enterFrom), pendingAction = useRef(false);
   const locked = item.lifetime?.mode === 'locked', countdown = item.countdown;
   useEffect(() => { if (revealDetails) setOpen(true); }, [revealDetails]);
@@ -213,12 +235,12 @@ export function ToastCard({ item, dismiss, remove = dismiss, enterFrom = 'top', 
     onFocusCapture={event => { setFocused(true); if (event.relatedTarget instanceof HTMLElement && !event.currentTarget.contains(event.relatedTarget)) returnFocus.current = event.relatedTarget; }}
     onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false); }}>
     <div ref={bodyRef} className="toast-body">
-      <ToastIcon tone={actionError ? 'error' : item.tone} />
+      <span ref={statusAnchor} data-toast-anchor="status" className="flex shrink-0 items-center"><ToastIcon tone={actionError ? 'error' : item.tone} /></span>
       <div className="toast-copy">
         <p className="toast-heading"><span className="toast-label">{label}</span></p>
         {details ? <div id={detailsId} data-open={expanded} aria-hidden={!expanded} inert={!expanded} className="toast-details">{details}</div> : null}
       </div>
-      <div className="toast-actions">
+      <div ref={actionsAnchor} data-toast-anchor="actions" className="toast-actions">
         {details ? <IconButton variant="inline" tooltip={t(expanded ? 'feedback.hideDetails' : 'feedback.showDetails')} aria-expanded={expanded} aria-controls={detailsId} onClick={() => setOpen(value => !value)} icon={<ContentIcon name="info" />} /> : null}
         {item.actions?.map(action => {
           const caption = formatProductMessage(action.label, t), disabled = action.disabled || busy !== null;

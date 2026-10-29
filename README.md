@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.0"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.0-2563EB?style=for-the-badge" alt="Release v0.3.2.0" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1" /></a>
   <a href="package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -37,12 +37,12 @@
 手动：
 
 ```sh
-git clone --branch v0.3.2.0 --depth 1 https://github.com/rainydesignstudio/rainy-markdown-editor.git && cd rainy-markdown-editor && npm ci && npm run build && npm start
+git clone --branch v0.3.2.1 --depth 1 https://github.com/rainydesignstudio/rainy-markdown-editor.git && cd rainy-markdown-editor && npm ci && npm run build && npm start
 ```
 
 Agent：
 
-> 请从 https://github.com/rainydesignstudio/rainy-markdown-editor 的 v0.3.2.0 安装 Rainy 文稿台；先读根 README.md、docs/locale/zh-CN/README.md 和 docs/locale/zh-CN/AGENT-GUIDE.md。在安装依赖、构建、启动之前，确认我能提供支持本地目录读写、可由你实际控制的外部桌面浏览器，并取得控制授权；不满足就停在这里说明恢复条件，不用内置浏览器替代。沿用已有有效授权，再确认安装目录、端口后克隆、npm ci、构建并启动。目录选择由我在网页中另行授权；资料库保存重开通过后，让我选择分步教程或直接使用，并给出以后启动的命令。
+> 请从 https://github.com/rainydesignstudio/rainy-markdown-editor 的 v0.3.2.1 安装 Rainy 文稿台；先读根 README.md、docs/locale/zh-CN/README.md 和 docs/locale/zh-CN/AGENT-GUIDE.md。在安装依赖、构建、启动之前，确认我能提供支持本地目录读写、可由你实际控制的外部桌面浏览器，并取得控制授权；不满足就停在这里说明恢复条件，不用内置浏览器替代。沿用已有有效授权，再确认安装目录、端口后克隆、npm ci、构建并启动。目录选择由我在网页中另行授权；资料库保存重开通过后，让我选择分步教程或直接使用，并给出以后启动的命令。
 
 ## ✨ 功能与特性
 

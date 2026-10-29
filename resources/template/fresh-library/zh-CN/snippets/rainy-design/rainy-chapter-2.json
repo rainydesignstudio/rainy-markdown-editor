@@ -1,0 +1,9 @@
+{
+  "id": "rainy-chapter-2",
+  "name": "Rainy Design · 章节 · 贰",
+  "trigger": "//rainy-chapter-2",
+  "description": "带‘编号／英文眉题’、H2 标题与引言的章节样式。同篇文章的 H2 与 rainy-chapter 二选一，不交替使用；另设 H3 小节时，推荐使用 rainy-chapter 作为 H2。",
+  "content": "<section class=\"my-8 pb-4 border-b border-article-accent\">\n  <p class=\"mt-0 mb-3 text-xs font-semibold tracking-widest text-article-accent\">01 / OBSERVATION</p>\n  <h2 class=\"mt-0 mb-2 pl-0 pb-0 text-2xl font-semibold text-article-heading border-none\">▌你说：我就喜欢 “古法写作”</h2>\n  <i class=\"m-0 text-base text-article-muted\">那还说啥呢？Markdown 语法和 HTML 你总得懂一个。</i>\n</section>",
+  "icon": "book",
+  "categoryId": "rainy-design"
+}

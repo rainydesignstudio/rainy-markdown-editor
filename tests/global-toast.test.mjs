@@ -22,15 +22,25 @@ async function fixture({ native = true, strict = false, maxVisible = 3, initiall
     originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key)); Object.defineProperty(globalThis, key, { configurable: true, writable: true, value });
   }
   const { createRoot } = await import('react-dom/client');
-  if (cssMotion) { const style = document.createElement('style'); style.textContent = '.toast-surface { transition-property: width,height,translate,opacity; }'; document.head.append(style); }
+  const motionStyle = document.createElement('style'); motionStyle.textContent = '.toast-surface { transition-duration: .5s; transition-timing-function: ease-in-out; }' + (cssMotion ? '.toast-surface { transition-property: width,height,translate,opacity; }' : ''); document.head.append(motionStyle);
   window.setTimeout = (callback, delay) => { const id = ++sequence; timers.set(id, { at: now + delay, callback }); return id; };
   window.clearTimeout = id => timers.delete(id);
   window.requestAnimationFrame = callback => { queueMicrotask(() => callback(now)); return 1; };
   window.cancelAnimationFrame = () => {};
   window.SVGElement.prototype.animate = function (frames, options) { const record = { element: this, frames, options, cancelled: false }; animations.push(record); return { cancel() { record.cancelled = true; } }; };
+  window.HTMLElement.prototype.animate = window.SVGElement.prototype.animate;
   const header = document.querySelector('header'); header.getBoundingClientRect = () => ({ bottom: height });
   const bounds = window.HTMLElement.prototype.getBoundingClientRect;
-  window.HTMLElement.prototype.getBoundingClientRect = function () { if (this.parentElement?.hasAttribute('data-toast-id')) { const open = this.querySelector('[aria-expanded="true"]'); return { width: open ? 440 : 220, height: open ? 140 : 48 }; } return bounds.call(this); };
+  window.HTMLElement.prototype.getBoundingClientRect = function () {
+    if (this.hasAttribute('data-toast-anchor')) {
+      const open = this.closest('[data-toast-id]').querySelector('[aria-expanded="true"]'), actions = this.dataset.toastAnchor === 'actions';
+      const animation = animations.findLast(value => value.element === this && !value.cancelled);
+      const offset = animation?.frames[0].translate.split(' ').map(parseFloat) ?? [0, 0], factor = animation?.offsetFactor ?? 1;
+      return { left: (actions ? open ? 380 : 160 : 16) + offset[0] * factor, top: (open ? 60 : 14) + offset[1] * factor };
+    }
+    if (this.parentElement?.hasAttribute('data-toast-id')) { const open = this.querySelector('[aria-expanded="true"]'); return { left: 0, top: 0, width: open ? 440 : 220, height: open ? 140 : 48 }; }
+    return bounds.call(this);
+  };
   const matches = window.HTMLElement.prototype.matches;
   window.HTMLElement.prototype.matches = function (selector) { return selector === ':popover-open' ? Boolean(this.openPopover) : matches.call(this, selector); };
   if (native) {
@@ -275,6 +285,32 @@ test('detail animation has measured endpoints, remains readable through keyed up
     await React.act(async () => { button.click(); f.document.getElementById('outside').focus(); });
     await f.advance(1999); assert.equal(f.cards.length,1);
     await f.advance(1); assert.equal(f.cards.length,0,'remaining two seconds resumes instead of a fresh timeout');
+  } finally { await f.close(); }
+});
+
+test('status and action anchors share detail timing and reverse from their current visual positions', async () => {
+  const f = await fixture();
+  try {
+    await f.sendStructured({ key: 'anchors', label: 'Saved', tone: 'success', details: 'Saved location' });
+    const card = f.cards[0], button = card.querySelector('[aria-controls]');
+    await React.act(async () => button.click());
+    const anchors = f.animations.filter(value => value.element.hasAttribute('data-toast-anchor') && !value.cancelled);
+    assert.equal(anchors.length, 2);
+    for (const animation of anchors) { assert.equal(animation.options.duration, 500); assert.equal(animation.options.easing, 'ease-in-out'); animation.offsetFactor = .5; }
+    assert.equal(anchors.find(value => value.element.dataset.toastAnchor === 'status').frames[0].translate, '0px -46px');
+    assert.equal(anchors.find(value => value.element.dataset.toastAnchor === 'actions').frames[0].translate, '-220px -46px');
+    await React.act(async () => button.click());
+    const reversed = f.animations.filter(value => value.element.hasAttribute('data-toast-anchor') && !value.cancelled);
+    assert.equal(reversed.find(value => value.element.dataset.toastAnchor === 'status').frames[0].translate, '0px 23px');
+    assert.equal(reversed.find(value => value.element.dataset.toastAnchor === 'actions').frames[0].translate, '110px 23px');
+    card.style.transitionDuration = '700ms'; card.style.transitionTimingFunction = 'linear';
+    await React.act(async () => button.click());
+    const retimed = f.animations.filter(value => value.element.hasAttribute('data-toast-anchor') && !value.cancelled);
+    assert.ok(retimed.every(value => value.options.duration === 700 && value.options.easing === 'linear'), 'geometry follows the surface CSS timing');
+    f.window.matchMedia = () => ({ matches: true });
+    const before = f.animations.length;
+    await React.act(async () => button.click());
+    assert.equal(f.animations.length, before, 'reduced motion does not create geometry animations');
   } finally { await f.close(); }
 });
 

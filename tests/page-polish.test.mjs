@@ -54,6 +54,20 @@ test('partial writes summarize retained source and index-repair states, while fu
   assert.equal(feedbackNotice(repair).summary.messageKey, 'feedback.indexRepair');
 });
 
+test('article saves keep full paths and partial failure causes out of the short heading in both languages', () => {
+  const path = 'articles/2026-10/' + '长标题'.repeat(30) + '/article.md';
+  for (const locale of ['zh-CN', 'en-US']) {
+    const t = createUII18n(locale).getFixedT(locale, 'messages');
+    const saved = messages.productMessage('controller.sourceSaved', { result_articleFilePath: path });
+    const heading = formatBriefFeedback(feedbackNotice(saved, 'success').summary, t, locale);
+    assert.ok([...heading].length < 30); assert.ok(!heading.includes(path));
+    assert.ok(messages.formatProductMessage(saved, t).includes(path));
+    const partial = messages.productMessage('shared.compose', { parts: messages.productJoin([messages.productReference('controller.sourceSavedTheRenderRecordWasNotUpdated'), 'disk full']) });
+    assert.equal(feedbackNotice(partial, 'warning').summary.messageKey, 'feedback.renderRecordPending');
+    assert.match(messages.formatProductMessage(partial, t), /disk full/);
+  }
+});
+
 test('library configuration errors retain nested message IDs through activation and change UI language without changing canonical errors', async () => {
   let writes = 0;
   const files = { 'config.json': { schemaVersion: 1, meta: { id: 'mismatched' } }, 'format-support.json': DEFAULT_FORMAT_BUNDLE.support, 'validator.json': DEFAULT_FORMAT_BUNDLE.validator, 'formatter.json': DEFAULT_FORMAT_BUNDLE.formatter };

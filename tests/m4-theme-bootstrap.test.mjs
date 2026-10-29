@@ -39,6 +39,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
     window: { matchMedia: () => media },
     require(id) {
       if (id === './Toast') return { ToastReadiness: 'toast-readiness' };
+      if (id === './ContentIcon') return { ContentIcon: 'content-icon' };
       if (id.endsWith('/i18n/productMessages')) return { formatProductMessage: value => value?.label ?? '' };
       if (id.endsWith('/EditingDrafts')) return { EditingDraftsProvider: 'draft-provider' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };

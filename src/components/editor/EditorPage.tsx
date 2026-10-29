@@ -42,7 +42,7 @@ export function EditorPage() {
       revision={controller.revision}
       mediaRevision={controller.mediaRefreshRevision}
       sourceFormatIssues={controller.sourceFormatIssues}
-      status={controller.status}
+      status={controller.sourceStatus}
       importProgress={<ImportProgressButton task={controller.markdownImport.pending.find(item => item.task.target.articleId === controller.currentArticleId)?.task ?? null} onClick={() => controller.markdownImport.openTasks(controller.currentArticleId)} />}
       mobilePane={controller.mobilePane}
       directory={controller.directory}

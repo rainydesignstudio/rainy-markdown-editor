@@ -2,6 +2,7 @@
 (() => {
   const paints = ['color', 'background-color', 'background-image', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color', 'outline-color', 'text-decoration-color', 'text-emphasis-color', '-webkit-text-fill-color', '-webkit-text-stroke-color', 'box-shadow', 'text-shadow'];
   let configured, used = false;
+  const exampleImagePath = typeof document !== 'undefined' && document.currentScript?.src ? new URL('../images/article-sample.png', document.currentScript.src).pathname : '/images/article-sample.png';
   const urls = value => [...value.matchAll(/url\((?:[^()"']|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')*\)/gi)].map(item => item[0]);
   const blobPattern = /blob:(?:https?:\/\/|null\/)[^\s"'<>)]*/g;
   async function prepareInput(root, request) {
@@ -23,7 +24,7 @@
     // Other HTTP images remain outside this bridge's fetch authority.
     for (const image of copied.querySelectorAll('img')) {
       const source = image.getAttribute('src');
-      if (source === '/images/article-sample.png' || source === new URL('/images/article-sample.png', document.baseURI).href) references.add(source);
+      if (source === exampleImagePath || source === new URL(exampleImagePath, document.baseURI).href) references.add(source);
     }
     if (references.size > 2048) throw new Error('ALGORITHM_RESOURCE_LIMIT');
     const resources = [], replacements = new Map(), fetched = new Map(); let total = 0;

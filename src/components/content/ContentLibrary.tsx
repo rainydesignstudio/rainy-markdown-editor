@@ -432,7 +432,7 @@ export function ContentLibrary(props: Props) {
         return { ...previous, [kind]: next };
       });
       setCategoryDraft(null);
-      await finishRefresh(kind, expectedRoot, productReference("contentLibrary.categorySaved"));
+      await finishRefresh(kind, expectedRoot, productReference("feedback.categorySaved"));
     } catch (error) { if (isCurrent(expectedRoot)) setCategoryError(error instanceof Error ? error.message : String(error)); }
     finally { operationLock.current = false; if (isCurrent(expectedRoot)) setOperation(null); }
   };

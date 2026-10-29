@@ -1,3 +1,4 @@
+import { appAssetPath } from '../appBasePath';
 import { algorithmHash } from './algorithms';
 import { canonicalFormatJson, freezeFormatBundle } from './config';
 import type { ConfigurationMetadata } from './libraryConfiguration';
@@ -75,7 +76,7 @@ function runnerFor(pkg: RendererPackage, authority: string, slot: string): Runne
     if (!idle) throw new Error('Format renderer is busy');
     idle.stop();
   }
-  const frame = document.createElement('iframe'); frame.src = '/format/article-package-sandbox.html'; frame.setAttribute('sandbox', 'allow-scripts'); frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1;
+  const frame = document.createElement('iframe'); frame.src = appAssetPath('/format/article-package-sandbox.html'); frame.setAttribute('sandbox', 'allow-scripts'); frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1;
   frame.style.cssText = 'position:fixed;left:-100000px;top:0;width:750px;height:2000px;border:0;pointer-events:none';
   const requests: Runner['requests'] = new Map(); let port: MessagePort | undefined, rejectReady: (reason: Error) => void = () => {}, stopped = false;
   const ready = new Promise<MessagePort>((resolve, reject) => {

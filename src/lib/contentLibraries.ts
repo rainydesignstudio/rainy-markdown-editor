@@ -23,6 +23,7 @@ import enSeedSnippet19 from '../../resources/template/fresh-library/en-US/snippe
 import enSeedSnippet20 from '../../resources/template/fresh-library/en-US/snippets/default/horizontal-scroll-without-padding.json' with { type: 'json' };
 import enSeedSnippet21 from '../../resources/template/fresh-library/en-US/snippets/default/mac-style-code-block.json' with { type: 'json' };
 import enSeedSnippet22 from '../../resources/template/fresh-library/en-US/snippets/default/mac-style-code-block-nowrap.json' with { type: 'json' };
+import enSeedSnippet23 from '../../resources/template/fresh-library/en-US/snippets/rainy-design/rainy-chapter-2.json' with { type: 'json' };
 import enSeedTemplate0 from '../../resources/template/fresh-library/en-US/templates/default/markdown-guide.md';
 import enSeedTemplate1 from '../../resources/template/fresh-library/en-US/templates/default/project-review.md';
 import enSeedTemplate2 from '../../resources/template/fresh-library/en-US/templates/default/tutorial.md';
@@ -53,6 +54,7 @@ import zhSeedSnippet19 from '../../resources/template/fresh-library/zh-CN/snippe
 import zhSeedSnippet20 from '../../resources/template/fresh-library/zh-CN/snippets/default/horizontal-scroll-without-padding.json' with { type: 'json' };
 import zhSeedSnippet21 from '../../resources/template/fresh-library/zh-CN/snippets/default/mac-style-code-block.json' with { type: 'json' };
 import zhSeedSnippet22 from '../../resources/template/fresh-library/zh-CN/snippets/default/mac-style-code-block-nowrap.json' with { type: 'json' };
+import zhSeedSnippet23 from '../../resources/template/fresh-library/zh-CN/snippets/rainy-design/rainy-chapter-2.json' with { type: 'json' };
 import zhSeedTemplate0 from '../../resources/template/fresh-library/zh-CN/templates/default/markdown-guide.md';
 import zhSeedTemplate1 from '../../resources/template/fresh-library/zh-CN/templates/default/project-review.md';
 import zhSeedTemplate2 from '../../resources/template/fresh-library/zh-CN/templates/default/tutorial.md';
@@ -84,7 +86,7 @@ const CURSOR_MARKER = '▌';
 const MAX_SNIPPET_LENGTH = 64_000;
 const MAX_TEMPLATE_LENGTH = 250_000;
 
-const enSnippets: ArticleSnippet[] = ([enSeedSnippet0, enSeedSnippet1, enSeedSnippet2, enSeedSnippet3, enSeedSnippet4, enSeedSnippet5, enSeedSnippet6, enSeedSnippet7, enSeedSnippet8, enSeedSnippet9, enSeedSnippet10, enSeedSnippet11, enSeedSnippet12, enSeedSnippet13, enSeedSnippet14, enSeedSnippet15, enSeedSnippet16, enSeedSnippet17, enSeedSnippet18, enSeedSnippet19, enSeedSnippet20, enSeedSnippet21, enSeedSnippet22] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+const enSnippets: ArticleSnippet[] = ([enSeedSnippet0, enSeedSnippet1, enSeedSnippet2, enSeedSnippet3, enSeedSnippet4, enSeedSnippet5, enSeedSnippet6, enSeedSnippet7, enSeedSnippet8, enSeedSnippet9, enSeedSnippet10, enSeedSnippet11, enSeedSnippet12, enSeedSnippet13, enSeedSnippet14, enSeedSnippet15, enSeedSnippet16, enSeedSnippet17, enSeedSnippet18, enSeedSnippet19, enSeedSnippet20, enSeedSnippet21, enSeedSnippet22, enSeedSnippet23] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
 const enTemplates: ArticleTemplate[] = [
   { id: 'markdown-guide', categoryId: 'default', name: parseArticle(enSeedTemplate0).metadata.title, source: enSeedTemplate0 },
   { id: 'project-review', categoryId: 'default', name: parseArticle(enSeedTemplate1).metadata.title, source: enSeedTemplate1 },
@@ -92,7 +94,7 @@ const enTemplates: ArticleTemplate[] = [
   { id: 'rainy-design-sample-ii', categoryId: 'theme-samples', name: parseArticle(enSeedTemplate3).metadata.title, source: enSeedTemplate3 },
   { id: 'rainy-design-sample', categoryId: 'theme-samples', name: parseArticle(enSeedTemplate4).metadata.title, source: enSeedTemplate4 },
 ];
-const zhSnippets: ArticleSnippet[] = ([zhSeedSnippet0, zhSeedSnippet1, zhSeedSnippet2, zhSeedSnippet3, zhSeedSnippet4, zhSeedSnippet5, zhSeedSnippet6, zhSeedSnippet7, zhSeedSnippet8, zhSeedSnippet9, zhSeedSnippet10, zhSeedSnippet11, zhSeedSnippet12, zhSeedSnippet13, zhSeedSnippet14, zhSeedSnippet15, zhSeedSnippet16, zhSeedSnippet17, zhSeedSnippet18, zhSeedSnippet19, zhSeedSnippet20, zhSeedSnippet21, zhSeedSnippet22] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
+const zhSnippets: ArticleSnippet[] = ([zhSeedSnippet0, zhSeedSnippet1, zhSeedSnippet2, zhSeedSnippet3, zhSeedSnippet4, zhSeedSnippet5, zhSeedSnippet6, zhSeedSnippet7, zhSeedSnippet8, zhSeedSnippet9, zhSeedSnippet10, zhSeedSnippet11, zhSeedSnippet12, zhSeedSnippet13, zhSeedSnippet14, zhSeedSnippet15, zhSeedSnippet16, zhSeedSnippet17, zhSeedSnippet18, zhSeedSnippet19, zhSeedSnippet20, zhSeedSnippet21, zhSeedSnippet22, zhSeedSnippet23] as ArticleSnippet[]).map(snippet => ({ ...snippet, icon: isSnippetCategoryIcon(snippet.icon) ? snippet.icon : DEFAULT_SNIPPET_ICONS[snippet.id] ?? 'snippet' }));
 const zhTemplates: ArticleTemplate[] = [
   { id: 'markdown-guide', categoryId: 'default', name: parseArticle(zhSeedTemplate0).metadata.title, source: zhSeedTemplate0 },
   { id: 'project-review', categoryId: 'default', name: parseArticle(zhSeedTemplate1).metadata.title, source: zhSeedTemplate1 },
