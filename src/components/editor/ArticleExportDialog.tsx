@@ -13,7 +13,7 @@ import { PackageOutputDialog } from './PackageOutputDialog';
 import type { ThemeConfig } from '../../lib/types';
 import { articleExportBaseName, articleMarkdownBody, createArticleDocumentPackage, downloadArticleBlob } from '../../lib/articleExport';
 import { articleCanvasToPdf, articleCanvasToPng, renderArticleExportCanvas } from '../../lib/articleVisualExport';
-import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
+import { ArticleExportForm } from './ArticleExportForm';
 import { inspectArticleResources } from '../../lib/resources/inspection';
 import { localResourceReference } from '../../lib/resources/references';
 import { resourceReference } from '../../lib/resources/types';
@@ -101,34 +101,22 @@ function LegacyArticleExportDialog({ source, title, dirty, root, month, folder, 
       if (!completed) setBusy(false);
     }
   };
-  return <DialogFrame titleId="article-export-title" descriptionId="article-export-description" onClose={onClose} focusActive={focusActive} dismissible={!busy} className="flex min-h-0 max-w-2xl flex-col overflow-hidden">
-    <DialogHeader titleId="article-export-title" eyebrow={t('common:eyebrows.exportArticle')} title={t('dialogs:ui.exportArticle')} onClose={onClose} closeDisabled={busy} />
-    <form className="flex min-h-0 flex-col" onSubmit={event => { event.preventDefault(); void exportArticle(); }}>
-      <div className="grid min-h-0 gap-4 overflow-x-clip overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
-        <p id="article-export-description" className="text-sm text-muted">{t('dialogs:ui.exportTheCurrentDraft')}{dirty ? t('dialogs:ui.includingUnsavedChanges') : ''}{t('dialogs:ui.thisDoesNotSaveOrModifyTheLibrary')}</p>
-        <label className="field-stack min-w-0"><span className="field-label">{t('dialogs:ui.downloadFilename')}</span><input className="field" value={fileBase} maxLength={80} onChange={event => setFileBase(event.target.value)} disabled={busy} /><span className="text-xs text-faint">{t('dialogs:templates.downloadAs', { name: fileName })}</span></label>
-        <fieldset className="grid min-w-0 gap-2"><legend className="mb-2 text-sm font-semibold text-primary">{t('dialogs:ui.format')}</legend>
-          {FORMATS.map(item => <label key={item.id} title={formatProductMessage(libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).reason, t) || undefined} tabIndex={!libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled ? 0 : undefined} className="flex cursor-pointer items-start gap-3 rounded-lg border border-line bg-panel p-3 hover:border-accent-line has-checked:border-accent-line has-checked:bg-accent-soft has-disabled:cursor-not-allowed has-disabled:opacity-50">
-            <input className="mt-1 accent-accent" type="radio" name="article-export-format" value={item.id} checked={format === item.id} onChange={() => { if (!libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled) return; setFormat(item.id); setResourceReview(null); }} disabled={busy || !libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]).enabled || (item.id === 'png' || item.id === 'pdf') && !visualAvailable} />
-            <span className="grid min-w-0 gap-1"><strong className="text-sm font-semibold text-primary">{t('dialogs:exportFormats.' + item.id + '.title')} <span className="font-mono text-xs font-normal text-muted">.{item.extension}</span></strong><span className="text-xs text-muted">{t('dialogs:exportFormats.' + item.id + '.detail')}</span></span>
-          </label>)}
-        </fieldset>
-        {(format === 'png' || format === 'pdf') ? <p className="rounded-lg border border-line bg-list/50 p-3 text-xs text-muted">{t('dialogs:templates.visualWidth', { width: formatSnapshot.bundle.formatter.output.visual.width })}</p> : null}
-        {format === 'package' && !folder ? <p className="rounded-lg border border-line bg-list/50 p-3 text-xs text-muted">{t('dialogs:ui.theManuscriptIsNotSavedYetThePackage')}</p> : null}
-        {error ? <p className="rounded-lg border border-danger/30 bg-danger-surface p-3 text-sm text-danger" role="alert">{formatProductMessage(error, t)}</p> : null}
-        {resourceReview?.length ? <section className="grid gap-2 rounded-lg border border-line bg-list/50 p-3" aria-label={t('messages:resources.packageReview')}><p className="text-sm text-primary">{t('messages:resources.packageReview')}</p><p className="text-xs text-muted">{t('messages:resources.packageReviewHelp')}</p><ul className="grid max-h-40 gap-2 overflow-x-clip overflow-y-auto text-xs text-warning">{resourceReview.map((issue, index) => <li key={index}>{formatDiagnosticMessage(issue, t)}</li>)}</ul></section> : null}
-      </div>
-      <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton>{resourceReview?.length ? <DialogButton variant="primary" disabled={busy || !isCurrent() || !capability.enabled} onClick={() => void exportArticle(true)}>{t('messages:resources.continuePartialPackage')}</DialogButton> : <DialogButton type="submit" variant="primary" disabled={busy || !isCurrent() || !capability.enabled}>{busy ? t('dialogs:ui.generating') : t('dialogs:templates.export', { name: t('dialogs:exportFormats.' + selected.id + '.title') })}</DialogButton>}</DialogActions></DialogFooter>
-    </form>
-  </DialogFrame>;
+  return <ArticleExportForm choices={FORMATS.map(item => {
+    const choice = libraryCapability(formatSnapshot, EXPORT_CAPABILITIES[item.id]);
+    return { id: item.id, title: t('dialogs:exportFormats.' + item.id + '.title'), extension: item.extension, detail: t('dialogs:exportFormats.' + item.id + '.detail'), disabled: !choice.enabled || (item.id === 'png' || item.id === 'pdf') && !visualAvailable, reason: formatProductMessage(choice.reason, t) };
+  })} selected={format} onSelect={id => { setFormat(id as Format); setResourceReview(null); }} filename={{ base: fileBase, name: fileName, onChange: setFileBase }} dirty={dirty} busy={busy} disabled={!isCurrent() || !capability.enabled} error={formatProductMessage(error, t)} focusActive={focusActive} onSubmit={() => void exportArticle()} onClose={onClose} continuation={resourceReview?.length ? { label: t('messages:resources.continuePartialPackage'), run: () => void exportArticle(true) } : undefined} review={resourceReview?.length ? <section className="grid gap-2 rounded-lg border border-line bg-list/50 p-3" aria-label={t('messages:resources.packageReview')}><p className="text-sm text-primary">{t('messages:resources.packageReview')}</p><p className="text-xs text-muted">{t('messages:resources.packageReviewHelp')}</p><ul className="grid max-h-40 gap-2 overflow-x-clip overflow-y-auto text-xs text-warning">{resourceReview.map((issue, index) => <li key={index}>{formatDiagnosticMessage(issue, t)}</li>)}</ul></section> : null}>
+    {(format === 'png' || format === 'pdf') ? <p className="rounded-lg border border-line bg-list/50 p-3 text-xs text-muted">{t('dialogs:templates.visualWidth', { width: formatSnapshot.bundle.formatter.output.visual.width })}</p> : null}
+    {format === 'package' && !folder ? <p className="rounded-lg border border-line bg-list/50 p-3 text-xs text-muted">{t('dialogs:ui.theManuscriptIsNotSavedYetThePackage')}</p> : null}
+
+  </ArticleExportForm>;
 }
 function parseBody(source: string) { return articleMarkdownBody(source); }
 
-export function ArticleExportDialog(props: ComponentProps<typeof LegacyArticleExportDialog> & { theme: ThemeConfig; onTransform: (source: string) => void }) {
+export function ArticleExportDialog(props: ComponentProps<typeof LegacyArticleExportDialog> & { theme: ThemeConfig }) {
   const active = useFormatSnapshot();
   let snapshot = active;
   if (!active.error && props.previewRef.current) {
     try { snapshot = getArticleRenderSnapshot(props.previewRef.current); } catch { /* The current source remains downloadable while the preview is stale. */ }
   }
-  return snapshot.renderer ? <PackageOutputDialog getResourceRevision={props.getResourceRevision} root={props.root} month={props.month} folder={props.folder} previewRef={props.previewRef} prepareVisual={props.prepareVisual} focusActive={props.focusActive} snapshot={snapshot} source={props.source} theme={props.theme} title={props.title} isCurrent={props.isCurrent} onTransform={props.onTransform} onExported={props.onExported} onClose={props.onClose} /> : <LegacyArticleExportDialog {...props} />;
+  return snapshot.renderer ? <PackageOutputDialog dirty={props.dirty} getResourceRevision={props.getResourceRevision} root={props.root} month={props.month} folder={props.folder} previewRef={props.previewRef} prepareVisual={props.prepareVisual} focusActive={props.focusActive} snapshot={snapshot} source={props.source} theme={props.theme} title={props.title} isCurrent={props.isCurrent} onExported={props.onExported} onClose={props.onClose} /> : <LegacyArticleExportDialog {...props} />;
 }

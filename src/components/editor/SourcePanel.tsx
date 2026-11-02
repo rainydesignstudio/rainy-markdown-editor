@@ -14,8 +14,10 @@ import type { Tone } from '../../hooks/useEditorController';
 import { inspectArticleResources, type ResourceProbeCache } from '../../lib/resources/inspection';
 import { useResourceDocumentVersion } from '../../hooks/imports/useResourceVersion';
 import { useAuthoringChecks } from '../../hooks/useMediaPreferences';
+import { useSourcePreferences } from '../../hooks/useSourcePreferences';
 import { useSourceLineNumbers } from '../../hooks/useSourceLineNumbers';
 import { SnippetTextarea } from '../content/SnippetTextarea';
+import { PaneActions } from './PaneActions';
 import { InsertElementsMenu } from './InsertElementsMenu';
 import type { InlineFormat } from '../../lib/editor/inlineFormatting';
 import { IconButton } from '../global/IconButton';
@@ -121,6 +123,7 @@ export function SourcePanel({
   const formatSelectionRef = useRef<((format: InlineFormat) => boolean) | null>(null);
   const imagePickerRef = useRef<HTMLInputElement | null>(null);
   const { showLineNumbers, toggle: toggleLineNumbers } = useSourceLineNumbers();
+  const { preferences: sourcePreferences, toggle: toggleSourcePreference } = useSourcePreferences();
   const [checksEnabled, setChecksEnabled] = useAuthoringChecks();
   const [fileRevision, setFileRevision] = useState(0);
   const resourceDocumentId = article.month && article.folder ? `${article.month}/${article.folder}` : 'draft';
@@ -167,6 +170,11 @@ export function SourcePanel({
 
   return (
     <section className="panel source-panel" data-mobile-hidden={mobilePane === 'preview'} onKeyDownCapture={event => {
+      if (!event.defaultPrevented && !event.repeat && !event.nativeEvent.isComposing && event.keyCode !== 229
+        && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && (event.code === 'KeyZ' || event.key.toLowerCase() === 'z')
+        && (!(event.target instanceof Element) || !event.target.closest('input,textarea,[contenteditable="true"]') || event.target === sourceTextareaRef.current)) {
+        event.preventDefault(); event.stopPropagation(); toggleSourcePreference('wrap'); return;
+      }
       if (event.defaultPrevented || event.repeat || event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey
         || !(event.metaKey || event.ctrlKey) || event.key !== '/' || !event.currentTarget.contains(event.target as Node)) return;
       event.preventDefault();
@@ -175,10 +183,12 @@ export function SourcePanel({
     }}>
       <div className="panel-header source-panel-header">
         <InformationButton icon={<InformationIcon />} title={fileName} subtitle={t('editor:source.info')} titleClassName="font-mono" onClick={onOpenInfo} disabled={!directory || readOnly || mediaBusy || parsed.diagnostics.some((item) => item.level === 'error')} />
-        <div className="toolbar-actions source-actions">
+        <PaneActions label={t('editor:source.actions')}>
           <input ref={imagePickerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif" multiple hidden onChange={handleImageFiles} />
-          <IconButton tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
-          <IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
+          <IconButton tooltip={t('editor:source.wrapToggle')} menuLabel={t('editor:source.wordWrap')} shortcut="⌥ Z / Alt Z" aria-pressed={sourcePreferences.wrap} onClick={() => toggleSourcePreference('wrap')} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18M3 10h13a4 4 0 0 1 0 8h-4m3-3-3 3 3 3M3 15h4M3 20h4" /></svg>} />
+          <IconButton tooltip={t('editor:source.syntaxHighlight')} aria-pressed={sourcePreferences.highlight} onClick={() => toggleSourcePreference('highlight')} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m7 7-5 5 5 5m10-10 5 5-5 5m-4-14-2 18" /></svg>} />
+          <IconButton menuLabel={t('editor:source.lineNumbers')} shortcut="⌘ / / Ctrl /" tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
+          <IconButton menuLabel={t('editor:source.findLabel')} shortcut="⌘ F / Ctrl F" tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
           {citationTools}
           <InsertElementsMenu
             disabled={readOnly || mediaBusy || parsed.diagnostics.some(item => item.level === 'error')}
@@ -189,7 +199,7 @@ export function SourcePanel({
             onInsert={(text, caretOffset) => insertTextRef.current?.(text, caretOffset)}
             onFormat={format => formatSelectionRef.current?.(format)}
           />
-        </div>
+        </PaneActions>
       </div>
       <SnippetTextarea
         historyKey={sourceHistoryKey}
@@ -208,6 +218,8 @@ export function SourcePanel({
         onImportFiles={onImportFiles}
         onPasteConflict={onPasteConflict}
         showLineNumbers={showLineNumbers}
+        wrap={sourcePreferences.wrap}
+        syntaxHighlight={sourcePreferences.highlight}
         lineOffset={sourceLayout.bodyLineOffset}
         sourceHeader={sourceHeader}
         lineConcerns={lineConcerns}

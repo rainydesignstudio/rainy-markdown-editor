@@ -167,6 +167,8 @@ export default async function invoke(action, input, api) {
 | copy | `{html, text}` |
 | export | `{data, extension?, mime?, encoding?}`；utf8或base64；/2 markdown由宿主处理 |
 
+导出入口按声明顺序将kind=export显示为卡片；名称、后缀和类型来自声明，不限制为内置格式清单。kind=format仍属于包契约，当前工作台无手动执行入口。
+
 render 必须返回 `{html, css}`。validate 必须返回 `{complete, issues, passed}`；issues 项为 `{message, severity, line?}`，severity 为 `error`、`warning`、`info`，line 使用正文行号。返回空对象、抛错或超时都不是通过。format 返回 `{source}`，仅应用到草稿；copy 返回 `{html, text}`；export 返回 `{data, extension?, mime?}`，data默认为UTF-8文本，二进制结果另返回encoding为base64。新增动作会出现在“导出文章”的资料库动作窗口，新增设置会出现在“设置 → 本地目录 → 校验与算法 → 渲染包设置”。
 
 ### 宿主服务：捕获、打包和测量

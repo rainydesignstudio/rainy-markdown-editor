@@ -135,24 +135,6 @@
     @apply w-auto overflow-visible;
   }
 
-  .insert-elements-menu {
-    @apply relative block shrink-0;
-  }
-
-  .insert-elements-menu > summary {
-    @apply list-none;
-  }
-
-  .insert-elements-menu > summary::-webkit-details-marker,
-  .insert-standard-category > summary::-webkit-details-marker {
-    @apply hidden;
-  }
-
-  .insert-elements-panel {
-    /* Geometry rationale: the menu needs the lesser of a 32rem cap and 70dvh on compact screens. */
-    @apply absolute right-0 top-full z-50 mt-1 grid max-h-[min(32rem,70dvh)] min-w-56 gap-0.5 overflow-y-auto overflow-x-clip rounded-lg border border-line-strong bg-popup-bg p-1.5 text-popup-text shadow-(--editor-popup-shadow);
-  }
-
   .insert-menu-label {
     @apply px-2 pt-2 text-sm font-semibold text-faint;
   }

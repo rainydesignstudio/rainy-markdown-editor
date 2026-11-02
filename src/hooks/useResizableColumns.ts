@@ -12,6 +12,8 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
   const [width, setWidth] = useState(0);
   const [wideEnough, setWideEnough] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const dragOrigin = useRef(0);
   const releaseCapture = () => {
     const captured = captureRef.current;
     captureRef.current = null;
@@ -20,7 +22,7 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
       if (captured.target.hasPointerCapture(captured.pointerId)) captured.target.releasePointerCapture(captured.pointerId);
     } catch { /* The browser may have already released a removed splitter. */ }
   };
-  const stopDrag = () => { draggingRef.current = false; releaseCapture(); setDragging(false); };
+  const stopDrag = () => { draggingRef.current = false; releaseCapture(); setDragging(false); setResizing(false); };
   useEffect(() => {
     const finish = () => { if (draggingRef.current) stopDrag(); };
     const onVisibilityChange = () => { if (document.visibilityState !== 'visible') finish(); };
@@ -59,12 +61,16 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
     try { event.currentTarget.setPointerCapture(event.pointerId); }
     catch { return; }
     captureRef.current = { target: event.currentTarget, pointerId: event.pointerId };
-    draggingRef.current = true; setDragging(true);
+    dragOrigin.current = getEditorSourceWidth(width, ratio, minimumPanel);
+    setResizing(false); draggingRef.current = true; setDragging(true);
   };
   const moveDrag = (event: PointerEvent<HTMLElement>) => {
     if (!draggingRef.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    setRatio(editorSourceRatioFromPointer(axis === 'y' ? event.clientY : event.clientX, axis === 'y' ? rect.top : rect.left, axis === 'y' ? rect.height : rect.width, minimumPanel));
+    const size = axis === 'y' ? rect.height : rect.width;
+    const next = editorSourceRatioFromPointer(axis === 'y' ? event.clientY : event.clientX, axis === 'y' ? rect.top : rect.left, size, minimumPanel);
+    if (Math.abs(getEditorSourceWidth(size, next, minimumPanel) - dragOrigin.current) >= 1) setResizing(true);
+    setRatio(next);
   };
   const keyResize = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!containerRef.current) return;
@@ -75,5 +81,6 @@ export function useResizableColumns(initialRatio = 50, breakpoint = '(width >= 6
   };
   const limits = getEditorSplitLimits(width, minimumPanel);
   const style = { [axis === 'y' ? '--editor-reference-height' : '--editor-source-width']: `${getEditorSourceWidth(width, ratio, minimumPanel)}px` } as CSSProperties;
-  return { axis, containerRef, wideEnough, dragging, ratio, style, minRatio: limits?.minimumRatio ?? 50, maxRatio: limits?.maximumRatio ?? 50, startDrag, moveDrag, stopDrag, keyResize };
+  const sourceWidth = getEditorSourceWidth(width, ratio, minimumPanel);
+  return { axis, containerRef, wideEnough, dragging, resizing, sourceWidth, previewWidth: Math.max(0, width - 12 - sourceWidth), ratio, style, minRatio: limits?.minimumRatio ?? 50, maxRatio: limits?.maximumRatio ?? 50, startDrag, moveDrag, stopDrag, keyResize };
 }

@@ -41,7 +41,7 @@ import { flushSync } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { useRouteNavigation } from './useRouteNavigation';
 import { templateHref, type TemplateTab } from '../lib/templateNavigation';
-import { createArticleSource, instantiateArticleTemplate, parseArticle, replaceArticleBody, updateFrontMatter } from '../lib/frontMatter';
+import { createArticleSource, parseArticle, replaceArticleBody, updateFrontMatter } from '../lib/frontMatter';
 import {
   copyStoredArticle,
   createNamedDataDirectory,
@@ -407,6 +407,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const autoSaveBusyRef = useRef(false);
   const autoSnapshotBusyRef = useRef(false);
   const historyOperationRef = useRef<symbol | null>(null);
+  const articleCreationRef = useRef<{ root: FileSystemDirectoryHandle; session: number; target: ArticleSnapshot | null; returnMode: ArticleMode; returnTrigger: string | null; submitted: boolean } | null>(null);
+  const articleCreationBusyRef = useRef(false);
+  const articleCreationReturnFocusRef = useRef<{ mode: ArticleMode; trigger: string | null } | null>(null);
   const historyOpenerRef = useRef<HTMLButtonElement | null>(null);
   const historyBaselineRef = useRef<{ root: FileSystemDirectoryHandle; articleId: string; fingerprint: string | null; initialized: boolean } | null>(null);
 
@@ -414,6 +417,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     const nextSession = contentLibraryRootSessionRef.current + 1;
     contentLibraryRootSessionRef.current = nextSession;
     setContentLibraryRootSession(nextSession);
+    articleCreationRef.current = null;
+    articleCreationReturnFocusRef.current = null;
+    setShowTemplateDialog(false);
     setMediaTarget(null);
     mediaPickerRequestRef.current = null;
     setMediaPickerRequest(null);
@@ -454,7 +460,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
 
   const persistEditorWorkspace = useCallback((
     update: (current: EditorWorkspace) => EditorWorkspace,
-    notice = productText("controller.localProjectSettingsSaved"),
+    notice: string | null = productText("controller.localProjectSettingsSaved"),
   ): Promise<boolean> => {
     const root = directoryRef.current;
     if (!root) {
@@ -478,7 +484,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         setEditorWorkspace(saved.workspace);
         setEditorAppearanceVerified(true);
         setEditorWorkspaceIssue(null);
-        setStatus({ label: notice, tone: 'success' });
+        if (notice !== null) setStatus({ label: notice, tone: 'success' });
         return true;
       } catch (error) {
         if (directoryRef.current === root && contentLibraryRootSessionRef.current === rootSession) {
@@ -946,7 +952,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, [matchesSnapshot, performSaveSnapshot, finishSavedSnapshot, renameSavedArticleFolder]);
 
   const saveCurrent = useCallback(async (): Promise<boolean> => {
-    if (mediaOperationRef.current || historyOperationRef.current) return false;
+    if (mediaOperationRef.current || historyOperationRef.current || articleCreationRef.current) return false;
     const showReport = getPreviewPreferences().saveReport;
     const snapshot = snapshotFor();
     setLoadInspectionRevision(null);
@@ -1923,7 +1929,27 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       () => sourceTextareaRef.current?.closest<HTMLElement>('[data-source-viewport]') ?? null);
   }, [cancelPendingAction, navigateArticleMode]);
 
-  const closeTemplateDialog = useCallback(() => setShowTemplateDialog(false), []);
+  const closeTemplateDialog = useCallback(() => {
+    if (articleCreationBusyRef.current) return;
+    const creation = articleCreationRef.current;
+    articleCreationRef.current = null;
+    setShowTemplateDialog(false);
+    if (creation) {
+      articleCreationReturnFocusRef.current = { mode: creation.submitted ? 'editor' : creation.returnMode, trigger: creation.submitted ? null : creation.returnTrigger };
+      if (!creation.submitted) navigateArticleMode(creation.returnMode);
+    }
+  }, [navigateArticleMode]);
+
+  useEffect(() => {
+    const pending = articleCreationReturnFocusRef.current;
+    if (!pending || showTemplateDialog || view !== 'articles' || articleMode !== pending.mode) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (articleCreationReturnFocusRef.current !== pending) return;
+      const target = pending.trigger ? document.querySelector<HTMLButtonElement>(`[data-create-article-trigger="${pending.trigger}"]`) : sourceTextareaRef.current;
+      if (target?.isConnected) { target.focus(); articleCreationReturnFocusRef.current = null; }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [articleMode, showTemplateDialog, view]);
 
   const openStoredArticle = useCallback((stored: ArticleSummary) => {
     resumeIntentRef.current.active = false;
@@ -2756,6 +2782,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   }, [capabilityAllowed, changeTheme, navigateArticleMode, storedArticles]);
 
   const createNewArticle = useCallback(() => {
+    if (articleCreationBusyRef.current || mediaOperationRef.current || historyOperationRef.current) return;
     if (!directoryRef.current) {
       setStatus({ ...productLabel("controller.chooseALibraryInSettingsBeforeCreatingAnArticle"), tone: 'warning' });
       navigateRoute('/settings/');
@@ -2764,46 +2791,58 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     runAfterDraftDecision({
       label: productText("controller.createAnArticle"),
       run: () => {
-        navigateArticleMode('overview');
+        const root = directoryRef.current;
+        if (!root) return;
+        const trigger = typeof document === 'undefined' ? null : document.activeElement?.closest('[data-create-article-trigger]')?.getAttribute('data-create-article-trigger') ?? null;
+        articleCreationReturnFocusRef.current = null;
+        articleCreationRef.current = { root, session: contentLibraryRootSessionRef.current, target: null, returnMode: articleMode, returnTrigger: trigger, submitted: false };
+        navigateArticleMode('editor');
         setShowTemplateDialog(true);
       },
     });
-  }, [navigateArticleMode, navigateRoute, runAfterDraftDecision]);
+  }, [articleMode, navigateArticleMode, navigateRoute, runAfterDraftDecision]);
 
-  const createArticleFromTemplate = useCallback((template: ArticleTemplate | null, selectedTheme: ThemeConfig) => {
-    if (!directoryRef.current) {
-      setStatus({ ...productLabel("controller.chooseALibraryBeforeCreatingAnArticle"), tone: 'warning' });
-      setShowTemplateDialog(false);
-      navigateRoute('/settings/');
-      return;
-    }
-    const now = new Date().toISOString();
+  const createArticleFromTemplate = useCallback(async (source: string, selectedTheme: ThemeConfig, projectId: string | null): Promise<boolean> => {
+    const creation = articleCreationRef.current;
+    if (!creation || articleCreationBusyRef.current || mediaOperationRef.current || historyOperationRef.current) return false;
+    const isCurrent = () => articleCreationRef.current === creation && directoryRef.current === creation.root && contentLibraryRootSessionRef.current === creation.session;
+    if (!isCurrent()) return false;
+    articleCreationBusyRef.current = true;
     try {
-      const source = template
-        ? instantiateArticleTemplate(template.source, { now, theme: selectedTheme })
-        : updateFrontMatter(createArticleSource(productText("controller.untitledTechnicalManuscript"), selectedTheme.id), {
-            createdAt: now,
-            updatedAt: now,
-            theme: { id: selectedTheme.id, version: selectedTheme.version },
-          });
-      const nextArticle = makeWorkingArticle(source, selectedTheme, null, null, true);
-      openDocument(directoryRef.current, 'draft');
-      articleBaselineRef.current = null;
-      articleRef.current = nextArticle;
-      revisionRef.current += 1;
-      compileRequestRef.current += 1;
-      setIsCompiling(false);
-      setArticle(nextArticle);
-      setRevision(revisionRef.current);
-      setCompiledRevision(null);
-      setStatus({ ...(template ? productLabel("controller.newDraftCreatedFromTheOriginalTemplateAndSavedArticlesAreUnchanged", { "templateName": template.name }) : productLabel("controller.newBlankDraftCreatedItIsWrittenToDiskOnlyAfterChoosing")), tone: 'neutral' });
-      setShowTemplateDialog(false);
-      navigateArticleMode('editor');
-      void compileCurrent(snapshotFor(nextArticle, revisionRef.current));
+      if (parseArticle(source).diagnostics.some(item => item.level === 'error')) return false;
+      if (creation.target && documentTokenRef.current !== creation.target.documentToken) throw new ProductError('controller.theArticleSessionChangedTheRenderRecordWasNotUpdated');
+      if (projectId && !editorWorkspaceRef.current.projects.some(project => project.id === projectId)) throw new ProductError('controller.theTargetProjectDoesNotExistSelectedManuscriptsAreUnchanged');
+      creation.submitted = true;
+      flushSync(() => {
+        if (!creation.target) {
+          openDocument(creation.root, 'draft');
+          articleBaselineRef.current = null;
+          articleRef.current = makeWorkingArticle(source, selectedTheme);
+        }
+        const folder = creation.target?.folder;
+        const titleChanged = creation.target && parseArticle(source).metadata.title !== parseArticle(creation.target.source).metadata.title;
+        updateArticle(source, selectedTheme, 'article-info', folder ? titleChanged ? sanitizeFolderName(parseArticle(source).metadata.title) : folder : undefined);
+      });
+      const result = await saveSnapshot(snapshotFor(), isCurrent, true);
+      if (!isCurrent()) return false;
+      // Keep the first write's identity even when rendering or project persistence needs a retry.
+      if (result.result?.sourceSaved && result.savedSnapshot) creation.target = result.savedSnapshot;
+      if (!result.current) return false;
+      let projectSaved = true;
+      if (creation.target && getArticleOrganization(editorWorkspaceRef.current, creation.target.articleId).projectId !== projectId) {
+        const id = creation.target.articleId;
+        projectSaved = await persistEditorWorkspace(workspace => moveArticleToProject(workspace, id, projectId,
+          orderArticlesForGroup(storedArticles, workspace, projectId, false).filter(item => item.id !== id).map(item => item.id)), null);
+        if (!isCurrent()) return false;
+        if (!projectSaved) setStatus({ ...productLabel('controller.sourceSavedProjectAssignmentNotSaved'), tone: 'warning' });
+      }
+      if (projectSaved && result.notice) setStatus(result.notice);
+      return result.ok && projectSaved;
     } catch (error) {
-      setStatus({ ...productLabel("controller.thisTemplateCannotBeUsedNoNewDraftWasCreated", { "cause": productCause(error) }), tone: 'error' });
-    }
-  }, [compileCurrent, navigateArticleMode, openDocument, navigateRoute, snapshotFor]);
+      if (isCurrent()) setStatus({ ...productErrorLabel(error), tone: 'error' });
+      return false;
+    } finally { articleCreationBusyRef.current = false; }
+  }, [openDocument, persistEditorWorkspace, saveSnapshot, snapshotFor, storedArticles, updateArticle]);
 
   const beginCopy = useCallback((target: ArticleSummary) => {
     const current = articleRef.current;
@@ -3135,7 +3174,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         const current = articleRef.current;
         const activeToken = documentTokenRef.current;
         if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, id).archived) return;
-        if (!editorPageRef.current || historyOperationRef.current || autoSaveBusyRef.current || mediaOperationRef.current || !current.dirty || directoryRef.current !== root ||
+        if (!editorPageRef.current || articleCreationRef.current || historyOperationRef.current || autoSaveBusyRef.current || mediaOperationRef.current || !current.dirty || directoryRef.current !== root ||
           activeToken !== token || articleId(current) !== id || activeToken?.root !== root || activeToken.articleId !== id ||
           !mutationQueueRef.current.canSave(token)) return;
         autoSaveBusyRef.current = true;
@@ -3163,7 +3202,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         const current = articleRef.current;
         const activeToken = documentTokenRef.current;
         if (current.folder && current.month && getArticleOrganization(editorWorkspaceRef.current, id).archived) return;
-        if (!editorPageRef.current || historyOperationRef.current || autoSnapshotBusyRef.current || mediaOperationRef.current || directoryRef.current !== root || activeToken !== token ||
+        if (!editorPageRef.current || articleCreationRef.current || historyOperationRef.current || autoSnapshotBusyRef.current || mediaOperationRef.current || directoryRef.current !== root || activeToken !== token ||
           articleId(current) !== id || activeToken?.root !== root || activeToken.articleId !== id || !mutationQueueRef.current.canSave(token)) return;
         if ((!current.folder || !current.month) && !current.dirty) return;
         autoSnapshotBusyRef.current = true;

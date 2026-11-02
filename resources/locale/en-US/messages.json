@@ -449,7 +449,8 @@
     "historyDeletedRefreshFailed": "The version was deleted, but the list could not refresh. Retry refreshing; do not delete again. {{cause}}",
     "historyDeleteFailed": "Could not delete the historical version: {{cause}}",
     "assetOperationFailed": "Action failed for {{fileName}}: {{cause}}",
-    "renderUpdateFailed": "Rendering could not complete."
+    "renderUpdateFailed": "Rendering could not complete.",
+    "sourceSavedProjectAssignmentNotSaved": "Source saved; project assignment was not saved"
   },
   "bootstrap": {
     "theArticlePreviewRootIsMissing": "The article preview root is missing.",
@@ -1513,6 +1514,7 @@
     "styleSource": "Library stylesheet"
   },
   "formatPackage": {
+    "noActions": "This library declares no actions of this kind.",
     "actions": "Library actions",
     "action": "Action",
     "filename": "Filename",

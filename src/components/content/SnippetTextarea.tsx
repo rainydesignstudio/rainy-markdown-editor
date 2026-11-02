@@ -40,6 +40,8 @@ type Props = {
   onImportFiles?: (files: File[], selection: Selection) => void | Promise<void>;
   onPasteConflict?: () => void;
   showLineNumbers?: boolean;
+  wrap?: boolean;
+  syntaxHighlight?: boolean;
   lineOffset?: number;
   sourceHeader?: ReactNode;
   lineConcerns?: ReadonlyMap<number, SourceLineConcern>;
@@ -62,14 +64,14 @@ function selectionOf(textarea: HTMLTextAreaElement): Selection {
   return { start: textarea.selectionStart, end: textarea.selectionEnd };
 }
 
-export function highlightMarkdownSource(value: string): ReactNode[] {
-  return tokenizeEditorSource(value).map((segment, index) => segment.tone
+export function highlightMarkdownSource(value: string, extended = false): ReactNode[] {
+  return tokenizeEditorSource(value, extended).map((segment, index) => segment.tone
     ? <span key={index} className={segment.tone}>{segment.text || <span data-source-padding="true">{'\u200b'}</span>}</span>
     : segment.text || <span key={index} data-source-padding="true">{'\u200b'}</span>);
 }
 
 export const SnippetTextarea = forwardRef(function SnippetTextarea(
-  { value, historyKey, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, lineOffset = 0, sourceHeader, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
+  { value, historyKey, snippets, categories = [], openFindRef, openPickerRef, insertTextRef, formatSelectionRef, onChange, onSnippetInserted, disabled = false, readOnly = false, ariaLabel: suppliedAriaLabel, id, sourceFont = 'article', onImportFiles, onPasteConflict, showLineNumbers = false, wrap = true, syntaxHighlight, lineOffset = 0, sourceHeader, lineConcerns = EMPTY_LINE_CONCERNS }: Props,
   forwardedRef: ForwardedRef<HTMLTextAreaElement>,
 ) {
   const { t } = useUITranslation('editor');
@@ -109,21 +111,22 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   const selectedFind = findOpen && !isComposing && found[activeFind]?.start === selection.start && found[activeFind]?.end === selection.end;
   const highlightedSource = useMemo(() => {
     const match = findOpen ? found[activeFind] : null;
-    if (!match) return highlightMarkdownSource(value);
-    const segments = tokenizeEditorSource(value); let offset = 0;
+    const segments = syntaxHighlight === false ? [{ text: value, tone: undefined }] : tokenizeEditorSource(value, syntaxHighlight === true);
+    if (!match) return segments.map((segment, index) => <span key={index} className={segment.tone}>{segment.text || <span data-source-padding="true">{'\u200b'}</span>}</span>);
+    let offset = 0;
     return segments.flatMap((segment, index) => {
       const start = offset; const end = start + segment.text.length; offset = end;
       if (end <= match.start || start >= match.end) return [<span key={index} className={segment.tone}>{segment.text || <span data-source-padding="true">{'\u200b'}</span>}</span>];
       const left = Math.max(0, match.start - start), right = Math.min(segment.text.length, match.end - start);
       return [<span key={index} className={segment.tone}>{segment.text.slice(0, left)}<mark data-source-find="true" className="rounded-sm bg-search-hit text-search-hit-ink">{segment.text.slice(left, right)}</mark>{segment.text.slice(right)}</span>];
     });
-  }, [value, findOpen, found, activeFind]);
+  }, [value, findOpen, found, activeFind, syntaxHighlight]);
   const sourceLines = useMemo(() => logicalSourceLines(value), [value]);
   const [measuredGutterDigits, setGutterDigits] = useState(3);
   const initialGutterDigits = Math.max(3, String(lineOffset + 1).length);
   const maxGutterDigits = Math.max(3, String(lineOffset + sourceLines.length).length);
   const gutterDigits = Math.max(initialGutterDigits, Math.min(measuredGutterDigits, maxGutterDigits));
-  const sourceBoxClass = `editor-inner ${fontClass} ${sourceLinePaddingClass(showLineNumbers)}`;
+  const sourceBoxClass = `editor-inner data-[wrap=false]:whitespace-pre data-[wrap=false]:wrap-normal ${fontClass} ${sourceLinePaddingClass(showLineNumbers)}`;
   const gutterNumberClass = SOURCE_LINE_NUMBER_CLASS;
   const measureGutter = () => {
     const viewport = viewportRef.current, rows = gutterRef.current?.firstElementChild?.children;
@@ -206,10 +209,11 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
   useLayoutEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+    if (wrap && viewportRef.current) viewportRef.current.scrollLeft = 0;
     textarea.scrollTop = 0;
     textarea.scrollLeft = 0;
     if (!pointerFocusRef.current && document.activeElement === textarea && textarea.selectionStart === textarea.selectionEnd) revealCaret();
-  }, [showLineNumbers, sourceFont, value]);
+  }, [showLineNumbers, sourceFont, value, wrap]);
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -416,7 +420,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       const first = markers[0].getBoundingClientRect(), last = markers[markers.length - 1].getBoundingClientRect();
       const top = Math.min(first.top, last.top), bottom = Math.max(first.bottom, last.bottom);
       const obscuredTop = Math.max(0, (findPanelRef.current?.getBoundingClientRect().bottom ?? 0) - viewport.getBoundingClientRect().top);
-      revealSourceRect(viewport, { top, bottom, height: bottom - top }, 'center', obscuredTop);
+      revealSourceRect(viewport, { top, bottom, height: bottom - top, left: first.left, right: last.right }, 'center', obscuredTop);
     };
     centerHit();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(centerHit);
@@ -520,13 +524,13 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       {!openFindRef && !findOpen ? <div className="absolute top-2 right-2 z-30"><IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={openFind} /></div> : null}
       {sourceHeader}
-      <ScrollViewport ref={viewportRef} data-source-viewport="true" className="flex-1" onScroll={handleViewportScroll}>
+      <ScrollViewport ref={viewportRef} horizontal={!wrap} data-source-viewport="true" className="flex-1" onScroll={handleViewportScroll}>
       <div className="flex min-h-full min-w-0 flex-col">
-      <div data-source-content="true" className="relative min-h-0 w-full flex-1">
-      <div ref={highlightRef} className={`pointer-events-none ${isComposing ? 'opacity-0' : ''}`} aria-hidden="true"><pre ref={sourceRef} className={sourceBoxClass}>{highlightedSource}</pre></div>
+      <div data-source-content="true" data-wrap={wrap} className="relative min-h-0 w-full flex-1 data-[wrap=false]:w-max data-[wrap=false]:min-w-full">
+      <div ref={highlightRef} className={`pointer-events-none ${isComposing ? 'opacity-0' : ''}`} aria-hidden="true"><pre ref={sourceRef} data-wrap={wrap} className={`${sourceBoxClass} data-[wrap=false]:w-max data-[wrap=false]:min-w-full`}>{highlightedSource}</pre></div>
       {showLineNumbers || lineConcerns.size > 0 ? <div ref={gutterRef} className="pointer-events-none absolute inset-0 z-20 overflow-clip">
         {/* Block rows wrap differently from a continuous preformatted source flow. */}
-        <pre className={sourceBoxClass}>
+        <pre data-wrap={wrap} className={`${sourceBoxClass} data-[wrap=false]:w-max data-[wrap=false]:min-w-full`}>
           {sourceLines.map((line, index) => {
             const number = index + 1 + lineOffset;
             const concern = lineConcerns.get(index + 1);
@@ -546,6 +550,8 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
           else if (forwardedRef) forwardedRef.current = node;
         }}
         className={`absolute inset-0 z-10 min-h-0 min-w-0 size-full resize-none overflow-hidden ${sourceBoxClass} caret-editor-text outline-0 selection:bg-selection/60 selection:text-editor-text data-[find-active=true]:selection:bg-transparent data-[find-active=true]:selection:text-transparent focus-visible:outline-none ${isComposing ? 'text-editor-text' : 'text-transparent'}`}
+        data-wrap={wrap}
+        wrap={wrap ? 'soft' : 'off'}
         data-find-active={selectedFind}
         value={value}
         disabled={disabled}

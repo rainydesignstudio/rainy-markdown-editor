@@ -156,7 +156,7 @@ test('the rename path accepts the saved draft, preserves failure recovery, and e
 
 test('article information has one save action, no per-folder saved badge, and Enter saves the whole form', async () => {
   const source = await readFile(new URL('../../src/components/editor/ArticleInfoDialog.tsx', import.meta.url), 'utf8');
-  const module = { exports: {} }, stub = () => null;
+  const module = { exports: {} }, stub = () => null, titleStub = () => null;
   const modules = {
     react: { ...React, useRef: value => ({ current: value }), useLayoutEffect() {} },
     '../global/UILocaleProvider': { useUITranslation: () => ({ t: key => key }) },
@@ -165,7 +165,7 @@ test('article information has one save action, no per-folder saved badge, and En
     '../global/SelectField': { SelectField: stub },
     '../global/DialogFrame': Object.fromEntries(['DialogActions', 'DialogButton', 'DialogFooter', 'DialogFrame', 'DialogHeader'].map(name => [name, stub])),
     '../global/InformationButton': { InformationButton: stub, InformationIcon: stub },
-    './EditableArticleTitle': { EditableArticleTitle: stub },
+    './EditableArticleTitle': { EditableArticleTitle: titleStub },
   };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require: name => name === 'react/jsx-runtime' ? { jsx: React.createElement, jsxs: React.createElement, Fragment: React.Fragment } : modules[name],
@@ -184,4 +184,20 @@ test('article information has one save action, no per-folder saved badge, and En
   assert.equal(saves, 1);
   nodes.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
   assert.equal(saves, 2);
+  assert.equal(input.props.disabled, false, 'an existing article still permits independent directory editing');
+  nodes.length = 0;
+  visit(module.exports.ArticleInfoDialog({ article: { dirty: true, themeValid: true, theme: {} }, parsed: { diagnostics: [], metadata: { categories: [] } },
+    workspace: { projects: [] }, folderName: 'New title', creation: { month: '2026-10', projectId: 'project', onBack() {} }, onSave() {} }));
+  assert.equal(nodes.find(node => node.props.name === 'article-folder').props.disabled, true);
+  assert.equal(nodes.find(node => node.props.name === 'article-project').props.disabled, false);
+  assert.equal(nodes.find(node => node.props.name === 'article-project').props.value, 'project');
+  assert.equal(nodes.some(node => node.props.id === 'article-manage-heading'), false);
+  assert.equal(nodes.some(node => Array.isArray(node.props.children) && node.props.children.includes('dialogs:creation.create')), true);
+  assert.equal(nodes.some(node => node.props.children === 'dialogs:creation.back'), true);
+  nodes.length = 0;
+  visit(module.exports.ArticleInfoDialog({ article: { dirty: true, themeValid: true, theme: {} }, parsed: { diagnostics: [{ level: 'error' }], metadata: { categories: [] } },
+    workspace: { projects: [] }, folderName: '', creation: { month: '2026-10', projectId: null, onBack() {} }, onSave: () => saves++ }));
+  assert.equal(nodes.find(node => node.type === titleStub).props.disabled, false, 'creation fields stay editable while repairing an empty title');
+  nodes.find(node => node.type === 'form').props.onSubmit({ preventDefault() {} });
+  assert.equal(saves, 2, 'invalid new metadata cannot be submitted');
 });

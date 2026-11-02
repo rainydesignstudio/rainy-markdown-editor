@@ -65,8 +65,8 @@ function inputFixture(value, snippets, synchronousCommit = true, extras = {}) {
       if (id === 'react') return react;
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id === 'react-dom') return { createPortal: children => children };
-      if (id.endsWith('/nativeTextareaEdit')) return nativeEdit;
       if (id.endsWith('/snippetComposer')) return composer;
+      if (id.endsWith('/nativeTextareaEdit')) return nativeEdit;
       if (id.endsWith('/SnippetCategoryDialog')) return { CategoryIcon: 'category-icon' };
       if (id.endsWith('/editorSourceHighlight')) return highlighter;
       if (id.endsWith('/sourceLineDiagnostics')) return lineDiagnostics;
@@ -296,6 +296,8 @@ test('the source toolbar uses the same undoable insert ref as the input', async 
       if (id.endsWith('/resources/inspection')) return { inspectArticleResources: async () => [] };
       if (id.endsWith('/useResourceVersion')) return { useResourceDocumentVersion: () => 0 };
       if (id.endsWith('/useMediaPreferences')) return { useAuthoringChecks: () => [true, () => {}] };
+      if (id.endsWith('/useSourcePreferences')) return { useSourcePreferences: () => ({ preferences: { wrap: true, highlight: true }, toggle() {} }) };
+      if (id.endsWith('/PaneActions')) return { PaneActions: 'pane-actions' };
       if (id.endsWith('/useSourceLineNumbers')) return { useSourceLineNumbers: () => ({ showLineNumbers: false, toggle() { lineToggles++; } }) };
       if (id.endsWith('/SnippetTextarea')) return { SnippetTextarea: 'snippet-input' };
       if (id.endsWith('/InsertElementsMenu')) return { InsertElementsMenu: 'insert-menu' };
@@ -451,10 +453,11 @@ test('insert menu labels expose B/I/U and formatting routes through the shared s
   const menuSource = await readFile(new URL('../src/components/editor/InsertElementsMenu.tsx', import.meta.url), 'utf8');
   vm.runInNewContext(ts.transpileModule(menuSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, require: withTextInputHistory(id => {
-      if (id === 'react') return { useRef: value => ({ current: value }), useEffect() {} };
+      if (id === 'react') return { useContext: () => null, useRef: value => ({ current: value }), useState: value => [value, () => {}], useEffect() {} };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'scroll-viewport' };
       if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
+      if (id.endsWith('/IconPopover')) return { IconPopover: 'icon-popover' };
       throw new Error(id);
     }),
   });

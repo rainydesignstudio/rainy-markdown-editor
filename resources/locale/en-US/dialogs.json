@@ -738,5 +738,11 @@
     "unsaved": "This CSS source has unsaved changes. Saving writes the shared file in this library and updates its existing integrity hash.",
     "reload": "Reload CSS source and rendering configuration",
     "problems": "CSS source problems"
+  },
+  "creation": {
+    "next": "Next",
+    "back": "Back",
+    "create": "Create article",
+    "description": "Enter article details, then choose Create article to create its folder and article file."
   }
 }

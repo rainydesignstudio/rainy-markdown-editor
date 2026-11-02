@@ -37,7 +37,13 @@
     "longDocumentWarning": "文稿共 {{count}} 行，即时渲染可能明显变慢；建议开启“仅保存时刷新预览”。",
     "longDocumentSavedOnly": "文稿共 {{count}} 行，当前已启用“仅保存时刷新预览”。",
     "metadataLines": "元数据 · 文件第 1–{{count}} 行",
-    "metadataViewOnly": "只读"
+    "metadataViewOnly": "只读",
+    "wordWrap": "自动换行",
+    "wrapToggle": "自动换行（⌥ Z / Alt Z）",
+    "syntaxHighlight": "语法高亮",
+    "lineNumbers": "显示行号",
+    "findLabel": "查找替换",
+    "actions": "源码操作"
   },
   "workspace": {
     "panes": "窄屏编辑与预览切换",
@@ -68,7 +74,8 @@
     "options": "预览选项",
     "scrollSync": "预览滚动对齐",
     "saveReport": "保存时显示格式检查",
-    "saveOnly": "仅保存时刷新预览"
+    "saveOnly": "仅保存时刷新预览",
+    "actions": "预览操作"
   },
   "clipboard": {
     "title": "剪贴板接收区",

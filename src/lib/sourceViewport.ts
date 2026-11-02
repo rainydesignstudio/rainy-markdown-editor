@@ -45,9 +45,15 @@ export function sourceOffsetRect(layer: HTMLElement, offset: number): DOMRect | 
 }
 
 /** Change only the common viewport; never scroll the textarea or a passive text layer. */
-export function revealSourceRect(viewport: HTMLElement, rect: Pick<DOMRect, 'top' | 'bottom' | 'height'>, alignment: 'nearest' | 'center' = 'nearest', obscuredTop = 0): void {
+export function revealSourceRect(viewport: HTMLElement, rect: Pick<DOMRect, 'top' | 'bottom' | 'height'> & Partial<Pick<DOMRect, 'left' | 'right'>>, alignment: 'nearest' | 'center' = 'nearest', obscuredTop = 0): void {
   if (!rect.height || !viewport.clientHeight) return;
-  const top = viewport.getBoundingClientRect().top + viewport.clientTop;
+  const bounds = viewport.getBoundingClientRect();
+  if (rect.left !== undefined && rect.right !== undefined && viewport.scrollWidth > viewport.clientWidth) {
+    const left = bounds.left + viewport.clientLeft, right = left + viewport.clientWidth;
+    if (rect.left < left) viewport.scrollLeft += rect.left - left;
+    else if (rect.right > right) viewport.scrollLeft += rect.right - right;
+  }
+  const top = bounds.top + viewport.clientTop;
   const bottom = top + viewport.clientHeight;
   if (alignment === 'center') {
     // The floating search does not shrink the source viewport. Center in that

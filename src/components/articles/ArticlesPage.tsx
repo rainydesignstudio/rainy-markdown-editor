@@ -218,7 +218,7 @@ export function ArticlesPage({
               <strong className="font-mono text-3xl font-medium tracking-tight text-accent-text">{formatUINumber(filtered.length, locale, { minimumIntegerDigits: 2, useGrouping: false })}</strong>
               <span className="text-xs text-muted">{t('articles:documentUnit', { count: filtered.length })}</span>
             </div>
-            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportTasks ? <button className="button button-quiet" type="button" onClick={onImportTasks}><ContentIcon name="changes" />{t('messages:imports.tasksTitle')}</button> : null}{onImportMarkdown ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={onImportMarkdown}><ContentIcon name="apply" />{t('messages:imports.title')}</button> : null}<button className="button button-primary" type="button" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
+            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportTasks ? <button className="button button-quiet" type="button" onClick={onImportTasks}><ContentIcon name="changes" />{t('messages:imports.tasksTitle')}</button> : null}{onImportMarkdown ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={onImportMarkdown}><ContentIcon name="apply" />{t('messages:imports.title')}</button> : null}<button className="button button-primary" type="button" data-create-article-trigger="overview" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
           </div>
         </PageHeading>
 
@@ -317,7 +317,7 @@ export function ArticlesPage({
             <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-8 text-center" aria-live="polite">
               <strong className="font-sub-heading text-sm font-semibold text-primary">{indexIssues.length && !articles.length ? t('articles:list.fixIndex') : articles.length ? t('articles:list.noMatches') : collection === 'archived' ? t('articles:list.archiveEmpty') : t('articles:list.empty')}</strong>
               <p className="m-0 max-w-112 text-sm text-muted mt-3">{indexIssues.length && !articles.length ? t('articles:list.fixIndexHelp') : articles.length ? t('articles:list.noMatchesHelp') : collection === 'archived' ? t('articles:list.archiveEmptyHelp') : t('articles:list.emptyHelp')}</p>
-              {!indexIssues.length && !articles.length && collection !== 'archived' ? <button className="button button-quiet" type="button" onClick={onNew}>{t('articles:newArticle')}</button> : null}
+              {!indexIssues.length && !articles.length && collection !== 'archived' ? <button className="button button-quiet" type="button" data-create-article-trigger="empty" onClick={onNew}>{t('articles:newArticle')}</button> : null}
             </div>
           )}
         </section>

@@ -2,8 +2,9 @@
 
 import { useUITranslation } from '../global/UILocaleProvider';
 
-import { useEffect, useRef } from 'react';
-import { IconButton } from '../global/IconButton';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { IconPopover } from '../global/IconPopover';
+import { ActionMenuAnchorContext, IconButton } from '../global/IconButton';
 import { INLINE_FORMATS, isInlineFormat, type InlineFormat } from '../../lib/editor/inlineFormatting';
 
 type InsertIconName = 'heading' | 'quote' | 'link' | 'code' | 'list' | 'ordered-list' | 'task-list' | 'bold' | 'italic' | 'underline' | 'strike' | 'inline-code' | 'table' | 'rule' | 'snippets';
@@ -74,11 +75,6 @@ export function InsertIcon({ name, className }: { name: InsertIconName; classNam
   return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M4 12h16" /></svg>;
 }
 
-function closeInsertMenu(target: Element): void {
-  const menu = target.closest('.insert-elements-menu') as HTMLDetailsElement | null;
-  if (menu) menu.open = false;
-}
-
 export function InsertElementsMenu({
   disabled,
   readOnly,
@@ -96,25 +92,16 @@ export function InsertElementsMenu({
   onInsert: (text: string, caretOffset: number) => void;
   onFormat: (format: InlineFormat) => void;
 }) {
+  const actionMenu = useContext(ActionMenuAnchorContext);
   const { t } = useUITranslation('editor');
-  const menuRef = useRef<HTMLDetailsElement | null>(null);
-  useEffect(() => {
-    const closeOnOutsidePointer = (event: PointerEvent) => {
-      if (event.target instanceof Node && menuRef.current && !menuRef.current.contains(event.target)) menuRef.current.open = false;
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !menuRef.current?.open) return;
-      menuRef.current.open = false;
-      menuRef.current.querySelector('summary')?.focus();
-      event.preventDefault();
-    };
-    document.addEventListener('pointerdown', closeOnOutsidePointer);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, []);
+  const anchor = useRef<HTMLElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const compact = actionMenu !== null;
+  useEffect(() => { setOpen(false); }, [compact, disabled]);
+  const toggle = () => {
+    if (!open) { anchor.current = actionMenu?.anchor() ?? null; actionMenu?.close(); }
+    setOpen(value => !value);
+  };
 
   const insert = (content: string, fallbackCaret = content.length) => {
     const marker = content.indexOf('▌');
@@ -130,24 +117,24 @@ export function InsertElementsMenu({
   }
 
   return (
-    <details ref={menuRef} className="insert-elements-menu">
-      <IconButton as="summary" tooltip={t('editor:insert.label')} icon={triggerIcon} />
-      <div className="insert-elements-panel" role="group" aria-label={t('editor:insert.label')}>
+    // Geometry rationale: retain the existing insert menu's 32rem/70dvh cap in both toolbar presentations.
+    <IconPopover label={t('editor:insert.label')} icon={triggerIcon} open={open} onToggle={toggle} onClose={() => setOpen(false)} anchorRef={anchor} align="end" panelClassName="max-h-[min(32rem,70dvh)] w-56">
+      <div className="insert-elements-panel contents" role="group" aria-label={t('editor:insert.label')}>
         <p className="insert-menu-label">{t('editor:insert.markdown')}</p>
         {STANDARD_GROUPS.map((group) => (
           <details key={group.id} className="insert-standard-category">
             <summary><InsertIcon name={group.icon} /><span>{t('editor:insert.groups.' + group.id)}</span><span aria-hidden="true">›</span></summary>
             <div className="insert-standard-options" role="group" aria-label={t('editor:insert.groups.' + group.id)}>
-              {group.items.map((item) => <button key={item.id} type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); if (isInlineFormat(item.id)) onFormat(item.id); else insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span>{isInlineFormat(item.id) ? <kbd className="ml-auto whitespace-nowrap font-mono text-xs text-faint">⌘ {INLINE_FORMATS[item.id].key.toUpperCase()} / Ctrl + {INLINE_FORMATS[item.id].key.toUpperCase()}</kbd> : null}</button>)}
+              {group.items.map((item) => <button key={item.id} role="menuitem" type="button" disabled={disabled} onClick={(event) => { setOpen(false); if (isInlineFormat(item.id)) onFormat(item.id); else insert(item.content, item.caret); }}><InsertIcon name={item.icon} /><span>{t('editor:insert.items.' + item.id)}</span>{isInlineFormat(item.id) ? <kbd className="ml-auto whitespace-nowrap font-mono text-xs text-faint">⌘ {INLINE_FORMATS[item.id].key.toUpperCase()} / Ctrl + {INLINE_FORMATS[item.id].key.toUpperCase()}</kbd> : null}</button>)}
             </div>
           </details>
         ))}
         <p className="insert-menu-label insert-menu-label--divider">{t('editor:insert.images')}</p>
-        <button type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); onOpenMediaPicker(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>{t('editor:insert.fromLibrary')}</span></button>
-        <button type="button" disabled={disabled} onClick={(event) => { closeInsertMenu(event.currentTarget); onChooseImage(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>{t('editor:insert.chooseImage')}</span></button>
+        <button role="menuitem" type="button" disabled={disabled} onClick={(event) => { setOpen(false); onOpenMediaPicker(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>{t('editor:insert.fromLibrary')}</span></button>
+        <button role="menuitem" type="button" disabled={disabled} onClick={(event) => { setOpen(false); onChooseImage(); }}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2" /><circle cx="9" cy="10" r="1.5" /><path d="m5 17 5-4 3 2 3-3 3 3" /></svg><span>{t('editor:insert.chooseImage')}</span></button>
         <p className="insert-menu-label insert-menu-label--divider">{t('editor:insert.snippets')}</p>
-        <button type="button" onClick={(event) => { closeInsertMenu(event.currentTarget); onOpenSnippetPicker(); }}><InsertIcon name="snippets" /><span>{t('editor:insert.openSnippets')}</span></button>
+        <button role="menuitem" type="button" onClick={(event) => { setOpen(false); onOpenSnippetPicker(); }}><InsertIcon name="snippets" /><span>{t('editor:insert.openSnippets')}</span></button>
       </div>
-    </details>
+    </IconPopover>
   );
 }

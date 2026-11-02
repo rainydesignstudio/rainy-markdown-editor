@@ -8,6 +8,9 @@ const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceRoots = ['src/styles', 'src/app', 'src/components'];
 const sourceExtensions = new Set(['.css', '.js', '.jsx', '.ts', '.tsx']);
 const expectedNumericGeometry = [
+  'src/components/editor/ArticleInfoDialog.tsx md:grid-rows-[1fr_auto]',
+  'src/components/editor/ArticleInfoDialog.tsx md:grid-rows-[auto_1fr]',
+  'src/components/global/IconPopover.tsx max-w-[calc(100vw-1rem)]',
   'src/components/global/LibraryCard.tsx grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))]',
   'src/components/knowledge/KnowledgeReferencePanel.tsx grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))]',
   'src/components/knowledge/KnowledgePage.tsx grid-cols-[auto_minmax(0,1fr)]',
@@ -20,7 +23,7 @@ const expectedNumericGeometry = [
   'src/styles/components-controls.css duration-[500ms,500ms,attr(data-motion-ms_ms,240ms),attr(data-motion-ms_ms,240ms)]',
   'src/styles/components-controls.css ease-[ease-in-out,ease-in-out,cubic-bezier(.2,0,0,1),cubic-bezier(.2,0,0,1)]',
   'src/styles/components-dialog.css max-h-[min(90dvh,56rem)]',
-  'src/styles/components-editor.css max-h-[min(32rem,70dvh)]',
+  'src/components/editor/InsertElementsMenu.tsx max-h-[min(32rem,70dvh)]',
   'src/styles/components-shell.css size-[29px]',
 ];
 

@@ -20,14 +20,14 @@ function persistence(kind, active = true, enabled = true, pending = false) {
     articleId: () => 'draft', settingsIssue: null, currentDocumentGeneration: 1, view: active ? 'articles' : 'settings', articleMode: active ? 'editor' : 'overview',
     articleSettings: { autoSave: { enabled, intervalSeconds: 30 }, autoSnapshot: { enabled, intervalMinutes: 1, maxCount: 10 } },
     editorWorkspace: {}, editorWorkspaceRef: { current: {} }, getArticleOrganization: () => ({ archived: false }), mutationQueueRef: { current: { canSave: () => true, run: task => task() } },
-    historyOperationRef: { current: null }, autoSaveBusyRef: { current: false }, autoSnapshotBusyRef: { current: false }, mediaOperationRef: { current: false }, historyBaselineRef: { current: null },
+    articleCreationRef: { current: null }, historyOperationRef: { current: null }, autoSaveBusyRef: { current: false }, autoSnapshotBusyRef: { current: false }, mediaOperationRef: { current: false }, historyBaselineRef: { current: null },
     snapshotFor: () => snapshot, matchesSnapshot: () => true,
     saveSnapshot: async () => { calls.save++; return pending ? new Promise(resolve => { finish = resolve; }) : { ok: false }; },
     compileCurrent: async () => { calls.compile++; return true; }, captureSavedRender: async () => { calls.render++; },
     listArticleHistory: async () => { calls.history++; return { snapshots: [] }; },
   };
   vm.runInNewContext(ts.transpileModule(source.slice(start, end), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
-  return { timers, clears, calls, editorPageRef, cleanup: () => cleanup?.(), finish: () => finish({ ok: true, current: true, savedSnapshot: { ...snapshot, month: '2026-10', folder: 'test' }, result: { article: { parse: { canCopy: true } } } }) };
+  return { timers, clears, calls, editorPageRef, articleCreationRef: context.articleCreationRef, cleanup: () => cleanup?.(), finish: () => finish({ ok: true, current: true, savedSnapshot: { ...snapshot, month: '2026-10', folder: 'test' }, result: { article: { parse: { canCopy: true } } } }) };
 }
 
 for (const kind of ['autoSave', 'autoSnapshot']) {
@@ -41,6 +41,16 @@ for (const kind of ['autoSave', 'autoSnapshot']) {
     f.editorPageRef.current = true; f.timers[0](); await new Promise(setImmediate);
     assert.equal(f.calls.save, 1, 'returning to the editor retains the enabled timer behavior');
     f.cleanup(); assert.deepEqual(f.clears, [1]);
+  });
+  test(kind + ' cannot write while the article creation wizard is open', async () => {
+    const f = persistence(kind);
+    f.articleCreationRef.current = {};
+    f.timers[0](); await new Promise(setImmediate);
+    assert.equal(f.calls.save, 0);
+    f.articleCreationRef.current = null;
+    f.timers[0](); await new Promise(setImmediate);
+    assert.equal(f.calls.save, 1);
+    f.cleanup();
   });
   test(kind + ' finishes an already-started save without initiating later render/history writes after departure', async () => {
     const f = persistence(kind, true, true, true);

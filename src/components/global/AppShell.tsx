@@ -165,7 +165,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         }
         setTemplateSnapshot(null);
       }} onClose={() => setTemplateSnapshot(null)} /> : null}
-      {exportSnapshot ? <ArticleExportDialog theme={controller.article.theme} onTransform={controller.updateArticle} getResourceRevision={() => controller.mediaRefreshRevisionRef.current} focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
+      {exportSnapshot ? <ArticleExportDialog theme={controller.article.theme} getResourceRevision={() => controller.mediaRefreshRevisionRef.current} focusActive={!controller.formatCheck} source={exportSnapshot.source} title={exportSnapshot.title} dirty={exportSnapshot.dirty} root={exportSnapshot.root} month={exportSnapshot.month} folder={exportSnapshot.folder} visualAvailable={controller.parsed.canCopy && controller.article.themeValid} previewRef={controller.previewRef} isCurrent={() => {
         const current = controller.articleRef.current;
         return getFormatSnapshot().id === exportSnapshot.formatId && controller.directoryRef.current === exportSnapshot.root && controller.contentLibraryRootSessionRef.current === exportSnapshot.sessionKey
           && current.month === exportSnapshot.month && current.folder === exportSnapshot.folder

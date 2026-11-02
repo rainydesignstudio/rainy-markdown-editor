@@ -18,17 +18,19 @@ function DocumentIcon() {
   return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 3h9l5 5v13H5V3ZM14 3v5h5M9 12h6M9 16h6" /></svg>;
 }
 
-export function TemplateDialog({ templates, categories, themes, defaultTheme, onClose, onCreate }: {
+export function TemplateDialog({ templates, categories, themes, defaultTheme, initialTemplateId = null, initialThemeId = null, onClose, onCreate }: {
   templates: ArticleTemplate[];
   categories: SnippetCategory[];
   themes: readonly ThemeConfig[];
   defaultTheme: ThemeConfig;
+  initialTemplateId?: string | null;
+  initialThemeId?: string | null;
   onClose: () => void;
   onCreate: (template: ArticleTemplate | null, theme: ThemeConfig) => void;
 }) {
   const { t } = useUITranslation('dialogs');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(initialTemplateId);
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>(initialThemeId);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const { dark, toggle } = useArticlePreviewMode();
   const usableTemplates = templates.filter(template => !parseArticle(template.source).diagnostics.some(item => item.level === 'error'));
@@ -66,6 +68,6 @@ export function TemplateDialog({ templates, categories, themes, defaultTheme, on
         <p className="shrink-0 text-xs text-faint">{selected ? t('dialogs:templates.starterTheme', { name: previewTheme.name }) : t('dialogs:ui.exampleTextInTheBlankManuscriptIsFor')}</p>
       </section>
     </div>
-    <DialogFooter><DialogActions><DialogButton onClick={onClose}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M18 6 6 18" /></svg>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" onClick={() => onCreate(selected, previewTheme)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M12 5v14M5 12h14" /></svg>{t('dialogs:ui.createArticle')}</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton onClick={onClose}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M18 6 6 18" /></svg>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" onClick={() => onCreate(selected, previewTheme)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg>{t('dialogs:creation.next')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

@@ -987,6 +987,35 @@
           ]
         }
       ]
+    },
+    "v0_3_2_2": {
+      "summary": "Create articles in two steps, with new source display controls and split-pane improvements.",
+      "sections": [
+        {
+          "title": "Article creation",
+          "items": [
+            "Choose a starter and theme, then select Next to enter manuscript details. The directory follows the title during creation and remains independently editable afterward.",
+            "Confirmation writes the article directory, source and theme snapshot and generates an available render record. Back retains entries, cancellation writes nothing, and partial failures recover the same article.",
+            "Fixes preview initialization in newly created libraries and restores focus to the entry point after cancelling article creation."
+          ]
+        },
+        {
+          "title": "Source and split panes",
+          "items": [
+            "Independent word-wrap and syntax-highlighting switches sit before line numbers. Alt/Option+Z toggles wrapping; turning it off enables horizontal scrolling. The browser remembers both choices.",
+            "Markdown, HTML and CSS source highlighting uses existing editor-theme colors without changing article themes or output.",
+            "Effective dragging of the source/preview divider displays both widths until release, cancellation or loss of focus.",
+            "At pane widths of 480px or less, right-hand icons become named menu entries retaining actions, shortcuts and states; manuscript information and theme selection remain available."
+          ]
+        },
+        {
+          "title": "Export cards",
+          "items": [
+            "Restores the original export dialog and single-column cards, retaining filenames, format descriptions and existing notices, with a close icon on Cancel.",
+            "Export types follow declarations from the current library, and the download dialog shows only export actions."
+          ]
+        }
+      ]
     }
   }
 }

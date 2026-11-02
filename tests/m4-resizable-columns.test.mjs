@@ -45,10 +45,16 @@ test('shared splitter captures drag, clamps both panes and supports the same key
   const target = pointerTarget();
   view.layout.startDrag({ button: 0, pointerId: 5, currentTarget: target }); view.render();
   assert.equal(target.captured(), 5); assert.equal(view.layout.dragging, true);
+  assert.equal(view.layout.resizing, false, 'pressing the handle alone does not show dimensions');
+  view.layout.moveDrag({ buttons: 1, clientX: 100 + 6 + view.layout.sourceWidth }); view.render();
+  assert.equal(view.layout.resizing, false, 'an unmoved pointer is not a resize');
   view.layout.moveDrag({ buttons: 1, clientX: 5000 }); view.render();
+  assert.equal(view.layout.resizing, true);
+  assert.equal(view.layout.sourceWidth + view.layout.previewWidth, 1188, 'size labels exclude the divider');
   assert.ok(Math.abs(sizing.getEditorSourceWidth(1200, view.layout.ratio) - 828) < 0.001);
   view.layout.stopDrag(); view.render();
   assert.equal(view.layout.dragging, false); assert.deepEqual(target.releases, [5]);
+  assert.equal(view.layout.resizing, false);
   let prevented = false;
   view.layout.keyResize({ key: 'Home', preventDefault() { prevented = true; } }); view.render();
   assert.equal(prevented, true); assert.equal(sizing.getEditorSourceWidth(1200, view.layout.ratio), 360);

@@ -192,7 +192,7 @@ test('standalone format inspection opens the inspection dialog without saving or
 test('manual save waits for the compiled report and uses it for the save dialog', async () => {
   const fixture = compileFixture(); const dialogs = []; let inspections = 0;
   const context = { ...fixture.context,
-    mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
+    articleCreationRef: { current: null }, mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
     captureSavedRender: async () => true,
     saveSnapshot: async () => ({ ok: true, current: true, savedSnapshot: fixture.snapshot, result: { article: { parse: { canCopy: true } } } }),
     compileCurrent: async () => { fixture.cache.current = { snapshot: fixture.snapshot, report }; return true; },
@@ -210,7 +210,7 @@ test('manual save report preference only changes presentation, including an all-
     const fixture = compileFixture(), dialogs = [], events = [];
     const clean = { complete: true, theme: { passed: ['theme'], issues: [] }, body: { passed: ['body'], issues: [] } };
     const context = { ...fixture.context, getPreviewPreferences: () => ({ saveReport: enabled }),
-      mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
+      articleCreationRef: { current: null }, mediaOperationRef: { current: null }, historyOperationRef: { current: null }, setLoadInspectionRevision() {},
       saveSnapshot: async () => { events.push('save'); fixture.cache.current = { snapshot: fixture.snapshot, report: clean }; return { ok, rendered: ok, current: true, savedSnapshot: fixture.snapshot, result: { article: { parse: { canCopy: true } } } }; },
       compileCurrent: async () => { events.push('compile'); fixture.cache.current = { snapshot: fixture.snapshot, report: clean }; return true; },
       captureSavedRender: async () => events.push('capture'),

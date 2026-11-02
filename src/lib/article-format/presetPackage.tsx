@@ -133,7 +133,7 @@ export default async function invoke(action: string, input: Input, api: API): Pr
   const bundle = input.context.rawBundle;
   const environment = await packageStyles(bundle, api, input.context.configuration), env = environment?.fingerprint ?? null;
   const algorithms = await packageAlgorithms(api, input.context.configuration);
-  const configuration = input.css === undefined ? { schemaVersion: 1 as const, meta: { id: bundle.support.meta.id }, ...input.context.configuration } : undefined;
+  const configuration = input.css === undefined ? { schemaVersion: 1 as const, meta: { id: bundle.support.meta.id }, ...input.context.configuration, renderer: api.declaration } : undefined;
   const key = canonicalFormatJson([bundle, algorithms.fingerprint, env, configuration]);
   if (contextKey !== key) { activateFormatBundle(bundle, 'package', 'library', environment, algorithms, 'library', configuration); contextKey = key; }
   const snapshot = getFormatSnapshot();

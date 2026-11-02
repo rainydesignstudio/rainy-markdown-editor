@@ -21,7 +21,7 @@ export function EditorPage() {
         <h2 id="editor-unavailable-title" className="page-title font-heading">{controller.directory ? t('editor:empty.chooseArticle') : t('editor:empty.chooseLibrary')}</h2>
         <p className="mt-3">{controller.directory ? t('editor:empty.articleHelp') : t('editor:empty.libraryHelp')}</p>
         <div className="editor-unavailable-actions">
-          {controller.directory ? <><button className="button button-quiet" type="button" onClick={() => controller.navigateArticleMode('overview')}>{t('articles:returnOverview')}</button><button className="button button-primary" type="button" onClick={controller.createNewArticle}>{t('articles:newArticle')}</button></> : <button className="button button-primary" type="button" onClick={() => controller.navigateView('settings')}>{t('articles:directory.settings')}</button>}
+          {controller.directory ? <><button className="button button-quiet" type="button" onClick={() => controller.navigateArticleMode('overview')}>{t('articles:returnOverview')}</button><button className="button button-primary" type="button" data-create-article-trigger="editor" onClick={controller.createNewArticle}>{t('articles:newArticle')}</button></> : <button className="button button-primary" type="button" onClick={() => controller.navigateView('settings')}>{t('articles:directory.settings')}</button>}
         </div>
       </section>
     );

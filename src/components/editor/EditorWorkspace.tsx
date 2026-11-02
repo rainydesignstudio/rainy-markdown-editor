@@ -200,7 +200,7 @@ export function EditorWorkspace({
             citationStatus={<>{!article.folder && pendingOrigins.length ? <span className="text-xs text-muted">{kt('citationAfterSave')}</span> : null}{originIssue ? <span role="alert" className="text-xs text-danger">{originIssue}</span> : null}</>}
           />
         </div>
-        <ColumnSplitter layout={layout} label={t('editor:workspace.resize')} />
+        <ColumnSplitter layout={layout} label={t('editor:workspace.resize')} showSizes />
         <div className="editor-preview-pane flex-col" data-mobile-hidden={!readOnly && mobilePane === 'source'}>
           <PreviewPanel
             onOpenSourceFind={openSourceFind}

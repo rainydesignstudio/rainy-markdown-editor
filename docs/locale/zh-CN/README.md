@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1.1" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.2"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.2-2563EB?style=for-the-badge" alt="Release v0.3.2.2" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -69,7 +69,7 @@
 | ⚙️ **外置检测器** | 每个资料库独立保存格式规范、校验与渲染策略，可通过配置文件或自主渲染包定制，无须修改应用。 |
 | ✅ **格式检查** | 在撰写时提示格式和本地图片问题；保存与复制前仍会提供独立检查结果，方便查看哪里还要改。 |
 | 🌐 **中英界面** | 切换语言保留草稿、查找替换和已有报告；日期、数量与公告按界面语言显示，资料库内容保持原文。 |
-| 📦 **文档导出** | 保存文稿，导出文档包、Markdown、长图片或 PDF；完整原稿可保留元数据和未保存修改；渲染失败时仍可下载。具体入口以应用中的导出菜单为准。 |
+| 📦 **文档导出** | 保存文稿，导出文档包、Markdown、长图片或 PDF；完整原稿可保留元数据和未保存修改；渲染失败时仍可下载。具体入口以应用中的导出菜单为准。 导出格式用卡片选择，随当前资料库提供。 |
 | 🔗 **只读知识库** | 连接多个只读知识源，支持检索、图谱、专题书架、摘录与引用、来源变化核对，也可导入可编辑副本。 |
 | 📥 **Markdown 导入** | 主题预选可换，正文先建档、资源后台复制，支持暂停、重试与补选。 |
 | 🧮 **公式与图** | 可选本地公式/静态 Mermaid 渲染，源码保持，输出按目标平台核对。 |
@@ -92,7 +92,7 @@
 
 **Agent Readable：先读 [AGENT-GUIDE.md](AGENT-GUIDE.md)；后续操作按[持续查阅要求](AGENT-GUIDE.md#doc-manual-use)取用说明书。** 安装来源与版本以你确认的仓库和分支为准。
 
-本次公开包为文档修订 `0.3.2.1.1`；应用界面仍显示 `0.3.2.1`，package 为 `0.3.2+patch.1`。
+本次公开版本为 `0.3.2.2`，package 为 `0.3.2+patch.2`。
 
 <a name="doc-run-yourself"></a>
 
@@ -132,7 +132,7 @@ npm start
 
 1. 打开“设置 → 本地目录 → 新建资料库”，输入资料库文件夹名称，选择校验与算法模板（“微信公众号”或“空校验器”），然后选择父目录并授权读写。应用会创建一个命名子目录；同名目录已存在时，请改名或使用“打开已有资料库”。
 2. 已有资料库直接使用“打开已有资料库”，选择资料库本身。应用只记住最后一个目录书签；权限失效时需重新授权。
-3. 新建文章，输入正文并保存（macOS `⌘S`，其它系统 `Ctrl+S`）。文章目录和主题快照在保存时生成。
+3. 新建文章，选择起稿模板和文章主题后点“下一步”，填写文稿信息，再点“新建文章”。这一步会创建文章目录、正文及主题快照；进入编辑器后继续撰写，用 macOS `⌘S` 或其它系统 `Ctrl+S` 保存修改。
 4. 在“主题”中试看文章主题。已保存文章使用“复制并应用”，生成副本并保留原稿和主题快照；未保存新稿使用“应用到当前稿”。
 5. 在“模板”中管理片段和起稿模板；在编辑器里通过“插入元素”或输入片段触发词采用。
 6. 在“素材”中导入共享/文章图片与附件。也可把本地文件拖入素材页，核对目标库、文件清单及格式后确认；取消不写入。采用共享图片会复制到文章自己的 `media/image/`；共享原件与文章副本独立。
@@ -159,6 +159,8 @@ npm start
 新资料库自动保存默认关闭，已有显式设置保持。离开编辑页后暂停自动保存和自动快照，返回后遵循原开关；手动保存及未保存提醒保持。
 
 预览深浅色开关位于三个预览操作按钮左侧，三个按钮的顺序保持。
+
+源码工具栏提供“自动换行”和“语法高亮”，位于行号按钮左侧。按 `Alt/Option + Z` 切换自动换行，关闭后可横向滚动；高亮使用编辑器主题为 Markdown、HTML 与 CSS 着色，不改变正文或文章主题。两项偏好由浏览器记住。拖动正文与预览的分隔条时显示两栏宽度，松开即隐藏；单栏宽度不超过480px时，右侧图标收进该栏菜单，文稿信息和主题入口保留。
 
 <a name="doc-source-formatting"></a>
 

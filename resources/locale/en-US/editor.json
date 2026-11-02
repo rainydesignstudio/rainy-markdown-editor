@@ -37,7 +37,13 @@
     "longDocumentWarning": "This manuscript has {{count}} lines. Live rendering may become slow; consider refreshing the preview only after saving.",
     "longDocumentSavedOnly": "This manuscript has {{count}} lines. The preview currently refreshes only after saving.",
     "metadataLines": "Metadata · file lines 1–{{count}}",
-    "metadataViewOnly": "Read only"
+    "metadataViewOnly": "Read only",
+    "wordWrap": "Word wrap",
+    "wrapToggle": "Word wrap (⌥ Z / Alt Z)",
+    "syntaxHighlight": "Syntax highlighting",
+    "lineNumbers": "Line numbers",
+    "findLabel": "Find and replace",
+    "actions": "Source actions"
   },
   "workspace": {
     "panes": "Switch between source and preview",
@@ -68,7 +74,8 @@
     "options": "Preview options",
     "scrollSync": "Align preview scrolling",
     "saveReport": "Show format check after manual save",
-    "saveOnly": "Refresh preview only after saving"
+    "saveOnly": "Refresh preview only after saving",
+    "actions": "Preview actions"
   },
   "clipboard": {
     "title": "Clipboard receiver",

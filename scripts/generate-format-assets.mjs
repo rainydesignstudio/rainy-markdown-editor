@@ -89,7 +89,7 @@ if (!fs.existsSync(licenseIndex) || fs.readFileSync(licenseIndex, 'utf8') !== li
 
 // Each initialized library receives this self-contained library-root interpreter.
 // Existing libraries retain their own bytes when the application is upgraded.
-const rendererBuild = await bundle({ entryPoints: ['src/lib/article-format/presetPackage.tsx'], bundle: true, write: false, metafile: true, platform: 'browser', target: 'es2022', format: 'esm', minify: true, legalComments: 'eof', define: { 'process.env.NODE_ENV': '"production"' } });
+const rendererBuild = await bundle({ entryPoints: ['src/lib/article-format/presetPackage.tsx'], bundle: true, write: false, metafile: true, platform: 'browser', target: 'es2022', format: 'esm', minify: true, legalComments: 'eof', define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_ARTICLE_BASE_PATH': JSON.stringify(process.env.NEXT_PUBLIC_ARTICLE_BASE_PATH || '') } });
 const rendererSource = rendererBuild.outputFiles[0].text;
 const rendererNotices = new Map();
 for (const input of Object.keys(rendererBuild.metafile.inputs).filter(name => name.startsWith('node_modules/'))) {

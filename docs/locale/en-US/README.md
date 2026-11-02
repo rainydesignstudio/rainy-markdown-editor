@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.1.1-2563EB?style=for-the-badge" alt="Release v0.3.2.1.1" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.2"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.2-2563EB?style=for-the-badge" alt="Release v0.3.2.2" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -69,7 +69,7 @@ The feature screenshots below show the English interface in 0.3.0.0. Click a thu
 | ⚙️ **External format policies** | Each library stores its own format rules, validation and rendering policies, customizable through configuration files or a standalone rendering package without modifying the application. |
 | ✅ **Format checks** | live feedback identifies formatting and local-image issues. Saving and copying also produce independent reports so you can review remaining concerns. |
 | 🌐 **Chinese/English interface** | language changes preserve drafts, find/replace and existing reports. Dates, counts and release notes follow the UI language; library content stays original. |
-| 📦 **Document export** | save manuscripts and export document packages, Markdown, long images or PDF. Complete source export retains metadata and unsaved edits and remains available when rendering fails. Available actions are listed in the application's export menu. |
+| 📦 **Document export** | save manuscripts and export document packages, Markdown, long images or PDF. Complete source export retains metadata and unsaved edits and remains available when rendering fails. Available actions are listed in the application's export menu. Choose export formats from cards supplied by the current library. |
 | 🔗 **Read-only knowledge** | Connect multiple read-only knowledge sources for search, graphs, topic bookshelves, excerpts, citations and source-change checks, or import editable copies. |
 | 📥 **Markdown import** | Choose a preselected theme, create the body first, copy resources in the background and pause/retry/replace them. |
 | 🧮 **Math and diagrams** | Optional local math/static Mermaid rendering retains source and requires destination checks. |
@@ -92,7 +92,7 @@ Copy this request into a clean Agent conversation with little unrelated context:
 
 **Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); consult the manuals for later operations under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).** Use the repository and branch you confirm for the installation source and version.
 
-This public package is documentation revision `0.3.2.1.1`; the app still displays `0.3.2.1`, and the package version is `0.3.2+patch.1`.
+This public release is `0.3.2.2`; the package version is `0.3.2+patch.2`.
 
 <a name="doc-run-yourself"></a>
 
@@ -132,7 +132,7 @@ Once saved in the library, fonts remain available offline. To download missing f
 
 1. Open **Settings → Local directory → New library**. Enter a folder name, choose a validation and processing template (“WeChat Official Account” or “Empty validator”), select its parent and grant read/write access. The app creates a named child directory. If that name exists, choose another or use **Open existing library**.
 2. For an existing library, select the library itself using **Open existing library**. Only the latest directory bookmark is remembered; authorize it again if permission expires.
-3. Create an article, enter body content and save with `⌘S` on macOS or `Ctrl+S` elsewhere. Saving creates the article directory and theme snapshot.
+3. Choose a starter and article theme, select **Next**, enter manuscript details, then select **Create article**. This creates its directory, source and theme snapshot. Continue writing in the editor; save later changes with `⌘S` on macOS or `Ctrl+S` elsewhere.
 4. Preview article themes under **Themes**. For saved articles, **Copy and apply** creates an independent copy and retains the original/theme snapshot; an unsaved new draft uses **Apply to current draft**.
 5. Manage snippets and starter templates under **Templates**. Insert them through **Insert element** or a snippet trigger.
 6. Import shared/article images and attachments under **Assets**. You can also drop local files onto the Assets page, review the target library, file list and formats, then confirm; cancellation writes nothing. Adopting a shared image copies it into the article's own `media/image/`; shared originals and article copies are independent.
@@ -159,6 +159,8 @@ A retained display does not replace current-draft checks, copying or export. Ali
 Auto-save defaults to off for new libraries, preserving explicit existing preferences. Auto-save and automatic snapshots pause outside the editor and resume according to their original switches; manual saving and unsaved-change warnings remain.
 
 The preview light/dark switch sits to the left of the three preview controls, whose order is unchanged.
+
+The source toolbar offers **Word wrap** and **Syntax highlighting** to the left of line numbers. Use `Alt/Option + Z` to toggle wrapping; turning it off enables horizontal scrolling. Highlighting uses the editor theme to color Markdown, HTML and CSS without changing the source or article theme. The browser remembers both choices. Dragging the source/preview divider displays both widths until release. At a pane width of 480px or less, its right-hand icons move into a menu while manuscript information and theme selection remain available.
 
 <a name="doc-source-formatting"></a>
 

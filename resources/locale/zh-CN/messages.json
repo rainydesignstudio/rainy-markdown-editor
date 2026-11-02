@@ -449,7 +449,8 @@
     "historyDeletedRefreshFailed": "历史版本已删除，但列表刷新失败；请重试刷新，不必再次删除。{{cause}}",
     "historyDeleteFailed": "历史版本删除失败：{{cause}}",
     "assetOperationFailed": "资源{{fileName}}操作失败：{{cause}}",
-    "renderUpdateFailed": "渲染未能完成。"
+    "renderUpdateFailed": "渲染未能完成。",
+    "sourceSavedProjectAssignmentNotSaved": "原文已保存，项目归属未保存"
   },
   "bootstrap": {
     "theArticlePreviewRootIsMissing": "文章预览根节点缺失。",
@@ -1513,6 +1514,7 @@
     "styleSource": "资料库样式"
   },
   "formatPackage": {
+    "noActions": "当前资料库未声明此类操作。",
     "actions": "资料库动作",
     "action": "操作",
     "filename": "文件名",

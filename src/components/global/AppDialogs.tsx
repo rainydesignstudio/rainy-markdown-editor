@@ -6,7 +6,7 @@ import { CopyDialog, DeleteDialog } from '../articles/ArticleDialogs';
 import { ProjectDeleteDialog } from '../articles/ProjectDeleteDialog';
 import { ArticleInfoDialog } from '../editor/ArticleInfoDialog';
 import { ThemeDialog } from '../themes/ThemeDialog';
-import { TemplateDialog } from '../content/TemplateDialog';
+import { ArticleCreationDialog } from '../content/ArticleCreationDialog';
 import { UnsavedDialog } from '../editor/UnsavedDialog';
 import { MediaAssetDialog } from '../media/MediaLibrary';
 import { MediaPickerDialog } from '../media/MediaPickerDialog';
@@ -127,7 +127,7 @@ export function AppDialogs() {
         scanReferences={controller.scanLibraryMediaReferences}
         onClose={controller.closeMediaPicker}
       /> : null}
-      {activeDialog === 'template' ? <TemplateDialog templates={controller.templates} categories={controller.templateCategories} themes={articleThemes} defaultTheme={defaultArticleTheme} onClose={closeTemplateDialog} onCreate={createArticleFromTemplate} /> : null}
+      {activeDialog === 'template' ? <ArticleCreationDialog key={controller.contentLibraryRootSession} templates={controller.templates} categories={controller.templateCategories} themes={articleThemes} defaultTheme={defaultArticleTheme} workspace={editorWorkspace} onClose={closeTemplateDialog} onCreate={createArticleFromTemplate} /> : null}
       {activeDialog === 'theme' ? <ThemeDialog
         key={`${controller.contentLibraryRootSession}:${controller.currentArticleId}`}
         current={article.theme}

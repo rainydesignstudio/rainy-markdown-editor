@@ -17,7 +17,7 @@ import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
 import { ThemeUpdateTag } from '../themes/ThemeUpdateTag';
 import { IconButton } from '../global/IconButton';
-import { ButtonBar } from '../global/ButtonBar';
+import { PaneActions } from './PaneActions';
 import { usePreviewPreferences } from '../../hooks/usePreviewPreferences';
 import { connectPreviewScrollSync } from '../../lib/previewScrollSync';
 import { ArticlePreviewCanvas } from './ArticlePreviewCanvas';
@@ -174,10 +174,10 @@ export function PreviewPanel({
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
           <PreviewModeSwitch dark={dark} onToggle={toggle} />
-          <ButtonBar label={t('editor:preview.options')}><IconButton tooltip={t('editor:preview.scrollSync')} aria-pressed={preferences.scrollSync} onClick={() => togglePreference('scrollSync')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 4h7M3 9h7M3 14h7M3 19h7M16 5v14m-3-11 3-3 3 3m-6 8 3 3 3-3" /></svg>} />
+          <PaneActions label={t('editor:preview.actions')}><IconButton tooltip={t('editor:preview.scrollSync')} aria-pressed={preferences.scrollSync} onClick={() => togglePreference('scrollSync')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 4h7M3 9h7M3 14h7M3 19h7M16 5v14m-3-11 3-3 3 3m-6 8 3 3 3-3" /></svg>} />
             <IconButton tooltip={t('editor:preview.saveReport')} aria-pressed={preferences.saveReport} onClick={() => togglePreference('saveReport')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H5v17h14V4h-4M9 3h6v4H9zM8 14l3 3 5-6" /></svg>} />
             <IconButton tooltip={t('editor:preview.saveOnly')} aria-pressed={preferences.saveOnly} onClick={() => togglePreference('saveOnly')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v12H4zM8 21h8m-4-4v4M8 11h8m-3-3 3 3-3 3" /></svg>} />
-          </ButtonBar>
+          </PaneActions>
         </div>
       </div>
       <div ref={referenceLayout.containerRef} className="flex min-h-0 flex-1 flex-col" style={referenceLayout.style}>

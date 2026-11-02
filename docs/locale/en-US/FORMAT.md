@@ -171,6 +171,8 @@ Render returns `{html, css}`. Validate returns `{complete, issues, passed}`; iss
 
 ### Host services: capture, archive and measurement
 
+The export dialog displays kind=export as cards in declaration order, using declared labels, extensions and types without a fixed format list. kind=format remains part of the package contract; the workbench currently provides no manual execution entry.
+
 The bundled interpreter also declares archive, PNG and PDF exports. For export requests only, api.service("capture-v1", {width, maxCanvasSide, background}) asks the existing authorized preview capture flow for {data, width, height, blockEnds}; data is base64 PNG. api.service("archive-source-v1", {}) asks the existing source/resource packaging flow for {data}, a base64 ZIP. Resource review stays in trusted UI; computation timeouts pause during that service, and cancellation invalidates the request and its services. These services expose no directory handles or arbitrary writes. Modules implement all conversion and output policy.
 
 Deep validation can call api.service("measure-v1", {html, css, widths}) for actual layout in script-free documents. The result is {screens}; each screen contains width, boxes in first-root-and-descendant DOM order (left/right/top/bottom/width/height and parent.left/right/width), and images (complete/width/height). Packages decide overflow, alignment and other business outcomes. Requests allow up to eight integer widths from 64–4096px and 20,000 elements per document; viewport height is 2000px and images wait up to five seconds, with unavailable images still marked incomplete. The service exposes no directory or element handles and retains declared resource permissions and cancellation guards.
