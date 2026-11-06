@@ -110,7 +110,7 @@ const controllerSource = await readFile(new URL('../src/hooks/useEditorControlle
 function action(name, next, context) {
   context.Error = Error;
   const start = controllerSource.indexOf(`  const ${name} = useCallback(`);
-  const end = controllerSource.indexOf(`\n\n  const ${next}`, start);
+  const end = controllerSource.indexOf(`\n  const ${next}`, start);
   assert.ok(start >= 0 && end > start);
   vm.runInNewContext(ts.transpileModule(controllerSource.slice(start, end) + `\nglobalThis.action = ${name};`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, Object.assign(context, productMessages));
   return context.action;
@@ -159,7 +159,7 @@ test('remembered-library permission failures keep their explicit feedback after 
 
 test('draft protection precedes the creation dialog and does not open the native picker until the form action', () => {
   let pending, opened = false;
-  const request = action('requestCreateDataDirectory', 'createDataDirectory', {
+  const request = action('requestCreateDataDirectory', 'openEntryDirectory', {
     useCallback: callback => callback, runAfterDraftDecision: value => { pending = value; }, setCreateLibraryDialogOpen: value => { opened = value; },
   });
   request(); assert.equal(opened, false); assert.equal(pending.label, '新建资料库'); pending.run(); assert.equal(opened, true);
@@ -179,6 +179,14 @@ test('directory creation reports success, cancellation, stale selection and file
   context.pickDataDirectory = async () => ({});
   assert.equal((await create('new-library')).status, 'created'); assert.equal(opened.length, 2);
   assert.equal(creates[0][3], 'zh-CN');
+  context.getFormatSnapshot = () => ({ error: 'format unavailable' });
+  const openBeforeFailure = context.openAuthorizedDirectory;
+  context.openAuthorizedDirectory = async () => false;
+  const failedLoad = await create('another-library');
+  assert.equal(failedLoad.status, 'error'); assert.equal(failedLoad.created, true);
+  assert.equal(failedLoad.message, 'format unavailable');
+  opened.splice(2);
+  context.openAuthorizedDirectory = openBeforeFailure;
   context.pickDataDirectory = async () => { throw new DOMException('取消', 'AbortError'); };
   assert.equal((await create('new-library')).status, 'cancelled'); assert.equal(opened.length, 2);
   context.pickDataDirectory = async () => { context.directorySelectionRef.current++; return {}; };
@@ -190,4 +198,28 @@ test('directory creation reports success, cancellation, stale selection and file
   assert.equal((await create('empty-library', 'empty')).status, 'created');
   assert.equal(creates.at(-1)[2], 'empty');
   assert.equal(opened.length, 4);
+});
+
+
+test('guide preparation starts only after a current picker selection, for opening and creation', async () => {
+  for (const kind of ['open', 'create']) {
+    let settle;
+    const events = [], root = { name: 'guide-test' };
+    const context = { useCallback: callback => callback, DOMException, resumeIntentRef: { current: { active: false } }, directorySelectionRef: { current: 0 },
+      seedLocale: 'zh-CN', DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset,
+      pickDataDirectory: () => { events.push('picker'); return new Promise((resolve, reject) => { settle = { resolve, reject }; }); },
+      assertExistingDataDirectory: async () => { events.push('validate'); }, createNamedDataDirectory: async () => { events.push('create'); return root; },
+      rememberAuthorizedDirectory: () => events.push('remember'), openAuthorizedDirectory: async (_handle, _selection, _manual, keepRoute) => { assert.equal(keepRoute, true); events.push('load'); return true; }, setStatus() {},
+    };
+    const run = kind === 'open' ? action('openEntryDirectory', 'createDataDirectory', context) : action('createDataDirectory', 'reopenRememberedDirectory', context);
+    const invoke = () => kind === 'open' ? run(() => events.push('selected')) : run('guide-test', 'empty', () => events.push('selected'), true);
+    let pending = invoke();
+    assert.deepEqual(events, ['picker']);
+    settle.resolve(root); assert.equal((await pending).status, 'created');
+    assert.deepEqual(events, ['picker', 'selected', kind === 'open' ? 'validate' : 'create', 'remember', 'load']);
+    events.length = 0; pending = invoke(); settle.reject(new DOMException('cancelled', 'AbortError'));
+    assert.equal((await pending).status, 'cancelled'); assert.deepEqual(events, ['picker']);
+    events.length = 0; pending = invoke(); context.directorySelectionRef.current++; settle.resolve(root);
+    assert.equal((await pending).status, 'cancelled'); assert.deepEqual(events, ['picker']);
+  }
 });

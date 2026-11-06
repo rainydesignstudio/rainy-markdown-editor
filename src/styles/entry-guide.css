@@ -1,0 +1,115 @@
+@layer components {
+  /* Shared welcome and Agent-handoff surfaces consume the same theme roles. */
+  .guide-welcome {
+    @apply relative w-full py-6 text-center;
+  }
+
+  .guide-greeting {
+    /* Geometry rationale: retain the approved .08em tracking instead of rounding to a nearby preset. */
+    @apply flex items-center justify-center gap-2_6 text-muted tracking-[.08em];
+  }
+
+  .guide-wordmark {
+    @apply mx-auto mt-6 mb-12 flex min-h-18 w-fit max-w-full items-center justify-center gap-4;
+
+    & > span {
+      /* Geometry rationale: preserve the existing brand shadow's 12px offset and 24px blur. */
+      @apply w-12 shrink-0 -rotate-7 text-on-accent drop-shadow-[0_12px_24px] drop-shadow-accent/16;
+      @variant md {
+        @apply w-16;
+      }
+    }
+
+    & h1 {
+      /* Geometry rationale: the approved title uses -.03em tracking. */
+      @apply min-w-0 whitespace-pre text-left font-heading font-semibold tracking-[-.03em] text-primary outline-none;
+    }
+  }
+
+  /* Choice and switch cards share geometry, theme roles and checked/focus states. */
+  .guide-choice {
+    @apply flex w-full min-w-0 cursor-pointer items-center gap-4 rounded-2xl border border-line bg-panel px-5 py-4_6 text-left transition-[border-color,background,box-shadow,transform,padding-bottom] duration-300 ease-[ease] motion-reduce:transition-none;
+
+    @variant hover {
+      @apply border-accent-line bg-hover;
+    }
+    @variant peer-checked {
+      /* Geometry rationale: preserve the 3px inset lip and its matching extra bottom padding. */
+      @apply border-accent bg-accent-soft shadow-[inset_-3px_-3px] shadow-accent pb-5_35;
+    }
+    @variant aria-checked {
+      /* Geometry rationale: switches use the same 3px inset lip as radio choices. */
+      @apply border-accent bg-accent-soft shadow-[inset_-3px_-3px] shadow-accent pb-5_35;
+    }
+    @variant peer-focus-visible {
+      @apply outline-2 -outline-offset-3 outline-accent;
+    }
+    @variant focus-visible {
+      @apply outline-2 -outline-offset-3 outline-accent;
+    }
+  }
+
+  .guide-choice-icon {
+    @apply flex size-11 shrink-0 items-center justify-center rounded-3_4 border border-line bg-linear-150/srgb from-hover to-list text-accent-text transition-transform duration-350 ease-[ease] motion-reduce:transition-none;
+    @variant group-hover/choice {
+      @apply -rotate-5;
+    }
+  }
+
+  .guide-action {
+    @apply inline-flex min-h-11_2 cursor-pointer items-center justify-center gap-2_6 rounded-full border border-line bg-transparent px-4_4 py-2_8 text-14 text-secondary transition-[background,border-color,transform] duration-300 ease-[ease] motion-reduce:transition-none;
+    @variant hover {
+      @apply border-accent-line bg-panel;
+    }
+    @variant focus-visible {
+      @apply outline-2 outline-offset-4 outline-accent;
+    }
+    @variant disabled {
+      @apply cursor-default opacity-45;
+    }
+  }
+
+  .guide-next {
+    /* Geometry rationale: preserve the existing action shadow, including its 6px offset and 20px blur. */
+    @apply inline-flex min-h-12 cursor-pointer items-center justify-center gap-2_4 rounded-full border border-accent-line bg-accent px-6 py-3 text-14_4 font-semibold text-on-accent shadow-[0_6px_20px] shadow-accent/12 transition-[opacity,transform,box-shadow] duration-300 ease-[ease] motion-reduce:transition-none;
+    @variant hover {
+      /* Geometry rationale: the existing hover lifts 2px and uses an 8px / 24px shadow. */
+      @apply transform-[translateY(-2px)] shadow-[0_8px_24px] shadow-accent/20;
+    }
+    @variant disabled {
+      @apply cursor-default transform-none opacity-35 shadow-none;
+    }
+    @variant focus-visible {
+      @apply outline-2 outline-offset-4 outline-accent;
+    }
+  }
+
+  /* Both folder halves follow the same gathering state and transform timeline. */
+  .guide-folder-rise {
+    /* Geometry rationale: keep the distinct 350ms opacity and 700ms translation timelines. */
+    @apply translate-y-17 opacity-0 transition-[opacity,translate] duration-[350ms,700ms] ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none;
+    @variant group-data-[gathering=true]/scene {
+      @apply translate-y-0 opacity-100 delay-250;
+    }
+  }
+
+  .guide-next-round {
+    @apply h-13 min-w-13 shrink-0 gap-0 rounded-full p-0;
+  }
+
+  .guide-nav-icon {
+    @apply grid size-12.5 shrink-0 place-items-center;
+  }
+
+  .guide-nav-label {
+    /* Geometry rationale: preserve the synchronized 450ms size/margin and 300ms label opacity transitions. */
+    @apply max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,margin,opacity] duration-[450ms,450ms,300ms] ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none;
+
+    .guide-next-round:is(:hover, :focus-visible) & {
+      @apply ml-4 max-w-48 opacity-100;
+    }
+    .guide-next-round[data-back=true]:is(:hover, :focus-visible) & {
+      @apply ml-0 mr-4;
+    }
+  }
+}

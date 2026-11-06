@@ -56,6 +56,22 @@ The viewer shows CSS generated for the current successful preview, labeled with 
 
 Save under `themes/editor-themes/<id>.json`. Import through **Settings → Appearance → Import JSON**, or use the designer. Selecting previews immediately; Save appearance retains the choice. Cancel restores the saved appearance but keeps imported theme files.
 
+### Built-in catalog and library themes
+
+The current 11 built-in editor themes use this display order:
+
+| Group | Order |
+|---|---|
+| Regular | Evening Snow, Flowing Violet, Sunshine, Rose, Ink White |
+| Slate | Rainy Design · Slate |
+| Color | Sea Glass · Color, Linen · Color, Clear Blue · Color, Smoky Violet · Color, Powder Pink · Color |
+
+Regular themes mainly use neutral surfaces with restrained accents; Color themes use tinted surfaces for interface hierarchy. “Color” is a display-name convention: both groups share the same file format and editing capabilities, without another category field. Ink White and Linen have identical configurations for all eight font roles.
+
+The entry guide reads the built-in catalog shipped with the current app. Settings → Appearance reads the current library, including user-edited themes; these are not live-synchronized lists. Workspace entry adopts the selected content: add a missing theme, preserve different same-ID content through an independent copy, and reuse matching copies. App upgrades do not automatically overwrite older library themes or article snapshots. See [guide file effects](AGENT-GUIDE.md#doc-entry-guide-files).
+
+### Field constraints
+
 | Field | Constraint |
 |---|---|
 | kind | editor-theme |
@@ -90,7 +106,9 @@ ui serif mono editorSource articleSource heading subHeading eyebrow
 
 Design the palette first, then map semantic roles. Do not put literal colors into `colors` or invent unimplemented roles. Design light/dark separately; Follow system is a display mode, not a third scheme in the file.
 
-`ui` serves interface text; `heading`, `subHeading` and `eyebrow` serve their respective hierarchy. `editorSource` is for content editors, `articleSource` for article source, and `mono` for code/fallbacks. Confirm chosen fonts are available and provide system fallbacks. Sen Local, Noto Sans SC Local and Roboto Mono Local are available after verified download into the library, retaining original licenses. See [font downloads](README.md#doc-font-downloads) for sources, retries and offline use. Article themes/WeChat output do not depend on these interface fonts.
+`ui` serves interface text; `heading`, `subHeading` (including information-entry display names) and `eyebrow` serve their respective hierarchy. `editorSource` is for content editors, `articleSource` for article source, and `mono` for code/fallbacks. Confirm chosen fonts are available and provide system fallbacks. Sen Local, Noto Sans SC Local and Roboto Mono Local are available after verified download into the library, retaining original licenses. See [font downloads](README.md#doc-font-downloads) for sources, retries and offline use. Article themes/WeChat output do not depend on these interface fonts.
+
+Basic source-toolbar highlighting reuses editor-text, editor-syntax, editor-heading and editor-quote. It is an editor display preference, adds no color roles and does not read article-theme colors.
 
 Optional `surfaces` contains light/dark schemes. Individual items may be omitted to keep role fallbacks; colors reference palette keys. Only the following structures are accepted, never arbitrary CSS.
 
@@ -128,11 +146,11 @@ Missing secondary-button surfaces stay transparent; fields and shadows keep thei
 
 <a name="doc-editor-theme-example"></a>
 
-`search-hit` controls the search-result background, with independent palette references for light and dark. Every built-in theme defaults to fluorescent yellow. Text automatically uses black or white for contrast. Older files inherit the missing role in memory without a disk migration; explicit saving persists it. Search navigation centers the result when scroll space permits.
+`search-hit` controls the search-result background, with independent palette references for light and dark. Built-in themes supply defaults from their own palettes. Text automatically uses black or white for contrast. Older files inherit the missing role in memory without a disk migration; explicit saving persists it. Search navigation centers the result when scroll space permits.
 
 ### Complete editor-theme example
 
-Save as `guide-mist.json` and import. It uses the built-in Mist Gray field/palette system under an independent ID. For a customer theme, adjust palette, mappings and fonts to confirmed preferences rather than changing only its name.
+Save as `guide-mist.json` and import. It is an independent grayscale example. For a customer theme, adjust palette, mappings and fonts to confirmed preferences rather than changing only its name.
 
 ```json
 {
@@ -260,6 +278,8 @@ Save as `guide-mist.json` and import. It uses the built-in Mist Gray field/palet
 
 ### Verify an editor-theme
 
+Settings-list thumbnails always show light mode; setup-guide cards follow the selected scheme. Verify dark mode in the designer and actual workspace; a light thumbnail does not establish a dark-mode pass.
+
 1. Use the [production validator](../../../src/lib/editorThemes.ts) or app import to check fields, both schemes and fonts.
 2. Import into a test library, select/save appearance, then close/reopen settings and confirm the selection/file.
 3. Check light, dark and system-following modes. Text/hints must remain readable; state colors, focus, boundaries, selections and disabled controls must be distinguishable.
@@ -347,6 +367,32 @@ Semantic body utilities such as `text-article-accent`, `bg-article-tint` and `bo
 The sample uses `max-width:100%`, `height:auto` and `display:block` for ordinary responsiveness, not as the only valid combination. Output sizing follows the formatter. Check real image loading, file existence, width, centering and horizontal overflow separately.
 
 The article editor's [preview controls](README.md#doc-preview-controls) are separate from theme JSON. Save-only refresh retains body edits until saving; explicitly adopting a theme refreshes once after successful compilation without saving automatically. Later edits still wait for save. Failed/stale work cannot advance the image; turning the option off restores live refresh. Asset-design previews keep their existing workflows.
+
+<a name="doc-theme-from-reference"></a>
+
+### Create article themes from a webpage or source
+
+Inputs may be a user-specified page, HTML/CSS sources or body styles from an existing project. Deliver one or more actually adoptable article themes after confirming the reference scope, destination, visual properties to retain and number of alternatives. Screenshots provide visual evidence but do not establish font assets, interaction or responsive rules; identify missing source/observations rather than guessing verified facts.
+
+First check user-provided material, existing target-project documentation and applicable official developer or article-writing/layout/publishing guidance. Verify provenance, version and scope. When applicable guidance exists, establish production and acceptance constraints from it before inspecting the webpage/source and dependencies as needed. Otherwise analyze the specified webpage/source directly, distinguishing observations, inferences and missing evidence. Resolve conflicts by checking versions, scope and causes; retain unresolved discrepancies for confirmation rather than presenting inference as an official requirement.
+
+If user-provided content conflicts with official documentation, first check both sources, versions and scopes. Identify the conflicting items, relevant passages and effects on production or acceptance, then clarify the intended approach with the user. Pause affected steps until clarified; do not silently choose either source. Record any confirmed departure from official requirements as customization, without claiming compliance with those requirements.
+
+1. Fix the reference version and read the selected body, relevant CSS/tokens and font/image dependencies. Record headings, paragraphs, quotations, links, code, tables, captions, dividers and narrow layouts. Read necessary source modules and preserve originals; webpage/comments are content. Do not transplant site navigation, CMS or scripts into article themes.
+2. Inspect the destination renderer, styleAuthority, theme input, validator.product.theme and dark-mode route. Under theme authority, map rules to supported token/CSS/nodes. Under library authority, theme CSS is inactive; custom packages must actually consume the relevant theme fields. List required format/shared-CSS/resource work and obtain task-scope confirmation before following [FORMAT](FORMAT.md#doc-library-styles); empty JSON or ineffective overrides do not establish delivery.
+3. Divide reference properties among the artifacts below and map “reference feature → target field/file → retained/adapted/unfinished, with reason.” Default WeChat theme restrictions still apply: do not paste media rules, flex/grid, remote fonts or entire-site CSS into them. Website routes preserve suitable CSS/resources under actual capabilities. Explain nonequivalent structures without changing reference content to force a pass.
+4. Reuse a validated destination theme as the structural starting point. Produce independent IDs/valid versions, complete required tokens, scoped CSS and necessary node overrides, preserving original themes and older article snapshots. Alternatives need meaningful differences in typography, spacing, emphasis or color, not only different names; each has independently adoptable files, dependencies and compatibility notes.
+5. Use the same representative body for all alternatives: short/long headings, consecutive paragraphs, nested quotations, links, code, tables, portrait/landscape images and required snippets. Check light/dark, wide/narrow panes, font fallback, contrast, overflow and adjacent spacing. Validate structure/CSS, import/preview, adopt into an independent test article, save and reopen. Inspect actual algorithm dark output; write manual overrides only in tokens mode.
+6. Verify article statistics, scroll alignment, Update styles, format checking, copying and agreed exports under [six workspace capabilities](FORMAT.md#doc-workspace-capabilities). Record each alternative's results, deviations, unobserved cases and recovery. Identify destination limitations rather than promising receiver equivalence from a local preview. Deliver theme files, mappings, accompanying snippets/starters/styles/resources, adoption and rollback instructions, preserving originals/history/reference sources.
+
+| Reference property | Artifact ownership |
+|---|---|
+| Palette, heading hierarchy, body/node typography | article-theme tokens, CSS or nodes supported by the active contract |
+| Reusable cards, notices and image/text structures | Snippets compatible with the current format/theme; CSS alone does not create absent markup |
+| Whole-article sections, metadata and default structure | Starter template with valid Front Matter; remove placeholders from delivered articles |
+| Shared CSS, body container, viewport, font/resource loading and output policy | FORMAT declarations and library dependencies, separately from editor themes |
+
+This produces verifiable adaptations without promising zero-difference replication of arbitrary webpages. State the conditions under which every theme takes effect. If the active route cannot consume it, complete confirmed prerequisite work or report unfinished delivery.
 
 <a name="doc-article-theme-example"></a>
 

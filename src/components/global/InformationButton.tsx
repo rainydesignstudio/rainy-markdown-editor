@@ -2,12 +2,12 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
-export function InformationButton({ icon, title, subtitle, titleClassName = '', className = '', ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'title'> & {
-  icon: ReactNode; title: ReactNode; subtitle: ReactNode; titleClassName?: string;
+export function InformationButton({ icon, title, subtitle, className = '', ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'title'> & {
+  icon: ReactNode; title: ReactNode; subtitle: ReactNode;
 }) {
   return <button {...props} type="button" className={`information-button ${className}`}>
     <span className="information-badge" aria-hidden="true">{icon}</span>
-    <span className="information-copy"><strong className={`information-title ${titleClassName}`}>{title}</strong><small className="information-subtitle">{subtitle}</small></span>
+    <span className="information-copy"><strong className="information-title">{title}</strong><small className="information-subtitle">{subtitle}</small></span>
   </button>;
 }
 

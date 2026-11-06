@@ -131,10 +131,6 @@
     }
   }
 
-  .source-actions {
-    @apply w-auto overflow-visible;
-  }
-
   .insert-menu-label {
     @apply px-2 pt-2 text-sm font-semibold text-faint;
   }
@@ -304,16 +300,8 @@
     }
   }
 
-  .page-card-heading {
-    @apply flex items-end justify-between gap-4;
-  }
-
   .page-title {
     @apply mt-1 text-2xl font-semibold tracking-tight text-primary;
-  }
-
-  .page-card-heading p:not(.eyebrow) {
-    @apply mt-1.5 mb-0 text-sm text-muted;
   }
 
   .empty-state {

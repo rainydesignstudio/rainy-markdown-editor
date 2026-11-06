@@ -45,7 +45,7 @@ export function ThemeDialog({ current, themes, source, media, busy = false, bloc
         </div>
         <p id="theme-dialog-description" className="hidden shrink-0 border-t border-line p-4 text-xs text-muted md:block">{t('dialogs:ui.previewWithTheCurrentBodyThenApplyAnd')}</p>
       </aside>
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4" aria-label={t('dialogs:ui.selectedThemePreview')}>
+      <section className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-x-clip overflow-y-auto p-4" aria-label={t('dialogs:ui.selectedThemePreview')}>
         <header className="flex shrink-0 flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-sub-heading text-base font-semibold text-primary">{selected.theme.name}</h3><p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">v{selected.theme.version}{selected.key === 'current' && latestTheme ? <ThemeUpdateTag /> : null}<span>{t('dialogs:ui.lightStyling')}</span></p></div><span className="rounded-md border border-line bg-list px-2 py-1 text-xs text-faint">{selected.key === 'current' ? t('dialogs:ui.currentTheme') : t('dialogs:ui.previewing')}</span></header>
         <ContentRenderPreview source={source} theme={selected.theme} media={media} fill />
         {blockedReason || issue ? <p className="shrink-0 rounded-lg border border-warning-line bg-warning-surface px-3 py-2 text-xs text-warning-strong" role="status">{blockedReason || issue}</p> : null}

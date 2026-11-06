@@ -34,15 +34,22 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
   const format={ error:null, loading:false };
   const module = { exports: {} };
   vm.runInNewContext(code, {
-    exports: module.exports, module,
+    exports: module.exports, module, URL,
     document,
-    window: { matchMedia: () => media },
+    window: { matchMedia: () => media, location: { href: 'http://localhost/articles/' }, localStorage: storage },
     require(id) {
+      if (id.endsWith('/onboarding/GuideArrival')) return { GuideArrival: 'guide-arrival' };
+      if (id.endsWith('/onboarding/GuideSampleRenderer')) return { GuideSampleRenderer: 'guide-sample-renderer' };
+      if (id.endsWith('/onboarding/EntryGuide')) return { EntryGuide: 'entry-guide' };
+      if (id.endsWith('/entryGuide')) return { readGuideCompletion: () => true };
+      if (id.endsWith('/articleSettings') || id.endsWith('/contentLibraries') || id.endsWith('/fileSystem')) return {};
+      if (id.endsWith('/article-format/runtime') || id.endsWith('/article-format/renderRecords')) return {};
       if (id === './Toast') return { ToastReadiness: 'toast-readiness' };
       if (id === './ContentIcon') return { ContentIcon: 'content-icon' };
       if (id.endsWith('/i18n/productMessages')) return { formatProductMessage: value => value?.label ?? '' };
       if (id.endsWith('/EditingDrafts')) return { EditingDraftsProvider: 'draft-provider' };
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
+      if (id.endsWith('/useGuideAudio')) return { useGuideAudio: () => ({ prime() {}, play() {}, quiet() {} }) };
       if (id.endsWith('/useEditorController')) return { useEditorController: () => controller };
       if (id.endsWith('/useFormatSnapshot')) return { useFormatSnapshot: () => format };
       if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ ready: true, locale: 'zh-CN' }), useUITranslation: () => ({ t: key => key }) };
@@ -54,6 +61,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
       if (id === 'react') return {
         createContext: () => ({ Provider: 'provider' }), useContext() {},
         useState(value) { const index = cursor++; if (!(index in cells)) cells[index] = typeof value === 'function' ? value() : value; return [cells[index], (next) => { cells[index] = next; }]; },
+        useRef(value) { const index = cursor++; if (!(index in cells)) cells[index] = { current: value }; return cells[index]; },
         useEffect, useLayoutEffect: useEffect,
       };
       throw new Error(`Unexpected provider import: ${id}`);
@@ -208,6 +216,6 @@ test('render-package reload after startup does not restart the full-screen loade
   f.controller.editorAppearanceReady=true;
   f.controller.contentLibrariesState='ready';
   f.render();f.render();f.format.loading=true;f.render();
-  const children=f.tree().props.children;
+  const children=f.tree().props.children.at(-1).props.children;
   assert.equal(children.at(-1).props.loading,false);
 });

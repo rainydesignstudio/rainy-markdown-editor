@@ -95,8 +95,8 @@ import { copyArticleImageAs, importArticleImage, insertArticleImageReferences, r
 import { DEFAULT_ARTICLE_SETTINGS, loadArticleSettings, saveArticleSettings, type ArticleSettings } from '../lib/articleSettings';
 import { createArticleSnapshot, deleteArticleSnapshot, listArticleHistory, setArticleSnapshotRetained, type ArticleHistoryIssue, type ArticleHistorySnapshot } from '../lib/articleHistory';
 import { BASIC_THEME } from '../lib/themes';
-import { BASE_EDITOR_THEME, parseEditorThemeJson, type EditorTheme } from '../lib/editorThemes';
-import { deleteEditorTheme, loadEditorThemeLibrary, saveEditorTheme, type EditorThemeIssue } from '../lib/editorThemeLibrary';
+import { BASE_EDITOR_THEME, getBuiltinEditorThemes, parseEditorThemeJson, type EditorTheme } from '../lib/editorThemes';
+import { deleteEditorTheme, ensureEditorThemeSnapshot, loadEditorThemeLibrary, saveEditorTheme, type EditorThemeIssue } from '../lib/editorThemeLibrary';
 import { migrateLegacyEditorAppearance } from '../lib/editorThemeMigration';
 import {
   createDefaultEditorWorkspace,
@@ -133,7 +133,7 @@ export type ViewKey = 'articles' | 'assets' | 'themes' | 'template' | 'settings'
 export type ArticleMode = 'overview' | 'editor';
 export type Tone = 'neutral' | 'success' | 'warning' | 'error';
 export type ArticleCollection = 'all' | 'unclassified' | 'archived' | 'trash' | `project:${string}`;
-export type LibraryCreationResult = { status: 'created' | 'cancelled' } | { status: 'error'; message: string };
+export type LibraryCreationResult = { status: 'created' | 'cancelled' } | { status: 'error'; message: string; created?: boolean };
 type PendingAction = { label: string; run: () => void | Promise<void>; onCancel?: () => void };
 type MediaPickerRequest = {
   id: number;
@@ -212,7 +212,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const [mounted, setMounted] = useState(false);
   const [fileSystemReady, setFileSystemReady] = useState(false);
   const pathname = usePathname();
-  const { navigateRoute, registerNavigationGuard } = useRouteNavigation(pathname);
+  const { navigateRoute, registerNavigationGuard, runWithNavigationGuard } = useRouteNavigation(pathname);
   const routePath = (pathname ?? '/').replace(/\/+$/, '') || '/';
   const routeSegment = routePath.split('/').filter(Boolean)[0] ?? '';
   const routePathRef = useRef(routePath); routePathRef.current = routePath;
@@ -728,6 +728,11 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     return true;
   }, [compileCurrent, navigateArticleMode, openDocument, snapshotFor]);
 
+  const selectEntryArticle = useCallback(async (stored: StoredArticle, root: FileSystemDirectoryHandle) => {
+    if (directoryRef.current !== root) return false;
+    return applyStoredArticle(stored, false, root, () => directoryRef.current === root);
+  }, [applyStoredArticle]);
+
   const closeMediaPicker = useCallback(() => {
     mediaPickerRequestRef.current = null; setMediaPickerRequest(null);
     window.requestAnimationFrame(() => sourceTextareaRef.current?.focus());
@@ -1058,6 +1063,32 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   ), [persistEditorWorkspace]);
 
   const editorThemeOperationRef = useRef(false);
+
+  const adoptGuideAppearance = useCallback(async (appearance: EditorAppearance, selectedTheme?: EditorTheme): Promise<boolean> => {
+    const root = directoryRef.current;
+    const source = selectedTheme ?? getBuiltinEditorThemes(seedLocale).find(theme => theme.id === appearance.themeId);
+    if (!source || source.id !== appearance.themeId || appearance.custom || (root && editorWorkspaceIssue) || editorThemeOperationRef.current) return false;
+    if (root) {
+      const selection = directorySelectionRef.current;
+      const current = () => directoryRef.current === root && directorySelectionRef.current === selection;
+      editorThemeOperationRef.current = true;
+      try {
+        const adopted = await ensureEditorThemeSnapshot(root, source, current);
+        const library = await loadEditorThemeLibrary(root);
+        if (!current()) return false;
+        setEditorThemes(library.themes); setEditorThemeIssues(library.issues);
+        const next = { ...appearance, themeId: adopted.id };
+        if (JSON.stringify(editorWorkspaceRef.current.appearance) === JSON.stringify(next)) return true;
+        return await persistEditorWorkspace(workspace => setEditorAppearance(workspace, next), null);
+      } catch { return false; }
+      finally { editorThemeOperationRef.current = false; }
+    }
+    const themes = getBuiltinEditorThemes(seedLocale);
+    const next = setEditorAppearance(editorWorkspaceRef.current, appearance);
+    editorWorkspaceRef.current = next;
+    setEditorWorkspace(next); setEditorThemes([...themes]);
+    return true;
+  }, [seedLocale, editorWorkspaceIssue, persistEditorWorkspace]);
 
   const createEditorTheme = useCallback(async (input: EditorTheme, previous?: EditorTheme, expectedRoot?: FileSystemDirectoryHandle): Promise<boolean> => {
     const root = directoryRef.current;
@@ -2191,11 +2222,12 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     );
   }, [persistEditorWorkspace, storedArticles]);
 
-  const openAuthorizedDirectory = useCallback(async (handle: FileSystemDirectoryHandle, selection: number, manual = false) => {
+  const openAuthorizedDirectory = useCallback(async (handle: FileSystemDirectoryHandle, selection: number, manual = false, keepRoute = false) => {
     const isCurrentSelection = () => directorySelectionRef.current === selection;
     const startedForResume = resumeIntentRef.current.active;
     let selectedRoot: FileSystemDirectoryHandle | null = null;
     let libraryLoadFinished = false;
+    let libraryReady = false;
     try {
           if (!isCurrentSelection()) return;
           selectedRoot = handle;
@@ -2384,7 +2416,8 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
             }
           }
           if (startedForResume) return;
-          if (routePathRef.current === '/articles' || routePathRef.current === '/editor') navigateArticleMode('overview');
+          // Entry setup still needs to save its choices before handing over the page.
+          if (!keepRoute && (routePathRef.current === '/articles' || routePathRef.current === '/editor')) navigateArticleMode('overview');
           else setPreferredArticleMode('overview');
           setStatus({
             ...(workspaceIssue
@@ -2392,6 +2425,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
               : defaultsIssue ? productLabel("controller.libraryAuthorizedSomeDefaultThemesCouldNotBeAdded", { "defaultsIssue": defaultsIssue }) : next.length ? productLabel("controller.libraryAuthorizedArticlesFound", { "nextCount": next.length }) : productLabel("controller.libraryAuthorizedNoArticlesYet")),
             tone: workspaceIssue || defaultsIssue ? 'warning' : 'success',
           });
+          libraryReady = libraryLoadSucceeded && Boolean(formatLoaded.snapshot && !formatLoaded.snapshot.error) && !workspaceIssue && settingsResult.status === 'fulfilled' && !settingsResult.value.issue;
     } catch (error) {
       if (!isCurrentSelection()) return;
       if (!libraryLoadFinished && selectedRoot && directoryRef.current === selectedRoot) {
@@ -2404,6 +2438,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     } finally {
       if (isCurrentSelection() && selectedRoot && directoryRef.current === selectedRoot) setEditorAppearanceLoaded(true);
     }
+    return libraryReady && isCurrentSelection();
   }, [advanceContentLibraryRootSession, applyStoredArticle, navigateArticleMode, notifyToast, openDocument, refreshArticles, setPreferredArticleMode]);
 
   const rememberAuthorizedDirectory = useCallback((handle: FileSystemDirectoryHandle, selection: number) => {
@@ -2457,23 +2492,46 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     runAfterDraftDecision({ label: productText("controller.createALibrary"), run: () => { setCreateLibraryDialogOpen(true); } });
   }, [runAfterDraftDecision]);
 
-  const createDataDirectory = useCallback(async (name: string, presetId: PlatformPresetId = DEFAULT_PLATFORM_PRESET_ID): Promise<LibraryCreationResult> => {
+  // Entry setup runs before a working document is mounted. Existing settings are preserved.
+  const openEntryDirectory = useCallback(async (onDirectorySelected?: () => void): Promise<LibraryCreationResult> => {
+    const selection = ++directorySelectionRef.current;
+    resumeIntentRef.current.active = false;
+    try {
+      const handle = await pickDataDirectory();
+      if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
+      onDirectorySelected?.();
+      await assertExistingDataDirectory(handle);
+      rememberAuthorizedDirectory(handle, selection);
+      const loaded = await openAuthorizedDirectory(handle, selection, true, true);
+      if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
+      return loaded ? { status: 'created' } : { status: 'error', message: getFormatSnapshot().error ?? productText('entryGuide.loadFailed') };
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return { status: 'cancelled' };
+      return { status: 'error', message: error instanceof Error ? error.message : String(error) };
+    }
+  }, [openAuthorizedDirectory, rememberAuthorizedDirectory]);
+
+  const createDataDirectory = useCallback(async (name: string, presetId: PlatformPresetId = DEFAULT_PLATFORM_PRESET_ID, onDirectorySelected?: () => void, keepRoute = false): Promise<LibraryCreationResult> => {
     resumeIntentRef.current.active = false;
     const selection = ++directorySelectionRef.current;
+    let created = false;
     try {
       getPublicPlatformPreset(presetId);
       const parent = await pickDataDirectory();
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
+      onDirectorySelected?.();
       const handle = await createNamedDataDirectory(parent, name, presetId, seedLocale);
+      created = true;
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
       rememberAuthorizedDirectory(handle, selection);
-      await openAuthorizedDirectory(handle, selection, true);
-      return { status: directorySelectionRef.current === selection ? 'created' : 'cancelled' };
+      const loaded = await openAuthorizedDirectory(handle, selection, true, keepRoute);
+      if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
+      return loaded ? { status: 'created' } : { status: 'error', created: true, message: getFormatSnapshot().error ?? productText('entryGuide.loadFailed') };
     } catch (error) {
       if (directorySelectionRef.current !== selection || error instanceof DOMException && error.name === 'AbortError') return { status: 'cancelled' };
       const message = error instanceof Error ? error.message : String(error);
       setStatus({ label: message, tone: 'error' });
-      return { status: 'error', message };
+      return { status: 'error', message, ...(created ? { created: true } : {}) };
     }
   }, [openAuthorizedDirectory, rememberAuthorizedDirectory, seedLocale]);
 
@@ -3341,7 +3399,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const sourceStatus = status.formatRevision === undefined && renderedFormat && matchesSnapshot(renderedFormat.snapshot)
     ? compiledArticleFormatStatus(renderedFormat.report, renderedFormat.snapshot.revision, renderedFormat.classes) : status;
   return {
-    mounted, fileSystemReady, view, articleMode, navigateView, navigateArticleMode, registerNavigationGuard, markdownImport, trash,
+    mounted, fileSystemReady, view, articleMode, navigateView, navigateArticleMode, registerNavigationGuard, runWithNavigationGuard, markdownImport, trash,
     directory, setDirectory, contentLibraryRootSession, contentLibrariesState, setContentLibrariesState,
     directoryName, setDirectoryName, libraryLoadIssue, rememberedDirectoryName: rememberedDirectory?.name ?? null,
     directoryRestoreState, directoryBookmarkIssue, storedArticles, setStoredArticles, articleIndexIssues, articleIndexMonths, articleChecks, articleListNotice, articleListWork, checkArticleList, cancelArticleListCheck, rebuildListIndexes, removeListCategories,
@@ -3370,7 +3428,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     documentTokenRef, historyOpenerRef, mutationQueueRef, mediaOperationRef,
     parsed, parseErrors, currentTitle, currentArticleId, currentProjectName, getCurrentArticleId, articleList, currentArticleIsArchived, isReadyToCopy, articleMediaContext,
     updateArticle, updateArticleBody, compileCurrent, updateCurrentStyles, checkCurrentFormat, prepareVisualExport, loadStoredArticles, refreshArticles, saveCurrent, saveSettings,
-    persistEditorWorkspace, saveEditorAppearance, setEditorColorMode, resetCurrentEditorAppearance,
+    persistEditorWorkspace, saveEditorAppearance, adoptGuideAppearance, setEditorColorMode, resetCurrentEditorAppearance,
     setArticleCollection, createProject, renameProject, setProjectCollapsed, setProjectPinned,
     reorderPinnedProjects, confirmDeleteProject, openArticleInfo, archiveStoredArticle, archiveStoredArticles, classifyStoredArticles,
     moveStoredArticleToProject, reorderStoredArticleGroup, moveStoredArticleInOrder, setStoredArticleProject,
@@ -3378,7 +3436,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     restoreHistorySnapshot, saveHistoryAsArticle, importImages, renameMediaImage,
     runAfterDraftDecision, resolvePendingAction, cancelPendingAction, resumeCurrentDraft, closeTemplateDialog,
     articleDraftKind: articleDraftKindRef.current, articleSourceLocationRef, articleInfoLocationRef,
-    openStoredArticle, authorizeDirectory, requestCreateDataDirectory, createDataDirectory, createLibraryDialogOpen, setCreateLibraryDialogOpen, reopenRememberedDirectory, copyRichText, pasteRichText, changeField,
+    openStoredArticle, selectEntryArticle, authorizeDirectory, openEntryDirectory, requestCreateDataDirectory, createDataDirectory, createLibraryDialogOpen, setCreateLibraryDialogOpen, reopenRememberedDirectory, copyRichText, pasteRichText, changeField,
     changeTheme, applyThemeFromLibrary, createNewArticle, createArticleFromTemplate,
     beginCopy, confirmCopy, confirmDelete,
   };

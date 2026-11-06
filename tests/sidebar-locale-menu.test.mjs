@@ -25,7 +25,8 @@ function sidebar() {
     if (id.endsWith('/IconPopover')) return { IconPopover: 'popover' };
     if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => locale, useUITranslation: () => ({ t: instance.t.bind(instance) }) };
     if (id.endsWith('/i18n/preferences')) return { UI_LOCALES: ['zh-CN', 'en-US'] };
-    throw new Error('Unexpected import ' + id);
+    if (id.endsWith('/BrandMark')) return { BrandMark: 'svg' };
+      throw new Error('Unexpected import ' + id);
   } });
   let collapsed = false;
   const render = () => { cursor = 0; const tree = module.exports.MainSidebar({ view: 'articles', mediaOperation: null, collapsed, colorMode: 'system', onNavigate: () => assert.fail('must not navigate'), onToggleCollapsed() {}, onSetColorMode: value => colorChanges.push(value), onOpenChangelog() {} }); while (effects.length) effects.shift()(); return tree; };

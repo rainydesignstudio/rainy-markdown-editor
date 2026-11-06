@@ -83,7 +83,7 @@
   }
 
   .information-title {
-    @apply truncate text-xs font-semibold text-primary;
+    @apply truncate font-sub-heading text-xs font-semibold text-primary;
   }
 
   .information-subtitle {
@@ -245,10 +245,6 @@
 
   textarea.field {
     @apply min-h-20 resize-y;
-  }
-
-  .article-list-meta {
-    @apply text-xs text-muted;
   }
 
   .clipboard-dock {

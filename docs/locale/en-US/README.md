@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.3.2.2"><img src="https://img.shields.io/badge/RELEASE-v0.3.2.2-2563EB?style=for-the-badge" alt="Release v0.3.2.2" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.0-2563EB?style=for-the-badge" alt="Release v0.4.0.0" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -24,7 +24,7 @@ Each library can also tailor its writing policies for platforms such as Shopify,
 
 Online use still requires selecting and authorizing a local library in a desktop browser with directory read/write support; it does not move the library to the server. Available features depend on the version shown in the interface.
 
-The feature screenshots below show the English interface in 0.3.0.0. Click a thumbnail to view the original.
+The feature screenshots below show the Chinese interface in 0.3.0.0. Click a thumbnail to view the original.
 
 <a name="doc-preview"></a>
 
@@ -92,7 +92,7 @@ Copy this request into a clean Agent conversation with little unrelated context:
 
 **Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); consult the manuals for later operations under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).** Use the repository and branch you confirm for the installation source and version.
 
-This public release is `0.3.2.2`; the package version is `0.3.2+patch.2`.
+This manual describes release `0.4.0.0` (package `0.4.0`). Features on an online page depend on its actual running version.
 
 <a name="doc-run-yourself"></a>
 
@@ -130,9 +130,13 @@ Once saved in the library, fonts remain available offline. To download missing f
 
 ## 🌱 First use
 
+When guide completion has not been recorded and no library is connected or remembered, the entry guide lets you choose language, appearance, content direction, writing method and saving preferences, then name a library and authorize its parent. Confirmation prepares the corresponding starter template and a separate example. Agent writers can copy a handoff prompt. You can also open an existing library; the workspace steps below remain available.
+
+Without a connected library, **Explore the workspace** requests no directory, creates no library or article and does not record new guide completion. After reopening the guide with a connected library, exploring still saves the chosen appearance. See the [guide option/file-effects table](AGENT-GUIDE.md#doc-entry-guide-files) for the files associated with each direction and choice.
+
 1. Open **Settings → Local directory → New library**. Enter a folder name, choose a validation and processing template (“WeChat Official Account” or “Empty validator”), select its parent and grant read/write access. The app creates a named child directory. If that name exists, choose another or use **Open existing library**.
 2. For an existing library, select the library itself using **Open existing library**. Only the latest directory bookmark is remembered; authorize it again if permission expires.
-3. Choose a starter and article theme, select **Next**, enter manuscript details, then select **Create article**. This creates its directory, source and theme snapshot. Continue writing in the editor; save later changes with `⌘S` on macOS or `Ctrl+S` elsewhere.
+3. Choose a starter and article theme, select **Next**, enter manuscript details, then select **Create article**. During creation, the directory follows the title and cannot be edited separately; submission creates the directory, source and theme snapshot. Continue writing in the editor and save later changes with `⌘S` on macOS or `Ctrl+S` elsewhere. Existing manuscripts can rename their folders independently.
 4. Preview article themes under **Themes**. For saved articles, **Copy and apply** creates an independent copy and retains the original/theme snapshot; an unsaved new draft uses **Apply to current draft**.
 5. Manage snippets and starter templates under **Templates**. Insert them through **Insert element** or a snippet trigger.
 6. Import shared/article images and attachments under **Assets**. You can also drop local files onto the Assets page, review the target library, file list and formats, then confirm; cancellation writes nothing. Adopting a shared image copies it into the article's own `media/image/`; shared originals and article copies are independent.
@@ -158,9 +162,13 @@ A retained display does not replace current-draft checks, copying or export. Ali
 
 Auto-save defaults to off for new libraries, preserving explicit existing preferences. Auto-save and automatic snapshots pause outside the editor and resume according to their original switches; manual saving and unsaved-change warnings remain.
 
+Before an external Agent modifies a library, it turns off auto-save and automatic snapshots, saves settings and verifies adoption, then manages explicit saves and history checkpoints. At handback it reports their state; automatic features resume by your choice. See [Agent write takeover](AGENT-GUIDE.md#doc-agent-write-handoff).
+
 The preview light/dark switch sits to the left of the three preview controls, whose order is unchanged.
 
-The source toolbar offers **Word wrap** and **Syntax highlighting** to the left of line numbers. Use `Alt/Option + Z` to toggle wrapping; turning it off enables horizontal scrolling. Highlighting uses the editor theme to color Markdown, HTML and CSS without changing the source or article theme. The browser remembers both choices. Dragging the source/preview divider displays both widths until release. At a pane width of 480px or less, its right-hand icons move into a menu while manuscript information and theme selection remain available.
+The source toolbar offers **Word wrap** and **Syntax highlighting** to the left of line numbers. Use `Alt/Option + Z` to toggle wrapping; turning it off enables horizontal scrolling. Highlighting uses the editor theme to color Markdown, HTML and CSS; fenced code and code/pre contents stay plain. Source and article themes remain unchanged. The browser remembers both choices.
+
+Starting to drag the source/preview divider displays both widths until release. At a pane width of 480px or less, its right-hand icons move into a menu while manuscript information and theme selection remain available. Choosing **Insert element** there closes the compact menu and opens the original insertion panel directly.
 
 <a name="doc-source-formatting"></a>
 
@@ -197,7 +205,9 @@ After editing article files outside the app, scan and rebuild the relevant month
 3. Relations use Markdown links and `[[path or unique filename|alias]]`. Code, math and Mermaid source examples are excluded. Global/local graphs offer filtering, locate, drag and zoom; double-click or Enter opens the read-only document.
 4. Choose **Create article** to create an editable copy with a selected article theme. The knowledge source stays read-only; copied resources, indexes and task records go into the manuscript library.
 
-Each manuscript library supports multiple read-only knowledge sources, with independent scanning and search for each source. Filter or use a local graph when a large graph is truncated. Indexes contain searchable source text and are included in manuscript-library backups. Back up knowledge originals separately.
+Each manuscript library supports multiple read-only knowledge sources with independent scans. Search covers all sources by default; use Search scope in the filters to select one source. Results identify their source and keep identical filenames separate. Unavailable sources or incomplete indexes produce an incomplete-results notice. Filter or use a local graph when a large graph is truncated. Indexes contain searchable source text and are included in manuscript-library backups. Back up knowledge originals separately.
+
+Hover over or focus a local document link for a preview. Use **＋ / Open in a new reading tab** to add a tab; ordinary and Cmd/Ctrl clicks on internal links use the current tab. The strip appears only with multiple tabs, each with its close action inside the right edge. Tabs retain independent reading positions, modes and back histories; temporary tabs are not restored after refresh.
 
 Enter keywords and expand phrase, exclusion, title and path filters. Same-paragraph matches rank first, with collapsible document groups. The reader locates headings/passages and follows document links with a return position. The editor’s right-side **Reference material** is a lightweight browser and reader: browse responsive document cards by source, open the full document, and use breadcrumbs to return to the previous list and reading position. The panel sits above the manuscript preview, can collapse, and has a draggable divider for height adjustment. Source management, scanning, graphs and topics remain on the Knowledge page.
 
@@ -253,6 +263,16 @@ An `editor-theme` controls the workspace; an `article-theme` controls article la
 Website libraries can load their own CSS modules, SVG and fonts, configure body containers/layout viewports, and retain rendering dependencies with articles/history. See [library styles and isolated canvases](FORMAT.md#doc-library-styles). For website publication, export **Markdown body** and handle image addresses separately. Whether a rich-text receiver preserves website CSS requires testing.
 
 These tutorials are read and carried out by your external Agent. The workspace has no built-in AI and does not log in to WeChat or publish articles automatically.
+
+Reopen the setup guide under **Settings → Local directory**. After confirmation, choose an appearance again. On workspace entry, a connected library saves that choice; without a library it applies only to the current window. A missing selected built-in theme is added; a same-ID difference preserves the original and adopts an independent copy, reusing an identical copy when available. Existing unsaved-content confirmation still applies.
+
+<a name="doc-workspace-tour"></a>
+
+### Workspace walkthrough
+
+Ask your Agent: “Open the Rainy workspace walkthrough.” It introduces Articles, Themes, Templates, Assets, Knowledge and Settings.
+
+The walkthrough is downloaded only on request. Codex can display it in the conversation when supported; other harnesses can open the standalone HTML in a browser. It neither connects to nor modifies a library. Files are delivered separately for their supported versions; if no matching published walkthrough exists, the Agent reports that it is unavailable rather than substituting a different version. See the [Agent guide](AGENT-GUIDE.md#doc-workspace-tour) for retrieval and verification.
 
 <a name="doc-library-and-backups"></a>
 
@@ -314,11 +334,13 @@ library/
 └── imports/tasks/<id>.json          # Independent resource tasks
 ```
 
-New-library creation installs the selected configuration and bundled renderer, loads themes and starter content according to the preset, and downloads missing fonts from the selected font source. It creates no articles and does not overwrite existing custom files. Without `settings.json`, defaults are used until settings are explicitly saved. Older libraries may retain a compatible layout; knowledge-source partitions follow the binding registry and should not be moved manually. Older-layout migration retains original files; theme subdirectories may contain migration markers.
+New-library creation installs the selected configuration and bundled renderer, loads themes and starter content according to the preset, and downloads missing fonts from the selected font source. Ordinary creation makes no articles and does not overwrite existing custom files; the entry guide additionally prepares the selected template, a separate example and confirmed settings. Without `settings.json`, defaults are used until settings are explicitly saved. Older libraries may retain a compatible layout; knowledge-source partitions follow the binding registry and should not be moved manually. Older-layout migration retains original files; theme subdirectories may contain migration markers.
 
 </details>
 
 **Back up code and libraries separately.** Source, metadata and theme snapshots are saved with articles; keep complete article directories to retain images and attachments. Historical snapshots are not complete media backups and cannot replace whole-library backups.
+
+The article toolbar's Version history can save important versions, compare, protect automatic versions, restore, fork history into a new article or explicitly delete a selected version. An important version can include current unsaved edits; restoration first preserves the current version. See [history management](AGENT-GUIDE.md#doc-article-history) for operations/recovery and [snapshot storage](FORMAT.md#doc-history-storage) for files.
 
 Regularly copy the entire library to an independent location and check that files are readable. Preserve the current library before restoration. Monthly indexes are caches; rebuilding them cannot recover missing bodies. Ignored `data/`, browser bookmarks and `out/` are not library backups.
 

@@ -59,10 +59,13 @@ export function useRouteNavigation(pathname: string | null) {
     return () => { if (guardRef.current === guard) guardRef.current = null; };
   }, []);
 
-  const navigateRoute = useCallback((href: string) => {
-    const proceed = () => router.push(href);
+  const runWithNavigationGuard = useCallback((proceed: () => void) => {
     if (!guardRef.current?.(proceed)) proceed();
-  }, [router]);
+  }, []);
 
-  return { navigateRoute, registerNavigationGuard };
+  const navigateRoute = useCallback((href: string) => {
+    runWithNavigationGuard(() => router.push(href));
+  }, [router, runWithNavigationGuard]);
+
+  return { navigateRoute, registerNavigationGuard, runWithNavigationGuard };
 }

@@ -7,6 +7,7 @@ import { formatProductMessage, type ProductMessageFields } from '../../lib/i18n/
 import type { ReadonlyImportSource } from '../../lib/imports/source';
 import type { ThemeConfig } from '../../lib/types';
 import { ButtonBar } from '../global/ButtonBar';
+import { ContentIcon } from '../global/ContentIcon';
 import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from '../global/DialogFrame';
 
 export function MarkdownImportDialog({ source, mode, themes, defaultTheme, busy, feedback, onChooseFile, onChooseDirectory, onConfirm, onClose }: {
@@ -28,13 +29,13 @@ export function MarkdownImportDialog({ source, mode, themes, defaultTheme, busy,
         {mode === 'local' ? <ButtonBar label={t('imports.sourceLabel')}><DialogButton disabled={busy} onClick={() => void onChooseFile()}>{t('imports.chooseFile')}</DialogButton></ButtonBar> : null}
       </section>
       <label className="field-stack" htmlFor="markdown-import-theme"><span className="field-label">{t('imports.themeLabel')}</span>
-        <SelectField label={t('imports.themeLabel')} id="markdown-import-theme" value={themeId} disabled={busy} onChange={nextValue => setThemeId(nextValue)} options={[...(themes.map(theme => ({ value: theme.id, label: [theme.name, " · v", theme.version].join('') })) ?? [])]} />
+        <SelectField label={t('imports.themeLabel')} title="" id="markdown-import-theme" value={themeId} disabled={busy} onChange={nextValue => setThemeId(nextValue)} options={[...(themes.map(theme => ({ value: theme.id, label: [theme.name, " · v", theme.version].join('') })) ?? [])]} />
         <span className="text-xs text-faint">{t('imports.themeHelp')}</span>
       </label>
       {source?.chooseDirectory ? <section className="field-stack" aria-label={t('imports.directoryLabel')}><p className="field-label">{t('imports.directoryLabel')}</p><p className="break-all text-xs text-secondary">{source.directoryName ?? t('imports.noDirectory')}</p><ButtonBar label={t('imports.directoryLabel')}><DialogButton disabled={busy} onClick={() => void onChooseDirectory()}>{t('imports.chooseDirectory')}</DialogButton></ButtonBar><p className="text-xs text-faint">{t('imports.directoryHelp')}</p></section> : null}
       {feedback ? <p role="alert" className="status-copy" data-tone="error">{formatProductMessage(feedback, t)}</p> : null}
       {busy ? <p className="text-xs text-muted" role="status">{t('imports.processing')}</p> : null}
     </div>
-    <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" disabled={busy || !source || !selected} onClick={() => { if (selected) void onConfirm(selected); }}>{t('imports.confirm')}</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onClose}><ContentIcon name="close" />{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" disabled={busy || !source || !selected} onClick={() => { if (selected) void onConfirm(selected); }}><ContentIcon name="apply" />{t('imports.confirm')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

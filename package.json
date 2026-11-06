@@ -1,6 +1,6 @@
 {
   "name": "rainy-markdown-editor",
-  "version": "0.3.2+patch.2",
+  "version": "0.4.0",
   "private": true,
   "license": "MIT",
   "scripts": {

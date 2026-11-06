@@ -1,0 +1,76 @@
+@layer utilities {
+  @keyframes guide-feedback-enter {
+    from { grid-template-rows: 0fr; opacity: 0; }
+    to { grid-template-rows: 1fr; opacity: 1; }
+  }
+  @keyframes guide-welcome {
+    0% { opacity: 0; transform: translateY(.75rem) scale(.88) rotate(-5deg); }
+    18% { opacity: 1; }
+    36%, 78% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
+    100% { opacity: 0; transform: translateY(-.25rem) scale(1.02) rotate(0); }
+  }
+  @keyframes guide-welcome-still {
+    0%, 100% { opacity: 0; }
+    12%, 86% { opacity: 1; }
+  }
+  @keyframes guide-depart {
+    0%, 78% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes guide-pack {
+    0% { opacity: 0; transform: translateY(.5rem) scale(.94); }
+    24%, 62% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-.75rem) scale(.9); }
+  }
+  @keyframes guide-environment {
+    from { opacity: 0; scale: 1.04; }
+    to { opacity: 1; scale: 1; }
+  }
+  @keyframes guide-ambient {
+    from { translate: -3% -2%; scale: .96; }
+    to { translate: 6% 4%; scale: 1.06; }
+  }
+  @keyframes guide-windowlight {
+    from { translate: -8% 0; opacity: .45; }
+    to { translate: 12% 0; opacity: .8; }
+  }
+  @keyframes guide-reveal {
+    from { opacity: 0; translate: 0 0.75rem; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes guide-collect {
+    0% { transform: none; background-color: transparent; }
+    35% { transform: translateY(-1rem) scale(var(--guide-sx), var(--guide-sy)); background-color: var(--color-accent); color: transparent; border-radius: 50%; }
+    100% { transform: translate(var(--guide-dx), var(--guide-dy)) scale(var(--guide-sx), var(--guide-sy)); background-color: var(--color-accent); color: transparent; border-radius: 50%; }
+  }
+  @keyframes guide-wave {
+    0%, 100% { rotate: 0deg; }
+    20%, 60% { rotate: 18deg; }
+    40%, 80% { rotate: -10deg; }
+  }
+  @keyframes guide-cursor {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  @keyframes guide-arrive {
+    from { opacity: 0; translate: -1.5rem 0; }
+    to { opacity: 1; translate: 0 0; }
+  }
+  @keyframes guide-ready {
+    0%, 100% { translate: 0 0; }
+    45% { translate: 0 -0.25rem; }
+    70% { translate: 0 0.05rem; }
+  }
+  @keyframes guide-sheen {
+    from { translate: -100% 0; }
+    to { translate: 100% 0; }
+  }
+  @keyframes guide-scene-reveal {
+    from { opacity: 0; translate: 0 1rem; scale: .97; }
+    to { opacity: 1; translate: 0 0; scale: 1; }
+  }
+  @keyframes guide-autosave {
+    from { rotate: 0deg; }
+    to { rotate: 360deg; }
+  }
+}

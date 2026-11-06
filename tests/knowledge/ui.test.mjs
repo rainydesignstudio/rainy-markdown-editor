@@ -22,7 +22,7 @@ async function moduleFrom(path, resolve) {
   return module.exports;
 }
 test('safe knowledge reading strips scripts, handler/style/class injection and remote media while reusing the scoped image loader', async () => {
-  const instance = createUII18n('en-US'), images = [];
+  const instance = createUII18n('en-US'), images = [], links = [], opened = [];
   const reader = await moduleFrom('../../src/components/knowledge/KnowledgeReader.tsx', id => {
     if (id === 'react') return React; if (id === 'react/jsx-runtime') return jsx;
     if (id === 'react-markdown') return { default: ReactMarkdown, __esModule: true };
@@ -31,7 +31,8 @@ test('safe knowledge reading strips scripts, handler/style/class injection and r
     if (id === 'rehype-sanitize') return { default: rehypeSanitize, defaultSchema, __esModule: true };
     if (id.endsWith('/ScrollViewport')) return { ScrollViewport: 'div' };
     if (id.endsWith('/IconButton')) return { IconButton: 'icon-button' };
-    if (id.endsWith('/TooltipButton')) return { TooltipButton: 'tooltip-button' };
+    if (id.endsWith('/TooltipButton')) return { TooltipButton: ({ tooltip, ...props }) => { links.push(props); return jsx.jsx('button', props); } };
+    if (id.endsWith('/KnowledgeHoverPreview')) return { KnowledgeHoverPreview: 'hover-preview' };
     if (id.endsWith('/CollapsiblePanel')) return { PanelIcon: 'panel-icon' };
     if (id.endsWith('/UILocaleProvider')) return { useUITranslation: namespace => ({ t: instance.getFixedT('en-US', namespace) }) };
     if (id.endsWith('/knowledge/model')) return model;
@@ -42,11 +43,13 @@ test('safe knowledge reading strips scripts, handler/style/class injection and r
   let reads = 0, writes = 0;
   const source = { readFile: async () => { reads++; }, createWritable: () => { writes++; } };
   const text = '# Safe\n\n<script>window.stolen=true</script>\n\n<div class="fixed inset-0" style="position:fixed" onclick="steal()">Visible text</div>\n\n[evil](javascript:alert(1))\n\n![local](../assets/picture.png)\n\n![remote](https://example.com/tracker.png)\n\n<video src="https://example.com/movie.mp4" autoplay></video>';
-  const html = renderToStaticMarkup(jsx.jsx(reader.KnowledgeReader, { source, path: 'notes/A.md', text, manifest: null, onOpen() {}, onDownload() {} }));
+  const html = renderToStaticMarkup(jsx.jsx(reader.KnowledgeReader, { source, path: 'notes/A.md', text: text + '\n\n[Related](linked.md#details)', manifest: { documents: [{ path: 'notes/linked.md', title: 'Related' }] }, onOpen: (...args) => opened.push(args), onDownload() {} }));
   assert.match(html, /Visible text/); assert.doesNotMatch(html, /<script|onclick|position:fixed|fixed inset|<video|src="https|href="javascript/);
   assert.match(html, /id="user-content-safe"/); assert.match(html, /data-line="1"/);
   assert.equal(images.length, 1); assert.equal(images[0].root, null); assert.equal(images[0].readFile, source.readFile); assert.equal(images[0].path, 'assets/picture.png'); assert.equal(images[0].defer, true);
   assert.equal(reads, 0); assert.equal(writes, 0);
+  for (const modifiers of [{}, { metaKey: true }, { ctrlKey: true }]) links[0].onClick(modifiers);
+  assert.deepEqual(opened, Array(3).fill(['notes/linked.md', 1, 'details']), 'modified links use the same current reading route');
 });
 
 test('source selection requires a writable library, requests read mode and ignores a late picker from an old root', async () => {

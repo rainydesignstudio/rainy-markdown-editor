@@ -1,8 +1,8 @@
 {
   "kind": "editor-theme",
   "id": "evening-snow-ii",
-  "name": "Evening Snow II",
-  "version": "1.0.1",
+  "name": "Clear Blue · Color",
+  "version": "1.0.3",
   "formatVersion": 4,
   "palette": {
     "slate-0": "#ffffff",
@@ -94,7 +94,7 @@
       "accent": "evening-snow-accent-700",
       "accent-strong": "evening-snow-accent-600",
       "accent-text": "evening-snow-accent-200",
-      "accent-soft": "evening-snow-600",
+      "accent-soft": "evening-snow-700",
       "accent-line": "evening-snow-accent-500",
       "selection": "evening-snow-accent-700",
       "on-accent": "evening-snow-0",

@@ -26,11 +26,13 @@ import zhChangelog from '../../../resources/locale/zh-CN/changelog.json' with { 
 import enChangelog from '../../../resources/locale/en-US/changelog.json' with { type: 'json' };
 import { chineseReleaseTexts } from './changelog';
 import { formatUINumber } from './formatters';
+import zhOnboarding from '../../../resources/locale/zh-CN/onboarding.json' with { type: 'json' };
+import enOnboarding from '../../../resources/locale/en-US/onboarding.json' with { type: 'json' };
 import { UI_LOCALES, type UILocale } from './preferences';
 
 export const UI_RESOURCES = {
-  'zh-CN': { common: zhCommon, shell: zhShell, articles: zhArticles, editor: zhEditor, themes: zhThemes, content: zhContent, media: zhMedia, settings: zhSettings, knowledge: zhKnowledge, dialogs: zhDialogs, messages: zhMessages, changelog: { ...zhChangelog, releases: chineseReleaseTexts } },
-  'en-US': { common: enCommon, shell: enShell, articles: enArticles, editor: enEditor, themes: enThemes, content: enContent, media: enMedia, settings: enSettings, knowledge: enKnowledge, dialogs: enDialogs, messages: enMessages, changelog: enChangelog },
+  'zh-CN': { onboarding: zhOnboarding, common: zhCommon, shell: zhShell, articles: zhArticles, editor: zhEditor, themes: zhThemes, content: zhContent, media: zhMedia, settings: zhSettings, knowledge: zhKnowledge, dialogs: zhDialogs, messages: zhMessages, changelog: { ...zhChangelog, releases: chineseReleaseTexts } },
+  'en-US': { onboarding: enOnboarding, common: enCommon, shell: enShell, articles: enArticles, editor: enEditor, themes: enThemes, content: enContent, media: enMedia, settings: enSettings, knowledge: enKnowledge, dialogs: enDialogs, messages: enMessages, changelog: enChangelog },
 };
 
 // Use i18next's registered formatter for display interpolation. Only numeric values are

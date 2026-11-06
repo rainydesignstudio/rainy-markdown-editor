@@ -23,11 +23,12 @@ export function withUILocaleImports(resolve) {
     if (id.endsWith('/MediaArticleNavigation')) return { MediaArticleNavigation: 'article-navigation' };
     if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
     if (id.endsWith('/LibraryCard')) return { LibraryCard: 'button', LibraryCardFrame: 'article', LibraryCardGrid: 'div' };
+    if (id.endsWith('/BrandMark')) return { BrandMark: 'svg' };
     if (id.endsWith('/ContentIcon')) return { ContentIcon: 'svg' };
     if (id.endsWith('/EditableArticleTitle')) return { EditableArticleTitle: 'editable-article-title' };
     if (id.endsWith('/UILocaleProvider')) return {
       useUITranslation: (namespace = 'common') => ({ t: instance.getFixedT('zh-CN', namespace) }),
-      useUILocale: () => ({ locale: 'zh-CN', ready: true }),
+      useUILocale: () => ({ locale: 'zh-CN', ready: true, setLocale: async () => {} }),
     };
     if (id.endsWith('/i18n/articleLabels')) return { articleCollectionLabel };
     if (id.endsWith('/i18n/themeLabels')) return { themeBindingLabel, themeBindingToken };

@@ -2,7 +2,7 @@
   "kind": "editor-theme",
   "id": "sunshine",
   "name": "Sunshine",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "formatVersion": 4,
   "palette": {
     "light-canvas": "#fafafa",
@@ -97,7 +97,7 @@
       "selection": "light-selection",
       "on-accent": "light-on-accent",
       "success": "light-success",
-      "success-surface": "light-success-surface",
+      "success-surface": "light-panel",
       "warning": "light-warning",
       "warning-strong": "light-warning-strong",
       "warning-surface": "light-warning-surface",
@@ -149,13 +149,13 @@
     }
   },
   "fonts": {
-    "ui": "\"Noto Sans SC Local\", \"PingFang SC\", sans-serif",
-    "serif": "\"Sen Local\", \"Noto Sans SC Local\", serif",
+    "ui": "\"Sen Local\", \"Noto Sans SC Local\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "serif": "\"Sen Local\", \"Noto Sans SC Local\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
     "mono": "\"Roboto Mono Local\", \"Noto Sans SC Local\", monospace",
     "editorSource": "\"Roboto Mono Local\", \"Noto Sans SC Local\", monospace",
-    "heading": "\"Sen Local\", \"Noto Sans SC Local\", sans-serif",
-    "eyebrow": "\"Noto Sans SC Local\", \"PingFang SC\", sans-serif",
-    "subHeading": "\"Noto Sans SC Local\", \"PingFang SC\", sans-serif",
+    "heading": "\"Sen Local\", \"Noto Sans SC Local\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "eyebrow": "\"Sen Local\", \"Noto Sans SC Local\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
+    "subHeading": "\"Sen Local\", \"Noto Sans SC Local\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
     "articleSource": "\"Roboto Mono Local\", \"Noto Sans SC Local\", monospace"
   },
   "surfaces": {

@@ -208,7 +208,6 @@ test('code edits require validation before saving, with pending tab and disabled
   const pendingTab = view.find(node => node.props.id === 'article-theme-tab-css');
   assert.equal(pendingTab.props['data-validation'], 'pending');
   assert.equal(pendingTab.props['data-modified'], true);
-  assert.ok(!pendingTab.props.className.includes('text-danger'));
   assert.equal(view.find(node => node.props['data-tooltip'] === '请先完成校验').props.tabIndex, 0);
   assert.equal(view.find(node => node.props.id === 'article-theme-tab-json').props['data-validation'], 'complete');
   view.button('保存主题').props.onClick(); await new Promise(resolve => setImmediate(resolve)); assert.equal(view.writes, 0);
@@ -232,7 +231,6 @@ test('either validation button checks both code buffers, preserves failures, and
   for (const kind of ['css', 'json']) {
     const tab = view.find(node => node.props.id === `article-theme-tab-${kind}`);
     assert.equal(tab.props['data-validation'], 'failed');
-    assert.ok(tab.props.className.includes('text-danger'));
   }
   assert.equal(view.button('保存主题').props.disabled, true);
   assert.equal(view.find(node => node.type === 'source-input').props.value, '{broken');

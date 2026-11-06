@@ -1,5 +1,7 @@
 'use client';
 
+import { BrandMark } from './BrandMark';
+
 import { useEffect, useState } from 'react';
 import { APP_VERSION, APP_VERSION_COMPACT } from '../../lib/appVersion';
 import type { EditorColorMode } from '../../lib/editorWorkspace';
@@ -14,8 +16,7 @@ type IconName = 'brand' | 'collapse' | 'articles' | 'assets' | 'themes' | 'templ
 
 function Icon({ name }: { name: IconName }) {
   const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  // Preserve icon.svg's viewBox and lettering geometry; UI colors come from the editor theme.
-  if (name === 'brand') return <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M10 0h16a6 6 0 0 1 6 6v16a10 10 0 0 1-10 10H6a6 6 0 0 1-6-6V10A10 10 0 0 1 10 0Z" className="fill-accent group-hover:fill-accent-strong group-focus-visible:fill-accent-strong" /><text x="16" y="22.5" className="fill-current" fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" fontSize="18" fontWeight="800" letterSpacing="-1.5" textAnchor="middle">R/</text></svg>;
+  if (name === 'brand') return <BrandMark />;
   if (name === 'collapse') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16M15 10l-2 2 2 2" /></svg>;
   if (name === 'articles') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><path d="M12 6.2C9.5 4.7 6.5 4.5 3 5v13c3.5-.5 6.5-.3 9 1.2 2.5-1.5 5.5-1.7 9-1.2V5c-3.5-.5-6.5-.3-9 1.2ZM12 6.2v13" /></svg>;
   if (name === 'assets') return <svg viewBox="0 0 24 24" aria-hidden="true" {...common}><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8" cy="9" r="1.5" /><path d="m4 18 5-5 3 3 3-4 5 6" /></svg>;

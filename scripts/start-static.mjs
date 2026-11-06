@@ -41,6 +41,7 @@ function contentType(filePath) {
     '.jpg': 'image/jpeg',
     '.jpeg': 'image/jpeg',
     '.webp': 'image/webp',
+    '.mp3': 'audio/mpeg',
     '.txt': 'text/x-component; charset=utf-8',
   }[extension] ?? 'application/octet-stream';
 }

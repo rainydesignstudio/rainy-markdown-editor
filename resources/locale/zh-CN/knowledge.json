@@ -264,6 +264,17 @@
     "results": "结果已裁切，请缩小范围",
     "changed": "来源已变化，请核对",
     "truncated": "内容已裁切，操作受限",
-    "collected": "已收集"
-  }
+    "collected": "已收集",
+    "incomplete": "检索结果可能不完整"
+  },
+  "searchScope": "检索范围",
+  "allSources": "全部知识源",
+  "readingTabs": "阅读标签页",
+  "closeReadingTab": "关闭阅读标签：{{title}}",
+  "openReadingTab": "在新阅读标签打开",
+  "resultsIncomplete": "部分知识源不可用或索引未完整，结果可能不全。",
+  "searchAllPlaceholder": "搜索所有知识源",
+  "searchSourcePlaceholder": "搜索：{{name}}",
+  "emptyPreview": "此资料暂无可预览文字。",
+  "hoverPartial": "显示原文开头的部分内容；点击链接打开完整资料。"
 }

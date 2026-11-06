@@ -2,7 +2,7 @@
   "kind": "editor-theme",
   "id": "evening-snow",
   "name": "暮雪",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "formatVersion": 4,
   "palette": {
     "light-canvas": "#fafafa",
@@ -153,7 +153,7 @@
     "serif": "\"Sen Local\", \"Noto Sans SC Local\", serif",
     "mono": "\"Roboto Mono Local\", \"Noto Sans SC Local\", monospace",
     "editorSource": "\"Roboto Mono Local\", \"Noto Sans SC Local\", monospace",
-    "heading": "\"Songti SC\", \"Noto Serif CJK SC\", serif",
+    "heading": "\"Noto Sans SC Local\", \"PingFang SC\", \"Microsoft YaHei\", sans-serif",
     "eyebrow": "\"Noto Sans SC Local\", \"PingFang SC\", sans-serif",
     "subHeading": "\"Noto Sans SC Local\", \"PingFang SC\", sans-serif",
     "articleSource": "\"Roboto Mono Local\", \"Noto Sans SC Local\", monospace"

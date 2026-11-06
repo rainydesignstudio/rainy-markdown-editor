@@ -9,6 +9,8 @@ import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { PageHeading } from '../global/PageHeading';
 
 import { ButtonBar } from '../global/ButtonBar';
+import { ContentIcon } from '../global/ContentIcon';
+import { PanelIcon } from '../global/CollapsiblePanel';
 import { ModeSwitch } from '../global/ModeSwitch';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -55,6 +57,7 @@ type Props = {
   onAuthorizeDirectory: () => void;
   onCreateDirectory: () => void;
   onReopenRememberedDirectory: () => void;
+  onReopenGuide?: () => void;
   onRetryFonts?: () => Promise<boolean>;
   onSaveAppearance: (appearance: EditorAppearance) => Promise<boolean>;
   onCreateEditorTheme: (theme: EditorTheme, previous?: EditorTheme, expectedRoot?: FileSystemDirectoryHandle) => Promise<boolean>;
@@ -189,6 +192,7 @@ export function SettingsPanel({
   onAuthorizeDirectory,
   onCreateDirectory,
   onReopenRememberedDirectory,
+  onReopenGuide,
   onRetryFonts,
   onSaveAppearance,
   onCreateEditorTheme,
@@ -202,6 +206,7 @@ export function SettingsPanel({
   const transform = format.bundle.formatter.preview.dark.transform;
   const algorithm = format.algorithms.manifest.components.find(component => component.id === transform);
   const [tab, setTab] = useState<SettingsTab>('library');
+  const [reopenGuideConfirm, setReopenGuideConfirm] = useState(false);
   const [draft, setDraft] = useState(settings);
   const [appearanceDraft, setAppearanceDraft] = useState(workspace.appearance);
   const [appearanceEdited, setAppearanceEdited] = useState(false);
@@ -364,7 +369,7 @@ export function SettingsPanel({
         <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-3 md:px-6">
           <div className="flex w-max gap-1 rounded-lg bg-list p-1" role="tablist" aria-label={t('settings:ui.settingsCategories')}>
             {SETTINGS_TABS.map((item) => <button key={item.id} id={`settings-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} aria-controls={`settings-panel-${item.id}`} tabIndex={tab === item.id ? 0 : -1} disabled={tabBusy} onClick={() => setTab(item.id)} onKeyDown={(event) => onTabKeyDown(event, item.id)} className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-selected:bg-panel aria-selected:text-accent-text">
-              <SettingsIcon name={item.icon} />{t('settings:tabs.' + item.id)}{item.id === 'appearance' && appearanceDirty ? <UnsavedMark /> : null}
+              {item.id === 'appearance' ? <PanelIcon kind="colors" className="" /> : <SettingsIcon name={item.icon} />}{t('settings:tabs.' + item.id)}{item.id === 'appearance' && appearanceDirty ? <UnsavedMark /> : null}
             </button>)}
           </div>
           <OperationFeedback hideTrigger id="settings-operation" notice={tab === 'appearance' ? appearanceNotice : null} />
@@ -385,6 +390,7 @@ export function SettingsPanel({
                     </div>
                   </div>
                   <ButtonBar label={t('settings:ui.libraryDirectoryActions')}>
+                    {onReopenGuide ? <button className="button button-quiet" type="button" disabled={tabBusy} aria-haspopup="dialog" onClick={() => setReopenGuideConfirm(true)}><SettingsIcon name="reset" />{t('settings:ui.reopenGuide')}</button> : null}
                     {!root && rememberedDirectoryName ? <button className="button button-primary" type="button" disabled={!fileSystemReady || tabBusy} onClick={onReopenRememberedDirectory}><SettingsIcon name="folder" />{t('settings:ui.authorizeAndOpen')}</button> : null}
                     <button className={!root && !rememberedDirectoryName ? 'button button-primary' : 'button button-quiet'} type="button" disabled={!fileSystemReady || tabBusy} onClick={onAuthorizeDirectory}><SettingsIcon name="export" />{t(root ? 'settings:ui.switchLibrary' : rememberedDirectoryName ? 'settings:ui.chooseAnotherLibrary' : 'settings:ui.openExistingLibrary')}</button>
                     <button className="button button-quiet" type="button" disabled={!fileSystemReady || tabBusy} aria-haspopup="dialog" onClick={() => {
@@ -482,12 +488,13 @@ export function SettingsPanel({
           </div>
         </section>
       </div>
+      {reopenGuideConfirm && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="guide-reopen-title" descriptionId="guide-reopen-description" onClose={() => setReopenGuideConfirm(false)}><DialogHeader titleId="guide-reopen-title" eyebrow="ENTRY GUIDE" title={t('settings:ui.reopenGuide')} onClose={() => setReopenGuideConfirm(false)} /><div className="dialog-content"><p id="guide-reopen-description" className="text-sm text-muted">{t('settings:ui.reopenGuideDescription')}</p></div><DialogFooter><DialogActions><DialogButton onClick={() => setReopenGuideConfirm(false)}><ContentIcon name="close" />{t('settings:ui.cancelOperation')}</DialogButton><DialogButton variant="primary" onClick={() => { setReopenGuideConfirm(false); onReopenGuide?.(); }}><ContentIcon name="reset" />{t('settings:ui.reopenGuide')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
       {designerSource && typeof document !== 'undefined' ? createPortal(<EditorThemeDesigner root={root} editing={designerEditing} appearanceScheme={previewScheme} source={designerSource} themes={editorThemes} navigationGuardRef={designerGuardRef} onClose={() => { designerGuardRef.current = null; setDesignerSource(null); }} onSave={async theme => { if (!await onCreateEditorTheme(theme, designerEditing ? designerSource : undefined, root ?? undefined)) return false; changeAppearance({ themeId: theme.id, colorMode: appearanceDraft.colorMode, custom: null }); return true; }} />, document.body) : null}
       {deleteThemeTarget && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="editor-theme-delete-title" role="alertdialog" onClose={() => setDeleteThemeTarget(null)} dismissible={!workspaceBusy}><DialogHeader titleId="editor-theme-delete-title" eyebrow={t('common:eyebrows.deleteEditorTheme')} title={t('settings:ui.deleteEditorTheme')} onClose={() => setDeleteThemeTarget(null)} closeDisabled={workspaceBusy} /><div className="dialog-content"><p className="text-sm text-primary">「{deleteThemeTarget.name}」</p><p className="mt-3 text-sm text-muted">{t('settings:ui.removeThisThemeFromTheCurrentLibraryDefaults')}</p></div><DialogFooter><DialogActions><DialogButton disabled={workspaceBusy} onClick={() => setDeleteThemeTarget(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={workspaceBusy} onClick={() => void onDeleteEditorTheme(deleteThemeTarget.id, deleteThemeRootRef.current ?? undefined).then(removed => { if (removed) { setDeleteThemeTarget(null); setAppearanceNotice(productText("settingsPanel.themeDeleted")); } else setAppearanceNotice(productText("settingsPanel.deletionFailedTheThemeIsRetained")); })}>{t('settings:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
       {departure && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={[{ label: t('settings:ui.appearanceSettings'), detail: t('settings:templates.combination', { colors: findEditorTheme(editorThemes, appearanceDraft.custom?.colorThemeId ?? appearanceDraft.themeId)?.name ?? appearanceDraft.themeId, fonts: findEditorTheme(editorThemes, appearanceDraft.custom?.fontThemeId ?? appearanceDraft.themeId)?.name ?? appearanceDraft.themeId }) }]} description={t('settings:ui.appearancePreviewIsUnsavedLeavingRestoresSavedColors')} saveDisabled={appearanceDisabled || Boolean(missingThemeIds.length)} onCancel={() => setDeparture(null)} onContinue={resumeAppearance} onDiscard={() => { const proceed = departure.proceed; cancelAppearance(); setDeparture(null); proceed(); }} onSave={async () => { const proceed = departure.proceed; if (!await saveAppearance()) return false; setDeparture(null); proceed(); return true; }} />, document.body) : null}
       {combination && typeof document !== 'undefined' ? createPortal(<DialogFrame wide titleId="appearance-combination-title" descriptionId="appearance-combination-description" onClose={() => setCombination(null)}><DialogHeader titleId="appearance-combination-title" eyebrow={t('common:eyebrows.customEditorTheme')} title={t('settings:ui.combineColorsAndFonts')} onClose={() => setCombination(null)} /><div className="dialog-content"><p id="appearance-combination-description" className="text-sm text-muted">{t('settings:ui.chooseColorsAndFontsSeparatelyForALive')}</p><div className="grid min-w-0 gap-4 md:grid-cols-2">
-        <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.colors')}</legend><div className="grid max-h-80 gap-2 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseColors', { name: theme.name })} aria-pressed={combination.colorThemeId === theme.id} onClick={() => setCombination({ ...combination, colorThemeId: theme.id })}><ThemeSample theme={theme} kind="colors" scheme={previewScheme} /><span>{theme.name}</span></button>)}</div></fieldset>
-        <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.fonts')}</legend><div className="grid max-h-80 gap-2 overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseFonts', { name: theme.name })} aria-pressed={combination.fontThemeId === theme.id} onClick={() => setCombination({ ...combination, fontThemeId: theme.id })}><ThemeSample theme={theme} kind="fonts" /><span className="text-xs text-faint">{theme.name}</span></button>)}</div></fieldset>
+        <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.colors')}</legend><div className="grid max-h-80 gap-2 overflow-x-clip overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseColors', { name: theme.name })} aria-pressed={combination.colorThemeId === theme.id} onClick={() => setCombination({ ...combination, colorThemeId: theme.id })}><ThemeSample theme={theme} kind="colors" scheme={previewScheme} /><span>{theme.name}</span></button>)}</div></fieldset>
+        <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.fonts')}</legend><div className="grid max-h-80 gap-2 overflow-x-clip overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseFonts', { name: theme.name })} aria-pressed={combination.fontThemeId === theme.id} onClick={() => setCombination({ ...combination, fontThemeId: theme.id })}><ThemeSample theme={theme} kind="fonts" /><span className="text-xs text-faint">{theme.name}</span></button>)}</div></fieldset>
       </div><DialogActions><DialogButton onClick={() => setCombination(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" disabled={appearanceDisabled} onClick={() => { changeAppearance({ ...appearanceDraft, custom: { ...combination } }); setCombination(null); }}>{t('settings:ui.applyCombinationAndPreview')}</DialogButton></DialogActions></div></DialogFrame>, document.body) : null}
     </section>
   );

@@ -6,6 +6,8 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { useUITranslation } from '../global/UILocaleProvider';
 import { IconButton } from '../global/IconButton';
+import { TooltipButton } from '../global/TooltipButton';
+import { KnowledgeHoverPreview } from './KnowledgeHoverPreview';
 import { ScrollViewport } from '../global/ScrollViewport';
 import { PanelIcon } from '../global/CollapsiblePanel';
 import { LibraryArticleImage } from '../../lib/article-format/LibraryArticleImage';
@@ -13,7 +15,7 @@ import { knowledgeReferencePath, isMarkdownPath, type KnowledgeManifest } from '
 import { remarkHeadingIds, rehypeAlignSanitizedFragmentLinks } from '../../lib/articleTableOfContents';
 import type { ReadonlyKnowledgeSource } from '../../lib/knowledge/source';
 
-type ReaderContext = { source: ReadonlyKnowledgeSource; path: string; paths: ReadonlySet<string>; open: (path: string, line?: number, fragment?: string) => void; download: (path: string) => void };
+type ReaderContext = { source: ReadonlyKnowledgeSource; path: string; paths: ReadonlyMap<string, string>; open: (path: string, line?: number, fragment?: string) => void; download: (path: string) => void };
 const Context = createContext<ReaderContext | null>(null);
 function useReader() { const context = useContext(Context); if (!context) throw new Error('Knowledge reader context missing'); return context; }
 function Link({ href, children }: { href?: string; children?: ReactNode }) {
@@ -25,7 +27,8 @@ function Link({ href, children }: { href?: string; children?: ReactNode }) {
   if (!path) return <span title={t('unsupportedLink')}>{children}</span>;
   const document = context.paths.has(path) ? path : context.paths.has(path + '.md') ? path + '.md' : context.paths.has(path + '.markdown') ? path + '.markdown' : null;
   if (isMarkdownPath(path) && !document) return <span className="text-warning" title={t('missingLink')}>{children}</span>;
-  return <button type="button" className="inline rounded text-left text-accent-text underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => document ? context.open(document, 1, href.split('#')[1]) : context.download(path)}>{children}</button>;
+  return document ? <TooltipButton type="button" className="inline rounded text-left text-accent-text underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent" tooltip={<KnowledgeHoverPreview source={context.source} path={document} title={context.paths.get(document) ?? document} />} onClick={() => context.open(document, 1, href.split('#')[1])}>{children}</TooltipButton>
+    : <button type="button" className="inline rounded text-left text-accent-text underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-accent" onClick={() => context.download(path)}>{children}</button>;
 }
 function Image({ src, alt }: { src?: string | Blob; alt?: string }) {
   const context = useReader(), { t } = useUITranslation('knowledge');
@@ -104,7 +107,7 @@ export const KnowledgeReader = memo(function KnowledgeReader({ source, path, tex
     else if (line > 1) target = [...content.querySelectorAll<HTMLElement>('[data-line]')].filter(node => Number(node.dataset.line) <= line).at(-1);
     target?.scrollIntoView({ block: 'center' });
   }, [path, text, line, fragment]);
-  const paths = useMemo(() => new Set(manifest?.documents.map(doc => doc.path) ?? []), [manifest]);
+  const paths = useMemo(() => new Map(manifest?.documents.map(doc => [doc.path, doc.title]) ?? []), [manifest]);
   const context = useMemo(() => ({ source, path, paths, open: onOpen, download: onDownload }), [source, path, paths, onOpen, onDownload]);
   return <Context.Provider value={context}><div className="relative flex min-h-0 min-w-0 flex-1">
     <ScrollViewport ref={scrollRef} className="flex-1"><div ref={contentRef} data-knowledge-content data-variant={variant} data-line-numbers={showLineNumbers} className="relative mx-auto w-full max-w-4xl p-4 md:p-6 data-[variant=reference]:max-w-none data-[variant=reference]:px-4 data-[line-numbers=true]:pl-18"><Body text={text} />{showLineNumbers ? <div ref={markerRef} aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 w-10 select-none text-right font-mono text-xs text-faint">{markers.map((marker, index) => <span key={index} data-origin-line={marker.line} className="absolute inset-x-0 before:content-[attr(data-origin-line)]" style={{ top: marker.top }} />)}</div> : null}</div></ScrollViewport>

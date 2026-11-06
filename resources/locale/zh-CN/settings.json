@@ -1,5 +1,9 @@
 {
   "ui": {
+    "reopenGuide": "重新打开入场引导",
+    "reopenGuideDescription": "将重新显示初始化流程。进入工作台时，会采用本次选择的编辑器外观，并保存到已连接的资料库。",
+    "cancelOperation": "取消操作",
+
     "manuscriptAa": "文稿 Aa",
     "keepIdeasInWords": "把想法留在文字里。",
     "wordsForAFreshStart": "文字，让下一篇从容开始。",

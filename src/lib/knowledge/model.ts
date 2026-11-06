@@ -13,7 +13,7 @@ export type KnowledgeManifest = {
   diagnostics: KnowledgeDiagnostic[]; diagnosticCount: number; topologyTruncated: boolean;
 };
 export type KnowledgeSearchQuery = { text: string; phrase?: string; exclude?: string; title?: string; path?: string };
-export type KnowledgeSearchHit = { path: string; title: string; line: number; endLine?: number; snippet: string; titleMatch: boolean; score?: number };
+export type KnowledgeSearchHit = { sourceId?: string; sourceName?: string; path: string; title: string; line: number; endLine?: number; snippet: string; titleMatch: boolean; score?: number };
 export type KnowledgeCapture = { sourceId: string; path: string; title: string; content: string; original?: string; line: number; endLine: number; whole: boolean };
 export const isKnowledgeId = (value: unknown): value is string => typeof value === 'string' && /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value);
 export const isMarkdownPath = (path: string) => /\.(?:md|markdown)$/i.test(path);

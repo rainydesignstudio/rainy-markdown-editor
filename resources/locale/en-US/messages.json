@@ -1751,5 +1751,8 @@
     "missingSource": "Markdown source is missing.",
     "existingFile": "Initialization will not overwrite an existing file: {{path}}",
     "aliasProtocol": "Resource aliases require rainy-format/2; legacy contracts are not migrated automatically."
+  },
+  "entryGuide": {
+    "loadFailed": "The library could not finish loading. Resolve the issue and try again."
   }
 }

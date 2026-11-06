@@ -270,8 +270,13 @@ const builtinEditorThemes = {
 export function getBuiltinEditorThemes(locale: string = 'en-US'): readonly EditorTheme[] { return builtinEditorThemes[locale === 'zh-CN' ? 'zh-CN' : 'en-US']; }
 export const BUILTIN_EDITOR_THEMES = getBuiltinEditorThemes();
 
-export const BASE_EDITOR_THEME = BUILTIN_EDITOR_THEMES[0];
+export const BASE_EDITOR_THEME = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'sea-glass')!;
 export const DEFAULT_EDITOR_THEME = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'rainy-design-slate')!;
+
+const builtinThemeOrder = new Map(BUILTIN_EDITOR_THEMES.map((theme, index) => [theme.id, index]));
+export function sortEditorThemes(themes: readonly EditorTheme[]): EditorTheme[] {
+  return [...themes].sort((left, right) => (builtinThemeOrder.get(left.id) ?? builtinThemeOrder.size) - (builtinThemeOrder.get(right.id) ?? builtinThemeOrder.size));
+}
 
 export function resolveEditorThemeColors(theme: EditorTheme, mode: EditorColorScheme): Record<EditorColorRole, string> {
   return Object.fromEntries(EDITOR_COLOR_ROLES.map((role) => [role, theme.palette[theme.colors[mode][role]]])) as Record<EditorColorRole, string>;
@@ -283,7 +288,7 @@ export function findEditorTheme(themes: readonly EditorTheme[], id: string): Edi
 
 export function composeLegacyEditorTheme(preset: string, accent: string, font: string): EditorTheme {
   // Freeze the original Mist colors so v1 workspace migration stays lossless.
-  const legacyThemes = BUILTIN_EDITOR_THEMES.map((theme) => theme.id === 'mist' ? parseEditorThemeJson(JSON.stringify(LEGACY_MIST_THEME_JSON)) : theme);
+  const legacyThemes = [...BUILTIN_EDITOR_THEMES, parseEditorThemeJson(JSON.stringify(LEGACY_MIST_THEME_JSON))];
   const neutral = findEditorTheme(legacyThemes, preset);
   const accentTheme = findEditorTheme(legacyThemes, { teal: 'sea-glass', moss: 'linen', berry: 'mist' }[accent] ?? '');
   if (!neutral || !accentTheme || !['sans', 'serif'].includes(font)) throw new ProductError("editorThemes.legacyAppearanceOptionsCannotBeMigrated");

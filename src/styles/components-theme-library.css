@@ -20,10 +20,6 @@
     @apply grid gap-2 border-l-4 border-danger bg-list px-3.5 py-3 text-xs-note text-danger;
   }
 
-  .media-library-issues {
-    @apply grid gap-2 border-l-4 border-warning-line bg-warning-surface px-3.5 py-3 text-xs-note text-warning-strong;
-  }
-
   .media-gallery-thumbnail {
     @apply relative grid aspect-square min-w-0 place-items-center overflow-hidden border-b border-line bg-list;
   }
@@ -52,10 +48,6 @@
 
   .article-local-image-placeholder {
     @apply inline-grid place-items-center rounded-lg border border-dashed border-line bg-list px-3 py-2 text-xs text-muted;
-  }
-
-  .media-dialog-backdrop {
-    @apply z-30;
   }
 
   .media-image-dialog {

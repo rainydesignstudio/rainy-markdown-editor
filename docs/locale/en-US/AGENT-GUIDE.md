@@ -41,18 +41,32 @@ Source coordinates under `src/` and `resources/` are relative to the source-pack
 
 | Task | Required entries | Verification endpoint |
 |---|---|---|
+| Read-only interface walkthrough | [External walkthrough](#doc-workspace-tour) | Matching version, verified file, actual local path and display |
 | Install or open an existing environment | [Prerequisite](#doc-browser-gate), [installation](#doc-install-and-start), [startup](README.md#doc-run-yourself), [fonts](README.md#doc-font-downloads) | Actual URL, directory permission, initialization, save/reopen |
 | Write from scratch | [Tutorial 1](#doc-tutorial-1), [complete example](THEME.md#doc-complete-article-example) | Complete manuscript, independent theme snapshot, assets and applicable output |
 | Article management | [Management workflow](#doc-article-management), [feedback/trash](#doc-operation-feedback), [recovery](#doc-recovery) | Fixed object scope; actual writes, organization/index and recovery/output checks |
+| History creation/management | [History workflow](#doc-article-history), [storage contract](FORMAT.md#doc-history-storage), [write takeover](#doc-agent-write-handoff) | Actual versions, protection, pre-restore checkpoints, rereads and preserved originals |
 | Editor theme | [Tutorial 2](#doc-tutorial-2), [editor-theme](THEME.md#doc-editor-theme) | JSON reread, saved appearance, schemes and fonts; article snapshots unchanged |
-| Article theme, snippet or starter | [Tutorial 3](#doc-tutorial-3), [assets](THEME.md#doc-design-assets), [verification](THEME.md#doc-verify-examples), [effective contract](#doc-effective-contract) | Reread each artifact, combined manuscript, insertion and output |
+| Article theme, snippet or starter | [Tutorial 3](#doc-tutorial-3), [assets](THEME.md#doc-design-assets), [web/source adaptation](THEME.md#doc-theme-from-reference), [verification](THEME.md#doc-verify-examples), [effective contract](#doc-effective-contract) | Reread each artifact, combined manuscript, insertion and output |
 | Import or rewrite | [Tutorial 4](#doc-tutorial-4), [import tasks](README.md#doc-import-tasks), [knowledge](#doc-knowledge-workflow) | Retained originals; separate manuscript, resource and task results |
 | Knowledge search, collection or citation | [Knowledge](#doc-knowledge-workflow), [library guide](README.md#doc-knowledge) | Actual selections, topic/citation relationships, zero writes to external sources |
 | Add a language | [Language maintenance](#doc-language-maintenance) and its source registration/seed entries | UI, seeds, samples, fallback and retained existing libraries |
 | Configuration, CSS or rendering diagnosis | [Effective contract](#doc-effective-contract), [package protocol](FORMAT.md#doc-format-package), [recovery](#doc-recovery) | Effective source, complete identity, explicit impact and recoverable results |
+| Format customization/change | [Package protocol](FORMAT.md#doc-format-package), [six capabilities](FORMAT.md#doc-workspace-capabilities), [write takeover](#doc-agent-write-handoff) | Actual statistics/alignment/Update styles/check/copy/export results individually |
 | Application repair or deployment | [Engineering/deployment](#doc-engineering-delivery), [development commands](README.md#doc-development), actual repository governance and deployment workflow | Separate engineering checks, actual build/release objects and external observations |
 
-Reuse existing valid installation, grants, library and tutorial choices. Verify validity and resume at the first unfinished stage. Without a checkpoint, inspect current state read-only; reinstalling, reinitializing or repeating writes is not a substitute for identifying it.
+Reuse existing valid installation, grants, library and tutorial choices. Verify validity and resume at the first unfinished stage. Without a checkpoint, inspect current state read-only; reinstalling, reinitializing or repeating writes is not a substitute for identifying it. Library-writing tasks first apply the takeover requirements below.
+
+<a name="doc-agent-write-handoff"></a>
+
+### Agent takeover of saving and snapshots
+
+Apply to Agent writes, recovery and cold-start continuation in new/existing libraries; read-only review does not change settings. Confirm authorization, current library/article identities, unsaved browser drafts and other writers; handle/preserve drafts and let already-started saves/snapshots finish. Unknown write state requires read-only inspection before overwrite.
+
+1. Before taking over, turn off Auto-save and history snapshots under Settings → Auto-save, save settings and verify adoption. Leave Article trash unchanged and retain intervals, snapshot limits and other preferences. The guide's Agent off defaults do not replace this check, including existing libraries. For a new library, check after initialization and before subsequent Agent writes.
+2. Disk values must be settings.json autoSave.enabled=false and autoSnapshot.enabled=false. External edits retain the existing structure/other fields, then require safe reload/adoption by open pages; file changes alone do not establish stopped React timers. Do not discard unsaved user drafts to refresh. Without permission or verified stopped automatic work, pause conflicting writes and report the missing condition.
+3. During takeover, the Agent explicitly saves and creates [history checkpoints](#doc-article-history), checking original, theme, indexes, render records and history manifests separately. Preserve recoverable versions before important changes and save at task stages. Ordinary saving does not establish history, and history does not replace article saving. Stop overwrite on concurrent edits, reread and retain both sides; disabling automatic work is not an interprocess lock.
+4. At handback, report actual saved version, snapshot IDs, unsaved/failed effects and both switch states; leave them off. Restore automatic features only by the user's explicit choice, without silently restoring previous on values. A later Agent checks again. Do not substitute new timer scripts, background Agents or persistence mechanisms.
 
 ### Execution checkpoint
 
@@ -113,7 +127,7 @@ This section selects execution routes; it does not define another schema. Fields
 | Route | Inspect the library's `format/config.json.renderer`. A declared package uses its protocol, files, actions, settings, values, permissions and actual implementation. Without renderer, use legacy trio compatibility; do not branch on platform or folder names |
 | Trio | The current protocol still checks `schemaVersion`, `meta.id`, the complete file set and references. The package interprets business fields; do not apply built-in operators, WeChat rules or algorithms to every custom package |
 | Input and commit | Check body, theme, configuration/package and resource identities. Judge original saving, style generation, indexing and output separately. Do not commit late results after switching libraries, reloading, cancellation or stale input |
-| Actions and settings | Read `actions[].kind` and declared parameters to distinguish rendering, validation, formatting, copying and exporting; button wording does not establish whether an action edits the draft. The current protocol requires render and validate; read declarations for other actions. Settings/values participate in package identity Export cards consume export only; the workbench currently has no manual format entry, while the package contract retains format. |
+| Actions and settings | Read `actions[].kind` and declared parameters to distinguish rendering, validation, formatting, copying and exporting; button wording does not establish whether an action edits the draft. The current protocol requires render and validate; read declarations for other actions. Settings/values participate in package identity. Export cards consume export only; the workbench currently has no manual format entry, while the package contract retains format. |
 | Style authority | Check `rendering.styleAuthority`, capabilities and actual output. With library style authority, theme CSS/token overrides are not the active style source. Retain original theme fields; generated CSS inspection stays read-only |
 | Preview geometry | `rendering.previewWidth` governs the resource-preview host. Inspect internal viewport, CSS body constraints, scaling and output sizes separately. Verify theme, snippet and starter entries separately; shrinking a screenshot does not change layout viewport |
 | Resources and output | Distinguish author URLs, authorized local resources, preview mappings and exports. Judge declared permissions and actual resource loading; script-free previews, package computation and the workspace have different capabilities |
@@ -137,13 +151,30 @@ When that route does not need platform-standard checks, set `meta.enabled=false`
 
 A custom package interprets these fields through its own public settings and implementation. Do not assume arbitrary custom code follows built-in switches. Report undeclared, unimplemented or unspecified defaults instead of adding switches or guessing values. Verify syntax, resources, preview, clipboard receipt and target-platform results separately.
 
+<a name="doc-workspace-tour"></a>
+
+### External workspace walkthrough
+
+This is a read-only interface walkthrough, separate from the app and the four numbered hands-on tutorials below. It requires no app installation, server, directory API or library grant. Restore the relevant prerequisites and authorization checks when the user proceeds to actual installation, creation or library operations.
+
+- Retrieve only after an explicit request for this walkthrough; reading manuals, starting the app or completing initialization does not prefetch it. Reuse a matching, verified local copy when available.
+- Match the actual app version and language. Before installation, use the user's specified version or the release stated by the public entry. Report missing matching published files; never guess an asset URL or claim compatibility.
+- Obtain the files from the project's corresponding GitHub Release walkthrough assets and checksum record. The release record must identify walkthrough version, supported app version, language, filenames, URLs and SHA256 for the conversation and standalone HTML forms. Verify bytes and metadata before opening; on failure retain existing files, report the cause and do not open a failed file.
+- Use a temporary or delivery directory already authorized in the current environment and report its actual path. Do not write into the app, a library or a maintainer-specific machine path.
+- Use the conversation form when an in-chat visualization surface is supported; otherwise open the standalone HTML in a browser. If opening is unavailable, deliver its local path and manual instructions rather than claiming it was displayed. The walkthrough does not connect to the app, request library access or perform real create/save/import/delete actions.
+- Present Articles, Themes, Templates, Assets, Knowledge and Settings in six steps, each with one or two sentences and one main entry. Step navigation and exit affect only the walkthrough, not app preferences or initialization completion. Report demonstration and real-operation evidence separately.
+
+Release walkthrough: project `0.4.0.0` / app `0.4.0`, tutorial version 1. The [release manifest](https://github.com/rainydesignstudio/rainy-markdown-editor/releases/download/v0.4.0.0/workspace-tour-manifest.json) identifies Chinese/English conversation and standalone files, URLs, byte lengths and SHA256. Verify the manifest itself against [SHA256SUMS.txt](https://github.com/rainydesignstudio/rainy-markdown-editor/releases/download/v0.4.0.0/SHA256SUMS.txt). Retrieve only the files explicitly requested by the user.
+
 <a name="doc-browser-gate"></a>
 
 ## Prerequisite: a controllable desktop browser
 
 **Before installing dependencies, building or starting**, explain and verify that the user can provide an external desktop browser this Agent conversation can actually control, with `showDirectoryPicker` and local-directory read/write support. Obtain browser-control authorization; reuse a valid existing grant. Do not substitute a built-in browser in this workflow.
 
-Browser-control authorization permits only agreed browser actions; it does not grant the page access to a library. The user selects directories and confirms read/write and subsequent browser permissions. Do not synthesize authorization gestures. If control, a supported directory API or authorization is missing, stop all subsequent installation, initialization, creation and teaching. Explain the missing condition and how to provide a supported browser, enable control or renew permission. Resume from the first unfinished stage without reinstalling or overwriting an existing library.
+Browser-control authorization permits only agreed browser actions; it does not grant the page access to a library. The user selects directories and confirms read/write and subsequent browser permissions. Do not synthesize authorization gestures. If control, a supported directory API or authorization is missing, stop all subsequent installation, initialization, creation and hands-on teaching. Explain the missing condition and how to provide a supported browser, enable control or renew permission. Resume from the first unfinished stage without reinstalling or overwriting an existing library.
+
+Merely displaying the [external read-only walkthrough](#doc-workspace-tour) requires no app server, directory API or library grant; follow that module independently.
 
 [Use online](https://rainydesign.cn/lab/rainy-markdown-editor/) skips local code installation but still requires the browser check, directory permission and initialization. Check the interface version for available features; development instructions do not establish that the online version has been updated.
 
@@ -200,10 +231,14 @@ Print the actual installation directory and a copyable restart command from ther
 
 ## Installation: directory access and initialization
 
+Identify the entry-guide state first. A first launch without a connected library may configure language, appearance, purpose, writing method, saving preferences and library creation through the browser guide; ordinary creation in Settings remains available. Guide creation additionally writes the selected template, separate example, theme/index/render records and confirmed settings; ordinary creation starts with an empty articles/ directory.
+
+For an Agent handoff, verify its record against actual disk contents, then load the required modules through the cold-start task index and ongoing manual-use rules; do not initialize again. A library name or relative path cannot establish its absolute location. Preserve already-written articles after partial preparation failure and retry only failed stages in the same directory, without duplicate libraries/examples or invented rendering success.
+
 1. Open the printed URL in a desktop browser supporting `showDirectoryPicker`.
 2. New library: first ask whether it is for writing WeChat Official Account articles. Recommend the WeChat preset for that use; start custom uses with the empty preset and configure as needed. Open **Settings → Local directory → New library**, enter its name and choose the corresponding validation and processing template (WeChat Official Account or Empty validator). Then let the user select a parent and grant read/write access. Empty validator has no platform rules or processing algorithms; product checks remain active. See the [format guide](FORMAT.md). A disk root may be the parent; the app creates files only in its named child.
 3. Existing library: **Open existing library**, select the library itself and verify its name/files. Cancellation/refused access retains existing data; report the current state.
-4. A new library copies the chosen format package into `format/`, with an initially empty `articles/`. See [FORMAT.md](FORMAT.md#doc-format-package) for its declaration, interpreter, dependencies and configuration. Wait for the library to load, then check themes, snippets and starters against the chosen preset. No snippets or snippet categories is a normal result for the empty preset; do not fill it with WeChat snippets. Missing complete fonts are verified and downloaded into `fonts/` from the chosen source; licenses are supplied with the app; `settings.json` is created when settings are explicitly saved.
+4. Ordinary library creation copies the chosen format package into `format/`, with an initially empty `articles/`. See [FORMAT.md](FORMAT.md#doc-format-package) for its declaration, interpreter, dependencies and configuration. Wait for the library to load, then check themes, snippets and starters against the chosen preset. No snippets or snippet categories is a normal result for the empty preset; do not fill it with WeChat snippets. Missing complete fonts are verified and downloaded into `fonts/` from the chosen source; licenses are supplied with the app; `settings.json` is created when settings are explicitly saved.
 5. Follow [FORMAT.md](FORMAT.md) to identify the current library’s render package or legacy trio compatibility path and its actual loaded source. Handle missing, damaged or incompatible configuration according to that path, without mixing files or automatically overwriting user content. Back up and obtain authorization before migration.
 6. Within the authorized demonstration scope, create a test manuscript, enter one sentence and save. Confirm its article directory, `article.md` and `theme.json`, then reopen it.
 
@@ -217,7 +252,7 @@ Check each stage before teaching:
 | Fonts | Record downloaded, cancelled or failed files separately; verify system fallback when needed | A font failure neither fails the whole library nor counts as fonts ready |
 | First manuscript | One sentence saved in the agreed demonstration scope, closed and reopened with matching content/theme | Retain drafts/saved originals, identify the failed stage; unobserved means pending |
 
-New libraries default to auto-save off; existing libraries retain their settings. Confirm the demonstration manuscript's location and whether to keep it. Do not put test content in real articles. Cancelling or failing initialization does not authorize clearing a same-name directory.
+Ordinary new libraries default to auto-save off; guide-created libraries use confirmed switches and existing-library loading retains settings. Before subsequent writes, an Agent still turns off auto-save/automatic snapshots and verifies adoption under [write takeover](#doc-agent-write-handoff). Confirm the demonstration manuscript's location and whether to keep it. Do not put test content in real articles. Cancelling or failing initialization does not authorize clearing a same-name directory.
 
 Lists read monthly indexes first. If an old library reports missing index fields, confirm the indicated months before scanning/rebuilding. Initial rebuild reads that scope's bodies/themes; normal subsequent list reads do not rescan every article.
 
@@ -226,6 +261,49 @@ Changing port or switching between `localhost` and `127.0.0.1` changes browser o
 Before opening a library, confirm the user’s font source in Settings → Local directory. Follow [font downloads](README.md#doc-font-downloads); do not add build-time downloads or overwrite existing fonts. Font failure is separate from installation/build and must be reported with retry guidance.
 
 Before creating a library, select the user's UI language in the lower-left language control; the version appears beneath it. Switching UI language does not translate library content or rewrite the format trio. Report dependency installation, build, startup, directory access, initialization and save/reopen separately. Unobserved steps remain pending user completion.
+
+Settings → Local directory → Reopen setup guide asks for confirmation, then shows the flow again while retaining completion and the library connection. Existing article/appearance draft guards still apply. Before workspace entry, adopt the chosen editor theme and color mode and clear the previous custom mix: save to a connected library or apply only to the current window without one. Adoption carries the selected built-in version and content snapshot, not only its ID. Reuse matching same-ID content (ignoring localized display names and equivalent palette spellings); add a missing selected theme; preserve different same-ID content and adopt an independent-ID copy, reusing a matching copy. Failed appearance saving stays in the guide without claiming completion; an imported but unadopted copy may remain for reuse on retry. Existing themes and article snapshots remain intact.
+
+<a name="doc-entry-guide-files"></a>
+
+### Entry guide: choices and file effects
+
+Paths are relative to the confirmed library root. These are the guide's additional effects; ordinary preset/seed creation, existing-library compatibility reads and missing-font downloads still follow [FORMAT](FORMAT.md#doc-bundled-resources) and [font guidance](README.md#doc-font-downloads). Do not infer zero writes to an existing library.
+
+The tables describe application-guide effects after final submission. Selecting/previewing alone creates no library files; language preferences are immediately remembered in the browser. Files already written during preparation follow the failure-recovery rules. Subsequent Agent writes verify switches under [saving/snapshot takeover](#doc-agent-write-handoff).
+
+| Entry route | Library effects | Guide completion record |
+|---|---|---|
+| Create a library and finish preparation | Create the named child under the confirmed parent with its preset/seeds, then write the template, independent example, render record and settings.json described below | Record completion after successful workspace entry |
+| I already have a library | Select the library itself. Add no guide template/example and replace neither format policy nor auto-save switches. Save the chosen editor appearance before entry, adding the selected theme or an independent copy when required | Record completion after loading and appearance adoption succeed |
+| Explore without a connected library | Request no directory and create no library/template/article; apply appearance only in the current window | Add no completion record and retain any existing marker |
+| Explore with a connected library | Retain the library/articles and save the selected appearance; add/reuse a missing theme or conflicting-ID copy under the snapshot-adoption contract above | Add no completion record and retain any existing marker |
+
+| Choice | Generated/saved effects |
+|---|---|
+| 简体中文 / English | Remember UI language in the browser; new libraries use matching seeds and guide-template/example wording, without translating existing libraries |
+| Editor appearance and light/dark/system | New libraries already contain the built-in theme seeds. Entry adopts the selected version/content and writes settings.json appearance with custom cleared; without a library, apply in memory only. Use the actual saved independent ID rather than guessing a path from its name |
+| Business scenario and starting direction | Select the format preset, template ID and example content below. This does not import website CSS or establish compatibility with every destination |
+| With an Agent / Right here | Both prepare the same template/example. The Agent route additionally displays a copyable handoff prompt without invoking a model or writing Agent scripts/prompt files. Changing the writing method resets both switch selections: off for Agent, on for Right here; the final saving-preference choices determine the saved values |
+| Auto-save and automatic snapshots | Save the user's final choices to settings.json autoSave.enabled/autoSnapshot.enabled, retaining existing interval/retention values; later automatic execution still follows page and permission guards |
+| Library name and parent | Write only in the explicitly named child; reject collisions. Example directories use the example title and current month. Use the actual samplePath rather than inferring it from the library name |
+
+Guide starters are added under `templates/entry-guide/`, with their category registered in `templates/index.json`; filenames are listed below. Each of the six directions also prepares an independent example. Preparation uses the first article theme returned from the library; report its actual ID/version separately from the editor appearance chosen earlier.
+
+| Business scenario | Direction / profile | Format preset | Added starter filename |
+|---|---|---|---|
+| Technical writing | Technical notes / technical | empty | entry-technical.md |
+| Technical writing | Website content / website | empty | entry-website.md |
+| Products & business | Product introduction / product | empty | entry-product.md |
+| Products & business | Brand or proposal / brief | empty | entry-brief.md |
+| Writing & sharing | WeChat article / wechat | wechat-article | entry-wechat.md |
+| Writing & sharing | Community post / community | empty | entry-community.md |
+
+Shared guide-creation writes include `articles/YYYY-MM/<example-directory>/article.md`, `theme.json`, `render.json` and that month's `index.json`; stable-identity indexes follow their existing on-demand workflow. Rendering dependency manifests use `styles/.versions/<hash>/manifest.json`, with actual resource objects reused/created under `assets/.objects/<hash>` as needed. Default themes, snippets and starters still follow the selected seed; adding a guide starter does not replace the default set.
+
+Completion uses this origin's localStorage key `rainy-entry-guide-v1` with `{version:1,completed:true}`. It stores neither business choices, manuscript drafts nor library files. Browser directory bookmarks are separate; appearance and saving settings live in settings.json. Reopening retains completion and the library connection and first handles unsaved content through existing guards. Explore is not a read-only demonstration when a library is connected.
+
+On preparation failure, inspect actual writes first; the same page can retry retained stages. Preparation checkpoints exist only in the current guide session. After refresh/reopen, inspect the real directory/artifacts and use recovery rather than creating a duplicate library, template or example. A completion marker or success notice does not replace disk rereads, rendering readiness and save/reopen verification.
 
 <a name="doc-language-maintenance"></a>
 
@@ -377,6 +455,8 @@ Give actual source/new-manuscript paths, theme, normalized fields, copied/failed
 
 ### Knowledge source and write boundaries
 
+Cross-source search defaults to all; filters can select one source. Identify results by sourceId plus relative path, never filename alone. Denied access, missing/partial indexes or failed sources make results incomplete; zero hits do not prove absence. Only ＋ adds a temporary reading tab; ordinary and Cmd/Ctrl internal-link clicks reuse the current tab. Render no strip for ≤1 tab; with >1, each close action stays inside its tab’s right edge. Closing down to one focuses the visible reader heading. Retain independent modes, positions and at most 100 back-history entries per tab; refresh restores none. Hover previews read only a bounded prefix as inert text, not the complete source. Clear unreadable source content and verify again after reconnection; existing topic/citation writes and original-file protection still apply.
+
 Knowledge sources stay read-only. Manuscript/source roots must be independent and non-nested. Scans are explicit; everyday searches/graphs use the index, originals are read on demand, and searchable text is stored in the manuscript library. Force rebuild repairs metadata false negatives/corrupt shards; failure keeps the old index.
 
 The five Knowledge views share a top toolbar. Reader line numbers refer to real Markdown lines; soft wrapping adds none. **Collect selection** requires an actual selection, while **Collect whole document** does not; both require a target research topic. Choosing an outline item navigates without closing the outline. The graph starts in local/two-level mode; its help icon opens instructions, and clipping feedback stays locked while the condition remains, becoming dismissible only after resolution, without consuming content height. The shelf retains collected snapshots; change review does not automatically edit articles or excerpts.
@@ -420,6 +500,23 @@ Refreshing the editor reopens this tab’s saved article in the same library. Re
 
 3. Direct library writes must satisfy the same identity, record and recovery contracts. If they cannot, use the app entry or report the capability gap; do not fabricate records or use rm as recoverable deletion. Report actual completed counts, file/organization/index results and unfinished items. Inspect writes after partial success and resume only failed layers under [diagnosis and recovery](#doc-recovery).
 
+<a name="doc-article-history"></a>
+
+## Create and manage article history
+
+Before execution, fully read this module, the [history storage contract](FORMAT.md#doc-history-storage) and [render dependencies](FORMAT.md#doc-render-records), and apply [write takeover](#doc-agent-write-handoff). Editor undo, saved articles, history, render records and whole-library backup are separate; Saved does not establish a snapshot.
+
+1. Fix the library/article stable identity, month/folder, current-versus-saved differences, theme validity and archive state. Read the history list and per-record issues; fix the target snapshot ID/content identity. Unarchive only within the user's allowed scope before mutation. Damaged records/missing dependencies do not mean absent history.
+2. Manual creation: article toolbar → Version history → Save important version captures the current manuscript/theme, including unsaved edits to an existing article. A new unfiled draft first uses normal saving; failed filing creates no history. Reread article.md, theme.json, snapshot.json and any valid render.json in the new directory, checking ID/time/kind=manual/protection. Manual creation does not promise deduplication. If creation succeeded but list refresh failed, retry the list only.
+3. Automatic versions: understand configured interval, conditions, limits and deduplication, but do not enable timers to replace manual checkpoints during Agent takeover. Use manual, before-restore and before-theme-change for their actual operations; invent neither automatic timer events nor historical dates. Snapshot creation may clean older unprotected automatic versions under the existing policy. Check limits and protect needed records first; switching automatic creation off does not remove this side effect.
+4. Protection: automatic versions can be protected/unprotected with retained reread afterward. Manual and both before-* checkpoints cannot be unprotected. Protection controls automatic cleanup, not explicitly confirmed single-record deletion; do not change kinds to bypass protection/count policy.
+5. Inspect/compare: select a version and compare historical/current body, metadata and actual theme content; inspect source and rendered layout separately. History uses valid render.json and retained dependencies. Missing records/dependencies, mismatched themes or source-only views require an explicit recovery limitation; current library CSS is not proof of the original appearance.
+6. Restore: select and explicitly confirm the version. The app first creates before-restore history of the current manuscript, then writes the target source/theme into the current article. Check checkpoint, actual original, independent theme, render record, month index and save/reopen. Handle source-success/theme-index-list-failure at its actual stage, retaining checkpoints without duplicate restore or current-article deletion. Invalid themes or changed source/library stop restoration.
+7. Fork history: use Fork from history, confirm new title/month and create an independent article identity. Check new source/theme snapshot and actual resource references/availability, then save/reopen. Retain the original article, selected history and shared dependencies; forking does not overwrite by restoration.
+8. Delete: fix the single version and impact, obtain explicit confirmation and additionally identify protection when relevant. Reread/compare target content immediately before execution; stop on stale targets, library switches, concurrent edits or unknown list state. Delete only the selected history directory. Article trash/Undo promises do not apply, and media or shared styles/assets objects are not cleaned with it. Reread the list and confirm only that target disappeared.
+9. Direct writes follow FORMAT directory/manifest/source-theme matching/unique-ID/manifest-last/failure-cleanup order, retaining valid unknown metadata and prior history. Retain only matching render records with all dependencies; otherwise report honest omission rather than fabricating hashes. Restore writes before-restore first, then follows article saving/index/identity contracts. If safe continuation cannot be established, use the app or report the gap; arbitrary copying/rm is not complete history management.
+10. Report actual article path, snapshot IDs/kinds/times/protection, created/reused/deleted counts, pre-restore checkpoint, save/reopen and unverified dependencies. History does not fully back up media; independent recovery needs a complete library copy. For partial success, inspect actual effects and recover list refresh separately from data writes.
+
 ## Reproduction and delivery
 
 Use an explicit test library and [verify all five asset types](THEME.md#doc-verify-examples) through load/import, save, reopen, preview and relevant output. Engineering changes use npm checks; content-only work follows its tutorial without rebuilding unnecessarily:
@@ -443,7 +540,7 @@ Keep actual artifact records for each selected tutorial. Mark tutorials not perf
 | 3 Article design | Theme, snippet, starter and combined test article; reread each | Real insertion, validation, article preview and relevant output; originals retained |
 | 4 Import/rewrite | Source/new paths, rewrite agreement and resource list; save/reopen | Original unchanged, facts/quotations, resource failures, preview and relevant output |
 
-For every result use passed/failed/unobserved with evidence and recovery. Success notices, builds or in-memory examples do not replace disk rereads and actual browser observation. Mark unavailable outputs not applicable with a reason. WeChat/mobile receipt requires the user to be present.
+For every result use passed/failed/unobserved with evidence and recovery. Success notices, builds or in-memory examples do not replace disk rereads and actual browser observation. Format customization individually verifies [six workspace capabilities](FORMAT.md#doc-workspace-capabilities); missing capabilities remain unfinished and cannot be waived through missing declarations or shortening. Only other genuinely irrelevant output types are not applicable, with a reason. WeChat/mobile receipt requires the user to be present.
 
 <a name="doc-recovery"></a>
 

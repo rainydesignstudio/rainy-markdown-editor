@@ -10,7 +10,7 @@ import { fileTitle, type KnowledgeManifest, type KnowledgeSearchHit } from '../.
 import { downloadArticleBlob } from '../../lib/articleExport';
 
 type Issue = ReturnType<typeof productErrorMessage> | null;
-export type KnowledgeOpenDocument = { path: string; title: string; text: string; line: number; fragment?: string; truncated: boolean; changed: boolean; modified: number; size: number };
+export type KnowledgeOpenDocument = { sourceId: string; sourceName?: string; path: string; title: string; text: string; line: number; fragment?: string; truncated: boolean; changed: boolean; modified: number; size: number };
 const cancelled = (error: unknown) => error instanceof DOMException && error.name === 'AbortError' || error instanceof ProductError && ['knowledge.changed', 'knowledge.indexCancelled'].includes(error.messageKey);
 const permissionOrBindingChanged = (error: unknown) => error instanceof DOMException && ['NotAllowedError', 'SecurityError'].includes(error.name) || error instanceof ProductError && ['knowledge.readRequired', 'knowledge.writableLibraryRequired', 'knowledge.overlappingRoots', 'knowledge.invalidBinding', 'knowledge.indexSourceChanged'].includes(error.messageKey);
 
@@ -27,10 +27,11 @@ export function useKnowledgeLibrary(root: FileSystemDirectoryHandle | null, sess
   const [loading, setLoading] = useState(Boolean(root)), [busy, setBusy] = useState<'connecting' | 'permission' | 'indexing' | 'reading' | null>(null);
   const [issue, setIssue] = useState<Issue>(null), [progress, setProgress] = useState<KnowledgeIndexProgress | null>(null);
   const [query, setQuery] = useState(''), [searching, setSearching] = useState(false);
+  const [scope, setScope] = useState('all');
   const [filters, setFilters] = useState({ phrase: '', exclude: '', title: '', path: '' });
   const searchQuery = useMemo(() => ({ text: query, ...filters }), [query, filters]);
   const searchActive = Object.values(searchQuery).some(value => value.trim());
-  const [results, setResults] = useState<{ hits: KnowledgeSearchHit[]; total: number; truncated: boolean } | null>(null);
+  const [results, setResults] = useState<{ hits: KnowledgeSearchHit[]; total: number; truncated: boolean; incomplete: boolean; problems: { sourceId: string; name: string; reason: 'unavailable' | 'indexMissing' | 'partial' | 'error'; issue?: KnowledgeConnection['issue'] }[] } | null>(null);
   const [document, setDocument] = useState<KnowledgeOpenDocument | null>(null), [reading, setReading] = useState(false);
   const loadedDocument = useRef<{ source: NonNullable<KnowledgeConnection['source']>; value: KnowledgeOpenDocument } | null>(null);
   const current = useCallback((token: number) => epoch.current === token && rootRef.current === root && currentRef.current(), [root]);
@@ -42,7 +43,7 @@ export function useKnowledgeLibrary(root: FileSystemDirectoryHandle | null, sess
     if (!root) return;
     if (await queryDirectoryReadWritePermission(root) !== 'granted') { if (current(token)) setConnection({ status: 'library-unavailable', binding: null, source: null }); return; }
     const entries = await readKnowledgeBindings(root); if (!current(token)) return;
-    setBindings(entries);
+    setBindings(entries); setScope(value => value === 'all' || entries.some(item => item.sourceId === value) ? value : 'all');
     const states = await readKnowledgeIndexStates(root, entries, () => current(token), worker);
     if (!current(token)) return; setIndexed(states);
     const id = sourceId && entries.some(item => item.sourceId === sourceId) ? sourceId : null;
@@ -73,7 +74,7 @@ export function useKnowledgeLibrary(root: FileSystemDirectoryHandle | null, sess
 
   useEffect(() => {
     const token = ++epoch.current; stop(); busyRef.current = false;
-    setBusy(null); setLoading(Boolean(root)); selectedRef.current = null; setSelectedId(null); setBindings([]); setIndexed({}); setConnection(null); setManifest(null); setIssue(null); setProgress(null); setQuery(''); setFilters({ phrase: '', exclude: '', title: '', path: '' }); setResults(null); clearDocument();
+    setBusy(null); setLoading(Boolean(root)); selectedRef.current = null; setSelectedId(null); setBindings([]); setIndexed({}); setConnection(null); setManifest(null); setIssue(null); setProgress(null); setQuery(''); setScope('all'); setFilters({ phrase: '', exclude: '', title: '', path: '' }); setResults(null); clearDocument();
     if (root) void load(token).catch(error => { if (current(token) && !cancelled(error)) setIssue(productErrorMessage(error)); }).finally(() => { if (current(token)) setLoading(false); });
     return () => { epoch.current++; stop(); };
   }, [root, sessionKey, load, current, stop, clearDocument]);
@@ -141,40 +142,75 @@ export function useKnowledgeLibrary(root: FileSystemDirectoryHandle | null, sess
 
   useEffect(() => {
     queryRef.current?.abort(); setResults(null); setSearching(false);
-    const active = connectionRef.current, token = epoch.current;
-    if (!root || !searchActive || !manifest || active?.status !== 'ready' || !active.source) return;
-    setSearching(true);
-    const abort = new AbortController(); queryRef.current = abort;
+    const token = epoch.current;
+    if (!root || !searchActive || !bindings.length) return;
+    const abort = new AbortController(); queryRef.current = abort; setSearching(true);
     const timer = window.setTimeout(() => {
-      setSearching(true);
-      void searchKnowledgeIndex(root, active.source!, manifest, searchQuery, worker(), abort.signal).then(value => { if (current(token) && !abort.signal.aborted) setResults(value); })
-        .catch(error => { if (current(token) && !abort.signal.aborted) { setIssue(productErrorMessage(error)); if (permissionOrBindingChanged(error)) void reload(); } })
+      void (async () => {
+        let hits: KnowledgeSearchHit[] = [], total = 0;
+        const problems: NonNullable<typeof results>['problems'] = [];
+        const targets = bindings.filter(item => scope === 'all' || item.sourceId === scope);
+        for (const binding of targets) {
+          if (abort.signal.aborted || !current(token)) return;
+          try {
+            const connection = await restoreKnowledgeSource(root, undefined, () => current(token) && !abort.signal.aborted, binding.sourceId);
+            if (abort.signal.aborted || !current(token)) return;
+            if (connection.status !== 'ready' || !connection.source) { problems.push({ ...binding, reason: 'unavailable', issue: connection.issue }); continue; }
+            const index = await readKnowledgeIndex(root, connection.source, worker(), abort.signal);
+            if (!index) { problems.push({ ...binding, reason: 'indexMissing' }); continue; }
+            const result = await searchKnowledgeIndex(root, connection.source, index, searchQuery, worker(), abort.signal);
+            if (abort.signal.aborted || !current(token)) return;
+            total += result.total;
+            hits = await worker().request('rank', [[...hits, ...result.hits.map(hit => ({ ...hit, sourceId: binding.sourceId, sourceName: binding.name }))]], abort.signal);
+            if (index.status === 'partial') problems.push({ ...binding, reason: 'partial' });
+          } catch (error) {
+            if (abort.signal.aborted || !current(token)) return;
+            problems.push({ ...binding, reason: 'error', issue: productErrorMessage(error) });
+          }
+        }
+        if (current(token) && !abort.signal.aborted) setResults({ hits, total, truncated: total > hits.length, incomplete: !targets.length || problems.length > 0, problems });
+      })().catch(error => { if (current(token) && !abort.signal.aborted) setIssue(productErrorMessage(error)); })
         .finally(() => { if (current(token) && !abort.signal.aborted) setSearching(false); });
     }, 200);
     return () => { window.clearTimeout(timer); abort.abort(); };
-  }, [root, searchQuery, searchActive, manifest, connection?.status, connection?.binding?.sourceId, current, worker, reload]);
+  }, [root, searchQuery, searchActive, scope, bindings, indexed, current, worker]);
 
-  const open = useCallback(async (path: string, line = 1, fragment?: string) => {
-    const active = connectionRef.current, token = epoch.current;
-    if (active?.status !== 'ready' || !active.source || !current(token)) return;
-    if (fragment && loadedDocument.current?.source === active.source && loadedDocument.current.value.path === path) {
+  const open = useCallback(async (path: string, line = 1, fragment?: string, sourceId = selectedRef.current) => {
+    const token = epoch.current;
+    let active = connectionRef.current;
+    if (!root || !current(token)) return;
+    if (fragment && active?.binding?.sourceId === sourceId && loadedDocument.current?.source === active?.source && loadedDocument.current.value.path === path) {
       readRef.current?.abort();
       const value = { ...loadedDocument.current.value, line, fragment };
-      loadedDocument.current = { source: active.source, value };
+      loadedDocument.current = { source: active.source!, value };
       setDocument(value); setReading(false); setIssue(null); return;
     }
     readRef.current?.abort(); const abort = new AbortController(); readRef.current = abort;
-    setReading(true); setIssue(null); setDocument(null);
+    loadedDocument.current = null; setReading(true); setIssue(null); setDocument(null);
     try {
+      if (!sourceId || !bindings.some(item => item.sourceId === sourceId)) throw new ProductError('knowledge.indexSourceChanged');
+      if (!active || active.binding?.sourceId !== sourceId || active.status !== 'ready') {
+        // The connection outlives this read; a later read must not invalidate its source.
+        active = await restoreKnowledgeSource(root, undefined, () => current(token), sourceId);
+        if (!current(token) || abort.signal.aborted) return;
+        selectedRef.current = sourceId; setSelectedId(sourceId); setConnection(active); connectionRef.current = active;
+        setManifest(null); manifestRef.current = null;
+        if (active.status === 'ready' && active.source) {
+          const index = await readKnowledgeIndex(root, active.source, worker(), abort.signal);
+          if (!current(token) || abort.signal.aborted) return;
+          setManifest(index); manifestRef.current = index;
+        }
+      }
+      if (active.status !== 'ready' || !active.source) throw new ProductError('knowledge.readRequired');
       const file = await active.source.readFile(path); if (!current(token) || abort.signal.aborted) return;
       const content = await worker().request('readText', [file], abort.signal), metadata = manifestRef.current?.documents.find(doc => doc.path === path);
       if (current(token) && !abort.signal.aborted) {
-        const value = { path, title: metadata?.title ?? fileTitle(path), text: content.text, truncated: content.truncated, line, fragment, modified: file.lastModified, size: file.size, changed: Boolean(metadata && (metadata.modified !== file.lastModified || metadata.size !== file.size)) };
+        const value = { sourceId, sourceName: active.binding?.name, path, title: metadata?.title ?? fileTitle(path), text: content.text, truncated: content.truncated, line, fragment, modified: file.lastModified, size: file.size, changed: Boolean(metadata && (metadata.modified !== file.lastModified || metadata.size !== file.size)) };
         loadedDocument.current = { source: active.source, value }; setDocument(value);
       }
-    } catch (error) { if (current(token) && !abort.signal.aborted) { setIssue(productErrorMessage(error)); if (permissionOrBindingChanged(error)) await reload(); } }
+    } catch (error) { if (current(token) && !abort.signal.aborted) setIssue(productErrorMessage(error)); }
     finally { if (current(token) && !abort.signal.aborted) setReading(false); }
-  }, [current, worker, reload]);
+  }, [root, bindings, current, worker]);
 
   const download = useCallback(async (path: string) => {
     const active = connectionRef.current, token = epoch.current;
@@ -203,5 +239,5 @@ export function useKnowledgeLibrary(root: FileSystemDirectoryHandle | null, sess
     if (loading || busy === 'reading') { ++epoch.current; stop(); busyRef.current = false; setBusy(null); setLoading(false); setProgress(null); clearDocument(); setManifest(null); manifestRef.current = null; setConnection(null); }
     else taskRef.current?.abort();
   };
-  return { connection, bindings, indexed, selectedId, select, edit, manifest, loading, busy, issue, progress, query, setQuery, filters, setFilters, searchActive, results, searching, document, reading, connect, authorize, scan, cancel, open, download, reload };
+  return { connection, bindings, indexed, selectedId, select, edit, clearDocument, manifest, loading, busy, issue, progress, scope, setScope, query, setQuery, filters, setFilters, searchActive, results, searching, document, reading, connect, authorize, scan, cancel, open, download, reload };
 }

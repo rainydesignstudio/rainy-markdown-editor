@@ -1016,6 +1016,62 @@
           ]
         }
       ]
+    },
+    "v0_4_0": {
+      "summary": "Cross-source knowledge search and temporary reading tabs, first-use and reopened setup, reorganized editor themes and an on-demand workspace walkthrough.",
+      "sections": [
+        {
+          "title": "Knowledge search and reading",
+          "items": [
+            "Search all sources by default or select one. Results identify their source, keep identical filenames separate and report incomplete coverage.",
+            "Hover over or focus a local document link for an inert summary, which does not replace the full original; clicking retains the reading workflow.",
+            "Temporary reading tabs retain independent positions, modes and back histories. Only ＋ adds a tab; a single tab hides the strip, close actions stay inside each tab, and refresh clears them.",
+            "Fix unexpectedly centered disabled-card text, tighten title/close spacing inside reading tabs, and remove duplicate import hints while adding action icons."
+          ]
+        },
+        {
+          "title": "Entry guide",
+          "items": [
+            "Choose language, appearance, one of six starting directions, writing method and saving preferences before creating a named library, corresponding starter and independent example.",
+            "Open an existing library while retaining its content and business configuration. Preserve completed preparation stages and retry unfinished steps in the same page without creating duplicate libraries, starters or examples.",
+            "Explore without a connected library requests no directory, creates no article and records no new guide completion; exploring with a connected library still saves the chosen appearance.",
+            "Reopen the guide after confirmation under Settings → Local directory, retaining completion and the library connection while preserving existing article and appearance draft guards.",
+            "Agent writers can copy a handoff prompt containing actual artifact paths and verification requirements. The app invokes no model and creates no Agent scripts or automatic publications.",
+            "Configuration, preparation, handoff and completion share consistent transitions. The introduction is silent; the ending plays naturally at 50% application gain, can finish after workspace entry, and never blocks use when unavailable."
+          ]
+        },
+        {
+          "title": "Editor appearance and themes",
+          "items": [
+            "Reorganize 11 built-in editor themes. The regular order is Evening Snow, Flowing Violet, Sunshine, Rose and Ink White, followed by Slate and five Color themes; renaming an existing theme retains its ID.",
+            "Rose uses neutral surfaces with rose accents, while Powder Pink becomes a Color theme. Ink White shares Linen fonts; Sunshine uses Sen for non-code roles, and Evening Snow headings use Noto Sans SC.",
+            "Guide previews read the current built-in catalog and adoption carries the same content. Add missing themes, preserve different same-ID originals through independent copies, and reuse matching copies.",
+            "Manuscript information follows subheading typography and Appearance uses the shared palette icon. Correct key button, selected-state and success-notice contrast without changing article themes or history snapshots."
+          ]
+        },
+        {
+          "title": "External workspace walkthrough",
+          "items": [
+            "Add an independent six-page read-only walkthrough covering Articles, Themes, Templates, Assets, Knowledge and Settings without connecting to or modifying libraries.",
+            "Retrieve only on request for the matching version/language. Support Codex conversation display or standalone HTML in other harnesses; explicitly report missing matching published files, with walkthrough assets delivered separately."
+          ]
+        },
+        {
+          "title": "Alignment and scrolling fixes",
+          "items": [
+            "Vertically center single-line titles with their icons in article asset navigation while retaining truncation, selection and keyboard actions.",
+            "Constrain horizontal overflow in vertical panels, express editor/theme states through controlled styles and remove unused primitives while retaining necessary preview, export and runtime styles."
+          ]
+        },
+        {
+          "title": "Manuals and records",
+          "items": [
+            "Review the complete root entry, four bilingual manuals and public/local logs. Add guide choice/file effects, built-in versus library-theme distinctions and format-capability guidance, synchronizing release installation entries and checksummed walkthrough assets.",
+            "Document six required format-customization checks: statistics, scroll alignment, Update styles, format checking, copying and exporting, plus a workflow for adapting webpages or source into one or more article themes.",
+            "Before writing, Agents disable and verify auto-save/automatic snapshots, then manage explicit saving and history checkpoints. Document history creation, comparison, protection, restoration, forking and deletion with actual storage contracts."
+          ]
+        }
+      ]
     }
   }
 }

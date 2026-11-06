@@ -31,6 +31,7 @@ export default function SettingsRoute() {
       onAuthorizeDirectory={controller.authorizeDirectory}
       onCreateDirectory={controller.requestCreateDataDirectory}
       onReopenRememberedDirectory={controller.reopenRememberedDirectory}
+      onReopenGuide={controller.reopenEntryGuide}
       onRetryFonts={controller.retryLocalFonts}
       onSaveAppearance={controller.saveEditorAppearance}
       onCreateEditorTheme={controller.createEditorTheme}

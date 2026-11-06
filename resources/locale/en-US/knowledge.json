@@ -264,6 +264,17 @@
     "results": "Results limited; narrow search",
     "changed": "Source changed; review needed",
     "truncated": "Content limited; actions paused",
-    "collected": "Collected"
-  }
+    "collected": "Collected",
+    "incomplete": "Search results may be incomplete"
+  },
+  "searchScope": "Search scope",
+  "allSources": "All sources",
+  "readingTabs": "Reading tabs",
+  "closeReadingTab": "Close reading tab: {{title}}",
+  "openReadingTab": "Open in a new reading tab",
+  "resultsIncomplete": "Some sources are unavailable or incompletely indexed. Results may be incomplete.",
+  "searchAllPlaceholder": "Search all knowledge sources",
+  "searchSourcePlaceholder": "Search: {{name}}",
+  "emptyPreview": "No preview text in this document.",
+  "hoverPartial": "Showing part of the opening text. Click the link to read the full document."
 }

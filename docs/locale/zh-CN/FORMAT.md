@@ -169,7 +169,7 @@ export default async function invoke(action, input, api) {
 
 导出入口按声明顺序将kind=export显示为卡片；名称、后缀和类型来自声明，不限制为内置格式清单。kind=format仍属于包契约，当前工作台无手动执行入口。
 
-render 必须返回 `{html, css}`。validate 必须返回 `{complete, issues, passed}`；issues 项为 `{message, severity, line?}`，severity 为 `error`、`warning`、`info`，line 使用正文行号。返回空对象、抛错或超时都不是通过。format 返回 `{source}`，仅应用到草稿；copy 返回 `{html, text}`；export 返回 `{data, extension?, mime?}`，data默认为UTF-8文本，二进制结果另返回encoding为base64。新增动作会出现在“导出文章”的资料库动作窗口，新增设置会出现在“设置 → 本地目录 → 校验与算法 → 渲染包设置”。
+render 必须返回 `{html, css}`。validate 必须返回 `{complete, issues, passed}`；issues 项为 `{message, severity, line?}`，severity 为 `error`、`warning`、`info`，line 使用正文行号。返回空对象、抛错或超时都不是通过。format 返回 `{source}`，仅应用到草稿；copy 返回 `{html, text}`；export 返回 `{data, extension?, mime?}`，data默认为UTF-8文本，二进制结果另返回encoding为base64。新增export动作会出现在“导出文章”的卡片选择窗，format不显示手动入口；新增设置会出现在“设置 → 本地目录 → 校验与算法 → 渲染包设置”。
 
 ### 宿主服务：捕获、打包和测量
 
@@ -216,6 +216,27 @@ JS
 根路径部署无需配置前缀；部署到子路径时，构建与启动须使用相同的 `NEXT_PUBLIC_ARTICLE_BASE_PATH`（如 `/lab/rainy-markdown-editor`）。宿主沙箱、预览及脚本资源使用此前缀，资料库自身的相对路径不变；根路径和子路径须分别验证加载、失败恢复及保存重开。
 
 使用其他静态服务器时，须为 `format/article-package-sandbox.html` 和 `format/article-package-preview.html` 保留随应用服务器提供的隔离/CSP策略；浏览器或部署层更严格的策略不能由 format 文件绕过。默认 `npm start` 已提供这两条专用规则。公众号、eBay线上及实体手机仍分别点验。
+
+<a name="doc-workspace-capabilities"></a>
+
+## 定制交付：六项工作台能力
+
+制作或修缮format时，文章统计、滚动对齐、更新样式、格式检查、复制和导出均须接通并逐项验证，不因文档精简省略。宿主已有的交互、权限及保存流程继续复用；包提供对应语义正文、位置、动作及真实结果。以下是交付要求，不新增协议字段，也不把旧协议中的可选声明改成解析必填项；实际能力缺失记未完成并定位原因，不能靠隐藏入口或任意标“不适用”通过。
+
+| 能力 | 制作与接入要求 | 验证 |
+|---|---|---|
+| 文章统计 | 使用宿主识别的正文根，保留h1～h6、p、img、a[href]、pre等语义；预览装饰标data-preview-only，不混入导航、元数据或工具UI | 用已知标题、段落、图片、链接、代码块的实稿核对当前渲染；未就绪不返回有效零值 |
+| 滚动对齐 | 正文块保留相应data-source-line；滚动事件、缓存及可见画布由宿主管理，包不另加滚动脚本 | 核对首中尾、插删、多行HTML、长代码／图片、分栏与明暗变化，以及仅保存刷新时的留存画面 |
+| 更新样式 | “更新样式”重新激活当前库配置、离开旧留存环境并重新编译，将当前稿标为待保存；保存后核对render.json及依赖。设置页可另行重新加载配置以排查外部修改 | 核对修改前后实际CSS、资源、正文／主题／配置身份，保存重开；失败保留原文及可恢复记录，不把旧结果冒充新结果 |
+| 格式检查 | render与validate分开；按当前源码、主题结构、资源及实际布局检查，返回真实complete／issues／passed，行号对应正文 | 先放入已知违规及资源缺失样例，再修复重检；关闭平台标准检查不关闭宿主安全或其他检查，不用空对象／异常当通过 |
+| 复制 | 声明并实现copy，返回html和text；处理计算样式、资源、目标平台限制及运行期标记，不能依赖接收方加载本地class／变量 | 真实系统剪贴板→接收区→目标平台分别核对文字、图片、链接和样式；缺资源或准备失败不宣称完整成功 |
+| 导出 | 以export声明实际类型、后缀及MIME，结果按声明编码；/2保留宿主完整原稿动作，其他类型按已确认交付目标实现 | 打开或解析实际下载文件，核对原稿／正文／HTML／ZIP／PNG／PDF各自范围、资源及可重用性；声明或文件名不代替可用结果 |
+
+统计采用渲染正文HTML：字符数为文本中的非空白Unicode码点数，阅读分钟数为ceil(字符数/300)。标题数取h1～h6；段落取有非空文本或图片的p；图片含本地资源占位，链接须有href，代码块取pre。script、style、template和data-preview-only子树不计；CSS生成内容、截图中文字及缺少语义的模拟标题不被推断。加载失败图片仍可有图片计数，统计不证明资源已载入。实现口径见[src/lib/articleStatistics.ts](../../../src/lib/articleStatistics.ts)。
+
+源码位置标记示例为`<p data-source-line="1">正文</p>`：值是传入正文的1起始行号，不含Front Matter；由解析器源位置产生，不按输出HTML行号或节点序号猜测。原始HTML、多行块、嵌套元素和图片等变换保留可靠位置；纯预览附加内容标data-preview-only并排除。宿主按工作根与显示根的元素顺序／标签对应建立锚点，缺标记、结构不匹配或无有效锚点时不能宣称对齐可用；不得用全篇滚动百分比冒充源码对应。复制／网页成品去掉内部定位装饰，完整原稿保持作者源码。实现见[src/lib/previewScrollSync.ts](../../../src/lib/previewScrollSync.ts)及[可见预览约束](#doc-visible-preview)。
+
+选择同一代表稿记录六项的输入revision、主题及有效配置身份、实际结果与未完成原因；同时回归旧稿留存和历史。只有静态包、缺少源码时按公开契约与应用入口验证，不虚构内部调用。公众号及手机接收仍由用户在场核对。验收不以编译、成功提示或单张截图替代真实操作。
 
 <a name="doc-bundled-resources"></a>
 
@@ -369,7 +390,7 @@ JS
 | output.html | `tagMap: { "blockquote": "section" }` | 微信复制先读取原引用主题样式，再在输出副本映射标签；保留嵌套引用、边框、背景及内间距。 |
 | output.css | `rootStyleOmissions` | 只省略生成文章根/正文外壳的指定CSS属性；微信默认包括margin/padding及各边、width/min-width/max-width、height/min-height/max-height，正文内部容器保持。 |
 
-把字段合并到现有步骤的 `parameters`，保留其它参数，不添加重复输出步骤。完整示例见[默认formatter](../../../resources/presets/platform/wechat-article/format/formatter.json)。旧配置省略新字段时保留原行为，其他平台自行配置。这不改变原稿、预览标签或PNG/PDF，不新增公众号合规判据。旧三件套兼容路径通过JSON调整已注册策略；自主渲染包的新算法按本页rainy-format/1在库内实现。
+把字段合并到现有步骤的 `parameters`，保留其它参数，不添加重复输出步骤。完整示例见[默认formatter](../../../resources/presets/platform/wechat-article/format/formatter.json)。旧配置省略新字段时保留原行为，其他平台自行配置。这不改变原稿、预览标签或PNG/PDF，不新增公众号合规判据。旧三件套兼容路径通过JSON调整已注册策略；自主渲染包的新算法按其声明的宿主协议在库内实现。
 
 <a name="doc-source-rendering"></a>
 
@@ -445,27 +466,29 @@ flowchart TD
 
 ## 格式化能力
 
-| operator | parameters  适用路线 |
+下表的markdown.code-highlight处理文章预览／输出中的代码块；源码工具栏的语法高亮是独立的编辑器显示偏好，使用编辑器主题配色，两者互不控制。
+
+| operator | parameters | 适用路线 |
 |---|---|---|
-| markdown.soft-breaks | `mode`: `space`／`line-break`  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.blank-lines | `preserve`、`betweenBlocks`、`atEdges`  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.code-highlight | styles[]；可选engine（highlight/prism）、themeDefaults、prismStyles（词法样式键→CSS声明）  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.math | singleDollar、maxLength、maxExpressions；可选静态MathML  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.mermaid | theme、maxLength、maxDiagrams；可选静态PNG  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.heading-ids | mode:auto/explicit；explicit保留{#id}且不自动造锚点  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.code-layout | wrapperClasses[]、preTag、contentClasses[]、copyClasses[]、copyHtml、copyLabel  内置解释器／旧兼容；自主包自行实现业务 |
-| css.stylesheets | entry、publicRoot；可选allowUnknownClasses  内置解释器／旧兼容；自主包自行实现业务 |
-| render.document | root、body、beforeHtml、afterHtml、language、preserveIds、viewport  内置解释器／旧兼容；自主包自行实现业务 |
-| render.nodes | image（width/height/classes/style/alt）、link（classes/rootBase/externalTarget）；只补缺省属性  内置解释器／旧兼容；自主包自行实现业务 |
-| markdown.code-whitespace | `tabSize`，关闭此步骤保留原始代码空白  内置解释器／旧兼容；自主包自行实现业务 |
-| preview.surface | `lightBackground`、`darkBackground`、`fontFamily`、`color`、`stripThemeBackground`  内置解释器／旧兼容；自主包自行实现业务 |
-| preview.dark-mode | `mode`: algorithm或tokens；algorithm要求组件transform与options，tokens只含mode  内置解释器／旧兼容；自主包自行实现业务 |
-| css.drop-properties | `properties[]`，可重复追加  内置解释器／旧兼容；自主包自行实现业务 |
-| css.utility-aliases | `aliases`，CSS 属性名称映射  内置解释器／旧兼容；自主包自行实现业务 |
-| output.css | `inlineProperties[]`、`dimensionProperties[]`、`preserveAutoDimensions`、`colorEncoding`: `rgb`／`preserve`；可选 `rootStyleOmissions[]`  内置解释器／旧兼容；自主包自行实现业务 |
-| output.html | `wrapperTag`、`preserveAttributes[]`、`removeClasses`、`stripRootBackground`；可选 `tagMap`  内置解释器／旧兼容；自主包自行实现业务 |
-| output.text | `maxConsecutiveNewlines`、`trim`  内置解释器／旧兼容；自主包自行实现业务 |
-| output.visual | `width`、`pngBackground`、`pdfBackground`、`maxCanvasSide`、`pdfMargin`  内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.soft-breaks | `mode`: `space`／`line-break` | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.blank-lines | `preserve`、`betweenBlocks`、`atEdges` | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.code-highlight | styles[]；可选engine（highlight/prism）、themeDefaults、prismStyles（词法样式键→CSS声明） | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.math | singleDollar、maxLength、maxExpressions；可选静态MathML | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.mermaid | theme、maxLength、maxDiagrams；可选静态PNG | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.heading-ids | mode:auto/explicit；explicit保留{#id}且不自动造锚点 | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.code-layout | wrapperClasses[]、preTag、contentClasses[]、copyClasses[]、copyHtml、copyLabel | 内置解释器／旧兼容；自主包自行实现业务 |
+| css.stylesheets | entry、publicRoot；可选allowUnknownClasses | 内置解释器／旧兼容；自主包自行实现业务 |
+| render.document | root、body、beforeHtml、afterHtml、language、preserveIds、viewport | 内置解释器／旧兼容；自主包自行实现业务 |
+| render.nodes | image（width/height/classes/style/alt）、link（classes/rootBase/externalTarget）；只补缺省属性 | 内置解释器／旧兼容；自主包自行实现业务 |
+| markdown.code-whitespace | `tabSize`，关闭此步骤保留原始代码空白 | 内置解释器／旧兼容；自主包自行实现业务 |
+| preview.surface | `lightBackground`、`darkBackground`、`fontFamily`、`color`、`stripThemeBackground` | 内置解释器／旧兼容；自主包自行实现业务 |
+| preview.dark-mode | `mode`: algorithm或tokens；algorithm要求组件transform与options，tokens只含mode | 内置解释器／旧兼容；自主包自行实现业务 |
+| css.drop-properties | `properties[]`，可重复追加 | 内置解释器／旧兼容；自主包自行实现业务 |
+| css.utility-aliases | `aliases`，CSS 属性名称映射 | 内置解释器／旧兼容；自主包自行实现业务 |
+| output.css | `inlineProperties[]`、`dimensionProperties[]`、`preserveAutoDimensions`、`colorEncoding`: `rgb`／`preserve`；可选 `rootStyleOmissions[]` | 内置解释器／旧兼容；自主包自行实现业务 |
+| output.html | `wrapperTag`、`preserveAttributes[]`、`removeClasses`、`stripRootBackground`；可选 `tagMap` | 内置解释器／旧兼容；自主包自行实现业务 |
+| output.text | `maxConsecutiveNewlines`、`trim` | 内置解释器／旧兼容；自主包自行实现业务 |
+| output.visual | `width`、`pngBackground`、`pdfBackground`、`maxCanvasSide`、`pdfMargin` | 内置解释器／旧兼容；自主包自行实现业务 |
 
 加载时按数组顺序编译配置。
 
@@ -565,13 +588,13 @@ window.ArticleAlgorithm = {
 
 三件套的任意 `meta` 也可声明同形的 `capabilities`、`rendering`。合并只收紧能力：任一声明为false即禁用，config.json不能重新放行。rendering的重复声明必须一致，冲突直接拒绝整套。未声明的控件保留原文案；禁用控件保留位置、显示不可用状态并提供原因，执行入口使用同一配置快照守卫，不靠禁用外观保护。
 
-| 能力 | 控制范围  缺省／限制 |
+| 能力 | 控制范围 | 缺省／限制 |
 |---|---|---|
-| articleTheme | 文章主题选择、采用和新稿默认主题设置  缺省保留；false收紧；/2原稿能力另行保障 |
-| previewMode | 用户切换文章预览明暗  缺省保留；false收紧；/2原稿能力另行保障 |
-| algorithm | 渲染算法执行；若formatter或启用的深色规则仍需要算法，禁用声明视为配置冲突，不自动删规则  缺省保留；false收紧；/2原稿能力另行保障 |
-| copyRichText | 富文本复制  缺省保留；false收紧；/2原稿能力另行保障 |
-| exportPackage / exportMarkdown / exportBody / exportPng / exportPdf | 各种文章导出；每项独立  缺省保留；false收紧；/2原稿能力另行保障 |
+| articleTheme | 文章主题选择、采用和新稿默认主题设置 | 缺省保留；false收紧；/2原稿能力另行保障 |
+| previewMode | 用户切换文章预览明暗 | 缺省保留；false收紧；/2原稿能力另行保障 |
+| algorithm | 渲染算法执行；若formatter或启用的深色规则仍需要算法，禁用声明视为配置冲突，不自动删规则 | 缺省保留；false收紧；/2原稿能力另行保障 |
+| copyRichText | 富文本复制 | 缺省保留；false收紧；/2原稿能力另行保障 |
+| exportPackage / exportMarkdown / exportBody / exportPng / exportPdf | 各种文章导出；每项独立 | 缺省保留；false收紧；/2原稿能力另行保障 |
 
 `rendering.styleAuthority`可为theme（原通道）或library。library必须具备库级样式入口；编译只消费库样式，不追加文章主题CSS或token覆盖，同时禁用文章主题选择。它不改原稿或主题快照，也不自动采用新环境。主题资源本身的维护与文章主题选择分开。
 
@@ -685,6 +708,8 @@ viewport设null时按实际预览栏宽响应式排版，使用可用高度滚�
 
 目标网站采用Markdown流程时，可用“导出文章 → Markdown正文”，仅提取可靠解析的body，保留Markdown、HTML、class和锚点，发布者处理图片地址。格式报告按当前库规则检查，历史回放不冒充当前平台合规。
 
+<a name="doc-visible-preview"></a>
+
 ### 可见预览与当前检查
 
 | 对象 | 检查依据 |
@@ -709,7 +734,7 @@ viewport设null时按实际预览栏宽响应式排版，使用可用高度滚�
 - 三份都不存在：明确提示使用内置默认整套，不静默写入。
 - 缺少部分文件、旧结构、JSON 损坏、未知能力／字段、参数类型错误、重复 ID 或引用缺失：报配置错误，不能混用默认文件补齐后声称通过。
 - 原始资料保持可恢复；格式编译和合规检查不会把错误配置当作可信结果。
-- 新建资料库生成所选三件套及自主解释器、清单和许可；文章目录为空，不附带测试文章或历史。
+- 普通新建资料库生成所选三件套及自主解释器、清单和许可；文章目录为空，不附带测试文章或历史。入场引导另行准备所选模板及独立示例，具体文件见[引导文件影响表](AGENT-GUIDE.md#doc-entry-guide-files)。
 
 ### 迁移与语言
 
@@ -755,7 +780,9 @@ viewport设null时按实际预览栏宽响应式排版，使用可用高度滚�
 
 ## 知识库写作辅助数据（0.3.2）
 
-知识源只读；以下记录写在文稿资料库，与格式包配置分开。
+知识源只读；以下记录写在文稿资料库，与格式包配置分开。持久化结构自0.3.2沿用，本版跨源查询与临时阅读标签不改变记录协议。
+
+跨源检索结果以内存中的sourceId、sourceName和相对path标识来源；未就绪来源单独报告，索引和原件不因查询修改。阅读标签、各标签读位／模式／返回历史仅在当前页面会话保存，刷新清除，不新增资料库记录或修改research协议。
 
 <details>
 <summary>进阶：完整写作辅助数据协议</summary>
@@ -769,6 +796,27 @@ viewport设null时按实际预览栏宽响应式排版，使用可用高度滚�
 Markdown代码示例中的引用管理注释与条目锚点不纳入管理。普通插入保留正文选区，旧标记替换须明确纳入。知识源重新定位保留binding.json及research文件名；首次创建失败仅凭保留的所属证据恢复，不把任意空JSON当作有效数据。
 
 </details>
+
+<a name="doc-history-storage"></a>
+
+## 文章历史快照契约
+
+历史位于`articles/YYYY-MM/<文章目录>/history/<snapshot-id>/`，与编辑器撤销、文章回收站及整库备份不同。执行步骤见[Agent历史管理](AGENT-GUIDE.md#doc-article-history)。
+
+| 文件／字段 | 当前合同 |
+|---|---|
+| article.md | 包含Front Matter的完整历史原稿，不能只存body；保留未知合法元数据 |
+| theme.json | 当时独立主题；结构合法，原稿theme.id／version须与其对应，不能引用当前主题库冒充历史 |
+| render.json | 可选，且必须匹配该原稿与主题；保留其styles/.versions及assets/.objects依赖，不从当前环境伪造旧记录 |
+| snapshot.json | 最后写入的完整性清单；owner固定为历史兼容值wechat-article-editor，version为1，不随应用名或版本改写 |
+| id | 与目录名相同，匹配`^snapshot-[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$`，碰撞拒绝，不覆盖 |
+| createdAt / kind / retained | 可解析日期字符串；kind为automatic、manual、before-restore或before-theme-change；retained为boolean |
+
+新建manual及两个before-*检查点始终保护；automatic可切换保护，按原文／主题／渲染环境身份去重。数量清理仅针对未保护的automatic，按最旧先清；上限1～100，底层缺省20，应用传入当前设置。创建任何类型快照均可能触发这项清理，接手前先核对策略并保护需要保留的自动版本；自动快照开关关闭不等于清理策略或手动历史入口消失。保护限制自动清理，明确确认后仍可主动删除指定保护版本。
+
+写入前确认库、文章和目标版本；新目录先写原稿、主题及匹配渲染记录，最后写snapshot.json，读回确认后才报完成。失败仅清理本次未完成目录，不伤原稿或其他历史；清理失败保留实际路径并报告。读取时逐条区分完整、损坏、主题不匹配及缺依赖，不能把坏条目当作空历史。创建成功但刷新列表失败只重试刷新；删除前重读完整内容身份，切库、目标变化或同期改动时停止。原实现见[src/lib/articleHistory.ts](../../../src/lib/articleHistory.ts)。
+
+恢复先保存当前原稿与主题的before-restore检查点，再写所选历史到当前文章并核对月索引及重开；失败按已写入层恢复，检查点保留。从历史另建文章创建独立身份，原稿与原历史保持。历史不复制整套媒体，删除单个版本不顺带清共享资源对象；备份及旧渲染复原边界见[渲染记录](#doc-render-records)。
 
 ## 文章回收记录
 

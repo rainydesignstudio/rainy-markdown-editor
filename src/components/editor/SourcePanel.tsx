@@ -182,7 +182,7 @@ export function SourcePanel({
       toggleLineNumbers();
     }}>
       <div className="panel-header source-panel-header">
-        <InformationButton icon={<InformationIcon />} title={fileName} subtitle={t('editor:source.info')} titleClassName="font-mono" onClick={onOpenInfo} disabled={!directory || readOnly || mediaBusy || parsed.diagnostics.some((item) => item.level === 'error')} />
+        <InformationButton icon={<InformationIcon />} title={fileName} subtitle={t('editor:source.info')} onClick={onOpenInfo} disabled={!directory || readOnly || mediaBusy || parsed.diagnostics.some((item) => item.level === 'error')} />
         <PaneActions label={t('editor:source.actions')}>
           <input ref={imagePickerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif" multiple hidden onChange={handleImageFiles} />
           <IconButton tooltip={t('editor:source.wrapToggle')} menuLabel={t('editor:source.wordWrap')} shortcut="⌥ Z / Alt Z" aria-pressed={sourcePreferences.wrap} onClick={() => toggleSourcePreference('wrap')} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18M3 10h13a4 4 0 0 1 0 8h-4m3-3-3 3 3 3M3 15h4M3 20h4" /></svg>} />

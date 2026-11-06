@@ -46,9 +46,11 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
       if (id.endsWith('/PageHeading')) return { PageHeading: 'header' };
     if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id.endsWith('/ButtonBar')) return { ButtonBar: 'button-bar' };
+      if (id.endsWith('/CollapsiblePanel')) return { PanelIcon: 'panel-icon' };
+      if (id.endsWith('/ContentIcon')) return { ContentIcon: 'content-icon' };
       if (id.endsWith('/ModeSwitch')) return { ModeSwitch: 'mode-switch' };
       if (id === 'react-dom') return { createPortal: (children) => children };
-      if (id.endsWith('/DialogFrame')) { const Dialog = (props) => jsx('dialog', props); return { DialogFrame: Dialog, DialogHeader: Dialog, DialogActions: Dialog, DialogButton: Dialog }; }
+      if (id.endsWith('/DialogFrame')) { const Dialog = (props) => jsx('dialog', props); return { DialogFrame: Dialog, DialogHeader: Dialog, DialogActions: Dialog, DialogButton: Dialog, DialogFooter: Dialog }; }
       if (id.endsWith('/FormatPackageControls')) return { FormatPackageControls: 'format-package-controls' };
       if (id.endsWith('/FontDownloadSettings')) return { FontDownloadSettings: 'font-download-settings' };
       if (id.endsWith('/EditorThemeDesigner')) return { EditorThemeDesigner: 'editor-theme-designer' };
@@ -166,7 +168,7 @@ test('unsaved appearance is resolved before opening the new library dialog', () 
   const page = settingsPage(); let opened = 0;
   page.props.onCreateDirectory = () => opened++;
   page.switch('appearance');
-  page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.onClick(); page.render();
+  page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.onClick(); page.render();
   page.switch('library'); page.button('新建资料库').props.onClick(); page.render();
   assert.equal(opened, 0); page.modal().props.onCancel(); page.render(); assert.equal(opened, 0);
   page.button('新建资料库').props.onClick(); page.render(); page.modal().props.onDiscard(); page.render();
@@ -193,11 +195,11 @@ test('theme designer and additive file actions coexist; saving its file only pre
 test('switching settings tabs retains unsaved appearance and automation values', () => {
   const page = settingsPage();
   page.switch('appearance');
-  page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.onClick(); page.render();
+  page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.onClick(); page.render();
   page.switch('workflow');
   page.find((node) => node.type === 'input' && node.props.max === '86400').props.onChange({ target: { value: '37' } }); page.render();
   page.switch('library'); page.switch('appearance');
-  assert.equal(page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props['aria-pressed'], true);
+  assert.equal(page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props['aria-pressed'], true);
   page.switch('workflow');
   assert.equal(page.find((node) => node.type === 'input' && node.props.max === '86400').props.value, 37);
   page.find((node) => node.type === 'form').props.onSubmit({ preventDefault() {} });
@@ -212,7 +214,7 @@ test('busy settings prevent tab changes and absent directory disables persisted 
   page.tab('library').props.onKeyDown({ key: 'End', preventDefault() { assert.fail('Busy tab must not navigate'); } }); page.render();
   assert.equal(page.panel('library').props.hidden, false);
   page.props.busy = false; page.props.root = null; page.render();
-  assert.equal(page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.disabled, true);
+  assert.equal(page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.disabled, true);
   assert.equal(page.find((node) => node.type === 'mode-switch' && node.props.label === '启用自动保存').props.disabled, true);
 });
 
@@ -264,10 +266,10 @@ test('successful explicit save writes once, shows saved state and disables all c
 
 test('failed appearance save keeps preview and changes available for retry', async () => {
   const page = settingsPage(); page.switch('appearance');
-  page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.onClick(); page.render();
+  page.find((node) => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.onClick(); page.render();
   await page.button('保存外观').props.onClick();
   await new Promise((resolve) => setImmediate(resolve)); page.render();
-  assert.equal(page.previews.at(-1).themeId, 'mist');
+  assert.equal(page.previews.at(-1).themeId, 'ink-white');
   assert.equal(page.button('保存外观').props.disabled, false);
   assert.equal(page.props.workspace.appearance.themeId, 'rainy-design-slate');
 });
@@ -299,7 +301,7 @@ test('custom color cards keep all 34 token slots in order even when values repea
   const page = settingsPage();
   page.switch('appearance');
   page.find((node) => node.props['aria-pressed'] === false && node.type === 'button' && node.props.children?.some?.((child) => child?.props?.children === '自定义组合')).props.onClick(); page.render();
-  const sample = page.find((node) => node.props.kind === 'colors' && node.props.theme.id === 'ink-white');
+  const sample = page.find((node) => node.props.kind === 'colors' && node.props.theme?.id === 'ink-white');
   for (const scheme of ['light', 'dark']) {
     const tree = sample.type({ ...sample.props, scheme });
     const [main, remainder] = tree.props.children;
@@ -318,12 +320,12 @@ test('custom color cards keep all 34 token slots in order even when values repea
 
 test('unsaved appearance blocks leaving; cancel retains preview, discard restores saved appearance before leaving', () => {
   const page = settingsPage(); page.switch('appearance');
-  page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.onClick(); page.render();
+  page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.onClick(); page.render();
   let left = 0;
   assert.equal(page.guard(() => left++), true); page.render();
   assert.equal(left, 0);
   page.modal().props.onCancel(); page.render();
-  assert.equal(page.previews.at(-1).themeId, 'mist');
+  assert.equal(page.previews.at(-1).themeId, 'ink-white');
   assert.equal(page.guard(() => left++), true); page.render();
   page.modal().props.onDiscard(); page.render();
   assert.equal(left, 1);
@@ -334,12 +336,12 @@ test('unsaved appearance blocks leaving; cancel retains preview, discard restore
 
 test('save and leave waits for success; failed appearance save keeps the pending navigation and preview', async () => {
   const page = settingsPage(); page.switch('appearance');
-  page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.onClick(); page.render();
+  page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.onClick(); page.render();
   let left = false;
   page.guard(() => { left = true; }); page.render();
   assert.equal(await page.modal().props.onSave(), false); page.render();
   assert.equal(left, false);
-  assert.equal(page.previews.at(-1).themeId, 'mist');
+  assert.equal(page.previews.at(-1).themeId, 'ink-white');
   page.props.onSaveAppearance = async appearance => { page.appearanceWrites.push(appearance); page.props.workspace = { ...page.props.workspace, appearance }; return true; };
   page.render();
   assert.equal(await page.modal().props.onSave(), true); page.render();
@@ -350,11 +352,12 @@ test('save and leave waits for success; failed appearance save keeps the pending
 
 test('refresh guard protects dirty appearance and is removed on unmount; tab icons all have labels', () => {
   const page = settingsPage();
-  for (const [id, icon] of [['library', 'folder'], ['appearance', 'theme'], ['workflow', 'clock']]) assert.ok(page.tab(id).props.children.some(child => child?.props?.name === icon));
+  for (const [id, icon] of [['library', 'folder'], ['workflow', 'clock']]) assert.ok(page.tab(id).props.children.some(child => child?.props?.name === icon));
+  assert.ok(page.tab('appearance').props.children.some(child => child?.type === 'panel-icon' && child.props.kind === 'colors' && child.props.className === ''));
   let prevented = false;
   const event = { preventDefault() { prevented = true; }, returnValue: null };
   page.listeners.get('beforeunload')(event); assert.equal(prevented, false);
-  page.switch('appearance'); page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist').name}`).props.onClick(); page.render();
+  page.switch('appearance'); page.find(node => node.type === 'button' && node.props['aria-label'] === `预览编辑器主题 ${editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white').name}`).props.onClick(); page.render();
   page.listeners.get('beforeunload')(event); assert.equal(prevented, true); assert.equal(event.returnValue, '');
   page.unmount(); assert.equal(page.guard, null); assert.equal(page.listeners.has('beforeunload'), false);
 });
@@ -362,7 +365,7 @@ test('refresh guard protects dirty appearance and is removed on unmount; tab ico
 
 test('theme card actions are sibling icon controls; selected and foundational themes cannot be deleted', async () => {
   const page = settingsPage(); page.switch('appearance');
-  const theme = editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'mist');
+  const theme = editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white');
   const edit = page.find(node => node.props['aria-label'] === `编辑主题「${theme.name}」`);
   assert.equal(edit.props['data-tooltip'], '编辑');
   edit.props.onClick(); page.render();
@@ -387,4 +390,17 @@ test('appearance toolbar restores import and additive default loading without ch
   assert.equal(loads, 1);
   assert.equal(page.previews.at(-1), null);
   assert.equal(page.appearanceWrites.length, 0);
+});
+
+
+test('Guide reopening confirms first, works without directory permission and cancellation has no effect', () => {
+  const page = settingsPage(); let reopened = 0;
+  page.props.onReopenGuide = () => reopened++; page.props.root = null; page.props.fileSystemReady = false; page.render();
+  assert.equal(page.button('重新打开入场引导').props.disabled, false);
+  page.button('重新打开入场引导').props.onClick(); page.render();
+  assert.equal(reopened, 0); assert.ok(page.find(n => n.props.descriptionId === 'guide-reopen-description'));
+  page.button('取消操作').props.onClick(); page.render(); assert.equal(reopened, 0);
+  page.button('重新打开入场引导').props.onClick(); page.render();
+  page.find(n => n.props.variant === 'primary' && page.text(n) === '重新打开入场引导').props.onClick(); page.render();
+  assert.equal(reopened, 1); page.unmount();
 });

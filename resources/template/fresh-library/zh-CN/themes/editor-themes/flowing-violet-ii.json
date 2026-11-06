@@ -1,8 +1,8 @@
 {
   "kind": "editor-theme",
   "id": "flowing-violet-ii",
-  "name": "流紫·贰",
-  "version": "1.0.1",
+  "name": "烟紫 · 彩调",
+  "version": "1.0.3",
   "formatVersion": 4,
   "palette": {
     "slate-0": "#ffffff",
@@ -94,7 +94,7 @@
       "accent": "flowing-violet-accent-700",
       "accent-strong": "flowing-violet-accent-600",
       "accent-text": "flowing-violet-accent-200",
-      "accent-soft": "flowing-violet-600",
+      "accent-soft": "flowing-violet-700",
       "accent-line": "flowing-violet-accent-500",
       "selection": "flowing-violet-accent-700",
       "on-accent": "flowing-violet-0",

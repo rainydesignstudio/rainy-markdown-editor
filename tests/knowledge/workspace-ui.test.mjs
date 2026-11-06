@@ -11,6 +11,7 @@ import { captureKnowledgeSelection } from '../../src/lib/knowledge/selection.ts'
 import { inspectCapture, sortCollectedKnowledge, transferCollectedKnowledge, reorderCollectedKnowledge } from '../../src/lib/knowledge/research.ts';
 import { ARTICLE_SORTS } from '../../src/lib/articleListSorting.ts';
 import { diffLines } from '../../src/lib/textDiff.ts';
+import * as readingTabs from '../../src/lib/knowledge/readerTabs.ts';
 
 const whole = { id: 'whole', sourceId: 'source', title: 'Source A', path: 'a.md', content: 'Old text.', line: 1, endLine: 2, whole: true, note: '' };
 const passage = { ...whole, id: 'passage', whole: false, line: 5, endLine: 7, content: 'A passage.' };
@@ -20,7 +21,7 @@ const text = node => typeof node === 'string' || typeof node === 'number' ? Stri
 const walk = node => Array.isArray(node) ? node.flatMap(walk) : node?.props ? [node, ...(node.type === 'popover' && !node.props.open ? [] : walk(node.props.children)), ...(node.type === 'DialogHeader' ? walk(node.props.actions) : [])] : [];
 
 async function fixture(name, props, { library, research, save } = {}) {
-  const cells = [], portals = [], i18n = createUII18n('en-US'); let cursor = 0;
+  const cells = [], portals = [], focused = [], i18n = createUII18n('en-US'); let cursor = 0, focusEffect;
   const react = {
     useState(initial) { const i = cursor++; if (!(i in cells)) cells[i] = typeof initial === 'function' ? initial() : initial; return [cells[i], value => { cells[i] = typeof value === 'function' ? value(cells[i]) : value; }]; },
     useRef(initial) { const i = cursor++; return cells[i] ??= { current: initial }; }, useMemo: callback => callback(), useEffect(callback) { if (research && callback.toString().includes('readResearch') && !callback.toString().includes('researchRevision')) callback(); },
@@ -30,7 +31,7 @@ async function fixture(name, props, { library, research, save } = {}) {
   const t = i18n.getFixedT('en-US', 'knowledge'), target = {}, module = { exports: {} };
   const source = await readFile(new URL('../../src/components/knowledge/' + name + '.tsx', import.meta.url), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, crypto, document: { body: target }, DOMException, require(id) {
+    module, exports: module.exports, crypto, document: { body: target, getElementById: id => ({ focus: () => focused.push(id) }) }, DOMException, require(id) {
       if (id === 'react') return react;
       if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
       if (id === 'react/jsx-runtime') return jsx;
@@ -38,6 +39,8 @@ async function fixture(name, props, { library, research, save } = {}) {
       if (id.endsWith('/UILocaleProvider')) return { useUITranslation: () => ({ t }), useUILocale: () => ({ locale: 'en-US' }) };
       if (id.endsWith('/useKnowledgeLibrary')) return { useKnowledgeLibrary: () => library };
       if (id.endsWith('/productMessages')) return { productErrorMessage };
+      if (id.endsWith('/knowledge/readerTabs')) return readingTabs;
+      if (id.endsWith('/KnowledgeReaderTabs')) return { KnowledgeReaderTabs: 'reader-tabs' };
       if (id.endsWith('/knowledge/errors')) return { formatKnowledgeIssue };
       if (id.endsWith('/knowledge/selection')) return { captureKnowledgeSelection };
       if (id.endsWith('/Toast')) return { useToast: () => () => {} };
@@ -62,8 +65,8 @@ async function fixture(name, props, { library, research, save } = {}) {
       throw new Error(id);
     },
   });
-  const result = { t, props, portals, target, render() { cursor = 0; return walk(module.exports[name](props)); } };
-  result.render(); await tick(); react.useEffect = () => {}; return result;
+  const result = { t, props, portals, target, library, focused, flushFocus: () => focusEffect?.(), render() { cursor = 0; return walk(module.exports[name](props)); } };
+  result.render(); await tick(); react.useEffect = callback => { if (callback.toString().includes('getElementById')) focusEffect = callback; }; return result;
 }
 
 test('compact navigation retains every knowledge view, source recovery and expandable filters', async () => {
@@ -231,12 +234,12 @@ test('reading actions share the header, switch preserves source, and editor adop
   let nodes = f.render();
   const header = nodes.find(node => node.type === 'header' && walk(node).some(child => child.props.tooltip === f.t('back')));
   const actions = walk(header).filter(node => node.type === 'icon-button');
-  assert.deepEqual(actions.map(node => node.props.tooltip), ['back', 'showLineNumbers', 'messages:imports.fromKnowledgeButton', 'download', 'collectPassage', 'collectDocument', 'adoptExcerpt', 'addCitation'].map(key => f.t(key)));
-  actions[2].props.onClick(); actions[3].props.onClick();
+  assert.deepEqual(actions.map(node => node.props.tooltip), ['back', 'openReadingTab', 'showLineNumbers', 'messages:imports.fromKnowledgeButton', 'download', 'collectPassage', 'collectDocument', 'adoptExcerpt', 'addCitation'].map(key => f.t(key)));
+  actions.find(node => node.props.tooltip === f.t('messages:imports.fromKnowledgeButton')).props.onClick(); actions.find(node => node.props.tooltip === f.t('download')).props.onClick();
   assert.deepEqual(imported, [['a.md', 'source']]); assert.deepEqual(downloads, ['a.md']);
   assert.equal(nodes.some(node => node.props.children === f.t('readonly')), false);
   assert.ok(nodes.some(node => node.props.tooltip === f.t('addCitation')));
-  actions[1].props.onClick();
+  actions.find(node => node.props.tooltip === f.t('showLineNumbers')).props.onClick();
   assert.equal(f.render().find(node => node.type === 'reader').props.showLineNumbers, true);
   const mode = nodes.find(node => node.type === 'mode-switch'); assert.equal(mode.props.checked, false);
   mode.props.onToggle(); nodes = f.render();
@@ -271,4 +274,37 @@ test('a fast native drag persists the latest drop order before React has rendere
   cards[1].props.onDrop(event);
   handle.props.onDragEnd(); await tick();
   assert.deepEqual(Array.from(props.data.topics[0].items, item => item.id), ['passage', 'whole']);
+});
+
+
+test('same-path search results open their own source, and reading tabs survive an unavailable source', async () => {
+  const opened = [];
+  const library = { connection: { status: 'ready', binding: { name: 'Source A', sourceId: 'a' }, source: {} }, bindings: [{ sourceId: 'a', name: 'Source A' }, { sourceId: 'b', name: 'Source B' }], selectedId: 'a', manifest: { documents: [], scannedAt: 'date' }, busy: null, loading: false, query: 'evidence', filters: {}, searchActive: true, results: { hits: [{ sourceId: 'a', sourceName: 'Source A', path: 'same.md', title: 'Same', line: 3, snippet: 'From A' }, { sourceId: 'b', sourceName: 'Source B', path: 'same.md', title: 'Same', line: 7, snippet: 'From B' }], total: 2 }, open: (...args) => opened.push(args), clearDocument() {} };
+  const f = await fixture('KnowledgePage', { root: {}, sessionKey: 1, isRootCurrent: () => true, onSettings() {} }, { library });
+  let nodes = f.render();
+  assert.equal(nodes.filter(node => node.type === 'details').length, 2, 'source identity participates in result grouping');
+  const choose = phrase => f.render().find(node => node.type === 'button' && text(node).includes(phrase) && node.props.className?.includes('border-t')).props.onClick();
+  choose('From A');
+  assert.deepEqual(opened.at(-1), ['same.md', 3, undefined, 'a']);
+  f.library.document = { sourceId: 'a', sourceName: 'Source A', path: 'same.md', title: 'Same', text: 'A', line: 3 };
+  nodes = f.render();
+  nodes.find(node => node.type === 'icon-button' && node.props.tooltip === f.t('openReadingTab')).props.onClick();
+  assert.equal(f.render().find(node => node.type === 'reader-tabs').props.tabs.length, 2);
+  choose('From B');
+  assert.deepEqual(opened.at(-1), ['same.md', 7, undefined, 'b']);
+  nodes = f.render(); const tabBar = nodes.find(node => node.type === 'reader-tabs'), first = tabBar.props.tabs[0].id;
+  assert.equal(tabBar.props.tabs[0].frame.sourceId, 'a');
+  assert.equal(tabBar.props.tabs[1].frame.sourceId, 'b');
+  f.library.document = null; f.library.connection = { status: 'needs-permission', binding: { sourceId: 'b' }, source: null };
+  nodes = f.render();
+  assert.ok(nodes.some(node => node.type === 'reader-tabs'), 'tabs remain actionable when a source cannot be read');
+  assert.equal(nodes.some(node => node.type === 'reader'), false, 'unavailable source cannot display the previous source text');
+  nodes.find(node => node.type === 'reader-tabs').props.onSelect(first);
+  assert.deepEqual(opened.at(-1), ['same.md', 3, undefined, 'a']);
+  f.render().find(node => node.type === 'reader-tabs').props.onClose(first);
+  f.render(); f.flushFocus(); assert.deepEqual(f.focused, [], 'closing must not focus an absent reading title');
+  f.library.connection = { status: 'ready', binding: { sourceId: 'b' }, source: {} };
+  f.library.document = { sourceId: 'b', path: 'same.md', title: 'B', text: 'B', line: 7 };
+  f.library.reading = true; f.render(); f.flushFocus(); assert.deepEqual(f.focused, [], 'wait for the asynchronous read');
+  f.library.reading = false; f.render(); f.flushFocus(); assert.deepEqual(f.focused, ['knowledge-reader-page-title']);
 });

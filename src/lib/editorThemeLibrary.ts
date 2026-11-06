@@ -1,5 +1,5 @@
 import { ProductError, productCause, productErrorMessage, productJoin, productMessage, productText } from "./i18n/productMessages";
-import { BASE_EDITOR_THEME, parseEditorThemeJson, inspectEditorTheme, type EditorTheme } from './editorThemes';
+import { BASE_EDITOR_THEME, parseEditorThemeJson, inspectEditorTheme, sortEditorThemes, resolveEditorThemeColors, resolveEditorThemeSurfaces, editorSurfaceTokens, type EditorTheme } from './editorThemes';
 import { getThemeDirectory } from './themeDirectories';
 
 export const EDITOR_THEME_DIRECTORY = 'themes/editor-themes';
@@ -35,7 +35,69 @@ export async function loadEditorThemeLibrary(root: FileSystemDirectoryHandle): P
       issues.push({ file: filename, ...productErrorMessage(error) });
     }
   }
-  return { themes, issues };
+  return { themes: sortEditorThemes(themes), issues };
+}
+
+function themeContent(theme: EditorTheme): string {
+  const normalized = { ...theme, palette: Object.fromEntries(Object.entries(theme.palette).map(([key, value]) => [key,
+    (value.length === 4 ? '#' + value.slice(1).split('').map(channel => channel + channel).join('') : value).toLowerCase(),
+  ])) };
+  const surfaces = resolveEditorThemeSurfaces(normalized);
+  return JSON.stringify({
+    version: theme.version,
+    fonts: Object.fromEntries(Object.entries(theme.fonts).sort(([left], [right]) => left.localeCompare(right))),
+    schemes: (['light', 'dark'] as const).map(mode => {
+      const colors = resolveEditorThemeColors(normalized, mode);
+      return { colors, surfaces: editorSurfaceTokens(colors, surfaces?.[mode]) };
+    }),
+  });
+}
+
+// Preserve user themes: a guide selection carries its content, not just a possibly reused ID.
+export async function ensureEditorThemeSnapshot(root: FileSystemDirectoryHandle, input: EditorTheme, isCurrent = () => true): Promise<EditorTheme> {
+  const selected = parseEditorThemeJson(JSON.stringify(input)), content = themeContent(selected);
+  const check = () => { if (!isCurrent()) throw new DOMException('Theme selection changed', 'AbortError'); };
+  check();
+  const { directory } = await getThemeDirectory(root, 'editor-themes');
+  check();
+  const read = async (id: string): Promise<{ exists: boolean; theme?: EditorTheme }> => {
+    let file: FileSystemFileHandle;
+    try { file = await directory.getFileHandle(`${id}.json`); }
+    catch (error) { if (notFound(error)) return { exists: false }; throw error; }
+    const raw = await (await file.getFile()).text();
+    check();
+    try {
+      const theme = parseEditorThemeJson(raw);
+      return { exists: true, ...(theme.id === id ? { theme } : {}) };
+    } catch { return { exists: true }; }
+  };
+  const existing = await read(selected.id);
+  check();
+  if (existing.theme && themeContent(existing.theme) === content) return existing.theme;
+  const prefix = `entry-${selected.id.slice(0, 20)}-`;
+  const library = await loadEditorThemeLibrary(root);
+  check();
+  const previousCopy = library.themes.find(theme => theme.id.startsWith(prefix) && themeContent(theme) === content);
+  if (previousCopy) return previousCopy;
+  let id = selected.id;
+  if (existing.exists) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+    check();
+    const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('').slice(0, 12);
+    const base = `${prefix}${hash}`;
+    for (let index = 0; ; index++) {
+      const suffix = index ? `-${index + 1}` : '';
+      id = base.slice(0, 48 - suffix.length) + suffix;
+      const candidate = await read(id);
+      check();
+      if (!candidate.exists) break;
+      if (candidate.theme && themeContent(candidate.theme) === content) return candidate.theme;
+    }
+  }
+  check();
+  const saved = await saveEditorTheme(root, { ...selected, id });
+  check();
+  return saved;
 }
 
 type RenameHooks = { commit: () => Promise<void>; rollback: () => Promise<void> };

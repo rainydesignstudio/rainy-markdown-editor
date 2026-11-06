@@ -1751,5 +1751,8 @@
     "missingSource": "缺少 Markdown 原稿内容。",
     "existingFile": "初始化不会覆盖已有文件：{{path}}",
     "aliasProtocol": "资源别名映射需要 rainy-format/2；旧契约不会被自动迁移。"
+  },
+  "entryGuide": {
+    "loadFailed": "资料库未能完整载入，请核对原因后重试。"
   }
 }

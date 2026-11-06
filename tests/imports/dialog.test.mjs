@@ -36,6 +36,9 @@ function fixture() {
 test('the shared import dialog preselects the library default, permits a theme change and guards missing sources/busy actions', async () => {
   const f = fixture();
   assert.equal(f.render().find(node => node.type === 'select-field').props.value, 'alternate');
+  assert.equal(f.render().find(node => node.type === 'select-field').props.title, '');
+  assert.equal(walk(f.button('取消')).find(node => node.type === 'svg').props.name, 'close');
+  assert.equal(walk(f.button('导入文稿')).find(node => node.type === 'svg').props.name, 'apply');
   assert.equal(f.button('导入文稿').props.disabled, true);
   await f.button('选择 Markdown 文件').props.onClick(); assert.deepEqual(f.calls, ['file']);
   f.props.source = { origin: { name: 'source.md', size: 100 }, title: 'Original title', directoryName: null, chooseDirectory() {} };

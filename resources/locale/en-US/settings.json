@@ -1,5 +1,9 @@
 {
   "ui": {
+    "reopenGuide": "Reopen setup guide",
+    "reopenGuideDescription": "Revisit the setup flow. Your selected editor appearance will be applied when you enter the workspace and saved to any connected library.",
+    "cancelOperation": "Cancel action",
+
     "manuscriptAa": "Manuscript Aa",
     "keepIdeasInWords": "Keep ideas in words.",
     "wordsForAFreshStart": "Words for a fresh start.",

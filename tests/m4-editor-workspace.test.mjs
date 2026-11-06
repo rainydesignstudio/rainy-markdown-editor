@@ -19,7 +19,7 @@ const {
   saveEditorWorkspace,
   validateEditorWorkspace,
 } = await import('../src/lib/editorWorkspace.ts');
-const { BUILTIN_EDITOR_THEMES } = await import('../src/lib/editorThemes.ts');
+const { BASE_EDITOR_THEME, BUILTIN_EDITOR_THEMES } = await import('../src/lib/editorThemes.ts');
 const { loadEditorThemeLibrary, saveEditorTheme, deleteEditorTheme, EDITOR_THEME_DIRECTORY } = await import('../src/lib/editorThemeLibrary.ts');
 const { initializeThemeDefaults, copyDefaultThemes } = await import('../src/lib/themeDefaults.ts');
 const { loadThemeLibrary } = await import('../src/lib/fileSystem.ts');
@@ -433,6 +433,15 @@ test('failed initial seeding retains a pending locale receipt and retries withou
   assert.equal((await loadEditorThemeLibrary(root)).themes.length, BUILTIN_EDITOR_THEMES.length);
 });
 
+test('library reading uses the shared builtin order regardless of directory enumeration and retains custom themes', async () => {
+  const root = new MemoryDirectoryHandle('theme-order');
+  const custom = ['local-z', 'local-a'].map(id => ({ ...structuredClone(BASE_EDITOR_THEME), id, name: id }));
+  for (const theme of [...custom.slice(0, 1), ...BUILTIN_EDITOR_THEMES].reverse().concat(custom.slice(1))) await saveEditorTheme(root, theme);
+  const loaded = await loadEditorThemeLibrary(root);
+  assert.deepEqual(loaded.issues, []);
+  assert.deepEqual(loaded.themes.map(theme => theme.id), [...BUILTIN_EDITOR_THEMES.map(theme => theme.id), 'local-z', 'local-a']);
+});
+
 test('editing local themes increments version, refuses external changes and preserves originals on failed writes', async () => {
   const root = new MemoryDirectoryHandle('local-theme-edit');
   const original = structuredClone(BUILTIN_EDITOR_THEMES[1]);
@@ -455,7 +464,7 @@ test('editing local themes increments version, refuses external changes and pres
   assert.equal(file.content, before);
   await deleteEditorTheme(root, saved.id);
   await assert.rejects(() => saveEditorTheme(root, { ...saved, name: '已移除' }, saved), /已被移除/);
-  await assert.rejects(() => deleteEditorTheme(root, BUILTIN_EDITOR_THEMES[0].id), /不可删除/);
+  await assert.rejects(() => deleteEditorTheme(root, BASE_EDITOR_THEME.id), /不可删除/);
   root.failOpenFor = 'new-failed-theme.json';
   await assert.rejects(() => saveEditorTheme(root, { ...saved, id: 'new-failed-theme' }), /保存失败/);
   assert.equal(directory.children.has('new-failed-theme.json'), false);

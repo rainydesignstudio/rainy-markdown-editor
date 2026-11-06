@@ -35,7 +35,7 @@ export function OperationFeedback({ id, notice, tone, summary, lifetime, childre
   }, [id, revision ?? signature, notify, announce, lifetime?.mode, retryDisabled]);
   useEffect(() => { if (!hasDetails) setOpen(false); }, [hasDetails]);
   if (hideTrigger || !hasDetails) return null;
-  return <IconPopover label={caption} tooltip={caption} icon={<ContentIcon name="info" />} kind="dialog" open={open && hasDetails} onToggle={() => setOpen(value => !value)} onClose={() => setOpen(false)}><div className="grid max-h-80 gap-3 overflow-y-auto p-3 text-xs text-secondary">
+  return <IconPopover label={caption} tooltip={caption} icon={<ContentIcon name="info" />} kind="dialog" open={open && hasDetails} onToggle={() => setOpen(value => !value)} onClose={() => setOpen(false)}><div className="grid max-h-80 gap-3 overflow-x-clip overflow-y-auto p-3 text-xs text-secondary">
     {full ? <p className="whitespace-pre-wrap break-words">{full}</p> : children ? null : <p>{t('feedback.noDetails')}</p>}{children}
     {onRetry ? <button type="button" className="button button-quiet" disabled={retryDisabled} onClick={onRetry}><ContentIcon name="reset" />{retryLabel ? formatProductMessage(retryLabel, t) : t('feedback.retryRefresh')}</button> : null}
   </div></IconPopover>;

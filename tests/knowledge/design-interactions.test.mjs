@@ -73,3 +73,46 @@ test('fragment navigation keeps the loaded document mounted, while explicit read
     await React.act(async () => api.open('A.md', 1, 'two')); assert.equal(reads, 3, 'cache never crosses source identities'); observer.disconnect();
   } finally { await f.close(); }
 });
+
+
+test('cross-source search stays lazy, preserves identical paths and reports sources omitted from the result', async () => {
+  const f = environment(), rootHandle = {}, restored = [], searched = [];
+  let api;
+  const bindings = ['a', 'b', 'c', 'd'].map(sourceId => ({ sourceId, name: 'Source ' + sourceId, directory: sourceId }));
+  const sources = Object.fromEntries(bindings.map(binding => [binding.sourceId, { binding, readFile: async () => new File(['Body ' + binding.sourceId], 'same.md') }]));
+  const { useKnowledgeLibrary } = await load('hooks/knowledge/useKnowledgeLibrary.ts', id => {
+    if (id.endsWith('/directoryBookmark')) return { queryDirectoryReadWritePermission: async () => 'granted' };
+    if (id.endsWith('/i18n/productMessages')) return messages;
+    if (id.endsWith('/knowledge/model')) return model;
+    if (id.endsWith('/knowledge/source')) return { readKnowledgeBindings: async () => bindings, restoreKnowledgeSource: async (_root, _store, isCurrent, sourceId) => { restored.push(sourceId); const source = sources[sourceId]; return { status: sourceId === 'c' ? 'needs-permission' : 'ready', binding: bindings.find(item => item.sourceId === sourceId), source: sourceId === 'c' ? null : { ...source, readFile: async () => { if (!isCurrent()) throw new messages.ProductError('knowledge.changed'); return source.readFile(); } } }; } };
+    if (id.endsWith('/knowledge/store')) return { readKnowledgeIndexStates: async () => ({}), readKnowledgeIndex: async (_root, source) => source.binding.sourceId === 'd' ? null : { sourceId: source.binding.sourceId, status: 'ready', documents: [] } };
+    if (id.endsWith('/knowledge/indexing')) return { searchKnowledgeIndex: async (_root, source, _index, query) => { searched.push([source.binding.sourceId, query.text]); return { hits: [{ path: 'same.md', title: 'Same', line: 2, snippet: 'Evidence', score: source.binding.sourceId === 'b' ? 20 : 10 }], total: 1 }; } };
+    if (id.endsWith('/knowledge/workerClient')) return { createKnowledgeWorker: () => ({ dispose() {}, request: async (operation, args) => operation === 'rank' ? args[0].sort((a, b) => b.score - a.score) : { text: await args[0].text(), truncated: false } }) };
+    if (id.endsWith('/articleExport')) return {};
+    throw new Error(id);
+  }, { window: f.window });
+  function Probe() { api = useKnowledgeLibrary(rootHandle, 1, () => true); return jsx.jsx('span', { children: api.document?.text ?? '' }); }
+  const settle = () => React.act(async () => { await new Promise(resolve => setTimeout(resolve, 220)); });
+  try {
+    await React.act(async () => f.root.render(jsx.jsx(Probe, {})));
+    assert.equal(restored.length, 0, 'startup does not restore or scan every source');
+    await React.act(async () => api.setQuery('Evidence')); await settle();
+    assert.deepEqual(Array.from(api.results.hits, hit => hit.sourceId), ['b', 'a']);
+    assert.equal(api.results.hits[0].sourceName, 'Source b');
+    assert.equal(api.results.total, 2); assert.equal(api.results.incomplete, true);
+    assert.deepEqual(Array.from(api.results.problems, problem => problem.reason), ['unavailable', 'indexMissing']);
+    await React.act(async () => api.setScope('b')); await settle();
+    assert.equal(api.results.total, 1); assert.equal(api.results.incomplete, false);
+    assert.deepEqual(searched.at(-1), ['b', 'Evidence']);
+    await React.act(async () => api.open('same.md', 2, undefined, 'a'));
+    assert.equal(api.document.sourceId, 'a'); assert.equal(api.document.text, 'Body a');
+    await React.act(async () => api.open('linked.md', 1, 'details', 'a'));
+    assert.equal(api.document.path, 'linked.md', 'a second read keeps the restored source valid');
+    assert.equal(api.issue, null);
+    await React.act(async () => api.open('same.md', 2, undefined, 'b'));
+    assert.equal(api.document.sourceId, 'b'); assert.equal(api.document.text, 'Body b');
+    await React.act(async () => api.open('same.md', 2, undefined, 'c'));
+    assert.equal(api.document, null, 'an unreadable tab cannot retain another source body');
+    assert.equal(api.connection.status, 'needs-permission');
+  } finally { await f.close(); }
+});

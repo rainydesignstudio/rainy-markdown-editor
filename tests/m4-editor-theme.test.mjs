@@ -11,6 +11,8 @@ const {
   composeLegacyEditorTheme,
   parseEditorThemeJson,
   resolveEditorThemeColors,
+  resolveEditorThemeSurfaces,
+  editorSurfaceTokens,
   validateEditorTheme,
 } = await import('../src/lib/editorThemes.ts');
 const { BASIC_THEME } = await import('../src/lib/themes.ts');
@@ -20,7 +22,7 @@ function copy(value) { return JSON.parse(JSON.stringify(value)); }
 
 test('every built-in editor theme supplies the same 34 roles for light and dark', () => {
   assert.equal(EDITOR_COLOR_ROLES.length, 34);
-  assert.equal(BUILTIN_EDITOR_THEMES.length >= 11, true);
+  assert.equal(BUILTIN_EDITOR_THEMES.length, 11);
   for (const theme of BUILTIN_EDITOR_THEMES) {
     assert.deepEqual(validateEditorTheme(theme), []);
     assert.deepEqual(Object.keys(theme.colors.light), EDITOR_COLOR_ROLES);
@@ -49,13 +51,27 @@ test('new themes retain readable interface, button and source text in both schem
       .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
     return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
   };
-  for (const id of ['flowing-violet', 'evening-snow', 'sunshine', 'ink-white', 'flowing-violet-ii', 'evening-snow-ii', 'dreaming']) {
-    const theme = BUILTIN_EDITOR_THEMES.find((item) => item.id === id);
+  for (const theme of BUILTIN_EDITOR_THEMES) {
+    const id = theme.id;
     for (const scheme of ['light', 'dark']) {
       const colors = resolveEditorThemeColors(theme, scheme);
-      for (const [foreground, background] of [['primary', 'panel'], ['muted', 'panel'], ['on-accent', 'accent'], ['editor-text', 'editor-surface']]) {
-        const [low, high] = [luminance(colors[foreground]), luminance(colors[background])].sort((a, b) => a - b);
-        assert.ok((high + 0.05) / (low + 0.05) >= 4.5, `${id}/${scheme}/${foreground}`);
+      const paint = editorSurfaceTokens(colors, resolveEditorThemeSurfaces(theme)?.[scheme]);
+      const pairs = [
+        ['body', colors.primary, colors.canvas], ['panel', colors.primary, colors.panel],
+        ['muted', colors.muted, colors.panel], ['popup', colors['popup-text'], colors['popup-bg']],
+        ['source', colors['editor-text'], colors['editor-surface']],
+        ['primary', paint['--color-action-text'], paint['--color-action']],
+        ['primary-hover', paint['--color-action-text'], paint['--color-action-hover']],
+        ['danger', colors.danger, paint['--color-danger-surface']],
+        ['danger-hover', colors['on-danger'], colors.danger],
+        ['selected', colors['accent-text'], colors['accent-soft']],
+        ['success', colors.success, colors['success-surface']],
+        ['warning', colors.warning, colors['warning-surface']],
+        ['warning-strong', colors['warning-strong'], colors['warning-surface']],
+      ];
+      for (const [state, foreground, background] of pairs) {
+        const [low, high] = [luminance(foreground), luminance(background)].sort((a, b) => a - b);
+        assert.ok((high + 0.05) / (low + 0.05) >= 4.5, `${id}/${scheme}/${state}`);
       }
     }
   }
@@ -63,17 +79,51 @@ test('new themes retain readable interface, button and source text in both schem
 
 test('bundled editor theme catalog contains the current library selection', () => {
   assert.deepEqual(BUILTIN_EDITOR_THEMES.map((theme) => theme.id), [
-    'sea-glass', 'linen', 'mist', 'rainy-design-slate', 'flowing-violet', 'evening-snow',
-    'sunshine', 'ink-white', 'flowing-violet-ii', 'evening-snow-ii', 'dreaming',
+    'evening-snow', 'flowing-violet', 'sunshine', 'rose', 'ink-white', 'rainy-design-slate',
+    'sea-glass', 'linen', 'evening-snow-ii', 'flowing-violet-ii', 'powder-pink',
   ]);
-  assert.equal(BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'dreaming')?.name, 'Dreaming');
+  assert.equal(BUILTIN_EDITOR_THEMES.some(theme => ['mist', 'dreaming', 'lime'].includes(theme.id)), false);
+  const names = { 'sea-glass': ['雨青 · 彩调', 'Sea Glass · Color'], linen: ['纸衫 · 彩调', 'Linen · Color'], 'evening-snow-ii': ['霁蓝 · 彩调', 'Clear Blue · Color'], 'flowing-violet-ii': ['烟紫 · 彩调', 'Smoky Violet · Color'], rose: ['蔷薇', 'Rose'], 'powder-pink': ['粉黛 · 彩调', 'Powder Pink · Color'] };
+  for (const [id, [zh, en]] of Object.entries(names)) {
+    assert.equal(getBuiltinEditorThemes('zh-CN').find(theme => theme.id === id).name, zh);
+    assert.equal(getBuiltinEditorThemes('en-US').find(theme => theme.id === id).name, en);
+  }
 });
 
-test('Ink White is monochrome across every role, including feedback colors', () => {
+test('regular Rose confines hue to accents and syntax while Powder Pink Color retains tinted structure', () => {
+  const powder = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'powder-pink');
+  const rose = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'rose');
+  const linen = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'linen');
+  assert.deepEqual(powder.fonts, linen.fonts);
+  for (const mode of ['light', 'dark']) {
+    const resolved = resolveEditorThemeColors(rose, mode);
+    for (const role of ['canvas', 'rail', 'list', 'panel', 'hover', 'popup-bg', 'primary', 'secondary', 'muted', 'faint', 'popup-text', 'line', 'line-strong', 'editor-surface', 'editor-text', 'editor-heading', 'editor-quote']) {
+      const hex = resolved[role];
+      assert.equal(hex.slice(1, 3), hex.slice(3, 5), mode + '/' + role);
+      assert.equal(hex.slice(3, 5), hex.slice(5, 7), mode + '/' + role);
+    }
+    assert.match(powder.colors[mode].accent, /^pink-/);
+    assert.match(rose.colors[mode].accent, /^rose-/);
+    const tinted = resolveEditorThemeColors(powder, mode);
+    for (const role of ['canvas', 'rail', 'editor-surface']) {
+      const hex = tinted[role];
+      assert.ok(hex.slice(1, 3) !== hex.slice(3, 5) || hex.slice(3, 5) !== hex.slice(5, 7), mode + '/' + role);
+    }
+  }
+  assert.ok(Object.keys(rose.palette).every(key => !key.startsWith('pink-')));
+  const sun = BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'sunshine');
+  for (const role of ['ui', 'heading', 'subHeading', 'eyebrow', 'serif']) assert.match(sun.fonts[role], /^"Sen Local"/);
+  for (const role of ['mono', 'editorSource', 'articleSource']) assert.match(sun.fonts[role], /^"Roboto Mono Local"/);
+  assert.match(BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'evening-snow').fonts.heading, /^"Noto Sans SC Local"/);
+  assert.equal(BASE_EDITOR_THEME.id, 'sea-glass', 'catalog order must not change foundational-theme identity');
+});
+
+test('Ink White preserves monochrome non-feedback roles', () => {
   const theme = BUILTIN_EDITOR_THEMES.find((item) => item.id === 'ink-white');
   for (const scheme of ['light', 'dark']) {
     for (const [role, hex] of Object.entries(resolveEditorThemeColors(theme, scheme))) {
       if (role === 'search-hit') { assert.equal(hex, '#eeff00'); continue; }
+      if (['success', 'success-surface', 'warning', 'warning-strong', 'warning-surface', 'warning-line', 'danger', 'on-danger'].includes(role)) continue;
       assert.equal(hex.slice(1, 3), hex.slice(3, 5), `${scheme}/${role}`);
       assert.equal(hex.slice(3, 5), hex.slice(5, 7), `${scheme}/${role}`);
     }
@@ -153,7 +203,7 @@ test('eyebrow fonts are independently configurable and old v2 files inherit UI f
   for (const theme of BUILTIN_EDITOR_THEMES) assert.equal(theme.fonts.eyebrow, theme.fonts.ui, theme.id);
 });
 
-test('three retained themes match current color/font baselines exactly', () => {
+test('retained color/font baselines change only the approved dark hover role', () => {
   const baselines = {
     'sea-glass': 'da24061a113cda26b9ed403a70f91b4997c9abb7107378baf096ae5edbbd35f8',
     linen: '394cff3f032915e2f7c05442aee679b91f4264afdb03b5be4bf936261e74a7b0',
@@ -164,24 +214,23 @@ test('three retained themes match current color/font baselines exactly', () => {
     const { heading, subHeading, eyebrow, articleSource, ...fonts } = theme.fonts;
     assert.equal(heading, fonts.ui);
     assert.equal(eyebrow, fonts.ui);
-    const colors = Object.fromEntries(['light', 'dark'].map((mode) => [mode, Object.entries(resolveEditorThemeColors(theme, mode)).filter(([role]) => role !== 'search-hit').map(([, value]) => value)]));
+    const colors = Object.fromEntries(['light', 'dark'].map((mode) => [mode, Object.entries(resolveEditorThemeColors(theme, mode)).filter(([role]) => role !== 'search-hit').map(([role, value]) => mode === 'dark' && role === 'accent-strong' && ['sea-glass', 'linen'].includes(id) ? { 'sea-glass': '#55797a', linen: '#708a5a' }[id] : value)]));
     const signature = createHash('sha256').update(JSON.stringify({ colors, fonts })).digest('hex');
     assert.equal(signature, baseline, id);
   }
 });
 
-test('Mist uses neutral grays and serif headings while feedback and other fonts stay intact', () => {
-  const mist = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'mist');
+test('Ink White uses Linen typography and retains semantic feedback while legacy Mist remains readable', () => {
+  const mist = BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'ink-white');
   const legacy = parseEditorThemeJson(readFileSync(new URL('../resources/template/compatibility/editor-theme-mist-legacy.json', import.meta.url), 'utf8'));
-  assert.equal(mist.fonts.heading, legacy.fonts.serif);
-  assert.notEqual(mist.fonts.heading, mist.fonts.ui);
-  for (const role of ['ui', 'serif', 'mono', 'editorSource']) assert.equal(mist.fonts[role], legacy.fonts[role]);
-  const feedback = ['success', 'success-surface', 'warning', 'warning-strong', 'warning-surface', 'warning-line', 'danger'];
+  assert.deepEqual(mist.fonts, BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'linen').fonts);
+  const feedback = ['success', 'success-surface', 'warning', 'warning-strong', 'warning-surface', 'warning-line', 'danger', 'on-danger'];
   for (const mode of ['light', 'dark']) {
     const colors = resolveEditorThemeColors(mist, mode);
     const oldColors = resolveEditorThemeColors(legacy, mode);
     for (const role of EDITOR_COLOR_ROLES) {
       if (role === 'search-hit') assert.equal(colors[role], '#eeff00');
+      else if (role === 'on-danger') assert.equal(colors[role], mode === 'light' ? '#ffffff' : '#0a0a0a');
       else if (feedback.includes(role)) assert.equal(colors[role], oldColors[role]);
       else {
         const rgb = colors[role].match(/^#(..)(..)(..)$/).slice(1);
@@ -194,10 +243,16 @@ test('Mist uses neutral grays and serif headings while feedback and other fonts 
   for (const mode of ['light', 'dark']) assert.deepEqual(resolveEditorThemeColors(migrated, mode), resolveEditorThemeColors(legacy, mode));
 });
 
+test('removing Mist from the catalog preserves every supported legacy appearance combination', () => {
+  for (const base of ['sea-glass', 'linen', 'mist']) for (const accent of ['teal', 'moss', 'berry']) for (const font of ['sans', 'serif']) {
+    assert.deepEqual(validateEditorTheme(composeLegacyEditorTheme(base, accent, font)), []);
+  }
+});
+
 test('published editor template includes an independent heading font and all fallback colors', () => {
   const template = parseEditorThemeJson(readFileSync(new URL('../resources/template/editor-theme-template.json', import.meta.url), 'utf8'));
-  assert.deepEqual(template, getBuiltinEditorThemes('zh-CN')[0]);
-  const composed = { ...template, id: 'mixed-heading-test', fonts: { ...BUILTIN_EDITOR_THEMES.find((theme) => theme.id === 'mist').fonts } };
+  assert.deepEqual(template, getBuiltinEditorThemes('zh-CN').find(theme => theme.id === BASE_EDITOR_THEME.id));
+  const composed = { ...template, id: 'mixed-heading-test', fonts: { ...template.fonts, heading: template.fonts.serif } };
   const restored = parseEditorThemeJson(JSON.stringify(composed));
   assert.equal(restored.fonts.heading, restored.fonts.serif);
   assert.notEqual(restored.fonts.heading, restored.fonts.ui);

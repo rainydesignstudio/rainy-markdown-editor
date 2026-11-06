@@ -17,8 +17,8 @@ export function PanelHeading({ title, icon, count, expanded, reserveAction = fal
   </Trigger>;
 }
 
-export function PanelIcon({ kind }: { kind: 'colors' | 'fonts' | 'nodes' | 'issues' }) {
-  return <svg className="size-4 shrink-0 text-accent-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+export function PanelIcon({ kind, className = 'text-accent-text' }: { kind: 'colors' | 'fonts' | 'nodes' | 'issues'; className?: string }) {
+  return <svg className={`size-4 shrink-0 ${className}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
     {kind === 'colors' ? <><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.1-2.5H18a3 3 0 0 0 3-3A9 9 0 0 0 12 3Z" /><circle cx="7.5" cy="10" r=".7" /><circle cx="11" cy="6.5" r=".7" /><circle cx="16" cy="7.5" r=".7" /></> : kind === 'fonts' ? <path d="M4 5h16M12 5v15M8 20h8M4 8V5m16 3V5" /> : kind === 'nodes' ? <path d="M4 5h16M4 12h11M4 19h16" /> : <><path d="m12 3 10 18H2L12 3Z" /><path d="M12 9v5m0 3v1" /></>}
   </svg>;
 }

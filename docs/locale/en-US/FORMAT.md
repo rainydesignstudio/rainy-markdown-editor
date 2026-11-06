@@ -167,7 +167,7 @@ This is an action-function excerpt, not a complete package: provide render, vali
 | copy | `{html, text}` |
 | export | `{data, extension?, mime?, encoding?}`; utf8/base64; host handles /2 markdown |
 
-Render returns `{html, css}`. Validate returns `{complete, issues, passed}`; issue entries are `{message, severity, line?}`, with error/warning/info severity and body-relative line numbers. Empty objects, exceptions and timeouts are not passes. Format returns source and only changes the draft. Copy returns HTML/text. Export returns data plus optional extension/MIME and encoding (utf8 by default, or base64 for binary). Declared actions appear in Export article → Library actions; declared settings appear in Settings → Local directory → Validation and processing → Format package settings.
+Render returns `{html, css}`. Validate returns `{complete, issues, passed}`; issue entries are `{message, severity, line?}`, with error/warning/info severity and body-relative line numbers. Empty objects, exceptions and timeouts are not passes. Format returns source and only changes the draft. Copy returns HTML/text. Export returns data plus optional extension/MIME and encoding (utf8 by default, or base64 for binary). Declared export actions appear in the Export article card dialog; format has no manual entry. Declared settings appear in Settings → Local directory → Validation and processing → Format package settings.
 
 ### Host services: capture, archive and measurement
 
@@ -216,6 +216,27 @@ Reload affects the current library only. Invalid packages fail explicitly withou
 Root deployment needs no prefix. For a subpath, use the same `NEXT_PUBLIC_ARTICLE_BASE_PATH` at build and start time, such as `/lab/rainy-markdown-editor`. Host sandbox, preview and script assets use this prefix; library-relative paths remain unchanged. Verify loading, failure recovery, saving and reopening separately for root and subpath deployments.
 
 Other static servers must retain the isolation/CSP rules supplied by the application server for format/article-package-sandbox.html and format/article-package-preview.html. Format files cannot bypass stricter browser/deployment restrictions. The default npm start server supplies both dedicated policies. WeChat, live eBay and physical phones still require separate acceptance.
+
+<a name="doc-workspace-capabilities"></a>
+
+## Customization delivery: six workspace capabilities
+
+Format creation or repair must connect and individually verify article statistics, scroll alignment, Update styles, format checking, copying and exporting. Documentation shortening must not remove them. Reuse host interactions, permission and saving workflows; packages supply semantic body content, source positions, actions and truthful results. These are delivery requirements, not new protocol fields or retroactive parser requirements for optional legacy declarations. Missing functionality is unfinished work with a diagnosed cause, not a reason to hide controls or mark them arbitrarily not applicable.
+
+| Capability | Production and integration requirements | Verification |
+|---|---|---|
+| Article statistics | Use the body root recognized by the host; retain h1–h6, p, img, a[href] and pre semantics. Mark preview decoration data-preview-only; exclude navigation, metadata and workspace UI | Check known headings, paragraphs, images, links and code blocks against the current rendition; an unready preview is not a valid zero result |
+| Scroll alignment | Retain corresponding data-source-line positions on body blocks. The host owns scrolling, caches and the displayed canvas; packages add no scrolling scripts | Check beginning/middle/end, insertion/deletion, multiline HTML, long code/images, pane and color-mode changes, and retained previews under save-only refresh |
+| Update styles | Update styles reactivates current library configuration, leaves the retained environment, recompiles and marks the manuscript unsaved; save and inspect render.json/dependencies. Settings also provides explicit configuration reload for external-edit diagnosis | Inspect actual CSS/resources and body/theme/configuration identities, save and reopen; preserve source/recoverable records on failure and reject stale results |
+| Format checking | Keep render and validate separate. Check current source, theme structure, resources and actual layout, returning truthful complete/issues/passed with body-relative lines | Introduce known violations and missing resources, repair and recheck. Disabling platform standards does not disable host security or other checks; empty objects/exceptions are not passes |
+| Copy | Declare and implement copy returning html/text; handle computed styles, resources, destination constraints and runtime markers rather than relying on destination access to local classes/variables | Verify the real system clipboard, receiver and destination separately for text/images/links/styles; failed preparation or missing resources cannot establish complete success |
+| Export | Declare actual export types/extensions/MIME and result encoding. Retain /2 host original-source export; implement other types required by the confirmed delivery target | Open/parse actual downloads and inspect original source/body/HTML/ZIP/PNG/PDF scopes, resources and reuse. Declarations and filenames do not prove usable files |
+
+Statistics parse rendered body HTML: characters are non-whitespace Unicode code points; reading minutes are ceil(characters/300). Count h1–h6 headings; p elements with nonempty text or images; images including local-resource placeholders; links with href; and pre code blocks. Ignore script/style/template and data-preview-only subtrees. CSS-generated content, text in images and nonsemantic simulated headings are not inferred. An image count does not establish successful loading. See [src/lib/articleStatistics.ts](../../../src/lib/articleStatistics.ts).
+
+A source marker such as `<p data-source-line="1">Body</p>` uses a one-based input-body line excluding Front Matter, obtained from parser positions rather than output-HTML lines or node order. Preserve reliable locations through raw HTML, multiline/nested blocks and image transformations; mark preview-only additions data-preview-only. Host anchors depend on element-order/tag correspondence between the working and displayed roots. Missing positions, incompatible structure or absent anchors cannot establish alignment; whole-document scroll percentages are not source mapping. Remove internal positioning decoration from copy/web output while preserving authored original source. See [src/lib/previewScrollSync.ts](../../../src/lib/previewScrollSync.ts) and [visible-preview constraints](#doc-visible-preview).
+
+Use one representative manuscript to record all six results with input revision, theme/effective configuration identities and unfinished causes; regress retained older articles/history. For static-only installations, verify public contracts and application behavior without inventing internal calls. WeChat/mobile reception remains attended verification. Builds, success notices or a single screenshot do not replace actual operations.
 
 <a name="doc-bundled-resources"></a>
 
@@ -382,7 +403,7 @@ The circular-arrow **Update styles** control is in the editor top bar, after **E
 | output.html | `tagMap: { "blockquote": "section" }` | WeChat copying reads original quote theme styles before mapping tags in the output copy, retaining nested quotes, borders, backgrounds and inner padding. |
 | output.css | `rootStyleOmissions` | Omits named CSS properties only from generated article/body shells. WeChat defaults cover margin/padding and their sides, width/min-width/max-width and height/min-height/max-height. Internal content containers remain intact. |
 
-Merge fields into existing steps’ `parameters`, retaining other parameters rather than adding duplicate output steps. See the complete [default formatter](../../../resources/presets/platform/wechat-article/format/formatter.json). Older configurations without new fields keep their behavior; other platforms choose their own policies. Source, preview tags and PNG/PDF remain unchanged. This adds no official compliance requirement. The legacy trio path configures registered policies; self-contained packages implement new algorithms through rainy-format/1 above.
+Merge fields into existing steps’ `parameters`, retaining other parameters rather than adding duplicate output steps. See the complete [default formatter](../../../resources/presets/platform/wechat-article/format/formatter.json). Older configurations without new fields keep their behavior; other platforms choose their own policies. Source, preview tags and PNG/PDF remain unchanged. This adds no official compliance requirement. The legacy trio path configures registered policies; self-contained packages implement new algorithms inside the library under their declared host protocol.
 
 <a name="doc-source-rendering"></a>
 
@@ -458,27 +479,29 @@ Copy/PNG/PDF checks use current resource/render versions and reject stale output
 
 ## Formatter capabilities
 
-| operator | parameters  Applicable route |
+The markdown.code-highlight operator below processes code blocks in article previews/output. Source-toolbar highlighting is a separate editor display preference using editor-theme colors; neither controls the other.
+
+| operator | parameters | Applicable route |
 |---|---|---|
-| markdown.soft-breaks | `mode`: `space` / `line-break`  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.blank-lines | `preserve`, `betweenBlocks`, `atEdges`  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.code-highlight | styles[]; optional engine (highlight/prism), themeDefaults, prismStyles mapping lexical keys to CSS declarations  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.math | singleDollar, maxLength, maxExpressions; optional static MathML  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.mermaid | theme, maxLength, maxDiagrams; optional static PNG  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.heading-ids | mode: auto/explicit; explicit retains {#id} without generating anchors  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.code-layout | wrapperClasses[], preTag, contentClasses[], copyClasses[], copyHtml, copyLabel  Bundled/legacy interpreter; custom packages own their business logic |
-| css.stylesheets | entry, publicRoot; optional allowUnknownClasses  Bundled/legacy interpreter; custom packages own their business logic |
-| render.document | root, body, beforeHtml, afterHtml, language, preserveIds, viewport  Bundled/legacy interpreter; custom packages own their business logic |
-| render.nodes | image (width/height/classes/style/alt), link (classes/rootBase/externalTarget); supplies missing defaults only  Bundled/legacy interpreter; custom packages own their business logic |
-| markdown.code-whitespace | `tabSize`; disabling retains original code whitespace  Bundled/legacy interpreter; custom packages own their business logic |
-| preview.surface | lightBackground, darkBackground, fontFamily, color, stripThemeBackground  Bundled/legacy interpreter; custom packages own their business logic |
-| preview.dark-mode | `mode`: algorithm or tokens; algorithm requires component transform/options, tokens contains only mode  Bundled/legacy interpreter; custom packages own their business logic |
-| css.drop-properties | properties[]; repeatable  Bundled/legacy interpreter; custom packages own their business logic |
-| css.utility-aliases | aliases mapping CSS property names  Bundled/legacy interpreter; custom packages own their business logic |
-| output.css | inlineProperties[], dimensionProperties[], preserveAutoDimensions, colorEncoding: rgb/preserve; optional rootStyleOmissions[]  Bundled/legacy interpreter; custom packages own their business logic |
-| output.html | wrapperTag, preserveAttributes[], removeClasses, stripRootBackground; optional tagMap  Bundled/legacy interpreter; custom packages own their business logic |
-| output.text | maxConsecutiveNewlines, trim  Bundled/legacy interpreter; custom packages own their business logic |
-| output.visual | width, pngBackground, pdfBackground, maxCanvasSide, pdfMargin  Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.soft-breaks | `mode`: `space` / `line-break` | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.blank-lines | `preserve`, `betweenBlocks`, `atEdges` | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.code-highlight | styles[]; optional engine (highlight/prism), themeDefaults, prismStyles mapping lexical keys to CSS declarations | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.math | singleDollar, maxLength, maxExpressions; optional static MathML | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.mermaid | theme, maxLength, maxDiagrams; optional static PNG | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.heading-ids | mode: auto/explicit; explicit retains {#id} without generating anchors | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.code-layout | wrapperClasses[], preTag, contentClasses[], copyClasses[], copyHtml, copyLabel | Bundled/legacy interpreter; custom packages own their business logic |
+| css.stylesheets | entry, publicRoot; optional allowUnknownClasses | Bundled/legacy interpreter; custom packages own their business logic |
+| render.document | root, body, beforeHtml, afterHtml, language, preserveIds, viewport | Bundled/legacy interpreter; custom packages own their business logic |
+| render.nodes | image (width/height/classes/style/alt), link (classes/rootBase/externalTarget); supplies missing defaults only | Bundled/legacy interpreter; custom packages own their business logic |
+| markdown.code-whitespace | `tabSize`; disabling retains original code whitespace | Bundled/legacy interpreter; custom packages own their business logic |
+| preview.surface | lightBackground, darkBackground, fontFamily, color, stripThemeBackground | Bundled/legacy interpreter; custom packages own their business logic |
+| preview.dark-mode | `mode`: algorithm or tokens; algorithm requires component transform/options, tokens contains only mode | Bundled/legacy interpreter; custom packages own their business logic |
+| css.drop-properties | properties[]; repeatable | Bundled/legacy interpreter; custom packages own their business logic |
+| css.utility-aliases | aliases mapping CSS property names | Bundled/legacy interpreter; custom packages own their business logic |
+| output.css | inlineProperties[], dimensionProperties[], preserveAutoDimensions, colorEncoding: rgb/preserve; optional rootStyleOmissions[] | Bundled/legacy interpreter; custom packages own their business logic |
+| output.html | wrapperTag, preserveAttributes[], removeClasses, stripRootBackground; optional tagMap | Bundled/legacy interpreter; custom packages own their business logic |
+| output.text | maxConsecutiveNewlines, trim | Bundled/legacy interpreter; custom packages own their business logic |
+| output.visual | width, pngBackground, pdfBackground, maxCanvasSide, pdfMargin | Bundled/legacy interpreter; custom packages own their business logic |
 
 Configuration compiles in array order, but execution still has Markdown, CSS, preview and output stages. Reordering cannot move an output operation ahead of parsing. Except for `css.drop-properties`, each capability can be enabled only once to avoid conflicting parameters. Disabled capabilities use neutral engine behavior; disabling output style capture loses those styles and does not disable checking.
 
@@ -576,13 +599,13 @@ This website-library example requires the trio ID `site-article` and a complete 
 
 Any trio `meta` may declare the same `capabilities` and `rendering` objects. Restrictions intersect: any false declaration disables the capability; config.json cannot enable it again. Repeated rendering declarations must agree or the whole configuration is rejected. Undeclared controls keep their existing labels. Disabled controls remain visible with a reason, and action handlers enforce the same immutable configuration as the UI.
 
-| Capability | Scope  Default/restriction |
+| Capability | Scope | Default/restriction |
 |---|---|---|
-| articleTheme | Selecting/applying article themes and setting the default for new articles  Retained by default; false restricts; /2 source recovery is separately guaranteed |
-| previewMode | User switching of article preview appearance  Retained by default; false restricts; /2 source recovery is separately guaranteed |
-| algorithm | Rendering algorithm execution; disabling it conflicts with any formatter or enabled dark rule that still requires an algorithm. Rules are never removed automatically  Retained by default; false restricts; /2 source recovery is separately guaranteed |
-| copyRichText | Rich-text copying  Retained by default; false restricts; /2 source recovery is separately guaranteed |
-| exportPackage / exportMarkdown / exportBody / exportPng / exportPdf | Each article export format independently  Retained by default; false restricts; /2 source recovery is separately guaranteed |
+| articleTheme | Selecting/applying article themes and setting the default for new articles | Retained by default; false restricts; /2 source recovery is separately guaranteed |
+| previewMode | User switching of article preview appearance | Retained by default; false restricts; /2 source recovery is separately guaranteed |
+| algorithm | Rendering algorithm execution; disabling it conflicts with any formatter or enabled dark rule that still requires an algorithm. Rules are never removed automatically | Retained by default; false restricts; /2 source recovery is separately guaranteed |
+| copyRichText | Rich-text copying | Retained by default; false restricts; /2 source recovery is separately guaranteed |
+| exportPackage / exportMarkdown / exportBody / exportPng / exportPdf | Each article export format independently | Retained by default; false restricts; /2 source recovery is separately guaranteed |
 
 `rendering.styleAuthority` accepts theme (the legacy path) or library. Library authority requires a library stylesheet entry and compiles that stylesheet without appending article-theme CSS or token overrides. Article theme selection is disabled. Sources and theme snapshots remain unchanged; adopting a new environment is explicit. Maintaining theme resources is separate from selecting a theme for an article.
 
@@ -718,6 +741,8 @@ Source, index and render retention have separate feedback. Dependency failure do
 
 For a website that accepts Markdown, **Export article → Markdown body** extracts the reliably parsed body, retaining Markdown, HTML, classes and anchors. The publisher handles image addresses. Reports use current library rules; replaying history is not proof of present platform compliance.
 
+<a name="doc-visible-preview"></a>
+
 ### Visible preview and current inspection
 
 | Object | Input |
@@ -742,7 +767,7 @@ Configuration is read when opening a library, explicitly reloading render config
 - All three absent: explicitly identify complete built-in fallback without silently writing files.
 - Partial files, old structure, damaged JSON, unknown capabilities/fields, incorrect parameter types, duplicate IDs or missing references: configuration errors. Do not combine defaults with fragments and claim success.
 - Original material remains recoverable; compilation/compliance checks do not trust invalid configuration.
-- A new library creates its selected trio, self-contained interpreter, declaration and notices, with an empty article directory and no test manuscripts/history.
+- Ordinary new-library creation installs the selected trio, self-contained interpreter, declaration and notices, with an empty article directory and no test manuscripts/history. The entry guide additionally prepares a starter and independent example; see [guide file effects](AGENT-GUIDE.md#doc-entry-guide-files).
 
 ### Migration and language
 
@@ -788,7 +813,9 @@ The marked element and its descendants skip every width check. The outer contain
 
 ## Knowledge writing metadata (0.3.2)
 
-Knowledge sources stay read-only; these records live in the manuscript library, separately from format-package configuration.
+Knowledge sources stay read-only; these records live in the manuscript library, separately from format-package configuration. The persisted structure is retained from 0.3.2; this version's cross-source queries and temporary reading tabs do not change the record protocol.
+
+Cross-source search results carry sourceId, sourceName and relative path in memory; unavailable sources are reported separately and queries do not modify indexes or originals. Reading tabs, positions, modes and back histories exist only in the current page session and disappear on refresh. No new library record or research schema change is introduced.
 
 <details>
 <summary>Advanced: complete writing metadata protocol</summary>
@@ -802,6 +829,27 @@ Body citations use `[[1]](#rme-cite-<uuid>)`, displaying `[1]`. The manuscript-e
 Citation region comments and entry anchors inside Markdown code examples are unmanaged. Normal insertion preserves selected manuscript text; replacing an old marker requires explicit adoption. Source relocation preserves binding.json and the research filename; failed creation recovery requires retained ownership evidence and never treats arbitrary empty JSON as valid data.
 
 </details>
+
+<a name="doc-history-storage"></a>
+
+## Article history snapshot contract
+
+History lives under `articles/YYYY-MM/<article-directory>/history/<snapshot-id>/`, separately from editor undo, article trash and whole-library backup. Execution steps are in [Agent history management](AGENT-GUIDE.md#doc-article-history).
+
+| File/field | Current contract |
+|---|---|
+| article.md | Complete historical original including Front Matter, not body alone; retain valid unknown metadata |
+| theme.json | Independent theme at that time, structurally valid and matching original theme.id/version; a current theme-library reference is not a historical snapshot |
+| render.json | Optional and matching that source/theme; retain referenced styles/.versions and assets/.objects dependencies rather than fabricating old records from current configuration |
+| snapshot.json | Completeness manifest written last; owner retains the legacy value wechat-article-editor and version is 1, independently of application name/version |
+| id | Same as directory name, matching `^snapshot-[a-zA-Z0-9][a-zA-Z0-9_-]{0,95}$`; reject collisions without overwrite |
+| createdAt / kind / retained | Parseable date string; kind is automatic, manual, before-restore or before-theme-change; retained is boolean |
+
+New manual and both before-* checkpoints are always protected. Automatic snapshots permit protection changes and deduplicate by original/theme/render-environment identity. Count cleanup removes only unprotected automatic versions, oldest first; the limit is 1–100, with low-level default 20 and current settings passed by the app. Creating any kind may trigger cleanup. Review policy and protect needed automatic versions before taking over; disabling automatic creation does not remove retention policy or manual history. Protection prevents automatic cleanup, while explicit confirmation can still delete a selected protected version.
+
+Confirm library/article/version identity before writing. In a new directory, write original, theme and any matching render record before snapshot.json, then reread before reporting completion. Failure cleans only this incomplete directory, preserving source/other history; report its actual path if cleanup fails. Distinguish complete, damaged, theme-mismatched and missing-dependency records rather than treating failures as empty history. If creation succeeds but list refresh fails, retry refresh only. Before deleting, reread complete content identity; switching libraries, changed targets or concurrent edits stop the operation. See [src/lib/articleHistory.ts](../../../src/lib/articleHistory.ts).
+
+Restore first writes the current original/theme as a before-restore checkpoint, then writes the selected version to the current article and checks month indexing/reopening. Recover according to actual completed writes and retain the checkpoint on failure. Forking history creates an independent article identity while preserving original/history. Snapshots do not copy all media; deleting one version does not remove shared objects. See [render records](#doc-render-records) for backup and historical-render recovery boundaries.
 
 ## Article trash records
 

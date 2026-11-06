@@ -527,7 +527,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
       <ScrollViewport ref={viewportRef} horizontal={!wrap} data-source-viewport="true" className="flex-1" onScroll={handleViewportScroll}>
       <div className="flex min-h-full min-w-0 flex-col">
       <div data-source-content="true" data-wrap={wrap} className="relative min-h-0 w-full flex-1 data-[wrap=false]:w-max data-[wrap=false]:min-w-full">
-      <div ref={highlightRef} className={`pointer-events-none ${isComposing ? 'opacity-0' : ''}`} aria-hidden="true"><pre ref={sourceRef} data-wrap={wrap} className={`${sourceBoxClass} data-[wrap=false]:w-max data-[wrap=false]:min-w-full`}>{highlightedSource}</pre></div>
+      <div ref={highlightRef} data-composing={isComposing} className="pointer-events-none data-[composing=true]:opacity-0" aria-hidden="true"><pre ref={sourceRef} data-wrap={wrap} className={`${sourceBoxClass} data-[wrap=false]:w-max data-[wrap=false]:min-w-full`}>{highlightedSource}</pre></div>
       {showLineNumbers || lineConcerns.size > 0 ? <div ref={gutterRef} className="pointer-events-none absolute inset-0 z-20 overflow-clip">
         {/* Block rows wrap differently from a continuous preformatted source flow. */}
         <pre data-wrap={wrap} className={`${sourceBoxClass} data-[wrap=false]:w-max data-[wrap=false]:min-w-full`}>
@@ -549,8 +549,9 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
           if (typeof forwardedRef === 'function') forwardedRef(node);
           else if (forwardedRef) forwardedRef.current = node;
         }}
-        className={`absolute inset-0 z-10 min-h-0 min-w-0 size-full resize-none overflow-hidden ${sourceBoxClass} caret-editor-text outline-0 selection:bg-selection/60 selection:text-editor-text data-[find-active=true]:selection:bg-transparent data-[find-active=true]:selection:text-transparent focus-visible:outline-none ${isComposing ? 'text-editor-text' : 'text-transparent'}`}
+        className={`absolute inset-0 z-10 min-h-0 min-w-0 size-full resize-none overflow-hidden ${sourceBoxClass} caret-editor-text outline-0 selection:bg-selection/60 selection:text-editor-text data-[find-active=true]:selection:bg-transparent data-[find-active=true]:selection:text-transparent focus-visible:outline-none text-transparent data-[composing=true]:text-editor-text`}
         data-wrap={wrap}
+        data-composing={isComposing}
         wrap={wrap ? 'soft' : 'off'}
         data-find-active={selectedFind}
         value={value}
@@ -606,7 +607,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
               <button
                 key={row.id}
                 id={row.id}
-                className={`snippet-command-option ${row.snippet ? 'items-start' : 'items-center py-2.5'}`}
+                className={`group/snippet-option snippet-command-option ${row.snippet ? 'items-start' : 'items-center py-2.5'}`}
                 type="button"
                 role="treeitem"
                 tabIndex={-1}
@@ -618,7 +619,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
                 onMouseMove={event => { if (event.movementX || event.movementY) setActiveIndex(index); }}
                 onClick={() => { if (row.snippet) commitSnippet(row.snippet, visibleMatch!.start, visibleMatch!.end); else { setActiveIndex(index); toggleGroup(row.group.id); } }}
               >
-                {row.snippet ? <><span className="mt-0.5 inline-flex size-4 shrink-0"><CategoryIcon name={row.snippet.icon} /></span><span className="grid min-w-0 flex-1 gap-1"><span className="snippet-option-heading"><strong className="min-w-0 break-words">{row.snippet.name}</strong><code>{row.snippet.trigger}</code></span><span className="snippet-option-description">{row.snippet.description}</span></span></> : <><span className="inline-flex size-4 shrink-0 text-accent-text"><CategoryIcon name={row.group.icon ?? 'snippet'} /></span><strong className="min-w-0 flex-1 truncate font-sub-heading text-sm font-semibold">{row.group.name}</strong><span className="font-mono text-xs text-faint">{row.group.items.length}</span><svg className={`size-4 text-faint ${expanded.includes(row.group.id) ? 'rotate-90' : ''}`} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg></>}
+                {row.snippet ? <><span className="mt-0.5 inline-flex size-4 shrink-0"><CategoryIcon name={row.snippet.icon} /></span><span className="grid min-w-0 flex-1 gap-1"><span className="snippet-option-heading"><strong className="min-w-0 break-words">{row.snippet.name}</strong><code>{row.snippet.trigger}</code></span><span className="snippet-option-description">{row.snippet.description}</span></span></> : <><span className="inline-flex size-4 shrink-0 text-accent-text"><CategoryIcon name={row.group.icon ?? 'snippet'} /></span><strong className="min-w-0 flex-1 truncate font-sub-heading text-sm font-semibold">{row.group.name}</strong><span className="font-mono text-xs text-faint">{row.group.items.length}</span><svg className="size-4 text-faint group-aria-expanded/snippet-option:rotate-90" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg></>}
               </button>
             ))}
           </div>

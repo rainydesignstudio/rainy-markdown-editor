@@ -141,12 +141,13 @@ test('current-color header adds exact Tailwind names and retains HEX alone for c
 
 test('disabled native buttons retain non-activating pointer and keyboard tooltip access', async () => {
   let clicks = 0, stopped = 0;
-  const h = await harness('../src/components/global/TooltipButton.tsx', {}, { tooltip: '请先选择图片', disabled: true, 'aria-label': '采用图片', onClick: () => clicks++ });
+  const h = await harness('../src/components/global/TooltipButton.tsx', {}, { tooltip: '请先选择图片', disabled: true, 'aria-label': '采用图片', 'aria-current': 'step', onClick: () => clicks++ });
   let tree = h.render('TooltipButton'); h.flush();
   const button = walk(tree).find(node => node.type === 'button');
   let wrapper = walk(tree).find(node => node.props['aria-disabled'] === 'true');
   wrapper.props.ref.current = { getBoundingClientRect: () => ({ left: 30, width: 32, top: 40, bottom: 72 }) };
   assert.equal(button.props.disabled, true); assert.equal(wrapper.props.tabIndex, 0);
+  assert.equal(wrapper.props['aria-current'], 'step');
   wrapper.props.onPointerEnter({ pointerType: 'mouse' });
   tree = h.render('TooltipButton'); assert.ok(walk(tree).some(node => node.props.role === 'tooltip'));
   wrapper = walk(tree).find(node => node.props['aria-disabled'] === 'true'); wrapper.props.onBlur();
