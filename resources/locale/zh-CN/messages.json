@@ -739,6 +739,7 @@
     "savingTheLibraryDirectoryRecordWasAborted": "保存资料目录记录已中止。"
   },
   "editorThemeLibrary": {
+    "missingThemes": "找不到所选主题：{{names}}。暂以基础主题显示，将对应 JSON 放入 themes/editor-themes/ 后刷新可恢复。",
     "theEditorThemeIdIsUnsafe": "Editor theme ID 不安全。",
     "invalidFilenameUseASafeIdJson": "文件名无效；须为安全的 <id>.json。",
     "theFilenameDoesNotMatchTheThemeId": "文件名与主题 ID 不一致。",

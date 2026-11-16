@@ -247,6 +247,10 @@ Use one representative manuscript to record all six results with input revision,
 
 Default UI catalogs live in `resources/locale/`, public release data in `resources/changelog/public.json`, and local development/review notes in Git-ignored `resources/changelog/local.md`. Platform sources are in `resources/presets/platform/`. New-library seeds live in `resources/template/fresh-library/en-US/` and `zh-CN/`, each with actual theme, snippet and starter directories, and no articles or history. Theme authoring starting points are in `resources/template/`.
 
+The prebuild step of npm run build invokes scripts/generate-library-assets.mjs to prepare default libraries, starters, independent examples and render records by language, preset and guide profile. It generates resources/prepared-library.generated.json plus the manifest and content-addressed objects under public/prepared-library/. Runtime loads and verifies the selected objects, writes them with bounded concurrency into a newly named empty directory, substitutes actual dates/months and writes version 2 settings. Verified font preload can be reused; complete fonts still come from the selected external source when missing.
+
+This installation path is for new libraries only. Existing libraries, user changes and history continue under their compatibility and protection contracts. Rebuild after changing maintained sources, and retain the complete manifest and extensionless objects in static packages/deployments. Preparing assets ahead of time does not change existing library, article or history protocols.
+
 Browser-loaded scripts remain in `public/format/` and `public/algorithm/`; complete font sources, sizes and hashes live in the [font manifest](../../../resources/font-sources.json), downloading only into authorized libraries. `public/fonts/` retains three OFL texts; images and other licenses remain in `public/images/` and `public/licenses/`. The sample uses only `/images/article-sample.png`. Old root URLs and arbitrary relative images are not replaced with the sample; correct the actual snippet/template references. Bilingual prose remains in `docs/locale/`.
 
 </details>
@@ -767,7 +771,7 @@ Configuration is read when opening a library, explicitly reloading render config
 - All three absent: explicitly identify complete built-in fallback without silently writing files.
 - Partial files, old structure, damaged JSON, unknown capabilities/fields, incorrect parameter types, duplicate IDs or missing references: configuration errors. Do not combine defaults with fragments and claim success.
 - Original material remains recoverable; compilation/compliance checks do not trust invalid configuration.
-- Ordinary new-library creation installs the selected trio, self-contained interpreter, declaration and notices, with an empty article directory and no test manuscripts/history. The entry guide additionally prepares a starter and independent example; see [guide file effects](AGENT-GUIDE.md#doc-entry-guide-files).
+- Ordinary new-library creation installs the selected prepared trio, self-contained interpreter, manifest and notices, and writes default settings.json with an initially empty articles/. The entry guide additionally installs the selected starter, independent example and confirmed settings; see [guide file effects](AGENT-GUIDE.md#doc-entry-guide-files).
 
 ### Migration and language
 

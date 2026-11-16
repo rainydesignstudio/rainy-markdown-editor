@@ -6,6 +6,8 @@ import { ContentIcon } from '../global/ContentIcon';
 import { TooltipButton } from '../global/TooltipButton';
 import { ModeSwitch } from '../global/ModeSwitch';
 import { BrandMark } from '../global/BrandMark';
+import { GuideFontPreload } from './GuideFontPreload';
+import { getFontPreloadState } from '../../lib/fontPreload';
 import { GuideWelcome } from './GuideWelcome';
 import type { GuideAudioControls } from '../../hooks/useGuideAudio';
 import type { EditorAppearance } from '../../lib/editorWorkspace';
@@ -14,16 +16,19 @@ import { GuideThemeDeck } from './GuideThemeDeck';
 import { GuideHandoff } from './GuideHandoff';
 import { DEFAULT_EDITOR_THEME, getBuiltinEditorThemes, type EditorTheme } from '../../lib/editorThemes';
 import { normalizeDataDirectoryName } from '../../lib/fileSystem';
-import { GUIDE_STEPS as S, guideProfile, profilesFor, type GuidePhase, type GuidePlan, type GuidePurpose, type GuideResources, type GuideResult, type GuideWriter } from '../../lib/entryGuide';
+import { prepareBuiltinLibrary } from '../../lib/preparedLibrary';
+import { GUIDE_STEPS as S, GUIDE_OUTRO, guideOutroDuration, guideProfile, profilesFor, type GuidePreparationProgress, type GuidePhase, type GuideProgress, type GuidePlan, type GuidePurpose, type GuideResources, type GuideResult, type GuideWriter } from '../../lib/entryGuide';
 
 type Props = {
   audio?: GuideAudioControls;
   supported: boolean;
   workspaceReady?: boolean;
   workspaceIssue?: string;
-  onCreate: (plan: GuidePlan, progress: (phase: GuidePhase) => void) => Promise<GuideResult>;
-  onOpen: (progress: (phase: GuidePhase) => void) => Promise<GuideResult>;
+  onCreate: (plan: GuidePlan, progress: GuideProgress) => Promise<GuideResult>;
+  onOpen: (progress: GuideProgress) => Promise<GuideResult>;
   onFinish: (remember: boolean) => void;
+  onVerifyReady?: () => Promise<boolean>;
+  onArrival?: () => void;
   onAppearance: (mode: GuidePlan['colorMode'], themeId?: string) => void;
   onAdoptAppearance?: (appearance: EditorAppearance, theme: EditorTheme) => Promise<boolean>;
 };
@@ -89,7 +94,7 @@ function Choice({ name, value, checked, onChange, onPreview, collecting, disable
   </div>;
 }
 
-export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, onCreate, onOpen, onFinish, onAppearance, onAdoptAppearance, audio }: Props) {
+export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, onCreate, onOpen, onFinish, onVerifyReady, onArrival, onAppearance, onAdoptAppearance, audio }: Props) {
   const { t } = useUITranslation('onboarding');
   const { locale, setLocale } = useUILocale();
   const [step, setStep] = useState(-2);
@@ -103,6 +108,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
   const surface = useRef<HTMLElement>(null), rememberEntry = useRef(true);
   const [languageChoice, setLanguageChoice] = useState<'zh-CN' | 'en-US' | null>(null);
   const [languageBusy, setLanguageBusy] = useState(false);
+  const [fontPreloadRequested, setFontPreloadRequested] = useState(false);
   const [purpose, setPurpose] = useState<GuidePurpose | null>(null);
   const [previewPurpose, setPreviewPurpose] = useState<GuidePurpose | null>(null);
   const [previewProfile, setPreviewProfile] = useState<string | null>(null);
@@ -139,6 +145,10 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
   const [complete, setComplete] = useState(false);
   const [entering, setEntering] = useState(false);
   const [appearanceFailed, setAppearanceFailed] = useState(false);
+  const [preparationProgress, setPreparationProgress] = useState<Partial<GuidePreparationProgress> | null>(null);
+  const [preparationId, setPreparationId] = useState(0);
+  const [outroStartedAt, setOutroStartedAt] = useState<number | null>(null);
+  const [motionReduced, setMotionReduced] = useState(false);
   const [panelView, setPanelView] = useState<'steps' | 'preparing' | 'handoff' | 'complete'>('steps');
   const panelTransition = useRef(false);
   const exitRequested = useRef(false), entryReady = useRef(workspaceReady);
@@ -146,10 +156,13 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
   const handoff = prepared && entryReady.current && mode === 'new' && writer === 'agent';
   const desiredView = complete ? 'complete' : handoff ? 'handoff' : busy ? 'preparing' : 'steps';
   const departing = complete && panelView === 'complete';
+  const outroActive = departing && outroStartedAt !== null;
   const pendingMove = useRef<(() => void) | null>(null);
   const languageRequest = useRef(false), readyResult = useRef(false), delivered = useRef(false);
   const onFinishRef = useRef(onFinish);
   onFinishRef.current = onFinish;
+  const onArrivalRef = useRef(onArrival);
+  onArrivalRef.current = onArrival;
   const request = useRef(false), alive = useRef(true);
   const heading = useRef<HTMLHeadingElement>(null);
   const feedback = useRef<HTMLDivElement>(null);
@@ -174,6 +187,12 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     return () => window.clearTimeout(timer);
   }, [welcome, greeting, greetingCount, hello, locale]);
   const selected = guideProfile(profileId);
+  useEffect(() => {
+    if (!selected) return;
+    let active = true;
+    void prepareBuiltinLibrary({ locale, preset: selected.preset, profile: selected.id }, () => active).catch(() => { /* Creation retries a failed background preload with explicit feedback. */ });
+    return () => { active = false; };
+  }, [locale, selected]);
   let normalized = '', nameIssue = '';
   if (name.trim()) { try { normalized = normalizeDataDirectoryName(name); } catch { nameIssue = t('invalidName'); } }
   const cancelMotion = () => { flightSerial.current++; pendingReturn.current = null; setReturnAnchor(null); setFlight(null); };
@@ -195,18 +214,23 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     if ((remember && !prepared) || !entryReady.current || exitRequested.current) return;
     rememberEntry.current = remember;
     exitRequested.current = true;
-    if (onAdoptAppearance) {
-      setEntering(true); setAppearanceFailed(false); setError('');
-      let adopted = false;
-      const selectedTheme = chosenTheme ?? getBuiltinEditorThemes(locale).find(theme => theme.id === DEFAULT_EDITOR_THEME.id)!;
-      try { adopted = await onAdoptAppearance({ themeId: selectedTheme.id, colorMode, custom: null }, structuredClone(selectedTheme)); } catch { /* Remain in the guide for retry. */ }
-      if (!alive.current) return;
-      setEntering(false);
-      if (!adopted || !entryReady.current || !exitRequested.current) {
-        exitRequested.current = false; setAppearanceFailed(true); setError(t('appearanceSaveFailed')); return;
+    setEntering(true); setAppearanceFailed(false); setError('');
+    try {
+      if (onAdoptAppearance) {
+        const selectedTheme = chosenTheme ?? getBuiltinEditorThemes(locale).find(theme => theme.id === DEFAULT_EDITOR_THEME.id)!;
+        if (!await onAdoptAppearance({ themeId: selectedTheme.id, colorMode, custom: null }, structuredClone(selectedTheme))) throw new Error(t('appearanceSaveFailed'));
       }
+      if (!alive.current) return;
+      if (!entryReady.current || !exitRequested.current) throw new Error(t('preparationChanged'));
+      if (onVerifyReady && !await onVerifyReady()) throw new Error(t('preparationChanged'));
+      if (!alive.current) return;
+      if (!entryReady.current || !exitRequested.current) throw new Error(t('preparationChanged'));
+      setEntering(false); setComplete(true);
+    } catch (cause) {
+      if (!alive.current) return;
+      exitRequested.current = false; setEntering(false); setAppearanceFailed(true);
+      setError(cause instanceof Error ? cause.message : t('preparationChanged'));
     }
-    setComplete(true);
   };
   useEffect(() => {
     if (!prepared && rememberEntry.current) return;
@@ -247,14 +271,14 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     return () => window.clearTimeout(timer);
   }, [desiredView, panelView, leaving]);
 
+  useLayoutEffect(() => { setOutroStartedAt(departing ? Date.now() : null); }, [departing]);
+  useEffect(() => { if (departing) audio?.play(); }, [departing]);
   useEffect(() => {
-    if (!departing) return;
-    audio?.play();
-    if (reducedMotion()) { deliver(); return; }
-    const seconds = Number.parseFloat(getComputedStyle(surface.current!).animationDuration) || 0;
-    const timer = window.setTimeout(deliver, seconds * 1000);
-    return () => window.clearTimeout(timer);
-  }, [departing]);
+    if (outroStartedAt === null || !departing) return;
+    const arrival = window.setTimeout(() => onArrivalRef.current?.(), Math.max(0, outroStartedAt + GUIDE_OUTRO.welcomeHold - Date.now()));
+    const timer = window.setTimeout(deliver, Math.max(0, outroStartedAt + guideOutroDuration(motionReduced, GUIDE_OUTRO.welcomeHold) - Date.now()));
+    return () => { window.clearTimeout(arrival); window.clearTimeout(timer); };
+  }, [departing, outroStartedAt, motionReduced]);
 
   useEffect(() => {
     alive.current = true;
@@ -263,13 +287,14 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     syncScheme(); scheme.addEventListener('change', syncScheme);
     appearanceRef.current('system', DEFAULT_EDITOR_THEME.id);
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setMotionReduced(media.matches);
     const finishFlight = cancelMotion;
     const syncMotion = () => {
+      setMotionReduced(media.matches);
       if (!media.matches) return;
       setGreeting('ready');
       cancelMotion(); pendingMove.current?.();
       feedback.current?.scrollIntoView({ block: 'nearest' });
-      if (exitRequested.current) deliver();
     };
     const settleGreeting = () => { if (document.hidden) setGreeting('ready'); };
     document.addEventListener('visibilitychange', settleGreeting);
@@ -387,7 +412,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
   const chooseLanguage = async (value: 'zh-CN' | 'en-US') => {
     if (languageRequest.current || pendingMove.current) return;
     cancelReturning(); languageRequest.current = true; setLanguageBusy(true); setError('');
-    try { await setLocale(value); if (alive.current) setLanguageChoice(value); }
+    try { await setLocale(value); if (alive.current) { setLanguageChoice(value); } }
     catch { if (alive.current) { setLanguageChoice(null); setError(t('languageFailed')); } }
     finally { languageRequest.current = false; if (alive.current) setLanguageBusy(false); }
   };
@@ -397,7 +422,14 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     const previousMode = mode;
     setMode(operation);
     request.current = true; setSelecting(true); setError(''); setCancelled(false); setPhase('directory');
-    const progress = (next: GuidePhase) => { if (alive.current) { setSelecting(false); setBusy(true); setPhase(next); } };
+    if (!resumable) { setPreparationProgress(null); setPreparationId(previous => previous + 1); }
+    const progress: GuideProgress = (next, detail) => {
+      if (!alive.current) return;
+      const preload = getFontPreloadState();
+      const preloadAtStart = preload.phase === 'complete' ? 1 : (preload.percent ?? 0) / 100;
+      setSelecting(false); setBusy(true); setPhase(next);
+      setPreparationProgress(previous => ({ ...previous, ...detail, preloadAtStart: previous?.preloadAtStart ?? preloadAtStart }));
+    };
     try {
       // Invoke the picker in the click's activation; no transition or timer comes first.
       const result = operation === 'existing' ? await onOpen(progress) : await onCreate({ profile: selected!.id, name: normalized, writer: writer!, autoSave, autoSnapshot, colorMode, themeId: themeId || DEFAULT_EDITOR_THEME.id }, progress);
@@ -405,6 +437,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
       if (result.status === 'ready') {
         readyResult.current = true;
         setResources(result.resources ?? null); setResumable(false);
+        setPreparationProgress(previous => previous ? ({ ...previous, localReady: true, fontsReady: true }) : null);
         setPrepared(true); setSelecting(false); setBusy(true);
         return;
       }
@@ -416,6 +449,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
   const nextEnabled = step === S.language ? Boolean(languageChoice) && !languageBusy : step === S.appearance ? Boolean(themeId) : step === S.purpose ? Boolean(purpose) : step === S.output ? Boolean(selected) : step === S.writer ? Boolean(writer) : step === S.library ? mode === 'existing' || Boolean(normalized && !nameIssue) : true;
   const savingLabel = t(autoSave ? autoSnapshot ? 'savingBoth' : 'autoSave' : autoSnapshot ? 'autoSnapshot' : 'savingNeither');
   const proceed = () => {
+    if (step === S.language) { if (!nextReady) return; setFontPreloadRequested(true); }
     if (step === S.review) { void finish(); return; }
     const source = decisionElement(step);
     const label = step === S.language ? languageChoice === 'zh-CN' ? '简体中文' : 'English' : step === S.appearance ? chosenTheme?.name ?? '' : step === S.purpose ? t(`purposes.${purpose}.title`) : step === S.output ? t(`profiles.${profileId}.title`) : step === S.writer ? t(`writers.${writer}.title`) : step === S.saving ? savingLabel : mode === 'new' ? normalized : t('existingLibrary');
@@ -436,7 +470,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
   const nextReady = nextEnabled && (step !== S.language || greeting === 'ready') && !leaving && !languageBusy && !selecting && !flight && !returnAnchor;
   const nextButton = <button className="guide-next guide-next-round motion-safe:data-[ready=true]:animate-guide-ready" type="button" aria-label={t('continue')} data-ready={nextReady} disabled={!nextReady} onClick={proceed}><span className="guide-nav-label" aria-hidden="true"><span>{t('continue')}</span></span><span className="guide-nav-icon"><ContentIcon name={languageBusy ? 'changes' : 'expand'} /></span></button>;
   const backButton = <button className="guide-action guide-next-round" type="button" data-back="true" aria-label={t('back')} disabled={leaving || resumable} onClick={() => returnTo(step === S.appearance ? -2 : mode === 'existing' ? 0 : step - 1)}><span className="guide-nav-icon"><ContentIcon name="collapse" /></span><span className="guide-nav-label" aria-hidden="true"><span>{t('back')}</span></span></button>;
-  return <main ref={surface} inert={entering} aria-busy={entering} onClickCapture={audio?.prime} data-entry-guide data-step={step} data-complete={departing} onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'guide-depart' && departing) deliver(); }} className="isolate bg-canvas fixed inset-0 flex h-dvh min-h-0 flex-col overflow-hidden font-sans text-secondary transition-[background-color,color] duration-500 motion-safe:data-[complete=true]:animate-guide-depart motion-reduce:transition-none">
+  return <main ref={surface} inert={entering} aria-busy={entering} onClickCapture={audio?.prime} data-entry-guide data-step={step} data-complete={outroActive} data-outro-started-at={outroStartedAt ?? undefined} style={{ '--guide-outro-hold': `${GUIDE_OUTRO.welcomeHold}ms`, '--guide-outro-exit': `${motionReduced ? GUIDE_OUTRO.reducedFade : GUIDE_OUTRO.collapse + GUIDE_OUTRO.fade}ms`, '--guide-bar-collapse': `${motionReduced ? 0 : GUIDE_OUTRO.collapse}ms`, '--guide-bar-fade': `${motionReduced ? GUIDE_OUTRO.reducedFade : GUIDE_OUTRO.fade}ms` } as CSSProperties} onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'guide-depart' && departing) deliver(); }} className="isolate bg-canvas fixed inset-0 z-60 flex h-dvh min-h-0 flex-col overflow-hidden font-sans text-secondary transition-[background-color,color] duration-500 motion-safe:data-[complete=true]:animate-guide-depart motion-reduce:data-[complete=true]:animate-guide-depart-still motion-reduce:transition-none">
     <div data-guide-ambience data-exit={departing} aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 scale-100 overflow-hidden opacity-60 transition-[scale,opacity] duration-700 data-[exit=true]:scale-110 md:opacity-100 motion-reduce:transition-none"><div className="absolute inset-0 animate-guide-environment motion-reduce:animate-none">
       <div className="absolute -left-1/4 -top-1/4 h-full w-full rounded-full bg-radial from-accent/14 via-accent/4 to-transparent to-70% blur-3xl animate-guide-ambient motion-reduce:animate-none" />
       <div className="absolute -bottom-1/3 -right-1/4 h-full w-full rounded-full bg-radial from-accent-soft/70 via-accent/5 to-transparent to-70% blur-3xl animate-guide-ambient-return motion-reduce:animate-none" />
@@ -446,7 +480,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     </div></div>
     {welcome ? <GuideWelcome onDone={() => setWelcome(false)} /> : null}
     <div data-guide-content hidden={welcome} inert={welcome} aria-hidden={welcome} className="contents">
-    <nav ref={journey} aria-label={t('journey')} className="relative z-30 mx-auto flex h-18 shrink-0 items-center justify-center px-4 md:h-22">
+    <nav ref={journey} data-hidden={panelView !== 'steps'} inert={panelView !== 'steps'} aria-hidden={panelView !== 'steps'} aria-label={t('journey')} className="relative z-30 mx-auto flex h-18 data-[hidden=true]:invisible shrink-0 items-center justify-center px-4 md:h-22">
       <span ref={slotMeasure} className="pointer-events-none invisible absolute w-10 md:w-11" />
       {nodes.map(node => {
         const visible = node.exists && completedStep >= node.step && (step > node.step || (flight?.direction === 'collect' && flight.step === node.step));
@@ -465,7 +499,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
         {!centered ? <aside data-scene-anchor data-scene-leaving={sceneLeaving} aria-hidden="true" className="relative hidden aspect-square min-w-0 items-center justify-center opacity-100 transition-[opacity,translate] duration-200 ease-out data-[scene-leaving=true]:translate-y-3 data-[scene-leaving=true]:opacity-0 motion-reduce:transition-none lg:col-span-5 lg:flex"><div className="size-full animate-guide-scene-reveal motion-reduce:animate-none"><GuideScene libraryName={name} purpose={step === S.purpose ? previewPurpose ?? purpose : purpose} profileId={step < 1 ? '' : step === S.output ? previewProfile ?? profileId : profileId} gathering={gathering} autoSave={step >= S.writer && autoSave} autoSnapshot={step >= S.writer && autoSnapshot} /></div></aside> : null}
         <section data-centered={centered} data-themes={step === S.appearance} className="mx-auto flex max-h-full min-h-0 w-full min-w-0 max-w-128 flex-col data-[centered=true]:max-w-144 data-[themes=true]:max-w-none lg:col-span-7 lg:data-[centered=true]:col-span-12">
           <div data-guide-panel data-view={panelView} data-selecting={selecting} data-leaving={leaving} data-direction={direction} inert={leaving || selecting} onTransitionEnd={event => { if (event.target === event.currentTarget && event.propertyName === 'opacity') pendingMove.current?.(); }} className="flex min-h-0 flex-col transition-[opacity,translate] duration-500 ease-out data-[leaving=true]:duration-200 data-[leaving=true]:translate-y-3 data-[direction=back]:data-[leaving=true]:-translate-y-3 data-[leaving=true]:opacity-0 motion-reduce:transition-none">
-            {panelView === 'handoff' && selected ? <GuideHandoff name={normalized} profile={selected.id} resources={resources} headingRef={heading} onEnter={() => void enterWorkspace()} error={appearanceFailed ? t('appearanceSaveFailed') : undefined} leaving={leaving || complete || !handoff} /> : step === S.language ? <div className="guide-welcome" data-guide-greeting-stage={greeting}>
+            {panelView === 'handoff' && selected ? <GuideHandoff name={normalized} profile={selected.id} resources={resources} headingRef={heading} onEnter={() => void enterWorkspace()} error={appearanceFailed ? error || t('appearanceSaveFailed') : undefined} leaving={leaving || complete || !handoff} /> : step === S.language ? <div className="guide-welcome" data-guide-greeting-stage={greeting}>
               <p data-guide-greeting data-expanded={greetingExpanded} data-hidden={greeting === 'waiting'} onTransitionEnd={event => { if (greeting === 'settle' && event.target === event.currentTarget && event.propertyName === 'font-size') setGreeting('reveal'); }} className="guide-greeting text-base transition-[font-size,line-height,translate] duration-500 data-[expanded=true]:translate-y-24 data-[expanded=true]:text-2xl data-[hidden=true]:invisible md:data-[expanded=true]:translate-y-28 md:data-[expanded=true]:text-3xl motion-reduce:transition-none">
                 <span className="sr-only">{hello}</span>
                 <span aria-hidden="true" data-waving={greeting === 'wave'} className="inline-block motion-safe:data-[waving=true]:animate-guide-line-reveal"><span data-guide-wave data-waving={greeting === 'wave'} onAnimationEnd={event => { if (greeting === 'wave' && event.animationName === 'guide-wave') setGreeting('typing'); }} className="inline-block origin-bottom-right motion-safe:data-[waving=true]:animate-guide-wave">🖐🏻</span></span>
@@ -484,7 +518,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
               <div data-theme-stage className="my-8 h-[min(45vh,340px)] min-h-[230px] w-full" />
               <footer className="flex shrink-0 items-center justify-between">{backButton}{nextButton}</footer>
             </> : <>
-              {panelView === 'preparing' || panelView === 'complete' ? <div data-guide-outro={departing} className="flex min-h-0 flex-col items-center justify-center py-6 text-center motion-safe:data-[guide-outro=true]:animate-guide-pack" role="status" aria-live="polite"><span data-complete={departing} className="mb-9 block size-18 text-on-accent data-[complete=true]:size-52 md:data-[complete=true]:size-64">{departing ? <GuideScene libraryName={name} purpose={purpose} profileId={profileId} gathering autoSave={autoSave} autoSnapshot={autoSnapshot} /> : <BrandMark />}</span><h1 ref={heading} tabIndex={-1} className="font-heading text-3xl font-semibold text-primary outline-none">{departing ? t(rememberEntry.current ? 'completeTitle' : 'exploreTitle') : t('preparingTitle')}</h1><p className="mt-4 text-sm text-muted">{departing ? t(rememberEntry.current ? mode === 'new' ? 'completeBody' : 'existingCompleteBody' : 'exploreBody') : t(`phases.${phase}`)}</p>{!departing ? <span className="mt-8 flex h-6 items-center gap-2 text-accent" aria-hidden="true"><span className="size-2 motion-safe:animate-pulse rounded-full bg-accent" /></span> : null}</div> : <>
+              {panelView === 'preparing' || panelView === 'complete' ? <div data-guide-outro={departing} className="flex min-h-0 flex-col items-center justify-center py-6 text-center motion-safe:data-[guide-outro=true]:animate-guide-pack" role="status" aria-live="polite"><span data-complete={departing} className="mb-9 block size-18 text-on-accent transition-[width,height] duration-700 ease-out data-[complete=true]:size-52 md:data-[complete=true]:size-64 motion-reduce:transition-none">{departing ? <GuideScene libraryName={name} purpose={purpose} profileId={profileId} gathering autoSave={autoSave} autoSnapshot={autoSnapshot} /> : <BrandMark />}</span><h1 ref={heading} tabIndex={-1} className="font-heading text-3xl font-semibold text-primary outline-none">{departing ? t(rememberEntry.current ? 'completeTitle' : 'exploreTitle') : t('preparingTitle')}</h1><p className="mt-4 text-sm text-muted">{departing ? t(rememberEntry.current ? mode === 'new' ? 'completeBody' : 'existingCompleteBody' : 'exploreBody') : t(`phases.${phase}`)}</p><span data-guide-preload-target className="mt-8 block h-6" aria-hidden="true" /></div> : <>
                 <header className="shrink-0"><h1 ref={heading} tabIndex={-1} className="font-heading text-3xl font-semibold tracking-tight text-primary outline-none md:text-4xl">{step >= S.library && mode === 'existing' ? t('existingLibrary') : t(`titles.${steps[step]}`)}</h1></header>
                 <div ref={content} className="mt-7 min-h-0 overflow-x-clip overflow-y-auto">
                   {step === S.purpose ? <fieldset><legend className="sr-only">{t('titles.purpose')}</legend><div className="grid gap-3">{purposes.map(item => <Choice key={item} name="purpose" value={item} checked={purpose === item} disabled={leaving} collecting={movingStep === S.purpose && purpose === item} onPreview={active => { if (!leaving) setPreviewPurpose(current => active ? item : current === item ? null : current); }} title={t(`purposes.${item}.title`)} detail={t(`purposes.${item}.detail`)} icon={item === 'development' ? 'code' : item === 'commerce' ? 'folder' : 'quote'} onChange={() => { cancelReturning(); if (purpose !== item) setProfileId(''); setPurpose(item); setMode('new'); }} />)}</div><button className="guide-choice group/choice mt-3 border-dashed bg-transparent hover:bg-hover" aria-label={t('alreadyHave')} disabled={leaving || selecting || busy} onClick={() => void finish('existing')}><span className="guide-choice-icon"><ContentIcon name="folder" /></span><CardText title={t('alreadyHave')} detail={t('existingHelp')} /><span className="ml-auto text-muted transition-[translate] duration-300 ease-[ease] group-hover/choice:translate-x-0.75 group-hover/choice:text-accent-text motion-reduce:transition-none"><ContentIcon name="expand" /></span></button></fieldset> : null}
@@ -512,6 +546,7 @@ export function EntryGuide({ supported, workspaceReady = true, workspaceIssue, o
     </div>
     {returnAnchor ? <span aria-hidden="true" data-guide-return-anchor className="pointer-events-none fixed z-60 rounded-full bg-accent" style={{ left: returnAnchor.rect.left, top: returnAnchor.rect.top, width: returnAnchor.rect.width, height: returnAnchor.rect.height }} /> : null}
     {flight ? <div ref={flightElement} key={flight.id} aria-hidden="true" data-guide-flight data-direction={flight.direction} data-kind={flight.kind} style={flight.style} onAnimationEnd={event => { if (event.target === event.currentTarget && event.animationName === 'guide-collect') setFlight(current => current?.id === flight.id ? null : current); }} className="pointer-events-none data-[direction=return]:[animation-direction:reverse] fixed z-60 flex origin-center motion-safe:animate-guide-collect items-center justify-center overflow-hidden whitespace-nowrap rounded-full text-primary">{flight.label}</div> : null}
+    <GuideFontPreload enabled={fontPreloadRequested} preparing={panelView === 'preparing'} preparation={preparationProgress} preparationId={preparationId} preparationReady={prepared && entryReady.current && !error} preparationIssue={error || undefined} onRetryPreparation={() => { if (readyResult.current) void enterWorkspace(rememberEntry.current); else void finish(); }} />
     </div>
   </main>;
 }

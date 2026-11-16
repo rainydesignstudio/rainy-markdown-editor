@@ -66,6 +66,14 @@ function page(collection = 'all', options = {}) {
   return { articles: props.articles, props, archived, classified, deleted, opened, render, control, text };
 }
 
+test('index diagnostics pass the affected path and cause to Toast and retain the rebuild action', () => {
+  const view = page('all', { indexIssues: [{ month: '2026-09', message: 'Invalid index JSON' }] });
+  const diagnostic = view.render().find(node => node.type === 'operation-feedback' && node.props.id === 'article-index-diagnostics').props;
+  assert.equal(diagnostic.summary.messageParams.count, 1);
+  assert.equal(productMessages.productText(diagnostic.notice.messageKey, diagnostic.notice.messageParams), 'articles/2026-09/index.json · Invalid index JSON');
+  assert.ok(view.render().some(node => node.type === 'button' && view.text(node) === '扫描并重建索引'));
+});
+
 test('multi-select uses the whole row, hides menus, and offers project and archive actions', () => {
   const view = page();
   assert.equal(view.render().filter(node => node.type === 'article-menu').length, 2);

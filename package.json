@@ -1,17 +1,17 @@
 {
   "name": "rainy-markdown-editor",
-  "version": "0.4.0",
+  "version": "0.4.0+patch.1",
   "private": true,
   "license": "MIT",
   "scripts": {
     "dev": "next dev --webpack -p 3500",
     "predev": "node scripts/generate-format-assets.mjs",
-    "prebuild": "node scripts/generate-tailwind-assets.mjs && node scripts/generate-format-assets.mjs",
+    "prebuild": "node scripts/generate-tailwind-assets.mjs && node scripts/generate-format-assets.mjs && node scripts/generate-library-assets.mjs",
     "build": "next build --webpack",
     "start": "node scripts/start-static.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --experimental-loader ./tests/ts-loader.mjs --test tests/*.test.mjs tests/**/*.test.mjs",
-    "pretest": "node scripts/generate-format-assets.mjs"
+    "pretest": "node scripts/generate-format-assets.mjs && node scripts/generate-library-assets.mjs"
   },
   "dependencies": {
     "d3-drag": "3.0.0",

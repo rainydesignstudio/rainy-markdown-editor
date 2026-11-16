@@ -6,14 +6,14 @@ import { initializeLocalFonts, loadLocalFonts, shareLocalFontsWithPreview } from
 import { OPEN_FONT_ASSETS, canonicalFontStack, codeFontStack, fontOptions } from '../src/lib/fontCatalog.ts';
 
 class Directory {
-  files = new Map(); directories = new Map(); failWrite = false; failClose = false; replacementOnCloseFailure = null;
+  files = new Map(); directories = new Map(); failWrite = false; failClose = false; replacementOnCloseFailure = null; replacedOnCloseFailure = new Set();
   async getDirectoryHandle(name, { create = false } = {}) {
     if (!this.directories.has(name)) { if (!create) throw new DOMException('missing', 'NotFoundError'); this.directories.set(name, new Directory()); }
     return this.directories.get(name);
   }
   async getFileHandle(name, { create = false } = {}) {
     if (!this.files.has(name)) { if (!create) throw new DOMException('missing', 'NotFoundError'); this.files.set(name, new ArrayBuffer(0)); }
-    return { getFile: async () => ({ size: this.files.get(name).byteLength, arrayBuffer: async () => this.files.get(name) }), createWritable: async () => ({ write: async content => { if (this.failWrite) throw new Error('write denied'); this.files.set(name, content); }, close: async () => { if (this.failClose) { if (this.replacementOnCloseFailure) this.files.set(name, this.replacementOnCloseFailure); throw new Error('close denied'); } }, abort: async () => {} }) };
+    return { getFile: async () => ({ size: this.files.get(name).byteLength, arrayBuffer: async () => this.files.get(name) }), createWritable: async () => ({ write: async content => { if (this.failWrite) throw new Error('write denied'); this.files.set(name, content); }, close: async () => { if (this.failClose) { if (this.replacementOnCloseFailure) { this.files.set(name, this.replacementOnCloseFailure); this.replacedOnCloseFailure.add(name); } throw new Error('close denied'); } }, abort: async () => {} }) };
   }
   async removeEntry(name) { this.files.delete(name); }
 }
@@ -27,22 +27,28 @@ test('font menu deduplicates full-stack variants by family and isolates code cho
   assert.ok(!/Songti/.test(codeFontStack('"Songti SC", serif')));
 });
 
-const fixtureBytes = new TextEncoder().encode('font test bytes').buffer;
-const fixtureHash = createHash('sha256').update(new Uint8Array(fixtureBytes)).digest('hex');
+let fixtureBytes, fixtureHash, fixtureId = 0;
+const restoredContexts = new WeakSet();
 function fixtureCatalog(t) {
-  const original = structuredClone(OPEN_FONT_ASSETS);
+  if (!restoredContexts.has(t)) {
+    const original = structuredClone(OPEN_FONT_ASSETS);
+    t.after(() => OPEN_FONT_ASSETS.forEach((asset, index) => Object.assign(asset, original[index])));
+    restoredContexts.add(t);
+  }
+  // Each failure scenario needs a fresh verified-cache identity.
+  fixtureBytes = new TextEncoder().encode('font test bytes ' + ++fixtureId).buffer;
+  fixtureHash = createHash('sha256').update(new Uint8Array(fixtureBytes)).digest('hex');
   for (const asset of OPEN_FONT_ASSETS) Object.assign(asset, { size: fixtureBytes.byteLength, sha256: fixtureHash, licenseSize: fixtureBytes.byteLength, licenseSha256: fixtureHash });
-  t.after(() => OPEN_FONT_ASSETS.forEach((asset, index) => Object.assign(asset, original[index])));
 }
 const okResponse = () => new Response(fixtureBytes.slice(0));
 
-test('directory initialization verifies external complete fonts and preserves every existing file', async t => {
+test('directory initialization verifies selected external fonts and preserves every existing file', async t => {
   fixtureCatalog(t);
   const root = new Directory(), urls = [];
   t.mock.method(globalThis, 'fetch', async url => { urls.push(url); return okResponse(); });
   await initializeLocalFonts(root);
   const directory = await root.getDirectoryHandle('fonts');
-  assert.deepEqual([...directory.files.keys()], OPEN_FONT_ASSETS.flatMap(asset => [asset.license, asset.file]));
+  assert.deepEqual([...directory.files.keys()].sort(), OPEN_FONT_ASSETS.flatMap(asset => [asset.license, asset.file]).sort());
   assert.equal(urls.filter(url => url.startsWith('https://raw.githubusercontent.com/google/fonts/')).length, 3);
   assert.equal(urls.filter(url => url.startsWith('/fonts/') && url.endsWith('-OFL.txt')).length, 3);
   const custom = new Uint8Array([1, 2, 3]).buffer;
@@ -50,6 +56,19 @@ test('directory initialization verifies external complete fonts and preserves ev
   await initializeLocalFonts(root);
   assert.equal(urls.length, 6);
   assert.equal(directory.files.get('sen-variable.ttf'), custom);
+  assert.equal(getLocalFontStatus().phase, 'ready');
+});
+
+test('complete fonts use the selected source without probing a bundled-font route', async t => {
+  fixtureCatalog(t);
+  const root = new Directory(), urls = [];
+  t.mock.method(globalThis, 'fetch', async url => {
+    urls.push(url);
+    return url.startsWith('/fonts/builtin/') ? new Response('', { status: 404 }) : okResponse();
+  });
+  await initializeLocalFonts(root);
+  assert.equal(urls.filter(url => url.startsWith('/fonts/builtin/')).length, 0);
+  assert.equal(urls.filter(url => url.startsWith('https://raw.githubusercontent.com/google/fonts/')).length, 3);
   assert.equal(getLocalFontStatus().phase, 'ready');
 });
 
@@ -62,6 +81,7 @@ test('failed writes remove only newly owned partial files; a stale session never
   assert.equal(directory.files.size, 0);
   assert.equal(getLocalFontStatus().phase, 'error');
   directory.failWrite = false;
+  fixtureCatalog(t);
   let current = true;
   t.mock.method(globalThis, 'fetch', async () => { current = false; return okResponse(); });
   await initializeLocalFonts(root, () => current);
@@ -88,8 +108,8 @@ test('failed close cleans owned bytes but preserves a replacement with unrelated
     const root = new Directory(), directory = await root.getDirectoryHandle('fonts', { create: true });
     directory.failClose = true; directory.replacementOnCloseFailure = replacement;
     await assert.rejects(initializeLocalFonts(root), /close denied/);
-    assert.equal(directory.files.size, replacement ? 1 : 0);
-    if (replacement) assert.equal(directory.files.get('sen-OFL.txt'), replacement);
+    assert.deepEqual([...directory.files.keys()].sort(), [...directory.replacedOnCloseFailure].sort());
+    if (replacement) for (const value of directory.files.values()) assert.equal(value, replacement);
   }
 });
 

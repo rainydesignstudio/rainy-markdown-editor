@@ -1,3 +1,4 @@
+import './prepared-library-fixture.mjs';
 import * as productMessages from '../src/lib/i18n/productMessages.ts';
 import { withUILocaleImports } from "./ui-locale-fixture.mjs";
 import assert from 'node:assert/strict';
@@ -8,6 +9,12 @@ import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
 import { normalizeDataDirectoryName } from '../src/lib/fileSystem.ts';
 import { DEFAULT_PLATFORM_PRESET_ID, PUBLIC_PLATFORM_PRESETS, getPublicPlatformPreset } from '../src/lib/article-format/library.ts';
+import * as localFonts from '../src/lib/localFonts.ts';
+import { fontFileRequest, fontLicenseRequest, getFontSource } from '../src/lib/fontSources.ts';
+import { OPEN_FONT_ASSETS } from '../src/lib/fontCatalog.ts';
+import { loadPreparedFontFile } from '../src/lib/fontPreload.ts';
+import { createHash } from 'node:crypto';
+import { tree } from './knowledge/fs-fixture.mjs';
 
 const source = await readFile(new URL('../src/components/settings/CreateLibraryDialog.tsx', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -108,6 +115,11 @@ test('unexpected creation errors remain inside the dialog and cancel returns wit
 
 const controllerSource = await readFile(new URL('../src/hooks/useEditorController.ts', import.meta.url), 'utf8');
 function action(name, next, context) {
+  context.directoryRef ??= { current: null };
+  context.entryCreationRef ??= { current: null };
+  context.fontLoadTaskRef ??= { current: null };
+  context.takeCreationFonts ??= localFonts.takeCreationFonts;
+  context.cancelCreationFonts ??= localFonts.cancelCreationFonts;
   context.Error = Error;
   const start = controllerSource.indexOf(`  const ${name} = useCallback(`);
   const end = controllerSource.indexOf(`\n  const ${next}`, start);
@@ -222,4 +234,99 @@ test('guide preparation starts only after a current picker selection, for openin
     events.length = 0; pending = invoke(); context.directorySelectionRef.current++; settle.resolve(root);
     assert.equal((await pending).status, 'cancelled'); assert.deepEqual(events, ['picker']);
   }
+});
+
+test('created-directory recovery reloads and revalidates the retained root without a second picker', async () => {
+  let picks = 0, creates = 0, loads = 0, permit = 'granted';
+  const root = { name: 'recover-created' };
+  const context = { useCallback: fn => fn, DOMException, resumeIntentRef: { current: {} }, directorySelectionRef: { current: 0 }, directoryRef: { current: null }, entryCreationRef: { current: null }, seedLocale: 'en-US', getPublicPlatformPreset, DEFAULT_PLATFORM_PRESET_ID,
+    pickDataDirectory: async () => { picks++; return {}; }, createNamedDataDirectory: async () => { creates++; return root; },
+    rememberAuthorizedDirectory() {}, setStatus() {}, getFormatSnapshot: () => ({ error: 'Load failed' }), requestDirectoryReadWritePermission: async () => permit,
+    openAuthorizedDirectory: async (handle, selection, manual, keepRoute) => { assert.equal(handle, root); assert.equal(selection, context.directorySelectionRef.current); assert.equal(manual, true); assert.equal(keepRoute, true); context.directoryRef.current = handle; return ++loads > 1; },
+  };
+  const create = action('createDataDirectory', 'resumeEntryDirectory', context);
+  const resume = action('resumeEntryDirectory', 'reopenRememberedDirectory', context);
+  const failed = await create('recover-created', 'empty', undefined, true);
+  assert.equal(failed.status, 'error'); assert.equal(failed.root, root);
+  assert.equal((await resume(root)).status, 'created');
+  assert.equal(picks, 1); assert.equal(creates, 1); assert.equal(loads, 2);
+  context.directorySelectionRef.current++;
+  assert.equal((await resume(root)).status, 'error'); assert.equal(loads, 2);
+});
+
+for (const consumed of [false, true]) test(`same-root first recovery drains pending ${consumed ? 'adopted' : 'unclaimed'} creation fonts and loads the current selection`, async t => {
+  const originalAssets = structuredClone(OPEN_FONT_ASSETS);
+  const bytes = new TextEncoder().encode(`pending creation recovery ${consumed}`);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  for (const asset of OPEN_FONT_ASSETS) Object.assign(asset, { size: bytes.byteLength, sha256, licenseSize: bytes.byteLength, licenseSha256: sha256 });
+  t.after(() => OPEN_FONT_ASSETS.forEach((asset, index) => Object.assign(asset, originalAssets[index])));
+  const previousDocument = globalThis.document, previousFace = globalThis.FontFace;
+  globalThis.document = { fonts: new Set() };
+  globalThis.FontFace = class { constructor(family) { this.family = family; } async load() { return this; } };
+  t.after(() => {
+    if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument;
+    if (previousFace === undefined) delete globalThis.FontFace; else globalThis.FontFace = previousFace;
+  });
+  let release, started;
+  const gate = new Promise(resolve => { release = resolve; }), firstRequest = new Promise(resolve => { started = resolve; });
+  const requests = [];
+  t.mock.method(globalThis, 'fetch', async url => { requests.push(url); started(); await gate; return new Response(bytes); });
+  const preload = Promise.all(OPEN_FONT_ASSETS.flatMap(asset => [fontFileRequest(asset), fontLicenseRequest(asset)]).map(file => loadPreparedFontFile(file, getFontSource())));
+  t.after(() => release());
+  let creation, opens = 0, picks = 0, creates = 0;
+  const root = tree('pending-created'), context = {
+    ...localFonts, getFontSource, useCallback: fn => fn, DOMException,
+    directoryRef: { current: null }, directorySelectionRef: { current: 0 }, entryCreationRef: { current: null }, resumeIntentRef: { current: {} },
+    seedLocale: 'en-US', getPublicPlatformPreset, DEFAULT_PLATFORM_PRESET_ID, setStatus() {},
+    fontSessionDisposeRef: { current: () => {} }, fontLoadTaskRef: { current: null },
+    requestDirectoryReadWritePermission: async () => 'granted', rememberAuthorizedDirectory() {}, getFormatSnapshot: () => ({ error: null }),
+    pickDataDirectory: async () => { picks++; return {}; },
+    createNamedDataDirectory: async (_parent, _name, _preset, _locale, options) => {
+      creates++; creation = localFonts.beginCreationFonts(root, options.current); await firstRequest; return root;
+    },
+  };
+  const beginFontLoad = action('beginFontLoad', 'waitForEntryFonts', context);
+  context.openAuthorizedDirectory = async (handle, selection) => {
+    opens++;
+    if (consumed || opens > 1) { context.directoryRef.current = handle; void beginFontLoad(handle, selection); }
+    return opens > 1;
+  };
+  const create = action('createDataDirectory', 'resumeEntryDirectory', context);
+  const failed = await create('pending-created', 'empty', undefined, true);
+  assert.equal(failed.status, 'error'); assert.equal(failed.root, root);
+  const resume = action('resumeEntryDirectory', 'reopenRememberedDirectory', context);
+  const result = await resume(root);
+  assert.equal(result.status, 'created');
+  assert.equal(opens, 2); assert.equal(picks, 1); assert.equal(creates, 1);
+  assert.equal(localFonts.takeCreationFonts(root), undefined, 'the stale creation token cannot be adopted again');
+  assert.equal(context.directorySelectionRef.current, 2);
+  assert.notEqual(context.fontLoadTaskRef.current.promise, creation.promise);
+  release();
+  await preload;
+  assert.equal(await context.fontLoadTaskRef.current.promise, true, 'the first resume finishes without another user retry');
+  assert.equal(context.fontLoadTaskRef.current.isCurrent(), true);
+  assert.equal(localFonts.getLocalFontStatus().phase, 'ready');
+  assert.equal(globalThis.document.fonts.size, OPEN_FONT_ASSETS.length);
+  assert.equal(requests.length, new Set(requests).size, 'consumer cancellation preserves the shared verified request/cache');
+  context.fontSessionDisposeRef.current();
+});
+
+test('a directory switch during old font-task draining prevents a late recovery load', async () => {
+  const root = tree('stale-recovery');
+  let finish, opens = 0;
+  const context = {
+    useCallback: fn => fn, directoryRef: { current: root }, directorySelectionRef: { current: 1 },
+    entryCreationRef: { current: { root, previousRoot: null, selection: 1 } },
+    fontLoadTaskRef: { current: { root, promise: new Promise(resolve => { finish = resolve; }) } },
+    requestDirectoryReadWritePermission: async () => 'granted',
+    rememberAuthorizedDirectory() { throw new Error('stale root must not be remembered'); }, openAuthorizedDirectory: async () => { opens++; return true; },
+  };
+  const resume = action('resumeEntryDirectory', 'reopenRememberedDirectory', context);
+  const pending = resume(root);
+  await new Promise(setImmediate);
+  context.directorySelectionRef.current++; context.directoryRef.current = tree('another-library');
+  finish(false);
+  const result = await pending;
+  assert.equal(result.status, 'error'); assert.equal(result.message, productMessages.productText('feedback.sessionChanged'));
+  assert.equal(opens, 0);
 });

@@ -247,6 +247,10 @@ JS
 
 维护应用默认内容时，界面文案在 `resources/locale/`，公开公告在 `resources/changelog/public.json`，本地开发与验收记录在不进Git的 `resources/changelog/local.md`。平台源位于 `resources/presets/platform/`；新库内容种子位于 `resources/template/fresh-library/en-US/` 与 `zh-CN/`，每套按真实资料库的主题、片段和模板目录分类，文章与历史为空。主题制作起点在 `resources/template/`。
 
+npm run build的prebuild调用scripts/generate-library-assets.mjs，按语言、预设和引导profile预制默认库、模板、独立示例及渲染成品，生成resources/prepared-library.generated.json和public/prepared-library/的清单／内容寻址对象。运行期按选择载入并校验所需对象，受控并发写入新命名空目录，替换实际日期／月份并写入version 2设置；复用已校验字体预载，完整字体仍沿所选外部来源补缺。
+
+这条装配路径仅用于新库；旧库、用户自改内容和历史继续按既有兼容与保护契约读取，不套用预制安装。维护源变化后须重新构建；静态包及部署保留完整清单和无扩展名对象。现有资料库、文章和历史协议不因预制而改变。
+
 浏览器直接加载的脚本仍在 `public/format/`、`public/algorithm/`，完整字体来源、大小与hash见[字体清单](../../../resources/font-sources.json)，只下载到授权资料库；`public/fonts/`保留三份OFL文本，图片和其它许可在 `public/images/`、`public/licenses/`。样图只使用 `/images/article-sample.png`；旧根地址或任意相对图片不会被替换成样图，应修改实际片段/模板引用。双语说明正文保留在 `docs/locale/`。
 
 </details>
@@ -734,7 +738,7 @@ viewport设null时按实际预览栏宽响应式排版，使用可用高度滚�
 - 三份都不存在：明确提示使用内置默认整套，不静默写入。
 - 缺少部分文件、旧结构、JSON 损坏、未知能力／字段、参数类型错误、重复 ID 或引用缺失：报配置错误，不能混用默认文件补齐后声称通过。
 - 原始资料保持可恢复；格式编译和合规检查不会把错误配置当作可信结果。
-- 普通新建资料库生成所选三件套及自主解释器、清单和许可；文章目录为空，不附带测试文章或历史。入场引导另行准备所选模板及独立示例，具体文件见[引导文件影响表](AGENT-GUIDE.md#doc-entry-guide-files)。
+- 普通新建资料库装配所选预制三件套、自主解释器、清单和许可，并写入默认settings.json；articles/初始为空。入场引导另装配所选模板、独立示例及已确认设置，具体文件见[引导文件影响表](AGENT-GUIDE.md#doc-entry-guide-files)。
 
 ### 迁移与语言
 

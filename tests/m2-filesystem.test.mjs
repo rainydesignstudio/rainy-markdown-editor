@@ -1,3 +1,4 @@
+import './prepared-library-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -19,6 +20,7 @@ class MemoryFileHandle {
     const content = this.content;
     const bytes = typeof content === 'string' ? new TextEncoder().encode(content) : new Uint8Array(content);
     return {
+      size: bytes.length,
       text: async () => typeof content === 'string' ? content : new TextDecoder().decode(bytes),
       arrayBuffer: async () => bytes.slice().buffer,
     };
@@ -26,7 +28,7 @@ class MemoryFileHandle {
 
   async createWritable() {
     return {
-      write: async (content) => { this.content = typeof content === 'string' ? content : new TextDecoder().decode(content); },
+      write: async (content) => { this.content = content; },
       close: async () => {},
     };
   }
@@ -89,7 +91,7 @@ test('new library stays inside its named child and existing libraries reopen wit
   await assert.rejects(assertExistingDataDirectory(parent), /不是完整的资料库/);
   const library = await createNamedDataDirectory(parent, '我的文稿');
   assert.deepEqual([...parent.children.keys()], ['我的文稿']);
-  assert.deepEqual([...library.children.keys()], ['themes', 'snippets', 'templates', 'articles', 'format']);
+  assert.deepEqual([...library.children.keys()].sort(), ['articles', 'assets', 'format', 'settings.json', 'snippets', 'templates', 'themes']);
   await assertExistingDataDirectory(library);
   await assert.rejects(createNamedDataDirectory(parent, '我的文稿'), /已有/);
   assert.deepEqual([...parent.children.keys()], ['我的文稿']);

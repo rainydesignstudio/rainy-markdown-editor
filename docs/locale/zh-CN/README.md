@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.0-2563EB?style=for-the-badge" alt="Release v0.4.0.0" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.1"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.1-2563EB?style=for-the-badge" alt="Release v0.4.0.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -92,7 +92,7 @@
 
 **Agent Readable：先读 [AGENT-GUIDE.md](AGENT-GUIDE.md)；后续操作按[持续查阅要求](AGENT-GUIDE.md#doc-manual-use)取用说明书。** 安装来源与版本以你确认的仓库和分支为准。
 
-本说明对应正式版本 `0.4.0.0`（package 为 `0.4.0`）。线上页面的实际功能以其运行版本为准。
+公开安装版为 `0.4.0.1`（package为 `0.4.0+patch.1`）。线上页面的实际功能以其运行版本为准。
 
 <a name="doc-run-yourself"></a>
 
@@ -122,7 +122,9 @@ npm start
 
 在“设置 → 本地目录 → 字体下载来源”中选择来源；连接或创建资料库前也能设置。默认 Google Fonts，国内可选免费“国内镜像（JSDMirror）”，无需购买 CDN。偏好保存在当前浏览器来源内，不按语言或地区自动切换。
 
-首次使用时会下载缺失的 Sen、Noto Sans SC、Roboto Mono 字体，已有字体和自定义文件不会被覆盖。下载失败时先用系统字体，不影响载入资料库；可在同一区域点“补充缺失字体”，或换源后重试，也可取消下载。
+首次使用时会下载缺失的 Sen、Noto Sans SC、Roboto Mono 字体，已有字体和自定义文件不会被覆盖。普通打开资料库时，下载失败可暂用系统字体，资料库其余载入继续；可在同一区域补充缺失字体、换源重试或取消下载。
+
+入场引导在确认语言后提前预载字体，当前页面可复用已校验字节；目录授权前不写入用户资料目录。Guide进入工作台须等待必要字体和工作台实际就绪；失败时保留已创建内容，在同一引导会话中继续准备，不把系统字体回退记成引导准备完成。
 
 字体保存在资料库后可离线读取。补充字体时，浏览器需要能访问 `raw.githubusercontent.com` 或 `cdn.jsdmirror.com`；下载直接访问所选来源，不经过官网服务器。字体来源与许可见 [字体来源清单](../../../resources/font-sources.json)。
 
@@ -131,6 +133,10 @@ npm start
 ## 🌱 第一次使用
 
 未记录引导完成，且没有已连接或记住的资料库时，会显示入场引导：选择语言、外观、内容方向、写作方式和保存偏好，再命名资料库并授权父目录。确认后会准备对应的起稿模板和一篇独立示例；选择 Agent 写作时可复制交接提示词。已有资料库可直接打开；进入工作台后仍可按下面的步骤操作。
+
+内置内容随应用预制，并按所选语言与方向提前载入。确认目录和读写授权后才开始准备；选择器等待不计为准备进度，取消保留填写内容及原连接。字体预载完成后停留3秒再收起；当前页面的有效预载已完成时，重开引导不再显示该预载条。悬停可查看阶段进度；准备完成时加载条就地收拢，随后按所选写作方式继续。
+
+若资料库已创建但准备尚未完成，使用“继续准备”沿原目录恢复。刷新页面后先核对实际连接和磁盘内容，不假定内存预载或恢复阶段仍保留，也不重复建立同名资料库。
 
 未连接库时也可“先看看工作台”，不请求目录、不创建资料库或文章，也不新记引导完成。已有库重开引导后，“先看看”仍会保存所选外观。各方向、选项与实际文件的对应关系见[引导文件影响表](AGENT-GUIDE.md#doc-entry-guide-files)。
 
@@ -283,7 +289,7 @@ npm start
 
 ```text
 资料库/
-├── settings.json                    # 保存工作流、组织及外观后生成
+├── settings.json                    # 新库创建时生成；旧库可缺省
 ├── _trash/                          # 文章回收及清理记录，按需生成
 ├── format/                          # 所选格式配置及随附渲染包
 │   ├── config.json                  # 包声明、文件校验值及设置
@@ -332,7 +338,9 @@ npm start
 └── imports/tasks/<id>.json          # 独立资源任务
 ```
 
-新建资料库生成所选格式配置及随附渲染包，按预设载入主题和起稿内容，并从所选字体来源补齐缺失字体；普通建库不会创建文章或覆盖已有自改文件；入场引导会另行准备所选模板、独立示例及已确认的设置。新库没有 `settings.json` 时先使用默认值，明确保存设置后再写入。旧库可能保留兼容布局，知识源分区以绑定登记为准；不要手动挪动索引。旧布局迁移保留原文件，主题子目录可能包含迁移标记。
+新建资料库装配所选预设的格式配置、随附渲染包、主题和起稿内容，并直接写入version 2的settings.json：普通建库采用默认设置，入场引导采用已确认选项，并额外准备所选模板和独立示例。普通建库的articles/初始为空；完整字体从所选来源补缺，已有字体保持。
+
+旧库缺少settings.json时仍按兼容契约使用默认值，显式保存设置后写入；旧布局迁移保留原文件。知识源分区以绑定登记为准，不手动挪动索引；主题子目录可能包含迁移标记。
 
 </details>
 
@@ -371,6 +379,7 @@ npm start
 | 改动后预览未更新 | 先检查“仅保存时刷新预览”是否开启，再保存或按需更新样式，并核对生成状态和格式报告 |
 | 外部改文稿后列表信息仍旧，或索引需要修复 | 主动扫描并重建对应月索引；不要根据不完整索引判断文章已丢失 |
 | 格式配置报错 | 按 FORMAT.md 修复整套配置；自主渲染包还需同步文件校验值，再点“设置 → 本地目录 → 重新加载渲染配置”。缺文件或坏配置不会与默认文件混配 |
+| 提示“文件需修复” | 点提示的信息图标或对应区域的诊断入口，查看文件路径和原因；主题文件按诊断修复，月索引问题核对受影响年月后重建 |
 | 主题 JSON 导入失败 | 检查两类主题格式、字段、ID／文件名及同名冲突，参见 THEME.md |
 | 公众号接收效果不同 | 核对微信草稿和手机预览；先用已测范围的写法，并查看格式报告 |
 

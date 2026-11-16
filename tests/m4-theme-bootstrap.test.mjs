@@ -44,6 +44,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
       if (id.endsWith('/entryGuide')) return { readGuideCompletion: () => true };
       if (id.endsWith('/articleSettings') || id.endsWith('/contentLibraries') || id.endsWith('/fileSystem')) return {};
       if (id.endsWith('/article-format/runtime') || id.endsWith('/article-format/renderRecords')) return {};
+      if (id.endsWith('/preparedLibrary')) return {};
       if (id === './Toast') return { ToastReadiness: 'toast-readiness' };
       if (id === './ContentIcon') return { ContentIcon: 'content-icon' };
       if (id.endsWith('/i18n/productMessages')) return { formatProductMessage: value => value?.label ?? '' };
@@ -216,6 +217,7 @@ test('render-package reload after startup does not restart the full-screen loade
   f.controller.editorAppearanceReady=true;
   f.controller.contentLibrariesState='ready';
   f.render();f.render();f.format.loading=true;f.render();
-  const children=f.tree().props.children.at(-1).props.children;
-  assert.equal(children.at(-1).props.loading,false);
+  const walk=node=>Array.isArray(node)?node.flatMap(walk):node?.props?[node,...walk(node.props.children)]:[];
+  const loader=walk(f.tree()).find(node=>node.type?.name==='StartupLoading');
+  assert.ok(loader); assert.equal(loader.props.loading,false);
 });

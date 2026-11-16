@@ -232,6 +232,64 @@ test('operation diagnostics update while typing without repeating Toast until th
 });
 
 
+test('a remounted named diagnostic clears stale warnings once its current data is ready', async () => {
+  const f = await fixture();
+  const { OperationFeedback } = await f.load(path.resolve('src/components/global/OperationFeedback.tsx'));
+  const render = (key, props) => f.render(React.createElement(OperationFeedback, { key, id: 'library-diagnostics', label: 'Library diagnostics', tone: 'warning', ...props }));
+  try {
+    await render('previous-root', { notice: messages.productReference('feedback.filesRepair', { count: 1 }) });
+    assert.equal(f.cards.length, 1);
+    await render('next-root', { notice: null, announce: false });
+    await render('next-root', { notice: null });
+    assert.equal(f.cards.length, 0, 'the new producer clears the old root diagnostic without having announced it');
+    const notice = messages.productReference('shared.compose', { parts: messages.productJoin(['themes/editor-themes/broken.json · ', messages.productReference('editorThemeLibrary.theFilenameDoesNotMatchTheThemeId')]) });
+    await render('next-root', { notice, summary: messages.productReference('feedback.filesRepair', { count: 1 }) });
+    const id = f.cards[0].dataset.toastId;
+    await React.act(async () => f.cards[0].querySelector('[aria-expanded="false"]').click());
+    assert.match(f.cards[0].textContent, /themes\/editor-themes\/broken\.json.*文件名与主题 ID 不一致/);
+    await f.language('en-US');
+    assert.equal(f.cards[0].dataset.toastId, id, 'language changes do not replay the diagnostic');
+    assert.match(f.cards[0].textContent, /themes\/editor-themes\/broken\.json.*filename does not match the theme ID/);
+  } finally { await f.close(); }
+});
+
+test('loading a new library discards visible and queued diagnostics from unmounted pages while retaining operation results', async () => {
+  const f = await fixture({ maxVisible: 1, strict: true });
+  const { OperationFeedback } = await f.load(path.resolve('src/components/global/OperationFeedback.tsx'));
+  const problem = messages.productReference('feedback.filesRepair', { count: 1 });
+  try {
+    await f.sendStructured({ key: 'saved', label: 'Saved operation', tone: 'success', lifetime: { mode: 'manual' } });
+    await f.render(React.createElement(OperationFeedback, { id: 'queued-diagnostic', label: 'Index', notice: problem, tone: 'warning' }));
+    await f.render(null);
+    await f.ready(false); await f.ready(true);
+    assert.equal(f.cards.length, 1); assert.match(f.cards[0].textContent, /Saved operation/);
+    await f.sendStructured({ key: 'saved', dismiss: true });
+    assert.equal(f.cards.length, 0, 'the old queued diagnostic cannot surface after the operation closes');
+    await f.render(React.createElement(OperationFeedback, { id: 'queued-diagnostic', label: 'Index', notice: problem, tone: 'warning' }));
+    assert.equal(f.cards.length, 1, 'the new library can report a real problem with the same message');
+    await f.render(null); await f.ready(false); await f.ready(true);
+    assert.equal(f.cards.length, 0, 'a visible diagnostic from an old page is also removed');
+    await f.render(React.createElement(OperationFeedback, { id: 'queued-diagnostic', label: 'Index', notice: problem, tone: 'warning' }));
+    await f.sendStructured({ key: 'queued-diagnostic', dismiss: true });
+    await f.render(null); await f.ready(false); await f.ready(true);
+    await f.render(React.createElement(OperationFeedback, { id: 'queued-diagnostic', label: 'Index', notice: problem, tone: 'warning' }));
+    assert.equal(f.cards.length, 1, 'closing a diagnostic in the old library does not suppress the same real problem in a new library');
+  } finally { await f.close(); }
+});
+
+test('named diagnostics report current problems after the loading cover releases without replaying resolved problems', async () => {
+  const f = await fixture({ initiallyReady: false });
+  const { OperationFeedback } = await f.load(path.resolve('src/components/global/OperationFeedback.tsx'));
+  const render = notice => f.render(React.createElement(OperationFeedback, { id: 'current-library', label: 'Library diagnostics', notice, tone: 'warning' }));
+  const problem = messages.productReference('feedback.filesRepair', { count: 1 });
+  try {
+    await render(problem); assert.equal(f.cards.length, 0);
+    await f.ready(true); assert.equal(f.cards.length, 1, 'the current diagnostic must not be consumed while the cover hides notifications');
+    await f.ready(false); await render(problem); await render(null); await f.ready(true);
+    assert.equal(f.cards.length, 0, 'a problem resolved during loading is not a queued notification');
+  } finally { await f.close(); }
+});
+
 test('diagnostics opened inside a modal stay in its focus scope and Escape closes only that popup', async () => {
   const f = await fixture();
   const { OperationFeedback } = await f.load(path.resolve('src/components/global/OperationFeedback.tsx')); let parentClosed = 0;

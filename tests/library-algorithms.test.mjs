@@ -104,7 +104,7 @@ test('empty configuration errors never pass, and selecting another preset never 
 test('static hosting confines Blob script permission to the opaque component runner', async () => {
   const source = await readFile(new URL('../scripts/start-static.mjs', import.meta.url), 'utf8');
   const methods = source.slice(source.indexOf('function inlineScriptHashes'), source.indexOf('const server ='));
-  const context = { path, crypto, fs: { readFileSync: () => '<html><script src="/runtime.js"></script></html>' } };
+  const context = { path, crypto, buildFiles: { get: () => Buffer.from('<html><script src="/runtime.js"></script></html>') } };
   vm.runInNewContext(methods + '\nthis.policy=contentSecurityPolicy;', context);
   const component = context.policy('/build/algorithm/article-algorithm-sandbox.html');
   assert.match(component, /script-src 'self' blob:/); assert.match(component, /connect-src 'none'/);

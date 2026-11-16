@@ -8,10 +8,14 @@ const projectRoot = fileURLToPath(new URL('../', import.meta.url));
 const sourceRoots = ['src/styles', 'src/app', 'src/components'];
 const sourceExtensions = new Set(['.css', '.js', '.jsx', '.ts', '.tsx']);
 const expectedNumericGeometry = [
+  'src/components/onboarding/GuideFontPreload.tsx max-w-[calc(100vw-3rem)]',
+  'src/components/onboarding/GuideFontPreload.tsx ease-[cubic-bezier(.22,1,.36,1)]',
   'src/components/editor/ArticleInfoDialog.tsx md:grid-rows-[1fr_auto]',
   'src/components/editor/ArticleInfoDialog.tsx md:grid-rows-[auto_1fr]',
   'src/components/global/IconPopover.tsx max-w-[calc(100vw-1rem)]',
   'src/components/onboarding/GuideHandoff.tsx max-w-[calc(100%-12rem)]',
+  'src/components/onboarding/GuideHandoff.tsx grid-rows-[0fr]',
+  'src/components/onboarding/GuideHandoff.tsx :grid-rows-[1fr]',
   'src/components/global/LibraryCard.tsx grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))]',
   'src/components/knowledge/KnowledgeReferencePanel.tsx grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))]',
   'src/components/knowledge/KnowledgePage.tsx grid-cols-[auto_minmax(0,1fr)]',

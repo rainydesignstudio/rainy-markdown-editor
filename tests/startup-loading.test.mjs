@@ -13,7 +13,7 @@ async function directoryLoad(duringLoad = () => {}, { successful = false, keepRo
   const end = source.indexOf('\n\n  const rememberAuthorizedDirectory', start);
   const root = { name: 'startup-test' }, statuses = [], states = [], appearance = [], navigation = [], preferredModes = [];
   const context = { ...productMessages, Error, manualLibraryLoad: { current: null },
-    useCallback: callback => callback, view: 'articles', resumeIntentRef: { current: { active: false } }, routePathRef: { current: '/articles' }, applyStoredArticle() {}, notifyToast() {},
+    useCallback: callback => callback, beginFontLoad: async () => true, view: 'articles', resumeIntentRef: { current: { active: false } }, routePathRef: { current: '/articles' }, applyStoredArticle() {}, notifyToast() {},
     directorySelectionRef: { current: 1 }, directoryRef: { current: root },
     articleListAbortRef: { current: null }, historyBaselineRef: { current: null },
     articleRef: { current: {} }, editorWorkspaceRef: { current: {} }, editorWorkspaceSnapshotRef: { current: {} },
@@ -90,7 +90,7 @@ async function startupPanel({fromGuide=false,reduced=false}={}) {
     window:{matchMedia:()=>({get matches(){return reduced;},addEventListener:(_,fn)=>mediaListeners.add(fn),removeEventListener:(_,fn)=>mediaListeners.delete(fn)}),setTimeout(fn,ms){timers.set(++timerId,fn);delays.set(timerId,ms);return timerId;},clearTimeout(id){timers.delete(id);delays.delete(id);}}};
   vm.runInNewContext(ts.transpileModule(source,{fileName:'loading.tsx',compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,context);
   const onReady=value=>readiness.push(value),onRetry=()=>retries++,onChoose=()=>choices++;
-  const render=(loading,issue=null)=>{cursor=0;const node=context.component({loading,issue,onReady,onRetry,onChoose,fromGuide});while(effects.length)effects.shift()();return node;};
+  const render=(loading,issue=null,arrivalActive=true)=>{cursor=0;const node=context.component({loading,issue,onReady,onRetry,onChoose,fromGuide,arrivalActive});while(effects.length)effects.shift()();return node;};
   const walk=node=>Array.isArray(node)?node.flatMap(walk):node?.props?[node,...walk(node.props.children)]:[];
   return{render,walk,timers,delays,readiness,setReduced:value=>{reduced=value;for(const fn of [...mediaListeners])fn();},setLocaleReady:()=>localeReady=true,get retries(){return retries;},get choices(){return choices;}};
 }
@@ -148,4 +148,21 @@ test('enabling reduced motion during workspace arrival ends only the already-rea
   f.setReduced(true);assert.equal(f.timers.size,0);assert.equal(f.render(false),null);assert.equal(f.readiness.at(-1),true);
   f.render(true);assert.equal(f.readiness.at(-1),false);f.setReduced(false);f.setReduced(true);
   assert.equal(f.readiness.at(-1),false,'motion changes must not finish a new pending load');
+});
+
+
+test('a pre-mounted guide cover cannot reveal the real workspace before its skeleton starts', async () => {
+  const f=await startupPanel({fromGuide:true});
+  const covered=f.render(false,null,false);
+  assert.ok(covered, 'an opaque cover exists before the guide can fade');
+  assert.equal(covered.props['data-fading'],false);
+  assert.equal(f.walk(covered).some(node=>node.type==='guide-arrival'),false);
+  assert.equal(f.timers.size,0, 'a covered wait consumes no arrival animation time');
+  assert.equal(f.readiness.at(-1),false);
+  const arrival=f.render(false,null,true);
+  assert.equal(f.walk(arrival).some(node=>node.type==='guide-arrival'),true);
+  assert.deepEqual([...f.delays.values()],[720,1020]);
+  for (const fn of [...f.timers.values()]) fn();
+  assert.equal(f.render(false,null,true),null);
+  assert.equal(f.readiness.at(-1),true);
 });

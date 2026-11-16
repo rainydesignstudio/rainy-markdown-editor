@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.0-2563EB?style=for-the-badge" alt="Release v0.4.0.0" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.1"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.1-2563EB?style=for-the-badge" alt="Release v0.4.0.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -92,7 +92,7 @@ Copy this request into a clean Agent conversation with little unrelated context:
 
 **Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); consult the manuals for later operations under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).** Use the repository and branch you confirm for the installation source and version.
 
-This manual describes release `0.4.0.0` (package `0.4.0`). Features on an online page depend on its actual running version.
+The released installer is `0.4.0.1` (package `0.4.0+patch.1`). Features on an online page depend on its actual running version.
 
 <a name="doc-run-yourself"></a>
 
@@ -122,7 +122,9 @@ After updating a theme or library configuration, choose **Update styles**, then 
 
 Choose **Settings → Local directory → Font download source**, even before opening or creating a library. Google Fonts is the default; the free **China mirror (JSDMirror)** is available for use in China. No CDN purchase is needed. The preference belongs to this browser origin and does not follow language or automatic region detection.
 
-First use downloads missing Sen, Noto Sans SC and Roboto Mono fonts without overwriting existing fonts or custom files. Failed downloads use system fonts while the library continues loading. Use **Download missing fonts**, change source and retry, or cancel an active download in the same section.
+First use downloads missing Sen, Noto Sans SC and Roboto Mono fonts without overwriting existing fonts or custom files. When opening a library normally, failed downloads can temporarily use system fonts while the rest of the library continues loading. Download missing fonts, change source and retry, or cancel an active download in the same section.
+
+The entry guide starts font preloading after language confirmation and can reuse verified bytes within the current page. It does not write into a user library before directory authorization. Guide entry waits for necessary fonts and the actual workspace to become ready. On failure, retain created content and continue preparation within the same guide session; system-font fallback does not establish guide readiness.
 
 Once saved in the library, fonts remain available offline. To download missing fonts, the browser needs access to `raw.githubusercontent.com` or `cdn.jsdmirror.com`. Downloads use the selected source directly rather than passing through the website server. See the [font source manifest](../../../resources/font-sources.json) for font sources and licenses.
 
@@ -131,6 +133,10 @@ Once saved in the library, fonts remain available offline. To download missing f
 ## 🌱 First use
 
 When guide completion has not been recorded and no library is connected or remembered, the entry guide lets you choose language, appearance, content direction, writing method and saving preferences, then name a library and authorize its parent. Confirmation prepares the corresponding starter template and a separate example. Agent writers can copy a handoff prompt. You can also open an existing library; the workspace steps below remain available.
+
+Bundled content is prepared ahead of time and preloaded for the selected language and direction. Preparation starts only after directory confirmation and read/write authorization. Waiting in the picker is not preparation progress; cancellation retains entered values and the previous connection. A completed font preload remains visible for three seconds before closing. Reopening the guide does not show that bar when the current page already has a completed valid preload. Hover to inspect stage progress. The preparation bar collapses in place when preparation completes, then the selected writing workflow continues.
+
+If the library was created but preparation remains incomplete, use Continue preparation to resume in the same directory. After refreshing, check the actual connection and disk contents rather than assuming that memory cache or recovery stages survived, and do not create another same-name library.
 
 Without a connected library, **Explore the workspace** requests no directory, creates no library or article and does not record new guide completion. After reopening the guide with a connected library, exploring still saves the chosen appearance. See the [guide option/file-effects table](AGENT-GUIDE.md#doc-entry-guide-files) for the files associated with each direction and choice.
 
@@ -285,7 +291,7 @@ Directories appear as the corresponding operations are used:
 
 ```text
 library/
-├── settings.json                    # After saving workflow, organization or appearance
+├── settings.json                    # Created with new libraries; optional in older libraries
 ├── _trash/                          # Article recovery and cleanup records, on demand
 ├── format/                          # Selected configuration and bundled renderer
 │   ├── config.json                  # Package declaration, file hashes and settings
@@ -334,7 +340,9 @@ library/
 └── imports/tasks/<id>.json          # Independent resource tasks
 ```
 
-New-library creation installs the selected configuration and bundled renderer, loads themes and starter content according to the preset, and downloads missing fonts from the selected font source. Ordinary creation makes no articles and does not overwrite existing custom files; the entry guide additionally prepares the selected template, a separate example and confirmed settings. Without `settings.json`, defaults are used until settings are explicitly saved. Older libraries may retain a compatible layout; knowledge-source partitions follow the binding registry and should not be moved manually. Older-layout migration retains original files; theme subdirectories may contain migration markers.
+New-library creation installs the selected preset’s configuration, bundled renderer, themes and starter content, and immediately writes version 2 settings.json. Ordinary creation uses defaults; the entry guide uses confirmed preferences and additionally prepares the selected starter and an independent example. Ordinary creation starts with an empty articles/ directory. Complete fonts are downloaded from the selected source only when missing; existing fonts remain intact.
+
+An older library without settings.json still uses defaults under the compatibility contract until settings are explicitly saved. Older-layout migration retains original files. Knowledge-source partitions follow the binding registry and should not be moved manually; theme subdirectories may contain migration markers.
 
 </details>
 
@@ -373,6 +381,7 @@ Loading, normal restoration and successful automatic saves and snapshots do not 
 | Preview has not updated after edits | Check whether Refresh preview only on save is enabled, then save or update styles as needed and inspect generation status and the format report |
 | Externally edited articles have stale/incomplete list information | Explicitly scan/rebuild the relevant monthly indexes; an incomplete index does not prove data loss |
 | Format configuration error | Repair the complete configuration using FORMAT.md; for a standalone rendering package, update its file hashes, then use Settings → Local directory → Reload rendering configuration. Missing files or invalid configurations are not mixed with defaults |
+| A file-repair warning appears | Open the notice’s information icon or the named diagnostic entry to inspect its file path and cause. Repair the identified theme file, or confirm the affected months before rebuilding monthly indexes |
 | Theme JSON import fails | Check theme type, fields, ID/filename and collisions; see THEME.md |
 | WeChat's result differs | Check the WeChat draft and mobile preview and inspect the format report for the tested scope |
 

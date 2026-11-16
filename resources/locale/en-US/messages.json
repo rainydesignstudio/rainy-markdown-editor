@@ -739,6 +739,7 @@
     "savingTheLibraryDirectoryRecordWasAborted": "Saving the library directory record was aborted."
   },
   "editorThemeLibrary": {
+    "missingThemes": "Selected themes are missing: {{names}}. The basic theme is shown temporarily. Restore the JSON files in themes/editor-themes/ and refresh.",
     "theEditorThemeIdIsUnsafe": "The editor theme ID is unsafe.",
     "invalidFilenameUseASafeIdJson": "Invalid filename. Use a safe <id>.json.",
     "theFilenameDoesNotMatchTheThemeId": "The filename does not match the theme ID.",

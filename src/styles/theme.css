@@ -32,8 +32,7 @@
   --text-28--line-height: 1.5;
   --animate-guide-welcome: guide-welcome 3s cubic-bezier(.22,1,.36,1) both;
   --animate-guide-welcome-still: guide-welcome-still 3s ease-out both;
-  --animate-guide-depart: guide-depart 3s cubic-bezier(.22,1,.36,1) both;
-  --animate-guide-pack: guide-pack 2500ms cubic-bezier(.22,1,.36,1) both;
+  --animate-guide-pack: guide-pack 600ms cubic-bezier(.22,1,.36,1) both;
   --animate-guide-environment: guide-environment 1400ms cubic-bezier(.22,1,.36,1) both;
   --animate-guide-ambient: guide-ambient 36s cubic-bezier(.37,0,.63,1) infinite alternate;
   --animate-guide-ambient-return: guide-ambient 44s cubic-bezier(.37,0,.63,1) infinite alternate-reverse;
@@ -47,6 +46,7 @@
   --animate-guide-arrive: guide-arrive 620ms cubic-bezier(.2,0,0,1) both;
   --animate-guide-arrive-later: guide-arrive 620ms 100ms cubic-bezier(.2,0,0,1) both;
   --animate-guide-ready: guide-ready 600ms cubic-bezier(.2,0,0,1) both;
+  --animate-guide-preload-ball: guide-preload-ball 800ms linear both;
   --animate-guide-sheen: guide-sheen 1200ms ease-in-out infinite;
   --animate-guide-toolbar: guide-reveal 420ms 140ms cubic-bezier(.2,0,0,1) both;
   --animate-guide-content: guide-reveal 420ms 240ms cubic-bezier(.2,0,0,1) both;
@@ -187,4 +187,10 @@
   --text-xs-code--line-height: calc(1.25 / 0.75);
   --text-editor-source: 0.875rem;
   --text-editor-source--line-height: 1.75rem;
+}
+
+/* Resolve the shared clock on the guide element, where its runtime variables live. */
+@theme inline {
+  --animate-guide-depart: guide-depart var(--guide-outro-exit) cubic-bezier(.22,1,.36,1) var(--guide-outro-hold) both;
+  --animate-guide-depart-still: guide-depart var(--guide-outro-exit) ease-out var(--guide-outro-hold) both;
 }

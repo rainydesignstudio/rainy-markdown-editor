@@ -43,7 +43,8 @@ export function fontLicenseRequest(asset: typeof manifest.fonts[number]): FontFi
 }
 
 /** Shared by library initialization and the README exporter. Nothing is written before verification. */
-export async function fetchVerifiedFontFile(file: FontFileRequest, signal?: AbortSignal): Promise<ArrayBuffer> {
+export type FontFileProgress = { loaded: number; phase: 'downloading' | 'verifying' };
+export async function fetchVerifiedFontFile(file: FontFileRequest, signal?: AbortSignal, onProgress?: (progress: FontFileProgress) => void): Promise<ArrayBuffer> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let abort = () => {};
@@ -54,6 +55,7 @@ export async function fetchVerifiedFontFile(file: FontFileRequest, signal?: Abor
   });
   const download = async () => {
     if (signal?.aborted) { abort(); throw new DOMException('Font download cancelled', 'AbortError'); }
+    onProgress?.({ loaded: 0, phase: 'downloading' });
     const response = await fetch(file.url, { signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'force-cache' });
     if (!response.ok) throw new ProductError('localFonts.downloadFailed', { name: file.name, status: response.status });
     if (Number(response.headers?.get('Content-Length') ?? 0) > file.size) throw new ProductError('localFonts.invalidFile', { name: file.name });
@@ -66,14 +68,18 @@ export async function fetchVerifiedFontFile(file: FontFileRequest, signal?: Abor
           size += result.value.length;
           if (size > file.size) throw new ProductError('localFonts.invalidFile', { name: file.name });
           chunks.push(result.value);
+          if (!controller.signal.aborted) onProgress?.({ loaded: size, phase: 'downloading' });
         }
       } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
       bytes = new Uint8Array(size); let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     } else bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.length !== file.size) throw new ProductError('localFonts.invalidFile', { name: file.name });
+    if (controller.signal.aborted) throw new DOMException('Font download cancelled', 'AbortError');
+    onProgress?.({ loaded: bytes.length, phase: 'verifying' });
     const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), value => value.toString(16).padStart(2, '0')).join('');
     if (hash !== file.sha256) throw new ProductError('localFonts.invalidFile', { name: file.name });
+    if (controller.signal.aborted) throw new DOMException('Font download cancelled', 'AbortError');
     return bytes.buffer;
   };
   try { return await Promise.race([download(), interruption]); }

@@ -127,7 +127,6 @@
     "combination": "{{colors}}配色 · {{fonts}}字体",
     "chooseColors": "选择{{name}}配色",
     "chooseFonts": "选择{{name}}字体",
-    "missingThemes": "找不到所选主题：{{names}}。暂以基础主题显示，将对应 JSON 放入 themes/editor-themes/ 后刷新可恢复。",
     "combinationSummary": "{{colors}}色彩 · {{fonts}}字体"
   },
   "tabs": {

@@ -1,40 +1,57 @@
 import { productCause, productMessage, type ProductMessageFields } from "./i18n/productMessages";
 import { OPEN_FONT_ASSETS } from './fontCatalog';
-import { fetchVerifiedFontFile, fontFileRequest, fontLicenseRequest, getFontSource, subscribeFontSource } from './fontSources';
+import { fontFileRequest, fontLicenseRequest, getFontSource, subscribeFontSource } from './fontSources';
+import { loadPreparedFontFile } from './fontPreload';
 
 const missing = (error: unknown) => error instanceof DOMException && error.name === 'NotFoundError';
 
 type FontStatus = { root: FileSystemDirectoryHandle | null; phase: 'idle' | 'downloading' | 'ready' | 'error' | 'cancelled'; completed: number; total: number; notice: ProductMessageFields | null };
 const initialStatus: FontStatus = Object.freeze({ root: null, phase: 'idle', completed: 0, total: 0, notice: null });
-let status = initialStatus, generation = 0, active: AbortController | null = null;
+let status = initialStatus, generation = 0, active: AbortController | null = null, activeRoot: FileSystemDirectoryHandle | null = null;
 const listeners = new Set<() => void>();
 export const getLocalFontStatus = () => status;
 export const getInitialLocalFontStatus = () => initialStatus;
 export function subscribeLocalFontStatus(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
 export function cancelLocalFontDownload() { active?.abort(); }
+export function cancelCreationFonts(root: FileSystemDirectoryHandle) { if (activeRoot === root) active?.abort(); }
+export const getLocalFontGeneration = () => generation;
+export function reportLocalFontLoadFailure(root: FileSystemDirectoryHandle, error: unknown) {
+  if (status.root === root) publish({ ...status, phase: 'error', notice: productMessage('localFonts.failed', { cause: productCause(error) }) });
+}
+export type LocalFontInitialization = { promise: Promise<void>; generation: number; source: ReturnType<typeof getFontSource> };
+const creationFonts = new WeakMap<FileSystemDirectoryHandle, LocalFontInitialization>();
+export function beginCreationFonts(root: FileSystemDirectoryHandle, current: () => boolean) {
+  const source = getFontSource(), promise = initializeLocalFonts(root, current);
+  const job = { promise, source, generation }; creationFonts.set(root, job); void promise.catch(() => {}); return job;
+}
+export function takeCreationFonts(root: FileSystemDirectoryHandle) { const job = creationFonts.get(root); creationFonts.delete(root); return job; }
 function publish(value: FontStatus) { status = Object.freeze(value); listeners.forEach(listener => listener()); }
 
 // The chosen source supplies only missing files. Existing fonts always belong to the user.
 export async function initializeLocalFonts(root: FileSystemDirectoryHandle, current: () => boolean = () => true): Promise<void> {
   if (!current()) return;
-  active?.abort(); const controller = new AbortController(); active = controller;
+  active?.abort(); const controller = new AbortController(); active = controller; activeRoot = root;
   const request = ++generation, source = getFontSource();
   const valid = () => current() && generation === request && !controller.signal.aborted && getFontSource() === source;
   const unsubscribe = subscribeFontSource(() => { if (getFontSource() !== source) controller.abort(); });
-  let completed = 0, total = 0;
+  let completed = 0, total = 0, failure: unknown;
   try {
     const directory = await root.getDirectoryHandle('fonts', { create: true });
     const files = OPEN_FONT_ASSETS.flatMap(asset => [fontLicenseRequest(asset), fontFileRequest(asset, source)]);
-    const pending = [];
+    const pending: (typeof files)[number][] = [];
     for (const file of files) {
       if (!valid()) return;
       try { await directory.getFileHandle(file.name); } catch (error) { if (!missing(error)) throw error; pending.push(file); }
     }
     total = pending.length;
-    for (const file of pending) {
+    let cursor = 0;
+    const worker = async () => {
+    while (valid() && !failure) {
+      const index = cursor++; if (index >= pending.length) return;
+      const file = pending[index];
       if (!valid()) return;
       publish({ root, phase: 'downloading', completed, total, notice: null });
-      const content = await fetchVerifiedFontFile(file, controller.signal);
+      const content = await loadPreparedFontFile(file, source, controller.signal);
       if (!valid()) return;
       // Recheck after downloading: a file supplied in the meantime must be retained.
       try { await directory.getFileHandle(file.name); completed++; continue; } catch (error) { if (!missing(error)) throw error; }
@@ -59,13 +76,16 @@ export async function initializeLocalFonts(root: FileSystemDirectoryHandle, curr
       }
       completed++;
     }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, pending.length) }, () => worker().catch(error => { if (!failure && !controller.signal.aborted) { failure = error; controller.abort(); } })));
+    if (failure) throw failure;
     if (valid()) publish({ root, phase: 'ready', completed, total, notice: productMessage('localFonts.ready') });
   } catch (error) {
-    if (!valid()) { if (generation === request) publish({ root, phase: 'cancelled', completed, total, notice: productMessage('localFonts.cancelled') }); return; }
+    if (!current() || generation !== request || getFontSource() !== source || !valid() && !failure) { if (generation === request) publish({ root, phase: 'cancelled', completed, total, notice: productMessage('localFonts.cancelled') }); return; }
     publish({ root, phase: 'error', completed, total, notice: productMessage('localFonts.failed', { cause: productCause(error) }) });
     throw error;
   } finally {
-    unsubscribe(); if (active === controller) active = null;
+    unsubscribe(); if (active === controller) { active = null; activeRoot = null; }
     if (generation === request && !valid() && status.phase === 'downloading') publish({ root, phase: 'cancelled', completed, total, notice: productMessage('localFonts.cancelled') });
   }
 }

@@ -1072,6 +1072,34 @@
           ]
         }
       ]
+    },
+    "v0_4_0_1": {
+      "summary": "Preload fonts and prebuild new-library content, with fixes for guide progress, workspace arrival and file diagnostics.",
+      "sections": [
+        {
+          "title": "Preloading and new libraries",
+          "items": [
+            "Preload fonts after language confirmation while selected prepared content loads separately. Reuse verified cache entries and preserve existing fonts.",
+            "Build default libraries, guide starters, examples and render records ahead of time, then install the selected content after directory confirmation to reduce preparation wait.",
+            "Preserve created content after preparation failure and resume in the same directory within the current guide session, without duplicate libraries or examples."
+          ]
+        },
+        {
+          "title": "Guide and progress feedback",
+          "items": [
+            "Separate directory selection from preparation. Show completion only after actual readiness, and keep combined progress monotonic while the stages overlap.",
+            "Fix tooltips flying across the screen, completed preload bars remaining visible, bars appearing during cached replay, and preparation bars changing position between pages.",
+            "Every guide entry shows the skeleton before revealing the workspace. Hold the ending for 1.8 seconds before its 0.7-second fade, retaining complete outro playback."
+          ]
+        },
+        {
+          "title": "Library diagnostics",
+          "items": [
+            "Fix repair warnings before connection or during loading, and stale diagnostics after switching libraries.",
+            "Expand actual problems to inspect file paths and specific causes. Named diagnostics appear after interface readiness without replaying on language changes."
+          ]
+        }
+      ]
     }
   }
 }

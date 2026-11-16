@@ -75,7 +75,7 @@ test('M1 keeps the static, local-only application boundary', async () => {
   assert.match(controls, /min-w-0/);
   assert.match(controls, /wrap-anywhere/);
   assert.match(startScript, /requestedPath\.startsWith/);
-  assert.match(startScript, /requestedStat\.isDirectory\(\)/);
+  assert.doesNotMatch(startScript, /\b(?:writeFile|unlink|rename|mkdir|rm)(?:Sync)?\s*\(/);
   assert.match(startScript, /path\.join\(requestedPath, 'index\.html'\)/);
   assert.match(startScript, /contentSecurityPolicy\(filePath\)/);
   assert.match(startScript, /\.txt': 'text\/x-component; charset=utf-8'/);

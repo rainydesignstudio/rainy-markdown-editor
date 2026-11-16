@@ -1,5 +1,7 @@
 'use client';
 
+import type { GuidePlan, GuidePreparationProgress } from '../lib/entryGuide';
+
 import { articleDraftBaseline, articleDraftChanged } from '../lib/editingDrafts';
 import { useToast, useToastReady } from '../components/global/Toast';
 import { useArticleTrash } from './useArticleTrash';
@@ -35,7 +37,10 @@ import { countCurrentMediaReferences, scanWorkspaceMediaReferences, inspectMedia
 import { insertUndoableText } from '../lib/nativeTextareaEdit';
 
 import { copyDefaultThemes, initializeThemeDefaults } from '../lib/themeDefaults';
-import { initializeLocalFonts, loadLocalFonts } from '../lib/localFonts';
+import { initializeLocalFonts, loadLocalFonts, getLocalFontGeneration, getLocalFontStatus, takeCreationFonts, cancelCreationFonts, reportLocalFontLoadFailure, type LocalFontInitialization } from '../lib/localFonts';
+import { getFontSource } from '../lib/fontSources';
+import { OPEN_FONT_ASSETS } from '../lib/fontCatalog';
+import { preloadFonts } from '../lib/fontPreload';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { usePathname } from 'next/navigation';
@@ -133,7 +138,7 @@ export type ViewKey = 'articles' | 'assets' | 'themes' | 'template' | 'settings'
 export type ArticleMode = 'overview' | 'editor';
 export type Tone = 'neutral' | 'success' | 'warning' | 'error';
 export type ArticleCollection = 'all' | 'unclassified' | 'archived' | 'trash' | `project:${string}`;
-export type LibraryCreationResult = { status: 'created' | 'cancelled' } | { status: 'error'; message: string; created?: boolean };
+export type LibraryCreationResult = { status: 'created' | 'cancelled' } | { status: 'error'; message: string; created?: boolean; root?: FileSystemDirectoryHandle };
 type PendingAction = { label: string; run: () => void | Promise<void>; onCancel?: () => void };
 type MediaPickerRequest = {
   id: number;
@@ -389,6 +394,40 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
   const editorWorkspaceQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const contentLibraryRootSessionRef = useRef(0);
   const directorySelectionRef = useRef(0);
+  const entryCreationRef = useRef<{ root: FileSystemDirectoryHandle; previousRoot: FileSystemDirectoryHandle | null; selection: number } | null>(null);
+  const fontLoadTaskRef = useRef<{ root: FileSystemDirectoryHandle; selection: number; promise: Promise<boolean>; isCurrent: () => boolean } | null>(null);
+  const beginFontLoad = useCallback((root: FileSystemDirectoryHandle, selection: number, creation: LocalFontInitialization | undefined = takeCreationFonts(root)) => {
+    const selected = () => directoryRef.current === root && directorySelectionRef.current === selection;
+    const download = creation?.promise ?? initializeLocalFonts(root, selected);
+    const generation = creation?.generation ?? getLocalFontGeneration(), source = creation?.source ?? getFontSource();
+    const current = () => selected() && getLocalFontGeneration() === generation && getFontSource() === source;
+    const promise = download.then(async () => {
+      if (!current() || getLocalFontStatus().phase !== 'ready') return false;
+      const dispose = await loadLocalFonts(root, current);
+      if (!current()) { dispose(); return false; }
+      fontSessionDisposeRef.current(); fontSessionDisposeRef.current = dispose;
+      return true;
+    }).catch(error => { if (current()) reportLocalFontLoadFailure(root, error); return false; });
+    fontLoadTaskRef.current = { root, selection, promise, isCurrent: current };
+    return promise;
+  }, []);
+  const waitForEntryFonts = useCallback(async (root: FileSystemDirectoryHandle, retry = false, verify = false) => {
+    const selection = directorySelectionRef.current;
+    if (directoryRef.current !== root) throw new ProductError('feedback.sessionChanged');
+    if (retry) void preloadFonts(true);
+    if (verify) {
+      const fonts = await root.getDirectoryHandle('fonts');
+      await Promise.all(OPEN_FONT_ASSETS.map(async asset => (await fonts.getFileHandle(asset.file)).getFile()));
+    }
+    let task = fontLoadTaskRef.current;
+    if (retry || verify || task?.root !== root || task.selection !== selection || !task.isCurrent()) {
+      beginFontLoad(root, selection); task = fontLoadTaskRef.current;
+    }
+    const ready = await task!.promise;
+    if (directoryRef.current !== root || directorySelectionRef.current !== selection) throw new ProductError('feedback.sessionChanged');
+    if (!ready) { const notice = getLocalFontStatus().notice; throw new ProductError(notice?.messageKey ?? 'localFonts.cancelled', notice?.messageParams); }
+    return true;
+  }, [beginFontLoad]);
   useEffect(() => {
     if (!notificationsReady || contentLibrariesState === 'loading' || manualLibraryLoad.current === null) return;
     const current = manualLibraryLoad.current === directorySelectionRef.current;
@@ -1132,18 +1171,15 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     if (!root) return false;
     const current = () => directoryRef.current === root && contentLibraryRootSessionRef.current === session;
     try {
-      await initializeLocalFonts(root, current);
-      if (!current()) return false;
-      const dispose = await loadLocalFonts(root, current);
-      if (!current()) { dispose(); return false; }
-      fontSessionDisposeRef.current(); fontSessionDisposeRef.current = dispose;
+      const ready = await beginFontLoad(root, directorySelectionRef.current);
+      if (!current() || !ready) return false;
       setStatus({ ...productLabel('localFonts.ready'), tone: 'success' });
       return true;
     } catch (error) {
       if (current()) setStatus({ ...productLabel('controller.fontLoadingFailed', { cause: productCause(error) }), tone: 'warning' });
       return false;
     }
-  }, []);
+  }, [beginFontLoad]);
 
   const loadDefaultEditorThemes = useCallback(async (): Promise<boolean> => {
     const root = directoryRef.current;
@@ -2291,16 +2327,9 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
           const formatLoaded = await activateLibraryFormat(handle, () => isCurrentSelection() && directoryRef.current === handle);
           if (!isCurrentSelection() || directoryRef.current !== handle) return;
           let defaultsIssue: string | null = formatLoaded.message;
-          try {
-            fontSessionDisposeRef.current();
-            fontSessionDisposeRef.current = () => {};
-            await initializeLocalFonts(handle, () => isCurrentSelection() && directoryRef.current === handle);
-            const dispose = await loadLocalFonts(handle, () => isCurrentSelection() && directoryRef.current === handle);
-            if (isCurrentSelection() && directoryRef.current === handle) {
-              fontSessionDisposeRef.current();
-              fontSessionDisposeRef.current = dispose;
-            } else dispose();
-          } catch (error) { defaultsIssue = [defaultsIssue, productText("controller.fontLoadingFailed", { "cause": productCause(error) })].filter(Boolean).join('；'); }
+          fontSessionDisposeRef.current();
+          fontSessionDisposeRef.current = () => {};
+          void beginFontLoad(handle, selection);
           if (!isCurrentSelection() || directoryRef.current !== handle) return;
           try { await initializeThemeDefaults(handle); } catch (error) { defaultsIssue = [defaultsIssue, error instanceof Error ? error.message : String(error)].filter(Boolean).join('；'); }
           if (!isCurrentSelection() || directoryRef.current !== handle) return;
@@ -2439,7 +2468,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       if (isCurrentSelection() && selectedRoot && directoryRef.current === selectedRoot) setEditorAppearanceLoaded(true);
     }
     return libraryReady && isCurrentSelection();
-  }, [advanceContentLibraryRootSession, applyStoredArticle, navigateArticleMode, notifyToast, openDocument, refreshArticles, setPreferredArticleMode]);
+  }, [beginFontLoad, advanceContentLibraryRootSession, applyStoredArticle, navigateArticleMode, notifyToast, openDocument, refreshArticles, setPreferredArticleMode]);
 
   const rememberAuthorizedDirectory = useCallback((handle: FileSystemDirectoryHandle, selection: number) => {
     setRememberedDirectory(handle);
@@ -2511,29 +2540,57 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     }
   }, [openAuthorizedDirectory, rememberAuthorizedDirectory]);
 
-  const createDataDirectory = useCallback(async (name: string, presetId: PlatformPresetId = DEFAULT_PLATFORM_PRESET_ID, onDirectorySelected?: () => void, keepRoute = false): Promise<LibraryCreationResult> => {
+  const createDataDirectory = useCallback(async (name: string, presetId: PlatformPresetId = DEFAULT_PLATFORM_PRESET_ID, onDirectorySelected?: () => void, keepRoute = false, guide?: GuidePlan, onPreparationProgress?: (progress: GuidePreparationProgress) => void): Promise<LibraryCreationResult> => {
     resumeIntentRef.current.active = false;
     const selection = ++directorySelectionRef.current;
-    let created = false;
+    let createdRoot: FileSystemDirectoryHandle | null = null;
+    entryCreationRef.current = null;
     try {
       getPublicPlatformPreset(presetId);
       const parent = await pickDataDirectory();
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
       onDirectorySelected?.();
-      const handle = await createNamedDataDirectory(parent, name, presetId, seedLocale);
-      created = true;
+      const handle = await createNamedDataDirectory(parent, name, presetId, seedLocale, { guide, prepareFonts: true, current: () => directorySelectionRef.current === selection, onProgress: detail => { if (directorySelectionRef.current === selection) onPreparationProgress?.(detail); } });
+      createdRoot = handle;
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
+      entryCreationRef.current = { root: handle, previousRoot: directoryRef.current, selection };
       rememberAuthorizedDirectory(handle, selection);
       const loaded = await openAuthorizedDirectory(handle, selection, true, keepRoute);
       if (directorySelectionRef.current !== selection) return { status: 'cancelled' };
-      return loaded ? { status: 'created' } : { status: 'error', created: true, message: getFormatSnapshot().error ?? productText('entryGuide.loadFailed') };
+      return loaded ? { status: 'created' } : { status: 'error', created: true, root: handle, message: getFormatSnapshot().error ?? productText('entryGuide.loadFailed') };
     } catch (error) {
       if (directorySelectionRef.current !== selection || error instanceof DOMException && error.name === 'AbortError') return { status: 'cancelled' };
       const message = error instanceof Error ? error.message : String(error);
       setStatus({ label: message, tone: 'error' });
-      return { status: 'error', message, ...(created ? { created: true } : {}) };
+      return { status: 'error', message, ...(createdRoot ? { created: true, root: createdRoot } : {}) };
     }
   }, [openAuthorizedDirectory, rememberAuthorizedDirectory, seedLocale]);
+
+  // Retry only the last creation's load transaction, never its directory/file creation.
+  const resumeEntryDirectory = useCallback(async (root: FileSystemDirectoryHandle): Promise<LibraryCreationResult> => {
+    const job = entryCreationRef.current;
+    const changed = () => ({ status: 'error' as const, created: true, root, message: productText('feedback.sessionChanged') });
+    if (!job || job.root !== root || job.selection !== directorySelectionRef.current || directoryRef.current !== root && directoryRef.current !== job.previousRoot) return changed();
+    const selection = ++directorySelectionRef.current;
+    job.selection = selection;
+    try {
+      const permission = await requestDirectoryReadWritePermission(root);
+      if (selection !== directorySelectionRef.current) return changed();
+      if (permission !== 'granted') return { status: 'error', created: true, root, message: productText('controller.thePreviousLibraryLacksReadWritePermissionAuthorizeItOrChooseAnother') };
+      const creation = takeCreationFonts(root), fontTask = fontLoadTaskRef.current;
+      cancelCreationFonts(root);
+      // The failed load's font consumer still belongs to its previous selection.
+      await Promise.allSettled([creation?.promise, fontTask?.root === root ? fontTask.promise : undefined]);
+      if (selection !== directorySelectionRef.current || entryCreationRef.current !== job || directoryRef.current !== root && directoryRef.current !== job.previousRoot) return changed();
+      if (fontTask?.root === root && fontLoadTaskRef.current === fontTask) fontLoadTaskRef.current = null;
+      rememberAuthorizedDirectory(root, selection);
+      const loaded = await openAuthorizedDirectory(root, selection, true, true);
+      if (selection !== directorySelectionRef.current || directoryRef.current !== root) return changed();
+      return loaded ? { status: 'created' } : { status: 'error', created: true, root, message: getFormatSnapshot().error ?? productText('entryGuide.loadFailed') };
+    } catch (error) {
+      return { status: 'error', created: true, root, message: error instanceof Error ? error.message : String(error) };
+    }
+  }, [openAuthorizedDirectory, rememberAuthorizedDirectory]);
 
   const reopenRememberedDirectory = useCallback(() => {
     const handle = rememberedDirectory;
@@ -3409,7 +3466,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     articlesForOverview, articleCollectionTitle, editorProjectsInDisplayOrder, orderedUnclassifiedArticles, orderedArchivedArticles,
     articleInfoDialogOpen, setArticleInfoDialogOpen, articleFolderName, setArticleFolderName, projectDeleteTarget, setProjectDeleteTarget,
     themeLibrary, setThemeLibrary, themeIssues, setThemeIssues,
-    editorThemes, editorThemeIssues, createEditorTheme, loadDefaultEditorThemes, removeEditorTheme, retryLocalFonts,
+    editorThemes, editorThemeIssues, createEditorTheme, loadDefaultEditorThemes, removeEditorTheme, retryLocalFonts, waitForEntryFonts,
     snippets, setSnippets, snippetIssues, setSnippetIssues, snippetCategories, setSnippetCategories,
     templates, setTemplates, templateIssues, setTemplateIssues, templateCategories, setTemplateCategories,
     article, setArticle, articleSettings, setArticleSettings, settingsIssue, setSettingsIssue, setDefaultArticleTheme,
@@ -3436,7 +3493,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     restoreHistorySnapshot, saveHistoryAsArticle, importImages, renameMediaImage,
     runAfterDraftDecision, resolvePendingAction, cancelPendingAction, resumeCurrentDraft, closeTemplateDialog,
     articleDraftKind: articleDraftKindRef.current, articleSourceLocationRef, articleInfoLocationRef,
-    openStoredArticle, selectEntryArticle, authorizeDirectory, openEntryDirectory, requestCreateDataDirectory, createDataDirectory, createLibraryDialogOpen, setCreateLibraryDialogOpen, reopenRememberedDirectory, copyRichText, pasteRichText, changeField,
+    openStoredArticle, selectEntryArticle, authorizeDirectory, openEntryDirectory, requestCreateDataDirectory, createDataDirectory, resumeEntryDirectory, createLibraryDialogOpen, setCreateLibraryDialogOpen, reopenRememberedDirectory, copyRichText, pasteRichText, changeField,
     changeTheme, applyThemeFromLibrary, createNewArticle, createArticleFromTemplate,
     beginCopy, confirmCopy, confirmDelete,
   };

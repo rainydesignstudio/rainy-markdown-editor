@@ -127,7 +127,6 @@
     "combination": "{{colors}} colors · {{fonts}} fonts",
     "chooseColors": "Choose {{name}} colors",
     "chooseFonts": "Choose {{name}} fonts",
-    "missingThemes": "Selected themes are missing: {{names}}. The basic theme is shown temporarily. Restore the JSON files in themes/editor-themes/ and refresh.",
     "combinationSummary": "{{colors}} colors · {{fonts}} fonts"
   },
   "tabs": {

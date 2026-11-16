@@ -1,9 +1,11 @@
 import { ProductError, productCause, productMessage, productReference, productText } from "./i18n/productMessages";
-import { DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset, initializeLibraryFormat } from './article-format/library';
+import { DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset } from './article-format/library';
 import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { parseArticle, updateFrontMatter } from './frontMatter';
 import { getTheme } from './themes';
-import { initializeThemeDefaults } from './themeDefaults';
+import { installPreparedLibrary, preparedCreationDirectories } from './preparedLibrary';
+import type { GuidePlan, GuidePreparationProgress } from './entryGuide';
+import { beginCreationFonts, cancelCreationFonts, type LocalFontInitialization } from './localFonts';
 import { parseThemeConfigJson, validateThemeConfig, validateThemeFormat } from './themeValidation';
 import { getThemeDirectory } from './themeDirectories';
 import type { ArticleDiagnostic, ArticleMeta, ArticleSummary, ArticleIndexIssue, SaveResult, StoredArticle, ThemeConfig } from './types';
@@ -98,7 +100,7 @@ export function normalizeDataDirectoryName(input: string): string {
   return name;
 }
 
-export async function createNamedDataDirectory(parent: DirectoryHandle, input: string, presetId: string = DEFAULT_PLATFORM_PRESET_ID, seedLocale: string = 'en-US'): Promise<DirectoryHandle> {
+export async function createNamedDataDirectory(parent: DirectoryHandle, input: string, presetId: string = DEFAULT_PLATFORM_PRESET_ID, seedLocale: string = 'en-US', options: { guide?: GuidePlan; current?: () => boolean; prepareFonts?: boolean; onProgress?: (progress: GuidePreparationProgress) => void } = {}): Promise<DirectoryHandle> {
   const preset = getPublicPlatformPreset(presetId);
   await ensurePermission(parent);
   const name = normalizeDataDirectoryName(input);
@@ -111,24 +113,22 @@ export async function createNamedDataDirectory(parent: DirectoryHandle, input: s
   for await (const _entry of child.entries()) {
     throw new ProductError("fileSystem.alreadyContainsFilesTheDirectoryIsUnchangedChooseAnotherNameOrOpen", { "name": name });
   }
+  let fontJob: LocalFontInitialization | undefined;
   try {
-    await ensureArticleDirectories(child);
-    await initializeLibraryFormat(child, presetId);
-    await initializeThemeDefaults(child, seedLocale, { previewSample: true, contentSeed: preset.contentSeed });
+    if (options.prepareFonts) fontJob = beginCreationFonts(child, options.current ?? (() => true));
+    await installPreparedLibrary(child, { locale: seedLocale, preset: preset.id, guide: options.guide }, options.current, options.onProgress);
   } catch (error) {
-    let rollbackSafe = true;
-    for await (const [entryName, entry] of child.entries()) {
-      if (entry.kind !== 'directory' || !DATA_DIRECTORY_NAMES.some(expected => expected === entryName)) {
-        rollbackSafe = false;
-        break;
+    if (fontJob) { cancelCreationFonts(child); await fontJob.promise.catch(() => {}); }
+    const generated = new Set(preparedCreationDirectories(child));
+    if (fontJob) generated.add('fonts');
+    const emptyOwnedTree = async (directory: DirectoryHandle, prefix = ''): Promise<boolean> => {
+      for await (const [entryName, entry] of directory.entries()) {
+        const path = prefix ? `${prefix}/${entryName}` : entryName;
+        if (entry.kind !== 'directory' || !generated.has(path) || !await emptyOwnedTree(await directory.getDirectoryHandle(entryName), path)) return false;
       }
-      const generated = await child.getDirectoryHandle(entryName);
-      for await (const _entry of generated.entries()) {
-        rollbackSafe = false;
-        break;
-      }
-      if (!rollbackSafe) break;
-    }
+      return true;
+    };
+    const rollbackSafe = await emptyOwnedTree(child);
     if (!rollbackSafe) {
       throw new ProductError("fileSystem.libraryInitializationFailedNewDirectoryContainsOtherContentAndWasNotCleaned", { "name": name, "cause": productCause(error) });
     }

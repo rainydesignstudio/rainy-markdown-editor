@@ -12,7 +12,7 @@ import { useUILocale, useUITranslation } from './UILocaleProvider';
 
 export type ToastLifetime = { mode: 'auto'; durationMs: number; countdown?: ToastCountdown } | { mode: 'manual' } | { mode: 'locked' };
 export type ToastAction = { id: string; label: ProductMessageInfo; presentation: 'icon' | 'text' | 'icon-text'; icon?: ComponentProps<typeof ContentIcon>['name']; disabled?: boolean; run: () => void | Promise<void> };
-export type ToastNotice = { key: string; label: string; tone: ToastTone; summary?: ProductMessageInfo; details?: unknown; lifetime?: ToastLifetime; actions?: ToastAction[] };
+export type ToastNotice = { key: string; label: string; tone: ToastTone; summary?: ProductMessageInfo; details?: unknown; lifetime?: ToastLifetime; actions?: ToastAction[]; diagnostic?: boolean };
 export type ToastContainerOptions = { maxVisible?: number; enterFrom?: 'top' | 'bottom' | 'left' | 'right'; motionDurationMs?: number };
 export type ToastItem = ToastNotice & { id: number; countdown?: ToastCountdown; ownsCountdown?: boolean; exiting?: boolean };
 const ToastContext = createContext<((notice: ToastNotice | { key: string; dismiss: true }, event?: string) => void) | null>(null);
@@ -49,13 +49,20 @@ export function ToastProvider({ children, initiallyReady = true, maxVisible = 3,
   currentItems.current = [...queue.visible, ...queue.pending];
   const sequence = useRef(0);
   const available = useRef(initiallyReady), [ready, setReady] = useState(initiallyReady);
-  const updateReady = useCallback((value: boolean) => { available.current = value; setReady(value); }, []);
   // Retain only the current event per producer so remounting a page cannot replay it.
-  const events = useRef(new Map<string, string>());
+  const events = useRef(new Map<string, { event: string; diagnostic: boolean }>());
+  const updateReady = useCallback((value: boolean) => {
+    available.current = value; setReady(value);
+    if (!value) {
+      for (const [key, event] of events.current) if (event.diagnostic) events.current.delete(key);
+      if (currentItems.current.some(item => item.diagnostic)) setQueue(previous => ({ visible: previous.visible.filter(item => !item.diagnostic), pending: previous.pending.filter(item => !item.diagnostic) }));
+    }
+  }, []);
   const notify = useCallback((notice: ToastNotice | { key: string; dismiss: true }, event?: string) => {
     if (event !== undefined) {
-      if (events.current.get(notice.key) === event) return;
-      events.current.set(notice.key, event);
+      const previous = events.current.get(notice.key);
+      if (previous?.event === event) return;
+      events.current.set(notice.key, { event, diagnostic: 'dismiss' in notice ? previous?.diagnostic ?? false : Boolean(notice.diagnostic) });
     }
     if (!('dismiss' in notice) && !available.current) return;
     capture.current?.();

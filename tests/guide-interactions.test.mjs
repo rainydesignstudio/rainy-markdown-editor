@@ -9,6 +9,7 @@ import * as jsx from 'react/jsx-runtime';
 import { JSDOM } from 'jsdom';
 import * as model from '../src/lib/entryGuide.ts';
 import * as editorThemes from '../src/lib/editorThemes.ts';
+import * as fontPreload from '../src/lib/fontPreload.ts';
 import { normalizeDataDirectoryName } from '../src/lib/fileSystem.ts';
 import { withUILocaleImports } from './ui-locale-fixture.mjs';
 
@@ -65,7 +66,7 @@ async function guide(t, overrides = {}, options = {}) {
     if (this.hasAttribute('data-guide-dot')) return new dom.window.DOMRect(650, 40, 8, 8);
     return new dom.window.DOMRect(600, 400, 110, 24);
   };
-  const notices = [], copied = [];
+  const notices = [], copied = [], preloadProps = [];
   let handoff, modeSwitch, tooltipButton, guideScene, guideWelcome;
   const requireComponent = withGuideImports(id => {
     if (id === 'react') return React;
@@ -75,9 +76,12 @@ async function guide(t, overrides = {}, options = {}) {
     if (id.endsWith('/GuideThemeDeck')) return { GuideThemeDeck: ({ expanded, onSelect }) => expanded ? jsx.jsx('div', { children: editorThemes.getBuiltinEditorThemes('zh-CN').map(theme => jsx.jsx('button', { 'aria-label': theme.name, onClick: () => onSelect(theme.id) }, theme.id)) }) : null };
     if (id.endsWith('/GuideHandoff')) return handoff;
     if (id.endsWith('/GuideWelcome')) return guideWelcome;
+    if (id.endsWith('/GuideFontPreload')) return { GuideFontPreload: props => { preloadProps.push(props); return null; } };
+    if (id.endsWith('/preparedLibrary')) return { prepareBuiltinLibrary: async () => {} };
     if (id.endsWith('/GuideScene')) return guideScene ?? { GuideScene: 'guide-scene' };
     if (id.endsWith('/TooltipButton')) return tooltipButton ?? { TooltipButton: ({ tooltip, ...props }) => jsx.jsx('button', props) };
     if (id.endsWith('/entryGuide')) return model;
+    if (id.endsWith('/fontPreload')) return fontPreload;
     if (id.endsWith('/fileSystem')) return { normalizeDataDirectoryName };
     if (id.endsWith('/ModeSwitch')) return modeSwitch;
     if (id.endsWith('/Toast')) return { useToast: () => notice => notices.push(notice) };
@@ -139,7 +143,7 @@ async function guide(t, overrides = {}, options = {}) {
     Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(input, value);
     input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
   });
-  return { doc, button, click, flush, advanceGreeting, endTransition, setReduced, enter, setName, chooseWriter, rerender, notices, copied, finished, appearance, window: dom.window, advanceFlight: async time => { flightTime = time; await flush(); } };
+  return { doc, button, click, flush, advanceGreeting, endTransition, setReduced, enter, setName, chooseWriter, rerender, notices, copied, finished, appearance, preload: () => preloadProps.at(-1), window: dom.window, advanceFlight: async time => { flightTime = time; await flush(); } };
 }
 
 test('existing-library card opens during its click, guards duplicates and returns to the same choices on cancel', async t => {
@@ -156,8 +160,10 @@ test('existing-library card opens during its click, guards duplicates and return
   assert.equal(f.doc.querySelector('[data-entry-guide]').dataset.step, '0');
   assert.equal(f.doc.querySelector('h1').textContent, '挑个业务场景。', 'native selection retains the current page');
   assert.equal(f.doc.querySelector('[data-guide-panel]').dataset.selecting, 'true');
+  assert.equal(f.preload().preparation, null, 'a pending native picker does not create a preparation-bar task');
   assert.deepEqual(f.finished, []);
   await React.act(async () => resolve({ status: 'cancelled' }));
+  assert.equal(f.preload().preparation, null, 'picker cancellation never starts a preparation-bar lifecycle');
   assert.equal(f.doc.querySelector('h1').textContent, '挑个业务场景。');
   assert.equal(f.doc.querySelectorAll('[data-guide-slot][aria-hidden=false]').length, 2);
   assert.equal(f.doc.querySelector('input[value=commerce]').checked, true);
@@ -166,9 +172,11 @@ test('existing-library card opens during its click, guards duplicates and return
   await f.click(f.button('我已经有资料库了'));
   assert.equal(f.doc.querySelector('h1').textContent, '挑个业务场景。');
   await React.act(async () => progress('directory'));
+  assert.ok(f.preload().preparation, 'the real transaction report starts preparation even without byte details');
   assert.equal(f.doc.querySelector('[data-guide-panel]').dataset.leaving, 'true');
   await f.endTransition('[data-guide-panel]');
   assert.equal(f.doc.querySelector('h1').textContent, '正在为你准备。', 'selection completion starts preparation');
+  assert.equal(f.preload().preparing, true);
   await React.act(async () => resolve({ status: 'error', message: 'read failed' }));
   await f.endTransition('[data-guide-panel]');
   assert.equal(f.doc.querySelector('h1').textContent, '挑个业务场景。');
@@ -301,7 +309,8 @@ test('a created-but-incomplete library retries by opening it and never records f
   assert.equal(created, 1); assert.deepEqual(f.finished, []);
   assert.match(f.doc.querySelector('[role=alert]').textContent, /Template write failed/);
   await f.click(f.button('选择并打开')); await f.flush();
-  assert.equal(opened, 1); assert.equal(created, 1); assert.deepEqual(f.finished, [true]);
+  assert.equal(opened, 1); assert.equal(created, 1); assert.deepEqual(f.finished, []);
+  await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
 
@@ -353,11 +362,12 @@ test('reduced-motion changes and interrupted returns settle the latest transitio
   assert.equal(f.doc.querySelectorAll('input:checked').length,0);
 });
 
-test('switching reduced motion on after actual readiness completes once without waiting for opacity', async t => {
+test('switching reduced motion keeps the outro reading gate and completes on its ending event', async t => {
   const f=await guide(t,{}, {reduced:false});await f.enter();
   await f.click(f.button('我已经有资料库了'));await f.flush();
   assert.deepEqual(f.finished,[]);
-  await f.setReduced(true);assert.deepEqual(f.finished,[true]);
+  await f.setReduced(true);assert.deepEqual(f.finished,[]);
+  await f.endTransition('[data-entry-guide]');assert.deepEqual(f.finished,[true]);
   await f.endTransition('[data-entry-guide]');assert.deepEqual(f.finished,[true]);
 });
 
@@ -603,7 +613,8 @@ test('Agent handoff waits for workspace readiness, copies the full text once and
   assert.equal(copyCalls, 1); assert.equal(f.button('复制提示词').disabled, true);
   await React.act(async () => resolveCopy());
   assert.deepEqual(f.copied, [fullText]); assert.equal(f.notices.at(-1).tone, 'success'); assert.deepEqual(f.finished, []);
-  await f.click(f.button('进入工作台')); assert.deepEqual(f.finished, [true]);
+  await f.click(f.button('进入工作台')); assert.deepEqual(f.finished, []);
+  await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
 test('copy failure stays on the full prompt and entering without a successful copy is allowed', async t => {
@@ -613,7 +624,8 @@ test('copy failure stays on the full prompt and entering without a successful co
   assert.equal(f.notices.at(-1).tone, 'error'); assert.deepEqual(f.copied, []);
   assert.ok(f.doc.querySelector('[data-guide-handoff] textarea')); assert.equal(f.button('复制提示词').disabled, false);
   assert.deepEqual(f.finished, []);
-  await f.click(f.button('进入工作台')); assert.deepEqual(f.finished, [true]);
+  await f.click(f.button('进入工作台')); assert.deepEqual(f.finished, []);
+  await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
 test('partial initialization freezes committed choices and retries setup without opening an existing library', async t => {
@@ -625,7 +637,7 @@ test('partial initialization freezes committed choices and retries setup without
   assert.ok([...f.doc.querySelectorAll('nav button')].every(button => button.disabled));
   await f.click(f.button('继续准备'));
   assert.equal(plans.length, 2); assert.deepEqual(plans[0], plans[1]); assert.equal(opens, 0);
-  assert.deepEqual(f.finished, [true]);
+  assert.deepEqual(f.finished, []); await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
 
@@ -672,7 +684,8 @@ test('welcome can finish or be skipped by Escape; configuration is silent and th
   await React.act(async () => f.doc.querySelector('[data-guide-welcome]').dispatchEvent(new f.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   assert.ok(!f.doc.querySelector('[data-guide-welcome]'));
   await reachSaving(f, 'workspace'); assert.deepEqual(cues, []);
-  await prepareLibrary(f); assert.deepEqual(cues, [[]]); assert.deepEqual(f.finished, [true]);
+  await prepareLibrary(f); assert.deepEqual(cues, [[]]); assert.deepEqual(f.finished, []);
+  await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
 test('sound controls and retry notices are absent without blocking the language choices', async t => {
@@ -778,8 +791,10 @@ test('preparation, Agent handoff and completion keep the outgoing panel until it
   await f.endTransition('[data-guide-panel]');
   const outro = f.doc.querySelector('[data-guide-outro=true]');
   assert.ok(outro.querySelector('svg')); assert.ok(outro.querySelector('h1')); assert.ok(outro.querySelector('p'), 'illustration and text share one packing animation');
-  assert.equal(outro.querySelector('h1').nextElementSibling.nextElementSibling, null, 'no success check or spare spacer follows the text');
+  assert.ok(outro.querySelector('h1').nextElementSibling.nextElementSibling.matches('[data-guide-preload-target]'), 'the only extra node anchors the linked progress indicator');
   assert.deepEqual(cues, [[]]);
+  assert.equal(f.doc.querySelector('[data-entry-guide]').style.getPropertyValue('--guide-outro-hold'), '1800ms');
+  assert.equal(f.doc.querySelector('[data-entry-guide]').style.getPropertyValue('--guide-outro-exit'), '700ms');
   await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
@@ -804,7 +819,7 @@ test('a rapid ready result settles through the transition fallback and reduced m
   await f.click(f.button('进入工作台'));
   await f.advanceGreeting();
   assert.equal(f.doc.querySelector('[data-guide-panel]').dataset.view, 'complete');
-  await f.setReduced(true); assert.deepEqual(f.finished, [true]);
+  await f.setReduced(true); assert.deepEqual(f.finished, []);
   await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });
 
@@ -821,7 +836,8 @@ test('entering waits for appearance adoption, clears the old mix and retries a f
   await React.act(async () => resolve(false));
   assert.match(f.doc.querySelector('[role=alert]').textContent, /所选外观未能应用/); assert.deepEqual(f.finished, []);
   await f.click(f.button('先看看工作台')); assert.equal(adopted.length, 2);
-  await React.act(async () => resolve(true)); await f.flush(); assert.deepEqual(f.finished, [false]);
+  await React.act(async () => resolve(true)); await f.flush(); assert.deepEqual(f.finished, []);
+  await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [false]);
 });
 
 test('a readiness interruption during appearance adoption cannot complete the guide', async t => {
@@ -830,4 +846,21 @@ test('a readiness interruption during appearance adoption cannot complete the gu
   await f.enter(); await f.click(f.button('先看看工作台')); await f.rerender({ workspaceReady: false });
   await React.act(async () => resolve(true)); await f.flush();
   assert.deepEqual(f.finished, []); assert.equal(f.doc.querySelector('[data-entry-guide]').dataset.complete, 'false');
+});
+
+test('final verification holds Agent entry on failure and starts the shared clock only after retry succeeds', async t => {
+  let valid = false, checks = 0;
+  const f = await guide(t, { onVerifyReady: async () => { checks++; return valid; } });
+  await reachSaving(f, 'agent'); await prepareLibrary(f);
+  assert.equal(checks, 0);
+  assert.equal(f.doc.querySelector('[data-entry-guide]').hasAttribute('data-outro-started-at'), false);
+  await f.click(f.button('进入工作台'));
+  assert.equal(checks, 1); assert.deepEqual(f.finished, []);
+  assert.equal(f.doc.querySelector('[data-entry-guide]').dataset.complete, 'false');
+  assert.equal(f.doc.querySelector('[data-entry-guide]').getAttribute('aria-busy'), 'false');
+  valid = true;
+  await f.click(f.button('进入工作台'));
+  assert.equal(checks, 2); assert.deepEqual(f.finished, []);
+  assert.ok(f.doc.querySelector('[data-entry-guide]').hasAttribute('data-outro-started-at'));
+  await f.endTransition('[data-entry-guide]'); assert.deepEqual(f.finished, [true]);
 });

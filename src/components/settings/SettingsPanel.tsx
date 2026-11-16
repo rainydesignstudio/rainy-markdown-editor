@@ -1,7 +1,7 @@
 'use client';
 
 import { OperationFeedback } from '../global/OperationFeedback';
-import { productReference, productJoin, formatProductMessage, productText } from "../../lib/i18n/productMessages";
+import { productReference, productJoin, productDiagnosticReference, formatProductMessage, productText } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
@@ -231,8 +231,13 @@ export function SettingsPanel({
   const deleteThemeRootRef = useRef<FileSystemDirectoryHandle | null>(null);
   const themeImportRef = useRef<HTMLInputElement | null>(null);
   const designerGuardRef = useRef<NavigationGuard | null>(null);
-  const missingThemeIds = [appearanceDraft.custom?.colorThemeId ?? appearanceDraft.themeId, appearanceDraft.custom?.fontThemeId ?? appearanceDraft.themeId]
-    .filter((id, index, ids) => ids.indexOf(id) === index && !findEditorTheme(editorThemes, id));
+  const missingThemeIds = root && libraryReady ? [appearanceDraft.custom?.colorThemeId ?? appearanceDraft.themeId, appearanceDraft.custom?.fontThemeId ?? appearanceDraft.themeId]
+    .filter((id, index, ids) => ids.indexOf(id) === index && !findEditorTheme(editorThemes, id)) : [];
+  const diagnosticIssues = [directoryBookmarkIssue, ...(root && libraryReady ? [workspaceIssue, issue,
+    ...editorThemeIssues.map(item => productJoin([item.file.endsWith('.json') && !item.file.includes('/') ? `themes/editor-themes/${item.file}` : item.file, ' · ', productDiagnosticReference(item)])),
+    ...missingThemeIds.map(id => productJoin(['settings.json · ', productReference('editorThemeLibrary.missingThemes', { names: id })])),
+  ] : [])].filter(Boolean);
+  const themeDiagnosticCount = root && libraryReady ? editorThemeIssues.length + missingThemeIds.length : 0;
   useEffect(() => setDraft(settings), [root, settings]);
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -373,7 +378,7 @@ export function SettingsPanel({
             </button>)}
           </div>
           <OperationFeedback hideTrigger id="settings-operation" notice={tab === 'appearance' ? appearanceNotice : null} />
-          <OperationFeedback id="settings-diagnostics" hideTrigger={!libraryReady} announce={libraryReady} label={t('common:feedback.libraryDiagnostics')} notice={directoryBookmarkIssue || workspaceIssue || issue ? productReference('shared.compose', { parts: productJoin([directoryBookmarkIssue, workspaceIssue, issue].filter(Boolean), '\n') }) : editorThemeIssues.length || missingThemeIds.length ? productReference('feedback.filesRepair', { count: editorThemeIssues.length + missingThemeIds.length }) : null} tone="warning">{editorThemeIssues.length || missingThemeIds.length ? <ul className="grid gap-2">{editorThemeIssues.map(item => <li className="break-words" key={item.file}>{item.file} · {formatProductMessage(item, t)}</li>)}{missingThemeIds.map(id => <li key={id}>{t('settings:templates.missingThemes', { names: id })}</li>)}</ul> : null}{workspaceIssue ? <p>{t('settings:ui.appearanceRemainsReadOnly')}</p> : null}{issue ? <p>{t('settings:ui.repairSettingsJsonThenReopenTheLibrary')}</p> : null}</OperationFeedback>
+          <OperationFeedback id="settings-diagnostics" hideTrigger={!libraryReady} announce={libraryReady} label={t('common:feedback.libraryDiagnostics')} notice={diagnosticIssues.length ? productReference('shared.compose', { parts: productJoin(diagnosticIssues, '\n') }) : null} summary={themeDiagnosticCount && !directoryBookmarkIssue && !workspaceIssue && !issue ? productReference('feedback.filesRepair', { count: themeDiagnosticCount }) : undefined} tone="warning">{workspaceIssue ? <p>{t('settings:ui.appearanceRemainsReadOnly')}</p> : null}{issue ? <p>{t('settings:ui.repairSettingsJsonThenReopenTheLibrary')}</p> : null}</OperationFeedback>
         </div>
 
         <section id="settings-panel-library" role="tabpanel" aria-labelledby="settings-tab-library" hidden={tab !== 'library'} tabIndex={0} className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">

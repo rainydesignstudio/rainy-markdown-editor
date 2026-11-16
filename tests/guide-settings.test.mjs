@@ -1,135 +1,95 @@
+import './prepared-library-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, mkdir, mkdtemp, rm, access, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 import path from 'node:path';
 import vm from 'node:vm';
 import ts from 'typescript';
-import { loadArticleSettings, saveArticleSettings } from '../src/lib/articleSettings.ts';
-import { GUIDE_PROFILES, guideProfile, guideTemplateSource, guideSampleSource } from '../src/lib/entryGuide.ts';
-import { BASIC_THEME } from '../src/lib/themes.ts';
-import { loadArticleTemplates, saveArticleTemplate, saveTemplateCategory } from '../src/lib/contentLibraries.ts';
-import { listStoredArticles, listArticleSummaries, readStoredArticleById, rebuildArticleIndexes, saveStoredArticle } from '../src/lib/fileSystem.ts';
-
-function diskHandle(directory, failures = { suffix: '', remaining: 0 }) {
-  return { name: path.basename(directory), kind: 'directory', async queryPermission() { return 'granted'; },
-    async getDirectoryHandle(name, options = {}) {
-      const target = path.join(directory, name);
-      if (options.create) await mkdir(target, { recursive: true });
-      try { await access(target); } catch { throw new DOMException('missing', 'NotFoundError'); }
-      return diskHandle(target, failures);
-    },
-    async getFileHandle(name, options = {}) {
-      const file = path.join(directory, name);
-      try { await access(file); } catch { if (!options.create) throw new DOMException('missing', 'NotFoundError'); await writeFile(file, ''); }
-      return { kind: 'file', name, async getFile() { return new File([await readFile(file)], name); }, async createWritable() {
-        let pending = '';
-        return { async write(value) { pending = String(value); }, async close() { if (failures.remaining && file.includes('/articles/') && file.endsWith(failures.suffix)) { failures.remaining--; throw new Error('Injected write failure'); } await writeFile(file, pending); }, async abort() {} };
-      } };
-    }, async removeEntry(name, options = {}) { await rm(path.join(directory, name), { recursive: options.recursive ?? false }); },
-    async *entries() { for (const entry of await readdir(directory, { withFileTypes: true })) yield [entry.name, entry.isDirectory() ? diskHandle(path.join(directory, entry.name), failures) : await this.getFileHandle(entry.name)]; },
-  };
-}
+import { libraryDirectory } from '../scripts/library-directory.mjs';
+import { loadArticleSettings, DEFAULT_ARTICLE_SETTINGS } from '../src/lib/articleSettings.ts';
+import { GUIDE_PROFILES, guideProfile } from '../src/lib/entryGuide.ts';
+import { loadArticleTemplates } from '../src/lib/contentLibraries.ts';
+import { listStoredArticles, listArticleSummaries, readStoredArticleById, createNamedDataDirectory } from '../src/lib/fileSystem.ts';
+import { getFreshGuide } from '../src/lib/preparedLibrary.ts';
 
 async function fixture(t, language = 'zh-CN', overrides = {}) {
   const parent = new URL('../data/test/', import.meta.url); await mkdir(parent, { recursive: true });
   const directory = await mkdtemp(path.join(parent.pathname, 'guide-preparation-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
-  const failures = { suffix: '', remaining: 0 };
-  const root = diskHandle(directory, failures), guideSetup = { current: null }, calls = { create: 0, selected: [], templates: [], rendered: [] };
-  const defaults = (await loadArticleSettings(root)).settings;
-  await saveArticleSettings(root, { ...defaults, autoSave: { enabled: false, intervalSeconds: 17 }, autoSnapshot: { enabled: true, intervalMinutes: 91, maxCount: 9 }, trash: { enabled: false } });
+  const parentHandle = libraryDirectory(directory), guideSetup = { current: null }, calls = { create: 0, reloaded: 0, selected: [], reads: 0 };
+  let readFailures = 0;
   const translations = JSON.parse(await readFile(new URL(`../resources/locale/${language}/onboarding.json`, import.meta.url), 'utf8'));
   const source = await readFile(new URL('../src/components/global/AppProviders.tsx', import.meta.url), 'utf8');
   const callback = source.slice(source.indexOf('  const createFromGuide ='), source.indexOf('  const openFromGuide ='));
   const controller = {
-    directoryRef: { current: root },
-    createDataDirectory: async (_name, _preset, _progress, keepRoute) => { calls.create++; assert.equal(keepRoute, true); return { status: 'created' }; },
-    setTemplates(items) { calls.templates = items; }, setTemplateCategories() {}, setArticleSettings() {},
-    selectEntryArticle: async article => { calls.selected.push(article); return true; },
-    refreshArticles: async () => listArticleSummaries(root), saveEditorAppearance: async () => true,
-    ...overrides,
+    directoryRef: { current: null },
+    createDataDirectory: async (name, preset, progress, keepRoute, plan) => {
+      calls.create++; assert.equal(keepRoute, true); progress?.();
+      controller.directoryRef.current = await createNamedDataDirectory(parentHandle, name, preset, language, { guide: plan });
+      if (overrides.failInitialLoad && calls.create === 1) return { status: 'error', created: true, root: controller.directoryRef.current, message: 'Injected post-copy load failure' };
+      return { status: 'created' };
+    },
+    waitForEntryFonts: async () => {},
+    resumeEntryDirectory: async root => {
+      if (root !== controller.directoryRef.current) return { status: 'error', message: 'Library changed' };
+      calls.reloaded++;
+      return { status: 'created' };
+    },
+    selectEntryArticle: async article => { calls.selected.push(article); return overrides.selectEntryArticle ? overrides.selectEntryArticle(article) : true; },
   };
   const create = vm.runInNewContext(ts.transpileModule(callback + '\ncreateFromGuide;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, {
-    controller, guideSetup, locale: { locale: language }, guideProfile, guideTemplateSource, guideSampleSource, loadArticleSettings, saveArticleSettings,
-    loadThemeLibrary: async () => ({ themes: [BASIC_THEME] }), saveTemplateCategory, saveArticleTemplate, loadArticleTemplates,
-    saveStoredArticle, readStoredArticleById, rebuildArticleIndexes,
-    renderGuideSample: async (_root, article) => { assert.equal(article.themeValid, true); assert.equal(article.parse.canCopy, true); calls.rendered.push(article.id); return {}; }, getStoredArticleDirectory: async () => ({}), persistRenderRecord: async () => {},
+    controller, guideSetup, prepareGuideWorkspace: async () => {}, locale: { locale: language }, guideProfile, loadArticleSettings, getFreshGuide,
+    readStoredArticleById: async (...args) => { calls.reads++; if (readFailures > 0) { readFailures--; throw Error('Injected first sample read failure'); } return readStoredArticleById(...args); },
     t: key => key.split('.').reduce((value, part) => value?.[part], translations) ?? key,
     formatProductMessage: value => String(value),
   });
-  const plan = { profile: 'technical', name: 'Preference test', writer: 'agent', autoSave: false, autoSnapshot: false, themeId: 'rainy-slate', colorMode: 'dark' };
-  return { create, root, directory, plan, calls, guideSetup, controller, translations, failures };
+  const plan = { profile: 'technical', name: 'Preference test', writer: 'agent', autoSave: false, autoSnapshot: false, themeId: 'rainy-design-slate', colorMode: 'dark' };
+  return { create, get root() { return controller.directoryRef.current; }, get directory() { return path.join(directory, plan.name); }, plan, calls, guideSetup, controller, translations, failReads(count) { readFailures = count; } };
 }
 
-test('all twelve localized starters create one template and one saved example, select the real example and preserve other settings', async t => {
+test('all twelve localized starters select one prepared saved example and retain the other bundled content', async t => {
   for (const language of ['zh-CN', 'en-US']) for (const profile of GUIDE_PROFILES) {
-    const f = await fixture(t, language);
-    const plan = { ...f.plan, profile: profile.id, autoSave: profile.purpose === 'development' || profile.id === 'product', autoSnapshot: profile.purpose === 'development' || profile.id === 'brief' };
-    const result = await f.create(plan, () => {});
-    assert.equal(result.status, 'ready', result.message);
+    const f = await fixture(t, language), plan = { ...f.plan, profile: profile.id, autoSave: profile.purpose === 'development', autoSnapshot: profile.id === 'brief' };
+    const result = await f.create(plan, () => {}); assert.equal(result.status, 'ready', result.message);
     const articles = await listStoredArticles(f.root), templates = await loadArticleTemplates(f.root);
-    assert.equal(articles.length, 1); assert.equal(templates.templates.length, 1);
-    const article = articles[0];
-    assert.equal(article.parse.canCopy, true); assert.equal(article.themeValid, true);
+    assert.equal(articles.length, 1); assert.equal(templates.templates.filter(item => item.id.startsWith('entry-')).length, 1);
+    assert.ok(templates.templates.some(item => item.id === 'markdown-guide'));
+    const article = articles[0]; assert.equal(article.parse.canCopy, true); assert.equal(article.themeValid, true);
     assert.equal(article.parse.metadata.title, f.translations.starterExamples[profile.id].title);
     assert.equal(article.parse.body.trim(), f.translations.starterExamples[profile.id].body);
-    assert.equal(result.resources.samplePath, article.filePath);
-    assert.equal(result.resources.templatePath, `templates/entry-guide/entry-${profile.id}.md`);
+    assert.equal(result.resources.samplePath, article.filePath); assert.equal(result.resources.templatePath, `templates/entry-guide/entry-${profile.id}.md`);
     assert.equal(f.calls.selected[0].id, article.id);
-    const settings = (await loadArticleSettings(diskHandle(f.directory))).settings;
-    assert.deepEqual(settings.autoSave, { enabled: plan.autoSave, intervalSeconds: 17 });
-    assert.deepEqual(settings.autoSnapshot, { enabled: plan.autoSnapshot, intervalMinutes: 91, maxCount: 9 });
-    assert.deepEqual(settings.trash, { enabled: false });
-    assert.equal(result.resources.autoSaveIntervalSeconds, 17); assert.equal(result.resources.autoSnapshotMaxCount, 9);
-    assert.equal((await listArticleSummaries(f.root)).articles.length, 1);
+    const settings = (await loadArticleSettings(f.root)).settings;
+    assert.deepEqual(settings.autoSave, { ...DEFAULT_ARTICLE_SETTINGS.autoSave, enabled: plan.autoSave });
+    assert.deepEqual(settings.autoSnapshot, { ...DEFAULT_ARTICLE_SETTINGS.autoSnapshot, enabled: plan.autoSnapshot });
+    assert.deepEqual(settings.trash, DEFAULT_ARTICLE_SETTINGS.trash); assert.equal((await listArticleSummaries(f.root)).articles.length, 1);
   }
 });
 
-test('a late failure resumes the same library and saved example without creating a duplicate', async t => {
-  let attempt = 0;
-  const f = await fixture(t, 'zh-CN', { saveEditorAppearance: async () => ++attempt > 1 });
-  const first = await f.create(f.plan, () => {});
-  assert.equal(first.status, 'error'); assert.equal(first.resumable, true);
-  const before = (await listStoredArticles(f.root))[0];
-  const templateBefore = (await loadArticleTemplates(f.root)).templates[0].source;
-  const resumed = await f.create(f.plan, () => {});
-  assert.equal(resumed.status, 'ready', resumed.message); assert.equal(f.calls.create, 1);
-  const articles = await listStoredArticles(f.root);
-  assert.equal(articles.length, 1); assert.equal(articles[0].id, before.id); assert.equal(articles[0].source, before.source);
-  assert.equal((await loadArticleTemplates(f.root)).templates[0].source, templateBefore);
+test('a late selection failure retries the same prepared library and example without duplicate creation or writes', async t => {
+  let attempt = 0; const f = await fixture(t, 'zh-CN', { selectEntryArticle: async () => ++attempt > 1 });
+  const first = await f.create(f.plan, () => {}); assert.equal(first.status, 'error'); assert.equal(first.resumable, true);
+  const before = (await listStoredArticles(f.root))[0], templates = await loadArticleTemplates(f.root);
+  const resumed = await f.create(f.plan, () => {}); assert.equal(resumed.status, 'ready', resumed.message); assert.equal(f.calls.create, 1);
+  const after = await listStoredArticles(f.root); assert.equal(after.length, 1); assert.equal(after[0].source, before.source);
+  assert.deepEqual((await loadArticleTemplates(f.root)).templates, templates.templates);
 });
 
-test('resuming refuses a changed plan, switched library or externally edited example', async t => {
-  const f = await fixture(t, 'zh-CN', { saveEditorAppearance: async () => false });
-  await f.create(f.plan, () => {});
+test('a first sample read failure remembers the created directory before retry and never opens a second picker', async t => {
+  const f = await fixture(t); f.failReads(1);
+  const first = await f.create(f.plan, () => {}); assert.equal(first.status, 'error'); assert.equal(first.resumable, true);
+  assert.ok(f.guideSetup.current?.root); assert.equal(f.guideSetup.current.sample, undefined);
+  const next = await f.create(f.plan, () => {}); assert.equal(next.status, 'ready', next.message);
+  assert.equal(f.calls.create, 1); assert.equal(f.calls.reads, 2); assert.equal((await listStoredArticles(f.root)).length, 1);
+});
+
+test('resuming refuses a changed plan, switched library or externally edited example and retains the edit', async t => {
+  const f = await fixture(t, 'zh-CN', { selectEntryArticle: async () => false }); await f.create(f.plan, () => {});
   assert.equal((await f.create({ ...f.plan, profile: 'website' }, () => {})).status, 'error');
-  const sample = f.guideSetup.current.sample;
-  const target = path.join(f.directory, sample.filePath);
-  const external = sample.source + '\nExternal edit retained.\n';
-  await writeFile(target, external);
-  assert.equal((await f.create(f.plan, () => {})).status, 'error');
-  assert.equal(await readFile(target, 'utf8'), external);
-  f.controller.directoryRef.current = null;
-  assert.equal((await f.create(f.plan, () => {})).status, 'error');
-  assert.equal(f.calls.create, 1);
+  const sample = f.guideSetup.current.sample, target = path.join(f.directory, sample.filePath), external = sample.source + '\nExternal edit retained.\n';
+  await writeFile(target, external); assert.equal((await f.create(f.plan, () => {})).status, 'error'); assert.equal(await readFile(target, 'utf8'), external);
+  f.controller.directoryRef.current = null; assert.equal((await f.create(f.plan, () => {})).status, 'error'); assert.equal(f.calls.create, 1);
 });
-
-test('theme and index write failures resume the saved source with valid rendering input', async t => {
-  for (const [suffix, remaining] of [['/theme.json', 1], ['/index.json', 2]]) {
-    const f = await fixture(t); Object.assign(f.failures, { suffix, remaining });
-    const first = await f.create(f.plan, () => {});
-    assert.equal(first.status, 'error'); assert.equal(first.resumable, true);
-    const saved = f.guideSetup.current.sample;
-    assert.ok(saved?.source); assert.equal(f.calls.rendered.length, 0);
-    const resumed = await f.create(f.plan, () => {});
-    assert.equal(resumed.status, 'ready', resumed.message);
-    const articles = await listStoredArticles(f.root);
-    assert.equal(articles.length, 1); assert.equal(articles[0].id, saved.id); assert.equal(articles[0].source, saved.source);
-    assert.equal(articles[0].themeValid, true); assert.equal((await listArticleSummaries(f.root)).articles.length, 1);
-    assert.deepEqual(f.calls.rendered, [saved.id]); assert.equal(f.calls.create, 1);
-  }
-});
-
 
 test('production Guide appearance adoption persists to an existing library and applies no-library choices in memory', async () => {
   const { getBuiltinEditorThemes } = await import('../src/lib/editorThemes.ts');
@@ -159,9 +119,30 @@ test('production Guide reopening passes both existing guards without erasing com
   let continueNavigation, continueDraft; const visibility = [], setup = { current: { keepUntilConfirmed: true } };
   const reopen = vm.runInNewContext(ts.transpileModule(callback + '\nreopenEntryGuide;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, {
     controller: { runWithNavigationGuard: next => { continueNavigation = next; }, runAfterDraftDecision: action => { continueDraft = action.run; } },
-    t: key => key, guideAudio: { quiet() {} }, guideSetup: setup, previewEditorAppearance() {}, setGuideVisible: value => visibility.push(value),
+    t: key => key, guideAudio: { quiet() {} }, guideSetup: setup, previewEditorAppearance() {}, setWorkspaceMounted() {}, setArrivalVisible() {}, setGuideVisible: value => visibility.push(value),
   });
   reopen(); assert.deepEqual(visibility, []); assert.ok(setup.current);
   continueNavigation(); assert.deepEqual(visibility, []); assert.ok(setup.current);
   continueDraft(); assert.deepEqual(visibility, [true]); assert.equal(setup.current, null);
+});
+
+test('post-copy load failure retries loading the same created root instead of creating a duplicate', async t => {
+  const f = await fixture(t, 'zh-CN', { failInitialLoad: true });
+  const first = await f.create(f.plan, () => {});
+  assert.equal(first.status, 'error'); assert.equal(first.resumable, true);
+  assert.equal(f.calls.reads, 0); assert.equal(f.guideSetup.current.needsReload, true);
+  const resumed = await f.create(f.plan, () => {});
+  assert.equal(resumed.status, 'ready', resumed.message);
+  assert.equal(f.calls.create, 1); assert.equal(f.calls.reloaded, 1);
+  assert.equal((await listStoredArticles(f.root)).length, 1);
+});
+
+test('post-copy recovery rejects a changed plan and a switched root before reading its sample', async t => {
+  const f = await fixture(t, 'zh-CN', { failInitialLoad: true });
+  await f.create(f.plan, () => {});
+  assert.equal((await f.create({ ...f.plan, profile: 'website' }, () => {})).status, 'error');
+  assert.equal(f.calls.reloaded, 0);
+  f.controller.directoryRef.current = null;
+  assert.equal((await f.create(f.plan, () => {})).status, 'error');
+  assert.equal(f.calls.create, 1); assert.equal(f.calls.reads, 0);
 });

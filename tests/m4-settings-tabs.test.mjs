@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import { productText } from '../src/lib/i18n/productMessages.ts';
 import { getInitialFormatSnapshot } from '../src/lib/article-format/runtime.ts';
 
 const editorThemes = await import('../src/lib/editorThemes.ts');
@@ -84,6 +85,26 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
     switch(id) { this.tab(id).props.onClick(); render(); },
   };
 }
+
+test('theme diagnostics wait for a connected, loaded library and include the file and reason', () => {
+  const page = settingsPage(), themes = page.props.editorThemes;
+  const diagnostic = () => page.find(node => node.type === 'operation-feedback' && node.props.id === 'settings-diagnostics').props;
+  page.props.root = null; page.props.editorThemes = []; page.props.libraryReady = true; page.render();
+  assert.equal(diagnostic().notice, null, 'an unconnected library has no missing theme');
+  page.props.root = { name: 'test-only' }; page.props.libraryReady = false; page.render();
+  assert.equal(diagnostic().notice, null, 'an unloaded theme list is not a damaged library');
+  page.props.libraryReady = true; page.render();
+  const missing = diagnostic();
+  assert.equal(missing.summary.messageParams.count, 1);
+  assert.match(productText(missing.notice.messageKey, missing.notice.messageParams), /settings\.json.*rainy-design-slate/);
+  page.props.editorThemes = themes; page.render();
+  assert.equal(diagnostic().notice, null);
+  page.props.editorThemeIssues = [{ file: 'broken.json', message: 'Invalid JSON at position 7' }]; page.render();
+  const invalid = diagnostic();
+  assert.equal(invalid.summary.messageParams.count, 1);
+  assert.match(productText(invalid.notice.messageKey, invalid.notice.messageParams), /themes\/editor-themes\/broken\.json · Invalid JSON at position 7/);
+  page.unmount();
+});
 
 test('local-library policy summary follows the active snapshot and never labels invalid or disconnected data as usable', () => {
   const initial = getInitialFormatSnapshot();

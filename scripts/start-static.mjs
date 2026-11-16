@@ -24,10 +24,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const output = path.join(root, 'out');
 const basePath = (process.env.NEXT_PUBLIC_ARTICLE_BASE_PATH || '').replace(/\/+$/, '');
 
+// Serve one complete build identity until an explicit restart, even if out is rebuilt.
+const buildFiles = new Map();
+function captureBuild(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) captureBuild(file);
+    else if (entry.isFile()) buildFiles.set(file, fs.readFileSync(file));
+  }
+}
+
 if (!fs.existsSync(path.join(output, 'index.html'))) {
   console.error(t('cli.missingBuild'));
   process.exit(1);
 }
+
+captureBuild(output);
 
 function contentType(filePath) {
   const extension = path.extname(filePath).toLowerCase();
@@ -48,7 +60,7 @@ function contentType(filePath) {
 
 function inlineScriptHashes(filePath) {
   if (path.extname(filePath).toLowerCase() !== '.html') return [];
-  const html = fs.readFileSync(filePath, 'utf8');
+  const html = buildFiles.get(filePath)?.toString('utf8') ?? '';
   const hashes = [];
   const pattern = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   for (const match of html.matchAll(pattern)) {
@@ -103,25 +115,20 @@ const server = http.createServer((request, response) => {
     response.end('Forbidden');
     return;
   }
-  fs.stat(requestedPath, (requestError, requestedStat) => {
-    const filePath = !requestError && requestedStat.isDirectory()
-      ? path.join(requestedPath, 'index.html')
-      : requestedPath;
-    fs.stat(filePath, (error, stat) => {
-      if (!error && stat.isFile()) {
-        response.writeHead(200, {
-          'cache-control': 'no-store',
-          'content-security-policy': contentSecurityPolicy(filePath),
-          'content-type': contentType(filePath),
-          'x-content-type-options': 'nosniff',
-        });
-        fs.createReadStream(filePath).pipe(response);
-        return;
-      }
-      response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-      response.end('Not found');
+  const filePath = buildFiles.has(requestedPath) ? requestedPath : path.join(requestedPath, 'index.html');
+  const bytes = buildFiles.get(filePath);
+  if (bytes) {
+    response.writeHead(200, {
+      'cache-control': 'no-store',
+      'content-security-policy': contentSecurityPolicy(filePath),
+      'content-type': contentType(filePath),
+      'x-content-type-options': 'nosniff',
     });
-  });
+    response.end(bytes);
+    return;
+  }
+  response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
+  response.end('Not found');
 });
 
 server.on('error', (error) => {

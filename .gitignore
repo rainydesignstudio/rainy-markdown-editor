@@ -3,6 +3,7 @@ node_modules/
 .next/
 /.next-*/
 out/
+/public/prepared-library/
 coverage/
 playwright-report/
 test-results/

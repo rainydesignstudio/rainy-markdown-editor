@@ -108,7 +108,7 @@ test('late library activation cannot publish a new format or change an existing 
 test('the transport is opaque and network-blocked; remote images are confined to the inert preview document', async () => {
   const source = await readFile(new URL('../scripts/start-static.mjs', import.meta.url), 'utf8');
   const methods = source.slice(source.indexOf('function inlineScriptHashes'), source.indexOf('const server ='));
-  const context = { path, crypto, fs: { readFileSync: () => '<html></html>' } }; vm.runInNewContext(methods + '\nthis.policy=contentSecurityPolicy;', context);
+  const context = { path, crypto, buildFiles: { get: () => Buffer.from('<html></html>') } }; vm.runInNewContext(methods + '\nthis.policy=contentSecurityPolicy;', context);
   const runner = context.policy('/out/format/article-package-sandbox.html');
   assert.match(runner, /sandbox allow-scripts(?:;|$)/); assert.doesNotMatch(runner, /allow-same-origin|unsafe-eval/); assert.match(runner, /connect-src 'none'/);
   const display = context.policy('/out/format/article-package-preview.html');

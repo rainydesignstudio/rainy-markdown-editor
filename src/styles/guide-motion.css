@@ -1,4 +1,13 @@
 @layer utilities {
+  @keyframes guide-preload-ball {
+    0% { opacity: 0; transform: translateY(2rem) scale(.8); animation-timing-function: cubic-bezier(.16,.8,.3,1); }
+    30% { opacity: 1; transform: translateY(-.75rem) scale(.95,1.05); animation-timing-function: cubic-bezier(.55,0,1,.45); }
+    55% { opacity: 1; transform: translateY(0) scale(1.22,.78); animation-timing-function: cubic-bezier(.16,.8,.3,1); }
+    73% { opacity: 1; transform: translateY(-.25rem) scale(.97,1.03); animation-timing-function: cubic-bezier(.55,0,1,.45); }
+    88% { opacity: 1; transform: translateY(0) scale(1.08,.92); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
   @keyframes guide-feedback-enter {
     from { grid-template-rows: 0fr; opacity: 0; }
     to { grid-template-rows: 1fr; opacity: 1; }
@@ -14,13 +23,12 @@
     12%, 86% { opacity: 1; }
   }
   @keyframes guide-depart {
-    0%, 78% { opacity: 1; }
-    100% { opacity: 0; }
+    from { opacity: 1; }
+    to { opacity: 0; }
   }
   @keyframes guide-pack {
-    0% { opacity: 0; transform: translateY(.5rem) scale(.94); }
-    24%, 62% { opacity: 1; transform: translateY(0) scale(1); }
-    100% { opacity: 0; transform: translateY(-.75rem) scale(.9); }
+    from { opacity: 0; transform: translateY(.5rem) scale(.94); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   @keyframes guide-environment {
     from { opacity: 0; scale: 1.04; }
