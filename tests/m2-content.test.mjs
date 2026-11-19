@@ -343,7 +343,8 @@ test('explicit initialization seeds themed snippets and sample templates in thei
   const snippets = await loadArticleSnippets(root);
   const templates = await loadArticleTemplates(root);
 
-  assert.equal(snippets.snippets.length, 24);
+  assert.equal(snippets.snippets.length, DEFAULT_ARTICLE_SNIPPETS.length);
+  assert.equal(snippets.snippets.filter(item=>item.categoryId==='interactive').length,0);
   assert.deepEqual(snippets.categories, DEFAULT_SNIPPET_CATEGORIES);
   assert.equal(templates.templates.length, 5);
   assert.deepEqual(snippets.snippets.map((item) => item.trigger).sort(), DEFAULT_ARTICLE_SNIPPETS.map((item) => item.trigger).sort());

@@ -72,10 +72,7 @@ test('inspection has only a close action, and close/cancel/copy controls carry i
     const tree = nodes(module.exports.FormatCheckDialog({ mode, report, onDecision: value => decisions.push(value) }));
     const buttons = tree.filter(node => node.type === 'dialog-button');
     assert.deepEqual(buttons.map(text), labels);
-    for (const button of buttons) {
-      const icon = button.props.children.find(child => typeof child?.type === 'function');
-      assert.ok(icon); assert.equal(icon.type(icon.props).type, 'svg');
-    }
+    assert.deepEqual(buttons.map(button => button.props.icon), mode === 'copy' ? ['close', 'copy'] : ['close']);
     buttons[0].props.onClick(); assert.deepEqual(decisions, [false]);
   }
 });
@@ -93,7 +90,7 @@ test('toolbar places export before the divider and inspection between refresh an
   });
   let inspected = 0;
   const tree = nodes(module.exports.EditorTopbar({ view: 'articles', articleMode: 'editor', currentTitle: '当前稿', currentProjectName: null, articleCollectionTitle: '全部文章', article: { dirty: true, folder: 'current', themeValid: true }, directory: {}, isReadyToCopy: true, mediaOperation: null, historyBusy: false, isCompiling: false, currentArticleIsArchived: false, metadataWritable: true, onCheckFormat: () => inspected++ }));
-  const controls = nodes(tree.find(node => node.props.className === 'toolbar-actions'));
+  const controls = nodes(tree.find(node => node.props.className?.split(' ').includes('button-bar') && node.props['aria-label'] === '文稿操作'));
   const index = label => controls.findIndex(node => node.props['aria-label'] === label);
   const divider = controls.findIndex(node => node.props.className === 'toolbar-divider');
   assert.ok(index('导出文章') < divider && divider < index('更新样式'));

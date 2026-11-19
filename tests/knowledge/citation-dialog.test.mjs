@@ -6,6 +6,7 @@ import ts from 'typescript';
 import * as jsx from 'react/jsx-runtime';
 import { createUII18n } from '../../src/lib/i18n/runtime.ts';
 import * as citations from '../../src/lib/knowledge/citations.ts';
+import { withActionComponents } from '../action-ui-fixture.mjs';
 
 async function fixture(locale = 'en-US', body = 'Keep this argument.') {
   const cells = [], changes = [], instance = createUII18n(locale);
@@ -20,7 +21,7 @@ async function fixture(locale = 'en-US', body = 'Keep this argument.') {
   const module = { exports: {} };
   const source = await readFile(new URL('../../src/components/knowledge/CitationTools.tsx', import.meta.url), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, document: { body: {} }, requestAnimationFrame: callback => callback(), require(id) {
+    module, exports: module.exports, document: { body: {} }, requestAnimationFrame: callback => callback(), require: withActionComponents(function(id) {
       if (id === 'react') return react;
       if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
       if (id === 'react/jsx-runtime') return jsx;
@@ -33,7 +34,7 @@ async function fixture(locale = 'en-US', body = 'Keep this argument.') {
       if (id.endsWith('/knowledge/citations')) return citations;
       if (id.endsWith('/nativeTextareaEdit')) return { insertUndoableText(target, value, _start, _end, _current, onChange) { target.value = value; onChange(value); return true; } };
       throw new Error(id);
-    },
+    }),
   });
   const all = node => Array.isArray(node) ? node.flatMap(all) : node?.props ? [node, ...all(node.props.children)] : [];
   const render = () => { cursor = 0; return all(module.exports.CitationTools(props)); };

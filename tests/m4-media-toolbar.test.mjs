@@ -144,12 +144,12 @@ test('single-resource tags and transfer labels agree for referenced, unused, unk
       const transfer = find(tree, node => node.type === 'tooltip' && node.props['aria-label'] === label);
       assert.equal(transfer.props.disabled, disabled || referenced === undefined);
       assert.equal(tree.some(node => node.type === 'span' && node.props.children === '被引用'), referenced === true);
-      assert.equal(transfer.props.icon.props.name, 'copy');
+      assert.equal(transfer.props.icon, 'copy');
       const actions = nodes(find(tree, node => node.props.role === 'group' && node.props.children?.some?.(child => child?.props === transfer.props)).props.children).filter(node => node.type === 'tooltip');
       assert.equal(actions[1], transfer); assert.equal(actions[2].props.tone, 'danger');
       const details = render('MediaDetails', { asset, referenced, disabled, onPreview() {}, onReplace() {}, onTransfer() {}, onDelete() {} });
       const buttons = details.filter(node => node.type === 'tooltip'), index = buttons.findIndex(node => node.props['aria-label'] === label);
-      assert.equal(buttons.length, 5); assert.deepEqual(buttons.map(node => node.props.icon.props.name), ['image', 'download', 'copy', 'replace', 'delete']);
+      assert.equal(buttons.length, 5); assert.deepEqual(buttons.map(node => node.props.icon), ['image', 'download', 'copy', 'replaceFile', 'delete']);
       assert.equal(buttons[index].props.disabled, disabled || referenced === undefined);
       assert.equal(details.some(node => node.type === 'span' && node.props.children === '被引用'), referenced === true);
     }

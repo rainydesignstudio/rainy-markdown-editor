@@ -52,6 +52,10 @@ function previewTree(root: HTMLElement): Node {
   const tree = root.getRootNode?.();
   return tree?.nodeType === 11 && 'host' in tree ? tree : root;
 }
+function articleRoot(root: HTMLElement): HTMLElement {
+  // A package host wraps the article markup. Compare the markup roots across frames.
+  return root.hasAttribute?.('data-package-document') ? root.querySelector<HTMLElement>('[data-article-content-root]') ?? root : root;
+}
 function surface(container: HTMLElement, canonical: HTMLElement): ScrollSurface | null {
   const dark = container.dataset.previewMode === 'dark';
   const tree = previewTree(canonical);
@@ -60,10 +64,11 @@ function surface(container: HTMLElement, canonical: HTMLElement): ScrollSurface 
   const frame = dark
     ? frameFor('iframe[data-article-frame="dark"],iframe[data-article-standalone-dark]') ?? frameFor('iframe[data-article-frame="light"]')
     : frameFor('iframe[data-article-frame="light"]');
-  if (!frame) return dark ? null : { root: canonical, viewport: container };
+  if (!frame) return dark ? null : { root: articleRoot(canonical), viewport: container };
   const doc = frame.contentDocument;
   if (!doc?.body || !doc.scrollingElement) return null;
-  const root = doc.querySelector('[data-article-content-root]') ?? (canonical.id ? doc.getElementById(canonical.id) : doc.body.querySelector(canonical.tagName.toLowerCase()));
+  const root = doc === canonical.ownerDocument ? articleRoot(canonical)
+    : doc.querySelector('[data-article-content-root]') ?? (canonical.id ? doc.getElementById(canonical.id) : doc.body.querySelector(canonical.tagName.toLowerCase()));
   return root ? { root, viewport: doc.scrollingElement as HTMLElement, ready: !frame.hasAttribute('data-article-standalone-dark') || doc.body.dataset.previewReady === 'true' } : null;
 }
 
@@ -74,6 +79,7 @@ export function connectPreviewScrollSync(options: {
   getRoot: () => HTMLElement | null;
   getSource: () => string;
   getRenderedSource?: () => string;
+  resume?: { waiting: boolean };
   onSample?: (sample: { durationMs: number; rebuilt: boolean; pending?: boolean; anchors: number; measuredSource: number; measuredPreview: number; wrote: boolean }) => void;
 }): () => void {
   const viewport = options.textarea.closest<HTMLElement>('[data-source-viewport]');
@@ -123,7 +129,7 @@ export function connectPreviewScrollSync(options: {
     }
   }
   function sync() {
-    frameId = 0; if (!active) return;
+    frameId = 0; if (!active || options.resume?.waiting) return;
     const started = options.onSample ? view.performance.now() : 0;
     const root = options.getRoot(); if (!root?.isConnected) return;
     const displayed = dirty || root !== observedRoot || !lastSurface || lastSurface.root.isConnected === false
@@ -139,7 +145,7 @@ export function connectPreviewScrollSync(options: {
       const sliceStart = options.onSample ? started : view.performance.now();
       if (!building) {
         const nodes = (element: Element) => [element, ...element.querySelectorAll('*')].filter(node => !node.closest?.('[data-preview-only]'));
-        const sourceNodes = nodes(root), shownNodes = nodes(displayed.root);
+        const sourceNodes = nodes(articleRoot(root)), shownNodes = nodes(displayed.root);
         if (sourceNodes.length !== shownNodes.length || sourceNodes.some((node, index) => node.tagName !== shownNodes[index].tagName)) {
           anchors = []; changedBounds = []; building = null; dirty = false;
           options.onSample?.({ durationMs: view.performance.now() - started, rebuilt: true, anchors: 0, measuredSource: 0, measuredPreview: 0, wrote: false });
@@ -198,7 +204,10 @@ export function connectPreviewScrollSync(options: {
     if (wrote) displayed.viewport.scrollTop = target!;
     options.onSample?.({ durationMs: view.performance.now() - started, rebuilt, anchors: anchors.length, measuredSource, measuredPreview, wrote });
   }
-  const scroll = () => schedule(true);
+  const scroll = () => {
+    if (options.resume) options.resume.waiting = false;
+    schedule(true);
+  };
   const resourceReady = () => invalidate();
   viewport.addEventListener('scroll', scroll, { passive: true });
   options.container.addEventListener('load', resourceReady, true);

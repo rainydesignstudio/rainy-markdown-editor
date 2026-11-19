@@ -2,10 +2,12 @@ import { ProductError } from '../i18n/productMessages';
 import { queryDirectoryReadWritePermission } from '../directoryBookmark';
 import { inspectArticleImage } from '../articleMedia';
 import { getResourceDirectory, type ResourceDestination } from './storage';
+import { libraryCacheScope, readBrowserCache, writeBrowserCache } from '../browserCache';
 
 export type CachedArticleImage = { handle: FileSystemFileHandle; file: File; mimeType: string; size: number };
 type Entry = { promise: Promise<CachedArticleImage>; value?: CachedArticleImage };
-const roots = new WeakMap<FileSystemDirectoryHandle, Map<string, Entry>>();
+let roots = new WeakMap<FileSystemDirectoryHandle, Map<string, Entry>>();
+export function clearArticleImageCache() { roots = new WeakMap(); }
 const cacheKey = (articleId: string, name: string, scope: string | number) => JSON.stringify([articleId, name, scope]);
 export function cachedArticleImage(root: FileSystemDirectoryHandle, articleId: string, name: string, scope: string | number): CachedArticleImage | null {
   return roots.get(root)?.get(cacheKey(articleId, name, scope))?.value ?? null;
@@ -25,7 +27,11 @@ export async function readArticleImage(root: FileSystemDirectoryHandle, destinat
       const handle = await directory.getFileHandle(name), path = await root.resolve(handle);
       const expected = destination.kind === 'shared' ? ['shared', 'image', name] : ['articles', destination.month, destination.folder, 'media', 'image', name];
       if (path?.join('/') !== expected.join('/')) throw new ProductError('resources.unsafeTarget');
-      const file = await handle.getFile(), format = await inspectArticleImage(file);
+      const actual = await handle.getFile(), identity = JSON.stringify([expected, scope, actual.size, actual.lastModified]);
+      const retained = await readBrowserCache('resources', libraryCacheScope(root), identity);
+      const file = retained instanceof Blob && retained.size === actual.size ? new File([retained], actual.name, { type: actual.type, lastModified: actual.lastModified }) : actual;
+      const format = await inspectArticleImage(file);
+      if (!(retained instanceof Blob)) void writeBrowserCache('resources', libraryCacheScope(root), identity, actual);
       if (!current()) throw new ProductError('resources.changed');
       row.value = { handle, file, mimeType: format.mimeType, size: file.size }; return row.value;
     })().catch(error => { if (cache!.get(key) === row) cache!.delete(key); throw error; });

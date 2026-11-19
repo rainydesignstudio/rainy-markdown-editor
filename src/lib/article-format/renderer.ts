@@ -16,9 +16,12 @@ import { renderPackage } from './package';
 import { assertPackageCss } from './packageRendering';
 import { parseArticle } from '../frontMatter';
 import { resolveLibraryResource } from './resourcePaths';
+import { readBrowserCache, writeBrowserCache, libraryCacheScope } from '../browserCache';
+import { contentHash } from './styles';
 
 type Compiler = Awaited<ReturnType<typeof compile>>;
 const cache = new Map<string, Promise<{ css: string; candidates: string[] }>>();
+const cacheSession = crypto.randomUUID();
 const stats = { baseCompiles: 0, hits: 0 };
 export function articleStyleCacheStats() { return { ...stats, entries: cache.size }; }
 export function clearArticleStyleCache() { cache.clear(); stats.baseCompiles = 0; stats.hits = 0; }
@@ -88,7 +91,7 @@ function generatedClasses(snapshot: FormatSnapshot): string[] {
     ...(snapshot.environment?.candidates ?? []),
   ];
 }
-export async function compileArticleStyles(markdown: string, theme: ThemeConfig, options?: { snapshot?: FormatSnapshot; environment?: StylesheetEnvironment }) {
+export async function compileArticleStyles(markdown: string, theme: ThemeConfig, options?: { snapshot?: FormatSnapshot; environment?: StylesheetEnvironment; root?: FileSystemDirectoryHandle }) {
   const snapshot = options?.snapshot ?? getFormatSnapshot(); assertFormatReady(snapshot);
   if (snapshot.renderer) {
     const result = await renderPackage(parseArticle(markdown).body, theme, snapshot);
@@ -97,15 +100,21 @@ export async function compileArticleStyles(markdown: string, theme: ThemeConfig,
   }
   const environment = options?.environment ?? snapshot.environment;
   const candidates = [...new Set([...extractMarkdownClassCandidates(markdown), ...generatedClasses(snapshot)])].sort();
-  const key = TAILWIND_COMPILER_VERSION + ':' + snapshot.id + ':' + snapshot.algorithms.fingerprint + ':' + (environment?.fingerprint ?? 'legacy') + ':' + canonicalFormatJson(theme) + ':' + JSON.stringify(candidates);
+  const scope = options?.root ? libraryCacheScope(options.root) : cacheSession + ':' + snapshot.id;
+  const key = scope + ':' + TAILWIND_COMPILER_VERSION + ':' + snapshot.id + ':' + snapshot.algorithms.fingerprint + ':' + (environment?.fingerprint ?? 'legacy') + ':' + canonicalFormatJson(theme) + ':' + JSON.stringify(candidates);
   let pending = cache.get(key);
   if (pending) stats.hits++;
   else {
     pending = (async () => {
-      stats.baseCompiles++;
-      // Each candidate set gets a fresh compiler; Tailwind's build() otherwise retains old candidates.
-      const compiler = await createCompiler(theme, snapshot, environment);
-      const output = compiler.build(candidates);
+      const identity = await contentHash(canonicalFormatJson({ compiler: TAILWIND_COMPILER_VERSION, algorithms: snapshot.algorithms.fingerprint, environment: environment?.fingerprint ?? 'legacy', theme, formatter: snapshot.rawFormatter ?? snapshot.bundle.formatter, configuration: snapshot.configuration ?? null, candidates }));
+      const retained = await readBrowserCache('compile', scope, identity);
+      let output = typeof retained === 'string' && !/blob:/i.test(retained) ? retained : null;
+      if (output === null) {
+        stats.baseCompiles++;
+        // Each candidate set gets a fresh compiler; Tailwind's build() otherwise retains old candidates.
+        const compiler = await createCompiler(theme, snapshot, environment); output = compiler.build(candidates);
+        if (!/blob:/i.test(output)) await writeBrowserCache('compile', scope, identity, output);
+      } else stats.hits++;
       const built = environment ? await environment.resolveCss(output, environment.policy.entry) : output;
       const dropped = snapshot.bundle.formatter.output.dropCssProperties;
       const sheet = dropped.length ? postcss.parse(built) : null;

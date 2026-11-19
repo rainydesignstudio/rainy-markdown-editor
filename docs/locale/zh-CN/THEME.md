@@ -400,7 +400,7 @@ color-article-code-tint
 
 使用库级CSS时，基础样式由formatter的css.stylesheets加载，可在本地模块维护preflight、媒体规则、嵌套、图标与字体，见 [FORMAT.md](FORMAT.md#doc-library-styles)。article-theme保留原JSON结构及节点覆盖；文章选择器按render.document映射至实际容器，editor-theme不参与。
 
-先配置正文容器及继承的字体、颜色和背景，再做覆盖；片段使用这个环境的类与token。网站发布按目标网站的发布流程选择输出，备份保留render.json及共享依赖；无记录旧稿不能承诺复原当时的库级CSS。
+先配置正文容器及继承的字体、颜色和背景，再做覆盖；片段使用这个环境的类与token。网站发布按目标网站的发布流程选择输出，备份保留render.json及cache/render中被引用的持久依赖，浏览器工作缓存无需随库携带；无记录旧稿不能承诺复原当时的库级CSS。
 
 保存为 `guide-paper.json`。css字符串中的 `\n` 表示换行，JSON不能含注释或未转义换行；应用编辑器也可在CSS标签页查看和修改。
 
@@ -466,6 +466,10 @@ color-article-code-tint
 在“模板 → 片段”选择已有片段后，可用“复制片段”建立独立副本，预填代码、说明、图标和分类。为副本确认名称、ID及触发词，处理冲突后校验保存；原片段保持。
 
 <a name="doc-snippet-example"></a>
+
+已有SVG内容的渲染和复制保留作者初始值与 `set`/`animate`/`animateTransform` 时序，重复插入隔离事件ID；仅接受受控绘图/几何目标，脚本、事件处理属性、可执行URL及动画修改可执行属性仍被拒绝。参见[渲染契约](FORMAT.md#doc-preview-host)。需验证实际事件和重播，XML或静态截图不代表通过。
+
+SVG的命中区域随显隐关闭，隐藏的播放控件不会继续排队触发。中途重播整体重启一条时间线，不叠加上一轮延迟事件。SVG内容变化会重建该图的时间线；普通文字编辑及结果/代码切换保留未变化图的状态。
 
 ### 完整片段示例
 

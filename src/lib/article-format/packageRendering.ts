@@ -9,6 +9,7 @@ import { normalizeLibraryPath, type CssAsset } from './styles';
 import type { FormatSnapshot } from './runtime';
 import type { ThemeConfig } from '../types';
 import { restorePreviewImageAttributes } from './previewImages';
+import { sanitizeSvgAnimations, SVG_ANIMATION_ATTRIBUTES, SVG_ANIMATION_TAGS } from './svgAnimation';
 import { formatFingerprint } from './config';
 import { invokeRenderer, rendererAction, renderPackage } from './package';
 
@@ -34,7 +35,7 @@ export function sanitizePackageHtml(html: string, snapshot: FormatSnapshot): str
     const urls = data.attrName === 'srcset' ? articleImageSourceSetCandidates(data.attrValue).map(candidate => candidate.url) : data.attrName === 'src' && node.localName === 'img' ? [data.attrValue] : [];
     if (urls.some(url => /^blob:(?:https?:\/\/|null\/)/i.test(url)) && urls.every(url => !/^(?:javascript|vbscript):|^data:(?!image\/)/i.test(url.replace(/[\u0000-\u0020\u007f]/g, '')))) data.forceKeepAttr = true;
   });
-  const clean = purifier.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true }, ADD_TAGS: ['animate', 'animateTransform'], ADD_ATTR: ['checked', 'disabled'],
+  const clean = purifier.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true }, ADD_TAGS: [...SVG_ANIMATION_TAGS], ADD_ATTR: ['checked', 'disabled', ...SVG_ANIMATION_ATTRIBUTES],
     FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'form'], FORBID_ATTR: ['srcdoc'], ADD_FORBID_CONTENTS: ['annotation-xml'] });
   const template = document.createElement('template'); template.innerHTML = clean;
   for (const image of template.content.querySelectorAll('img,image,source')) for (const name of ['src', 'href', 'xlink:href', 'srcset']) {
@@ -45,7 +46,7 @@ export function sanitizePackageHtml(html: string, snapshot: FormatSnapshot): str
       image.removeAttribute(name); image.setAttribute('data-asset-state', 'error'); image.setAttribute('data-local-asset-src', value);
     }
   }
-  return template.innerHTML;
+  return sanitizeSvgAnimations(template.innerHTML);
 }
 export function assertInertPackageMarkup(html: string, allowStyles = false, permissions?: RendererDeclaration['permissions']) {
   const template = document.createElement('template'); template.innerHTML = html;

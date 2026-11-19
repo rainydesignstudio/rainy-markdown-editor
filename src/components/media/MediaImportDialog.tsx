@@ -1,12 +1,14 @@
 'use client';
 
+import { ContentIcon } from '../global/ContentIcon';
+
 import { OperationFeedback } from '../global/OperationFeedback';
 import { useEffect, useRef, useState } from 'react';
 import { inspectArticleImage, type ArticleImageFormat, type MediaActionOutcome } from '../../lib/articleMedia';
 import { formatProductMessage, productErrorMessage } from '../../lib/i18n/productMessages';
 import { useUILocale, useUITranslation } from '../global/UILocaleProvider';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
-import { formatMediaBytes, MediaIcon } from './MediaGallery';
+import { formatMediaBytes } from './MediaGallery';
 import { inspectResourceFile } from '../../lib/resources/storage';
 import { ResourceGlyph } from './ResourceGlyph';
 
@@ -58,15 +60,15 @@ export function MediaImportDialog({ feedbackId = 'media-import', files, libraryN
       <p className="break-words text-sm text-primary">{t('media:upload.destination', { name: libraryName })}</p>
       <ul className="grid max-h-72 gap-3 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" aria-label={t('media:upload.files')}>
         {files.map((file, index) => <li key={index} className="flex min-w-0 items-start gap-3 rounded-lg border border-line bg-list/50 p-3">
-          <span className="mt-0.5 text-faint">{allResources ? <span className="block size-12 overflow-hidden rounded-md"><ResourceGlyph compact fileName={file.name} mimeType={rows?.[index]?.format?.mimeType ?? file.type} /></span> : <MediaIcon name="image" />}</span>
+          <span className="mt-0.5 text-faint">{allResources ? <span className="block size-12 overflow-hidden rounded-md"><ResourceGlyph compact fileName={file.name} mimeType={rows?.[index]?.format?.mimeType ?? file.type} /></span> : <ContentIcon name="image" />}</span>
           <div className="min-w-0 flex-1"><p className="break-all text-sm font-medium text-primary">{file.name}</p><p className="mt-1 text-xs text-muted">{formatMediaBytes(file.size, locale)} · {rows?.[index]?.format?.mimeType ?? (file.type || t('media:upload.unknownFormat'))}</p>{rows?.[index]?.issue ? <p className="mt-1 break-words text-xs text-danger">{formatProductMessage(rows[index].issue!, t)}</p> : null}</div>
         </li>)}
       </ul>
       <p className="text-xs text-muted" role="status">{rows ? t(allResources ? 'messages:resources.importSummary' : 'media:upload.summary', { valid: valid.length, invalid: files.length - valid.length }) : t(allResources ? 'messages:resources.checkingFiles' : 'media:upload.checking')}</p>
     </div>
     <DialogFooter><DialogActions>
-      <DialogButton disabled={locked} onClick={close}><MediaIcon name="close" />{t('common:actions.cancel')}</DialogButton>
-      <DialogButton variant="primary" disabled={locked || !rows || !valid.length || !isCurrent()} onClick={() => void confirm()}><MediaIcon name="import" />{locked ? t('media:ui.working') : t(allResources ? 'messages:resources.importCount' : 'media:upload.confirm', { count: valid.length })}</DialogButton>
+      <DialogButton icon="close" disabled={locked} onClick={close}>{t('common:actions.cancel')}</DialogButton>
+      <DialogButton icon="upload" variant="primary" disabled={locked || !rows || !valid.length || !isCurrent()} onClick={() => void confirm()}>{locked ? t('media:ui.working') : t(allResources ? 'messages:resources.importCount' : 'media:upload.confirm', { count: valid.length })}</DialogButton>
     </DialogActions></DialogFooter>
   </DialogFrame>;
 }

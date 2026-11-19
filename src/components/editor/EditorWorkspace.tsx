@@ -22,7 +22,7 @@ import { readResearch, updateResearch } from '../../lib/knowledge/research';
 import { readCitations } from '../../lib/knowledge/citations';
 import { KnowledgeReferencePanel } from '../knowledge/KnowledgeReferencePanel';
 import { SourcePanel } from './SourcePanel';
-import { InsertIcon } from './InsertElementsMenu';
+
 import { PanelHeading } from '../global/CollapsiblePanel';
 import type { RememberedEditingLocation } from '../../lib/editingLocation';
 
@@ -139,7 +139,7 @@ export function EditorWorkspace({
     if (!wideEnough && !readOnly) onSetMobilePane('source');
     requestAnimationFrame(() => openFindRef.current?.());
   }, [sourceFocusDisabled, wideEnough, readOnly, onSetMobilePane]);
-  const citationTools = <CitationTools icon={<InsertIcon name="quote" className="size-4" />} body={parsed.body} textareaRef={sourceTextareaRef} onChange={onChangeBody} request={citationRequest} onConsumed={() => setCitationRequest(null)} disabled={readOnly || mediaBusy || !parsed.canCopy} loadChanges={async () => {
+  const citationTools = <CitationTools icon="quote" body={parsed.body} textareaRef={sourceTextareaRef} onChange={onChangeBody} request={citationRequest} onConsumed={() => setCitationRequest(null)} disabled={readOnly || mediaBusy || !parsed.canCopy} loadChanges={async () => {
     if (!directory || !isLibraryCurrent()) return [];
     const ids = await articleIdentityMap(directory), path = article.month + '/' + article.folder, articleId = ids.get(path) ?? path;
     const changed: string[] = [];

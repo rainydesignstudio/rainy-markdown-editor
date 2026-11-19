@@ -2,6 +2,7 @@ import { ProductError } from "./i18n/productMessages";
 import { getFormatSnapshot, type FormatSnapshot } from './article-format/runtime';
 import { formatPreviewDocument } from './article-format/frame';
 import { INSPECTION_CLASSES } from './themeInspection';
+import {svgAnimatedProperties} from './article-format/svgAnimation';
 const INSPECTION_STATE_CLASSES = new Set(INSPECTION_CLASSES.filter(name => name.startsWith('data-[theme-inspection-')));
 export function articlePreviewMarkup(root: HTMLElement): string {
   return root.outerHTML.replace(/\sdata-theme-inspection-[\w-]+="[^"]*"/g, '')
@@ -46,9 +47,12 @@ export function cloneArticleForDarkPreview(root: HTMLElement, snapshot = getForm
   const originals = [root, ...root.querySelectorAll<HTMLElement>('*')];
   const copies = [clone, ...clone.querySelectorAll<HTMLElement>('*')];
   const options = snapshot.bundle.formatter.output;
+  const animations=new WeakMap<Element,Set<string>>();
   originals.forEach((source, index) => {
     const computed = view.getComputedStyle(source);
-    for (const property of options.inlineProperties) copies[index].style.setProperty(property, computed.getPropertyValue(property));
+    const animated=source.namespaceURI==='http://www.w3.org/2000/svg'?svgAnimatedProperties(source,animations):undefined;
+    if(['set','animate','animateTransform'].includes(source.localName))return;
+    for (const property of options.inlineProperties) if(!animated?.has(property))copies[index].style.setProperty(property, computed.getPropertyValue(property));
   });
   if (snapshot.bundle.formatter.preview.stripThemeBackground) {
     for (const node of [clone, clone.querySelector<HTMLElement>(':scope > .article-body')]) {

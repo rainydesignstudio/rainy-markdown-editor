@@ -89,10 +89,7 @@ export function ChangelogDialog({ onClose }: { onClose: () => void }) {
       eyebrow={`${t('common:eyebrows.releaseNotes')} / v${APP_VERSION}`}
       title={t('changelog:title')}
       onClose={onClose}
-      actions={<DialogButton onClick={toggleAll}>
-        {allOpen
-          ? <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m8 4 4 4 4-4M8 20l4-4 4 4" /></svg>
-          : <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m8 9 4-4 4 4M8 15l4 4 4-4" /></svg>}
+      actions={<DialogButton icon={allOpen ? 'collapse' : 'expand'} onClick={toggleAll}>
         {t(allOpen ? 'changelog:collapseAll' : 'changelog:expandAll')}
       </DialogButton>}
     />

@@ -3,7 +3,6 @@
 import type { ReactNode } from 'react';
 import { useUITranslation } from '../global/UILocaleProvider';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
-import { ContentIcon } from '../global/ContentIcon';
 
 export type ExportChoice = { id: string; title: string; extension?: string; detail?: string; disabled?: boolean; reason?: string };
 
@@ -34,8 +33,8 @@ export function ArticleExportForm({ choices, selected, onSelect, filename, dirty
         {error ? <p className="rounded-lg border border-danger/30 bg-danger-surface p-3 text-sm text-danger" role="alert">{error}</p> : null}
         {review}
       </div>
-      <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onClose}><ContentIcon name="close" />{t('common:actions.cancel')}</DialogButton>
-        {continuation ? <DialogButton variant="primary" disabled={busy || disabled} onClick={continuation.run}>{continuation.label}</DialogButton> : <DialogButton type="submit" variant="primary" disabled={busy || disabled || !action}>{busy ? t('dialogs:ui.generating') : t('dialogs:templates.export', { name: action?.title ?? '' })}</DialogButton>}
+      <DialogFooter><DialogActions><DialogButton icon="close" disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton>
+        {continuation ? <DialogButton icon="download" variant="primary" disabled={busy || disabled} onClick={continuation.run}>{continuation.label}</DialogButton> : <DialogButton icon="download" type="submit" variant="primary" disabled={busy || disabled || !action}>{busy ? t('dialogs:ui.generating') : t('dialogs:templates.export', { name: action?.title ?? '' })}</DialogButton>}
       </DialogActions></DialogFooter>
     </form>
   </DialogFrame>;

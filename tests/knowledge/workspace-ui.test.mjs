@@ -12,6 +12,7 @@ import { inspectCapture, sortCollectedKnowledge, transferCollectedKnowledge, reo
 import { ARTICLE_SORTS } from '../../src/lib/articleListSorting.ts';
 import { diffLines } from '../../src/lib/textDiff.ts';
 import * as readingTabs from '../../src/lib/knowledge/readerTabs.ts';
+import { withActionComponents } from '../action-ui-fixture.mjs';
 
 const whole = { id: 'whole', sourceId: 'source', title: 'Source A', path: 'a.md', content: 'Old text.', line: 1, endLine: 2, whole: true, note: '' };
 const passage = { ...whole, id: 'passage', whole: false, line: 5, endLine: 7, content: 'A passage.' };
@@ -31,7 +32,7 @@ async function fixture(name, props, { library, research, save } = {}) {
   const t = i18n.getFixedT('en-US', 'knowledge'), target = {}, module = { exports: {} };
   const source = await readFile(new URL('../../src/components/knowledge/' + name + '.tsx', import.meta.url), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, crypto, document: { body: target, getElementById: id => ({ focus: () => focused.push(id) }) }, DOMException, require(id) {
+    module, exports: module.exports, crypto, document: { body: target, getElementById: id => ({ focus: () => focused.push(id) }) }, DOMException, require: withActionComponents(function(id) {
       if (id === 'react') return react;
       if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
       if (id === 'react/jsx-runtime') return jsx;
@@ -63,7 +64,7 @@ async function fixture(name, props, { library, research, save } = {}) {
       if (id.endsWith('/textDiff')) return { diffLines };
       for (const [suffix, component] of Object.entries({ KnowledgeChanges: 'changes', KnowledgeRelations: 'relations', KnowledgeTopics: 'topics', KnowledgeReader: 'reader', KnowledgeSource: 'source-reader', KnowledgeGraph: 'graph' })) if (id.endsWith('/' + suffix)) return { [suffix]: component };
       throw new Error(id);
-    },
+    }),
   });
   const result = { t, props, portals, target, library, focused, flushFocus: () => focusEffect?.(), render() { cursor = 0; return walk(module.exports[name](props)); } };
   result.render(); await tick(); react.useEffect = callback => { if (callback.toString().includes('getElementById')) focusEffect = callback; }; return result;

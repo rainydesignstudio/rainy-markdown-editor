@@ -6,6 +6,16 @@ import { ProductError } from '../i18n/productMessages';
 import type { ThemeConfig } from '../types';
 import { IMPORT_LIMITS } from './model';
 
+function importHeader(text:string){
+  const header=/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
+  if(!header){if(/^---\r?\n/.test(text))throw new ProductError('imports.invalidMarkdown');return null;}
+  try{
+    const document=parseDocument(header[1],{schema:'core',uniqueKeys:true});if(document.errors.length)throw new Error('invalid header');
+    const value:unknown=document.toJS({maxAliasCount:0});if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('invalid metadata');
+    return {header,document,metadata:value as Record<string,unknown>};
+  }catch{throw new ProductError('imports.invalidMarkdown');}
+}
+
 export async function readMarkdownImport(file: File): Promise<{ text: string; hash: string }> {
   if (!isMarkdownPath(file.name)) throw new ProductError('imports.markdownOnly');
   if (file.size > IMPORT_LIMITS.documentBytes) throw new ProductError('imports.documentTooLarge');
@@ -14,13 +24,13 @@ export async function readMarkdownImport(file: File): Promise<{ text: string; ha
   let text: string;
   try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
   catch { throw new ProductError('imports.utf8Required'); }
+  importHeader(text);
   return { text, hash: await knowledgeHash(bytes) };
 }
 
 /** Normalize only the target protocol's fields; unknown YAML keys and the body survive. */
 export function prepareMarkdownImport(text: string, path: string, theme: ThemeConfig, now = new Date().toISOString()): string {
-  const header = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  if (!header && /^---\r?\n/.test(text)) throw new ProductError('imports.invalidMarkdown');
+  const parsedHeader=importHeader(text),header=parsedHeader?.header;
   const parsedTitle = parseKnowledgeText(text, path).title;
   let result: string;
   if (!header) {
@@ -28,11 +38,7 @@ export function prepareMarkdownImport(text: string, path: string, theme: ThemeCo
     result = updateFrontMatter(result, { title: parsedTitle, createdAt: now, updatedAt: now, theme: { id: theme.id, version: theme.version } });
   } else {
     try {
-      const document = parseDocument(header[1], { schema: 'core', uniqueKeys: true });
-      if (document.errors.length) throw new Error('invalid header');
-      const meta: unknown = document.toJS({ maxAliasCount: 0 });
-      if (!meta || typeof meta !== 'object' || Array.isArray(meta)) throw new Error('invalid metadata');
-      const original = meta as Record<string, unknown>;
+      const {document,metadata:original}=parsedHeader!;
       document.set('title', parsedTitle);
       for (const field of ['description', 'author']) document.set(field, typeof original[field] === 'string' ? original[field] : '');
       document.set('categories', typeof original.categories === 'string' ? [original.categories] : Array.isArray(original.categories) ? original.categories.filter(value => typeof value === 'string') : []);

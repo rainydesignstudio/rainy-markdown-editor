@@ -16,8 +16,9 @@ import { getArticleOrganization } from '../../lib/editorWorkspace';
 import { FormatCheckDialog } from './FormatCheckDialog';
 import { CreateLibraryDialog } from '../settings/CreateLibraryDialog';
 import { MarkdownImportDialog } from '../imports/MarkdownImportDialog';
-import { ImportTasksDialog } from '../imports/ImportTasksDialog';
-import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from './DialogFrame';
+import {monthKey} from '../../lib/fileSystem';
+
+import { ConfirmDialog } from './ConfirmDialog';
 
 export function AppDialogs() {
   const { t } = useUITranslation('messages');
@@ -79,8 +80,7 @@ export function AppDialogs() {
   const activeDialog = formatCheck ? 'format'
     : showUnsavedDialog ? 'unsaved'
     : controller.createLibraryDialogOpen ? 'create-library'
-    : controller.markdownImport.request?.root === directory && controller.markdownImport.request.session === controller.contentLibraryRootSession ? 'markdown-import'
-    : controller.markdownImport.tasksOpen && directory ? 'import-tasks'
+    : controller.markdownImport.isOpen && controller.markdownImport.request && directory ? 'markdown-import'
     : controller.mediaPickerRequest && controller.view === 'articles' && controller.articleMode === 'editor' ? 'media-picker'
     : mediaTarget ? 'media'
     : articleInfoDialogOpen ? 'info'
@@ -94,19 +94,18 @@ export function AppDialogs() {
 
   return (
     <>
-      {activeDialog === 'import-tasks' ? <ImportTasksDialog
-        tasks={controller.markdownImport.pending.map(item => item.task)} selectedId={controller.markdownImport.selectedTaskId}
-        busy={controller.markdownImport.taskBusy} issues={controller.markdownImport.taskIssues}
-        onSelect={controller.markdownImport.setSelectedTaskId} onClose={controller.markdownImport.closeTasks}
-        onRetry={controller.markdownImport.retryTask} onPause={controller.markdownImport.pauseTask} onCancel={controller.markdownImport.cancelTask}
-        onChooseSource={controller.markdownImport.chooseTaskSource} onChooseDirectory={controller.markdownImport.chooseTaskDirectory} onReplace={controller.markdownImport.replaceResource}
-      /> : null}
       {activeDialog === 'markdown-import' && controller.markdownImport.request ? <MarkdownImportDialog
         key={controller.markdownImport.request.id}
-        source={controller.markdownImport.request.source} mode={controller.markdownImport.request.mode}
+        choices={controller.markdownImport.request.choices} themeId={controller.markdownImport.request.themeId} onThemeChange={controller.markdownImport.setThemeId}
         themes={articleThemes} defaultTheme={defaultArticleTheme}
-        busy={controller.markdownImport.busy} feedback={controller.markdownImport.feedback}
-        onChooseFile={controller.markdownImport.chooseFile} onChooseDirectory={controller.markdownImport.chooseDirectory}
+        existingFolders={controller.storedArticles.filter(item=>item.month===monthKey()).map(item=>item.folder)}
+        busy={controller.markdownImport.busy} phase={controller.markdownImport.phase}
+        jobs={controller.markdownImport.pending} selectedId={controller.markdownImport.selectedTaskId} taskBusy={controller.markdownImport.taskBusy} issues={controller.markdownImport.taskIssues}
+        onChooseFile={controller.markdownImport.chooseFile} onDropFiles={controller.markdownImport.dropFiles} onChooseDirectory={controller.markdownImport.chooseDirectory}
+        onRemove={controller.markdownImport.removeChoice} onCancelBatch={controller.markdownImport.cancelBatch}
+        onSelectTask={controller.markdownImport.setSelectedTaskId} onOpenTask={controller.markdownImport.openTask}
+        onRetry={controller.markdownImport.retryTask} onPause={controller.markdownImport.pauseTask} onCancel={controller.markdownImport.cancelTask}
+        onChooseSource={controller.markdownImport.chooseTaskSource} onChooseTaskDirectory={controller.markdownImport.chooseTaskDirectory} onReplace={controller.markdownImport.replaceResource}
         onConfirm={controller.markdownImport.confirm} onClose={controller.markdownImport.close}
       /> : null}
       {activeDialog === 'media-picker' && controller.mediaPickerRequest ? <MediaPickerDialog
@@ -164,11 +163,10 @@ export function AppDialogs() {
         onConfirm={confirmCopy}
       /> : null}
       {activeDialog === 'delete' && deleteTargets.length ? <DeleteDialog articles={deleteTargets} trashEnabled={controller.articleSettings.trash.enabled} disabled={Boolean(controller.settingsIssue) || controller.trash.busy} archived={getArticleOrganization(editorWorkspace, deleteTargets[0].id).archived} onClose={() => setDeleteTargets([])} onConfirm={confirmDelete} /> : null}
-      {activeDialog === 'trash-cleanup' && controller.trash.confirmation ? <DialogFrame titleId="trash-cleanup-title" descriptionId="trash-cleanup-copy" role="alertdialog" onClose={controller.trash.closeConfirmation}>
-        <DialogHeader titleId="trash-cleanup-title" eyebrow={t('messages:trash.eyebrow')} title={t('messages:trash.cleanupTitle')} onClose={controller.trash.closeConfirmation} />
+      {activeDialog === 'trash-cleanup' && controller.trash.confirmation ? <ConfirmDialog titleId="trash-cleanup-title" descriptionId="trash-cleanup-copy" role="alertdialog" onClose={controller.trash.closeConfirmation} title={t('messages:trash.cleanupTitle')} eyebrow={t('messages:trash.eyebrow')}
+        cancel={{ label: t('common:actions.cancel'), autoFocus: true, onClick: controller.trash.closeConfirmation }} confirm={{ label: t('messages:trash.confirmCleanup'), icon: "delete", onClick: () => void controller.trash.confirmCleanup(), disabled: controller.trash.busy || !controller.articleSettings.trash.enabled || Boolean(controller.settingsIssue), variant: "danger" }}>
         <div className="grid gap-4 p-4"><p className="break-all text-sm font-semibold text-primary">{controller.directoryName}/_trash/</p><p id="trash-cleanup-copy" className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong">{t('messages:trash.cleanupWarning', { count: controller.trash.confirmation.ids.length })}</p></div>
-        <DialogFooter><DialogActions><DialogButton autoFocus onClick={controller.trash.closeConfirmation}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={controller.trash.busy || !controller.articleSettings.trash.enabled || Boolean(controller.settingsIssue)} onClick={() => void controller.trash.confirmCleanup()}>{t('messages:trash.confirmCleanup')}</DialogButton></DialogActions></DialogFooter>
-      </DialogFrame> : null}
+      </ConfirmDialog> : null}
       {activeDialog === 'project-delete' && projectDeleteTarget ? <ProjectDeleteDialog
         name={projectDeleteTarget.name}
         busy={editorWorkspaceBusy}

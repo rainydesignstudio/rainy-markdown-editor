@@ -3,7 +3,7 @@ import { SelectField } from '../global/SelectField';
 import { ModeSwitch } from '../global/ModeSwitch';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ContentIcon } from '../global/ContentIcon';
+
 import { GraphToast } from './GraphToast';
 import { formatUINumber } from '../../lib/i18n/formatters';
 import { select } from 'd3-selection';
@@ -126,13 +126,13 @@ export function KnowledgeGraph({ manifest, selectedPath, onOpen, toolbarTarget }
   };
   const nodes = positions.current.size ? positions.current : new Map(initialNodes.map(node => [node.path, node]));
   const selectedDocument = manifest.documents.find(doc => doc.path === selected);
-  const controls = <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2" role="group" aria-label={t('graph.scope')}>
+  const controls = <ButtonBar label={t('graph.scope')} className="min-w-0 flex-1">
     <ModeSwitch label={t('graph.scope')} start={t('graph.global')} end={t('graph.local')} checked={mode === 'local'} onToggle={() => { if (mode === 'global' && selected) setCenter(selected); setMode(value => value === 'global' ? 'local' : 'global'); }} />
     <ModeSwitch label={t('graph.depth')} start={t('graph.depthOne')} end={t('graph.depthTwo')} checked={depth === 2} onToggle={() => setDepth(depth === 2 ? 1 : 2)} disabled={mode !== 'local'} reason={mode !== 'local' ? t('graph.localOnly') : undefined} />
-    <IconButton tooltip={mode === 'local' ? t('graph.centerSelected') : t('graph.localOnly')} aria-label={t('graph.centerSelected')} icon={<ContentIcon name="graph" />} disabled={mode !== 'local' || !selectedDocument} onClick={() => setCenter(selected)} />
+    <IconButton tooltip={mode === 'local' ? t('graph.centerSelected') : t('graph.localOnly')} aria-label={t('graph.centerSelected')} icon="graph" disabled={mode !== 'local' || !selectedDocument} onClick={() => setCenter(selected)} />
     <input className="field min-w-24 flex-1" type="search" maxLength={200} aria-label={t('graph.filter')} placeholder={t('graph.filter')} value={filter} onChange={event => setFilter(event.target.value)} />
     <SelectField label={t('graph.select')} className="max-w-56" value={snapshot?.nodes.some(node => node.path === selected) ? selected : ''} disabled={loading || !snapshot?.nodes.length} onChange={setSelected} options={[{ value: '', label: t('graph.select') }, ...(snapshot?.nodes.map(node => ({ value: node.path, label: node.title, detail: node.path })) ?? [])]} />
-  </div>;
+  </ButtonBar>;
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     {toolbarTarget ? createPortal(controls, toolbarTarget) : <div className="border-b border-line p-3">{controls}</div>}
     <div className="relative flex min-h-0 flex-1 overflow-hidden bg-canvas">
@@ -145,13 +145,13 @@ export function KnowledgeGraph({ manifest, selectedPath, onOpen, toolbarTarget }
         {initialNodes.map(node => { const point = nodes.get(node.path) ?? node; return <g key={node.path} data-graph-node={node.path} transform={`translate(${point.x},${point.y})`} role="button" tabIndex={0} aria-label={t('graph.node', { title: node.title, path: node.path })} className="cursor-grab focus-visible:outline-2 focus-visible:outline-accent" onClick={() => setSelected(node.path)} onDoubleClick={() => latestOpen.current(node.path)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); latestOpen.current(node.path); } else if (event.key === ' ') { event.preventDefault(); setSelected(node.path); } }}><title>{node.title + '\n' + node.path}</title><circle r={Math.min(10, 5 + Math.sqrt(node.degree))} data-selected={selected === node.path} data-unindexed={node.status === 'unindexed'} className="fill-panel stroke-line-strong data-[selected=true]:fill-accent data-[selected=true]:stroke-accent-strong data-[unindexed=true]:stroke-warning" strokeWidth="2" /><text x="14" y="4" className="pointer-events-none fill-primary font-sans text-xs select-none">{node.title.length > 28 ? node.title.slice(0, 28) + '…' : node.title}</text></g>; })}
       </g></svg>
       {feedbackKind ? <div className="pointer-events-none absolute inset-x-3 bottom-3 ml-auto max-h-full max-w-96 overflow-x-clip overflow-y-auto"><GraphToast tone={feedbackKind === 'error' ? 'error' : feedbackKind === 'truncated' ? 'warning' : 'info'} locked={Boolean(criticalKind)} duration={criticalKind ? null : 5000} label={feedbackKind === 'error' ? t('graph.unavailable') : t('graph.' + feedbackKind)} details={[feedbackKind === 'error' && issue ? formatProductMessage(issue, t) : '', criticalKind && notice?.kind === 'help' ? t('graph.help') : ''].filter(Boolean).join('\n') || undefined} revealDetails={criticalKind && notice?.kind === 'help' ? notice.id : undefined} onClose={() => { noticeRef.current = null; setNotice(null); }} /></div> : null}
-      {issue ? <IconButton className="absolute right-3 top-3" tone="danger" tooltip={t('graph.errorDetails')} icon={<ContentIcon name="info" />} onClick={() => showNotice('error')} /> : null}
+      {issue ? <ButtonBar label={t('graph.errorDetails')} className="absolute right-3 top-3"><IconButton className="" tone="danger" tooltip={t('graph.errorDetails')} icon="info" onClick={() => showNotice('error')} /></ButtonBar> : null}
       {!loading && !issue && !snapshot?.nodes.length ? <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-muted">{t('graph.empty')}</p> : null}
     </div>
     <footer className="flex shrink-0 flex-wrap items-center gap-3 border-t border-line p-3">
-      <ButtonBar label={t('graph.actions')} className="gap-1"><IconButton tooltip={t('graph.zoomOut')} onClick={() => moveCamera('out')} icon={<ContentIcon name="minus" />} /><IconButton tooltip={t('graph.zoomIn')} onClick={() => moveCamera('in')} icon={<ContentIcon name="plus" />} /><IconButton tooltip={t('graph.reset')} onClick={() => moveCamera('reset')} icon={<ContentIcon name="reset" />} /><IconButton tooltip={t('graph.locate')} disabled={!snapshot?.nodes.some(node => node.path === selected)} onClick={() => moveCamera('locate')} icon={<ContentIcon name="target" />} /><IconButton variant="primary" tooltip={t('graph.readSelected')} disabled={!selectedDocument} onClick={() => onOpen(selected)} icon={<ContentIcon name="book" />} /></ButtonBar>
+      <ButtonBar label={t('graph.actions')}><IconButton tooltip={t('graph.zoomOut')} onClick={() => moveCamera('out')} icon="minus" /><IconButton tooltip={t('graph.zoomIn')} onClick={() => moveCamera('in')} icon="plus" /><IconButton tooltip={t('graph.reset')} onClick={() => moveCamera('reset')} icon="reset" /><IconButton tooltip={t('graph.locate')} disabled={!snapshot?.nodes.some(node => node.path === selected)} onClick={() => moveCamera('locate')} icon="target" /><IconButton variant="primary" tooltip={t('graph.readSelected')} disabled={!selectedDocument} onClick={() => onOpen(selected)} icon="book" /></ButtonBar>
       <p className="min-w-0 flex-1 truncate text-xs text-muted" title={selectedDocument?.path}>{selectedDocument?.title}</p>
-      <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-2xs text-faint">{snapshot ? t('graph.count', { shown: formatUINumber(snapshot.nodes.length, locale), total: formatUINumber(snapshot.total, locale), edges: formatUINumber(snapshot.edges.length, locale) }) : null}<IconButton variant="inline" tooltip={t('graph.helpTooltip')} aria-describedby={`graph-help-${manifest.sourceId}`} icon={<ContentIcon name="info" />} onClick={() => showNotice('help')} /></span>
+      <span className="ml-auto inline-flex shrink-0 items-center gap-1 text-2xs text-faint">{snapshot ? t('graph.count', { shown: formatUINumber(snapshot.nodes.length, locale), total: formatUINumber(snapshot.total, locale), edges: formatUINumber(snapshot.edges.length, locale) }) : null}<IconButton variant="inline" tooltip={t('graph.helpTooltip')} aria-describedby={`graph-help-${manifest.sourceId}`} icon="info" onClick={() => showNotice('help')} /></span>
       <span id={`graph-help-${manifest.sourceId}`} className="sr-only">{t('graph.help')}</span>
     </footer>
   </div>;

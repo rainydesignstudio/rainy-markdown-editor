@@ -11,6 +11,7 @@ import * as messages from '../src/lib/i18n/productMessages.ts';
 import * as sources from '../src/lib/fontSources.ts';
 import * as fonts from '../src/lib/localFonts.ts';
 import { OPEN_FONT_ASSETS } from '../src/lib/fontCatalog.ts';
+import { withActionComponents } from './action-ui-fixture.mjs';
 
 const componentSource = await readFile(new URL('../src/components/settings/FontDownloadSettings.tsx', import.meta.url), 'utf8');
 const componentCode = ts.transpileModule(componentSource, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
@@ -39,7 +40,7 @@ async function fixture() {
   const { createRoot } = await import('react-dom/client');
   const i18n = createUII18n('zh-CN'); let locale = 'zh-CN', feedback;
   const module = { exports: {} };
-  vm.runInNewContext(componentCode, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(componentCode, { module, exports: module.exports, require: withActionComponents(function(id) {
     if (id.endsWith('/OperationFeedback')) return { OperationFeedback: props => { feedback = props; return React.createElement('button', { 'data-diagnostics':true }, 'Details'); } };
     if (id === 'react') return React;
     if (id === 'react/jsx-runtime') return jsxRuntime;
@@ -48,7 +49,7 @@ async function fixture() {
     if (id.endsWith('/fontSources')) return sources;
     if (id.endsWith('/localFonts')) return fonts;
     throw new Error('Unexpected font settings import: ' + id);
-  } });
+  }) });
   const root = createRoot(document.getElementById('root'));
   const props = { root: null, onRetry: async () => true };
   const render = async () => { await React.act(async () => root.render(React.createElement(module.exports.FontDownloadSettings, props))); };

@@ -12,6 +12,10 @@ import { createArticleSnapshot, listArticleHistory } from '../src/lib/articleHis
 import { saveStoredArticle, getStoredArticleDirectory, readStoredArticleById } from '../src/lib/fileSystem.ts';
 import { compileArticleStyles } from '../src/lib/tailwind.ts';
 import DOMPurify from 'dompurify';
+import { clearBrowserCache } from '../src/lib/browserCache.ts';
+import { scanRenderStorage, migrateRenderStorage, reclaimRenderStorage } from '../src/lib/article-format/renderMaintenance.ts';
+import { storeRenderObject } from '../src/lib/article-format/renderStore.ts';
+import { readManifest, renderRecordFiles } from '../src/lib/article-format/renderRecords.ts';
 
 function memoryLibrary() {
   const files = new Map(), directories = new Set(['']), writes = [];
@@ -74,13 +78,19 @@ async function fixture(darkParameters, configuration) {
   const prepared = await prepareRenderRecord(source, BASIC_THEME, element, compiled.css, { snapshot });
   return { ...library, snapshot, source, saved, directory, prepared, environment };
 }
+// Seed the legacy on-disk contract independently of the new writer.
+function seedLegacy(f, prepared=f.prepared){
+ f.put('styles/.versions/'+prepared.record.environmentHash+'/manifest.json',canonicalFormatJson(prepared.manifest));
+ for(const asset of prepared.assets)f.put('assets/.objects/'+asset.hash,asset.blob);
+ f.put('articles/'+f.saved.article.month+'/'+f.saved.article.folder+'/render.json',JSON.stringify(prepared.record));
+}
 test('pre-mode renditions reopen current and historical sources without migration or weaker integrity checks', async () => {
   const algorithm = structuredClone(DEFAULT_FORMAT_BUNDLE.formatter.steps.find(step => step.operator === 'preview.dark-mode').parameters);
   delete algorithm.mode;
   for (const parameters of [algorithm, { transform: 'preserve', options: {} }]) {
     const f = await fixture(parameters);
     try {
-      await persistRenderRecord(f.root, f.directory, f.prepared);
+      seedLegacy(f);
       await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'manual', retained: true, id: 'snapshot-pre-mode' });
       for (const [path, text] of f.files) if (path.endsWith('/render.json')) {
         const record = JSON.parse(text);
@@ -116,7 +126,7 @@ test('pre-mode renditions reopen current and historical sources without migratio
         f.files.set(object, bytes);
         const next = await prepareRenderRecord(f.source, BASIC_THEME, element, restored.css, { snapshot: restored.snapshot });
         await persistRenderRecord(f.root, f.directory, next);
-        assert.equal((await readRenderRecord(f.directory)).formatter.preview.dark.mode, mode);
+        const updated = await restoreRenderEnvironment(f.root, await readRenderRecord(f.directory)); try { assert.equal(updated.snapshot.bundle.formatter.preview.dark.mode, mode); } finally { updated.dispose(); }
       } finally { restored.dispose(); }
     } finally { f.environment.dispose(); }
   }
@@ -143,10 +153,10 @@ test('renditions keep verified immutable dependencies; opening old source perfor
     const record = await readRenderRecord(f.directory);
     assert.equal(await renderRecordMatches(record, f.source, BASIC_THEME), true);
     assert.equal(await renderRecordMatches(record, f.source + '\nchanged', BASIC_THEME), false);
-    assert.ok(record.css.includes('article-asset:'));
-    const immutableWrites = f.writes.filter(path => path.startsWith('assets/.objects/') || path.startsWith('styles/.versions/'));
+    assert.equal(record.schemaVersion,2);assert.equal(Object.hasOwn(record,'html'),false);assert.equal(Object.hasOwn(record,'css'),false);
+    const immutableWrites = f.writes.filter(path => path.startsWith('cache/render/'));
     await persistRenderRecord(f.root, f.directory, f.prepared);
-    assert.deepEqual(f.writes.filter(path => path.startsWith('assets/.objects/') || path.startsWith('styles/.versions/')), immutableWrites);
+    assert.deepEqual(f.writes.filter(path => path.startsWith('cache/render/')), immutableWrites);
     f.put('styles/globals.css', '.card{color:blue}');
     const restored = await restoreRenderEnvironment(f.root, record);
     try {
@@ -160,17 +170,17 @@ test('renditions keep verified immutable dependencies; opening old source perfor
 test('missing or tampered objects fail and a dependency-write failure never publishes a pointer', async () => {
   const f = await fixture();
   try {
-    f.fail('manifest.json');
+    f.fail('owner.json');
     await assert.rejects(persistRenderRecord(f.root, f.directory, f.prepared), /injected/);
     assert.equal(await readRenderRecord(f.directory), null);
     assert.equal(await (await f.directory.getFileHandle('article.md')).getFile().then(file => file.text()), f.source);
     await persistRenderRecord(f.root, f.directory, f.prepared);
     const record = await readRenderRecord(f.directory);
-    f.files.set('assets/.objects/' + record.assets[0].hash, 'tampered');
-    await assert.rejects(restoreRenderEnvironment(f.root, record), /校验失败/);
-    assert.throws(() => validateRenderRecord({ ...record, rawFormatter: { ...record.rawFormatter, steps: [{ id: 'bad', operator: 'arbitrary.js', enabled: true, parameters: {} }] } }), /未知/);
-    assert.throws(() => validateRenderRecord({ ...record, css: '.x{background:url(https://example.invalid/tracker)}' }), /未留存资源/);
-    assert.throws(() => validateRenderRecord({ ...record, css: '@import "https://example.invalid/style.css";' }), /额外/);
+    f.files.set('cache/render/objects/' + f.prepared.assets[0].hash, 'tampered');
+    await assert.rejects(restoreRenderEnvironment(f.root, record), error => error.messageKey === 'renderCache.corrupt');
+    assert.throws(() => validateRenderRecord({ ...f.prepared.record, rawFormatter: { ...f.prepared.record.rawFormatter, steps: [{ id: 'bad', operator: 'arbitrary.js', enabled: true, parameters: {} }] } }), /未知/);
+    assert.throws(() => validateRenderRecord({ ...f.prepared.record, css: '.x{background:url(https://example.invalid/tracker)}' }), /未留存资源/);
+    assert.throws(() => validateRenderRecord({ ...f.prepared.record, css: '@import "https://example.invalid/style.css";' }), /额外/);
   } finally { f.environment.dispose(); }
 });
 test('history carries the same environment; automatic dedup compares its version as well as body and theme', async () => {
@@ -178,7 +188,7 @@ test('history carries the same environment; automatic dedup compares its version
   try {
     await persistRenderRecord(f.root, f.directory, f.prepared);
     const first = await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'automatic', id: 'snapshot-first' });
-    assert.equal(first.snapshot.renderRecord.environmentHash, f.prepared.record.environmentHash);
+    assert.equal(first.snapshot.renderRecord.environmentHash, (await readRenderRecord(f.directory)).environmentHash);
     assert.equal((await createArticleSnapshot(f.root, f.saved.article.month, f.saved.article.folder, f.source, BASIC_THEME, { kind: 'automatic', id: 'snapshot-duplicate' })).created, false);
     const manifest = { ...f.prepared.manifest, candidates: ['card', 'p-4'] };
     const updated = { ...f.prepared, manifest, record: { ...f.prepared.record } };
@@ -196,7 +206,7 @@ test('historical algorithm code is retained and verified independently of today\
   try {
     await persistRenderRecord(f.root, f.directory, f.prepared);
     const record = await readRenderRecord(f.directory);
-    assert.equal(record.algorithmHash, DEFAULT_ALGORITHMS.fingerprint);
+    assert.equal(record.schemaVersion,2);
     const modified = structuredClone(DEFAULT_ALGORITHMS);
     modified.files['mp-darkmode.adapter.js'] += '\n// changed current component\n';
     modified.manifest.components[0].scripts[1].sha256 = await algorithmHash(modified.files['mp-darkmode.adapter.js']);
@@ -206,7 +216,7 @@ test('historical algorithm code is retained and verified independently of today\
     const before = f.writes.length;
     const restored = await restoreRenderEnvironment(f.root, record, live);
     try {
-      assert.equal(restored.snapshot.algorithms.fingerprint, record.algorithmHash);
+      assert.equal(restored.snapshot.algorithms.fingerprint, DEFAULT_ALGORITHMS.fingerprint);
       assert.notEqual(restored.snapshot.algorithms.fingerprint, live.algorithms.fingerprint);
       assert.equal(restored.snapshot.algorithms.files['mp-darkmode.adapter.js'], DEFAULT_ALGORITHMS.files['mp-darkmode.adapter.js']);
       assert.equal(f.writes.length, before);
@@ -224,7 +234,7 @@ test('older render manifests use a marked legacy algorithm fallback without migr
     const legacy = { ...f.prepared, manifest: { ...f.prepared.manifest }, record: { ...f.prepared.record } };
     delete legacy.manifest.algorithms; delete legacy.record.algorithmHash;
     legacy.record.environmentHash = await contentHash(canonicalFormatJson(legacy.manifest));
-    await persistRenderRecord(f.root, f.directory, legacy);
+    seedLegacy(f, legacy);
     const before = f.writes.length;
     const restored = await restoreRenderEnvironment(f.root, legacy.record);
     try { assert.equal(restored.snapshot.algorithmSource, 'legacy'); assert.equal(f.writes.length, before); }
@@ -276,7 +286,7 @@ test('a retained library configuration is immutable, hash-bound and independent 
       assert.equal(f.writes.length, writes);
     } finally { restored.dispose(); }
     const altered = structuredClone(record);
-    altered.configuration.capabilities.copyRichText.enabled = true;
+    altered.configuration = { capabilities: { copyRichText: { enabled: true } } };
     await assert.rejects(restoreRenderEnvironment(f.root, altered, live));
   } finally { f.environment.dispose(); }
 });
@@ -285,7 +295,7 @@ test('legacy render records without configuration retain legacy defaults instead
   const f = await fixture();
   try {
     assert.equal(Object.hasOwn(f.prepared.record, 'configuration'), false);
-    await persistRenderRecord(f.root, f.directory, f.prepared);
+    seedLegacy(f);
     const raw = structuredClone(DEFAULT_FORMAT_BUNDLE);
     const live = activateFormatBundle(raw, 'fixed-live', 'library', undefined, DEFAULT_ALGORITHMS, 'library', { schemaVersion: 1, meta: { id: raw.support.meta.id }, rendering: { previewMode: 'light' } });
     const writes = f.writes.length;
@@ -296,4 +306,49 @@ test('legacy render records without configuration retain legacy defaults instead
       assert.equal(f.writes.length, writes);
     } finally { restored.dispose(); }
   } finally { f.environment.dispose(); }
+});
+
+test('content-addressed parts are shared across different resource environments and new pointers contain no generated HTML/CSS',async()=>{
+ const f=await fixture();try{
+  const first=await persistRenderRecord(f.root,f.directory,f.prepared);
+  const hashes=[...f.files.keys()].filter(n=>n.startsWith('cache/render/objects/'));
+  const original=await readManifest(f.root,first);assert.equal(original.algorithms.fingerprint,DEFAULT_ALGORITHMS.fingerprint);
+  const next=structuredClone(f.prepared.manifest);next.candidates.push('p-8');const prepared={...f.prepared,manifest:next,record:{...f.prepared.record,environmentHash:await contentHash(canonicalFormatJson(next))}};
+  const second=await persistRenderRecord(f.root,f.directory,prepared);
+  assert.notEqual(first.environmentHash,second.environmentHash);
+  assert.equal([...f.files.keys()].filter(n=>n.startsWith('cache/render/objects/')).length,hashes.length+1,'only the changed candidate list adds an object; the algorithm and styles remain shared');
+  assert.equal(Object.hasOwn(second,'css'),false);assert.equal(Object.hasOwn(second,'html'),false);assert.ok(JSON.stringify(second).length<600);
+  const files=await renderRecordFiles(f.root,second);assert.ok(files.has('cache/render/owner.json'));assert.equal([...files.keys()].filter(n=>n.includes('/manifests/')).length,1);assert.equal([...files.keys()].some(n=>n.includes(first.environmentHash)),false);
+ }finally{f.environment.dispose();}
+});
+
+test('legacy migration copies before switching, can resume cancellation, and survives browser cache clearing without adopting current styles',async()=>{
+ const f=await fixture();try{
+  seedLegacy(f);await createArticleSnapshot(f.root,f.saved.article.month,f.saved.article.folder,f.source,BASIC_THEME,{kind:'manual',id:'snapshot-migrate'});
+  const path='articles/'+f.saved.article.month+'/'+f.saved.article.folder+'/render.json',old=f.files.get(path);
+  const permission=f.root.queryPermission;f.root.queryPermission=async()=> 'denied';await assert.rejects(migrateRenderStorage(f.root),error=>error.messageKey==='renderCache.permission');assert.equal(f.files.get(path),old);f.root.queryPermission=permission;
+  const writes=f.writes.length;await assert.rejects(migrateRenderStorage(f.root,()=>f.writes.length<=writes+1),error=>error.messageKey==='renderCache.changed');
+  assert.equal(f.files.get(path),old);assert.equal((await readRenderRecord(f.directory)).schemaVersion,1);
+  assert.equal(await migrateRenderStorage(f.root),2);const record=await readRenderRecord(f.directory);assert.equal(record.schemaVersion,2);
+  assert.equal((await listArticleHistory(f.root,f.saved.article.month,f.saved.article.folder)).snapshots[0].renderRecord.schemaVersion,2);
+  assert.ok(f.files.has('styles/.versions/'+f.prepared.record.environmentHash+'/manifest.json'),'migration retains the original closure until explicit reclamation');
+  await clearBrowserCache();f.put('styles/globals.css','.card{color:blue}');const restored=await restoreRenderEnvironment(f.root,record);
+  try{assert.match(restored.css,/color: red/);}finally{restored.dispose();}
+  const scan=await scanRenderStorage(f.root);await reclaimRenderStorage(f.root,scan);assert.equal((await scanRenderStorage(f.root)).reclaimBytes,0,'cleanup and refresh also work after removing the final legacy manifest');
+ }finally{f.environment.dispose();}
+});
+
+test('reclamation protects recycle-bin references, rejects stale scans and damaged records, and preserves unknown files',async()=>{
+ const f=await fixture();try{
+  seedLegacy(f);f.put('_trash/fixture/article/render.json',JSON.stringify(f.prepared.record));f.put('_trash/fixture/article/article.md',f.source);f.put('_trash/fixture/article/theme.json',JSON.stringify(BASIC_THEME));
+  f.put('_trash/fixture/entry.json',JSON.stringify({schemaVersion:1,state:'ready',files:{'render.json':await contentHash(JSON.stringify(f.prepared.record)),'article.md':await contentHash(f.source),'theme.json':await contentHash(JSON.stringify(BASIC_THEME))}}));
+  await migrateRenderStorage(f.root);assert.equal((await readRenderRecord(await f.root.getDirectoryHandle('_trash').then(d=>d.getDirectoryHandle('fixture')).then(d=>d.getDirectoryHandle('article')))).schemaVersion,1);
+  const orphan=await storeRenderObject(f.root,{unused:true});f.put('cache/render/objects/unknown.txt','user retained');
+  const before=await scanRenderStorage(f.root);assert.equal(before.candidates.some(n=>n.path.startsWith('styles/.versions/')),false,'trash retains the legacy environment');
+  await storeRenderObject(f.root,{later:true});await assert.rejects(reclaimRenderStorage(f.root,before),error=>error.messageKey==='renderCache.changed');
+  const current=await scanRenderStorage(f.root);assert.ok(current.reclaimBytes>0);await reclaimRenderStorage(f.root,current);assert.equal(f.files.has('cache/render/objects/'+orphan),false);assert.equal(f.files.get('cache/render/objects/unknown.txt'),'user retained');
+  assert.ok(f.files.has('styles/.versions/'+f.prepared.record.environmentHash+'/manifest.json'));
+  f.put('_trash/fixture/article/render.json','broken');await assert.rejects(scanRenderStorage(f.root));
+  const foreign=memoryLibrary();foreign.put('cache/render/user.txt','keep');await assert.rejects(storeRenderObject(foreign.root,{test:true}),error=>error.messageKey==='renderCache.foreignStore');assert.equal(foreign.files.get('cache/render/user.txt'),'keep');assert.equal(foreign.files.has('cache/render/owner.json'),false);
+ }finally{f.environment.dispose();}
 });

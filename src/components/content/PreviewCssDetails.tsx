@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom';
 import { getFormatSnapshot, type FormatSnapshot } from '../../lib/article-format/runtime';
 import { useUITranslation } from '../global/UILocaleProvider';
 import { IconButton } from '../global/IconButton';
-import { ContentIcon } from '../global/ContentIcon';
+
 import { DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { SnippetTextarea } from './SnippetTextarea';
 
@@ -30,7 +30,7 @@ export function PreviewCssDetails({ css, ready, revision, snapshot, dark, hostRe
   const renderer = snapshot.renderer?.declaration;
   const close = () => setOpen(false);
   return <>
-    <IconButton tooltip={t(ready ? 'previewCss.view' : 'previewCss.notReady')} icon={<ContentIcon name="code" />} disabled={!ready} onClick={() => {
+    <IconButton tooltip={t(ready ? 'previewCss.view' : 'previewCss.notReady')} icon="code" disabled={!ready} onClick={() => {
       if (!ready || getFormatSnapshot().id !== snapshot.id) return;
       setRecord({ revision, formatId: snapshot.id, dark, css: readPreviewCss(css, dark, hostRef.current, target, darkFrameRef?.current ?? null) }); setOpen(true);
     }} />

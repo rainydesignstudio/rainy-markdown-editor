@@ -8,7 +8,7 @@ import { previewSurfaceStyle } from '../../lib/article-format/preview';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { parseArticle } from '../../lib/frontMatter';
 import type { WorkingArticle } from '../../lib/types';
 import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
@@ -22,6 +22,11 @@ import { usePreviewPreferences } from '../../hooks/usePreviewPreferences';
 import { connectPreviewScrollSync } from '../../lib/previewScrollSync';
 import { ArticlePreviewCanvas } from './ArticlePreviewCanvas';
 import { retainPreviewInput, refreshRetainedPreviewMedia, type PreviewInput } from '../../lib/previewSnapshot';
+import { RenderedCodePane } from './RenderedCodePane';
+import { packageInputKey } from '../../lib/article-format/packageRendering';
+import type { RenderedCode } from '../../lib/renderedCode';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 type Props = {
   article: WorkingArticle;
@@ -71,6 +76,10 @@ export function PreviewPanel({
   const { t } = useUITranslation('editor');
   const referenceLayout = useResizableColumns(45, undefined, referenceOpen, 'y');
   const { preferences, toggle: togglePreference } = usePreviewPreferences();
+  const [codeView,setCodeView]=useState(false),[codeMounted,setCodeMounted]=useState(false),[codeValue,setCodeValue]=useState<RenderedCode>({key:'',status:'pending'});
+  const onCode=useCallback((next:RenderedCode)=>setCodeValue(previous=>previous.key===next.key&&previous.status===next.status&&previous.code===next.code&&previous.error===next.error?previous:next),[]);
+  const codeContext=useMemo(()=>({}),[directory,article.month,article.folder,documentGeneration]);
+  const scrollResume=useRef<{ context: object; waiting: boolean } | null>(null);
   const liveViewportRef = useRef<HTMLDivElement | null>(null);
   const frozenViewportRef = useRef<HTMLDivElement | null>(null);
   const frozenRootRef = useRef<HTMLElement | null>(null);
@@ -112,15 +121,19 @@ export function PreviewPanel({
   // Ordinary typing does not keep rendering an invisible copy of the frozen manuscript.
   const workingInput = workingInputRef.current.input;
   const { dark, toggle } = useArticlePreviewMode();
+  const visibleInput=frozenVisible?frozen!.input:workingInput;
+  const codeKey=useMemo(()=>packageInputKey(visibleInput.parsed.body,visibleInput.article.theme,visibleInput.snapshot)+':'+(dark?'dark':'light'),[visibleInput,dark]);
+  const visibleCode=codeValue.key===codeKey?codeValue:{key:codeKey,status:'pending' as const};
   useEffect(() => {
-    if (!preferences.scrollSync) return;
+    if (!preferences.scrollSync || codeView) return;
     const textarea = sourceTextareaRef.current;
     const container = frozenVisible ? frozenViewportRef.current : liveViewportRef.current;
     const root = frozenVisible ? frozenRootRef : previewRef;
     if (!textarea || !container) return;
     return connectPreviewScrollSync({ textarea, container, getRoot: () => root.current, getSource: () => sourceTextRef.current,
-      getRenderedSource: () => frozenVisible ? frozen!.input.parsed.body : sourceTextRef.current });
-  }, [preferences.scrollSync, frozenVisible, frozen, sourceTextareaRef, previewRef, formatSnapshot.id, dark, documentGeneration, directory]);
+      getRenderedSource: () => frozenVisible ? frozen!.input.parsed.body : sourceTextRef.current,
+      resume: scrollResume.current?.context === codeContext ? scrollResume.current : undefined });
+  }, [preferences.scrollSync, codeView, codeContext, frozenVisible, frozen, sourceTextareaRef, previewRef, formatSnapshot.id, dark]);
   // The clipboard dock opens to half the preview panel, measured once against the panel so the
   // target does not chase the preview as the dock itself takes space away from it.
   const [dockOpen, setDockOpen] = useState(false);
@@ -164,7 +177,7 @@ export function PreviewPanel({
       const interactive = event.nativeEvent.composedPath().some(node => node !== event.currentTarget && node instanceof Element && node.matches('a,button,input,textarea,select,[tabindex],[contenteditable="true"]'));
       if (!interactive) event.currentTarget.focus({ preventScroll: true });
     }} className="panel preview-panel" data-mobile-hidden={mobilePane === 'source'} onKeyDownCapture={event => {
-      if (!onOpenSourceFind || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'f'
+      if (codeView || !onOpenSourceFind || event.defaultPrevented || event.nativeEvent.isComposing || event.keyCode === 229 || event.altKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'f'
         || !event.nativeEvent.composedPath().includes(event.currentTarget)) return;
       event.preventDefault(); event.stopPropagation(); onOpenSourceFind();
     }}>
@@ -172,22 +185,30 @@ export function PreviewPanel({
         <div className="flex min-w-0 items-center gap-2 md:gap-6">
           <span className="inline-flex min-w-0" title={themeCapability.reason} tabIndex={!themeCapability.enabled ? 0 : undefined} aria-label={themeCapability.reason}><InformationButton icon={<InformationIcon book />} title={liveFormatSnapshot.configuration?.rendering.styleAuthority === 'library' ? liveFormatSnapshot.bundle.support.meta.name : article.theme.name} subtitle={liveFormatSnapshot.configuration?.rendering.styleAuthority === 'library' ? t('messages:libraryConfiguration.styleSource') : <span className="flex items-center gap-1.5">v{article.theme.version}{themeUpdateAvailable ? <ThemeUpdateTag /> : null}</span>} onClick={() => { if (themeCapability.enabled) onOpenTheme(); }} disabled={mediaBusy || !themeCapability.enabled} aria-label={t('editor:preview.themeLabel', { name: article.theme.name, version: article.theme.version, update: themeUpdateAvailable ? t('editor:preview.updateSuffix') : '' })} /></span>
         </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <ButtonBar label={t('editor:preview.actions')} className="ml-auto">
           <PreviewModeSwitch dark={dark} onToggle={toggle} />
-          <PaneActions label={t('editor:preview.actions')}><IconButton tooltip={t('editor:preview.scrollSync')} aria-pressed={preferences.scrollSync} onClick={() => togglePreference('scrollSync')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 4h7M3 9h7M3 14h7M3 19h7M16 5v14m-3-11 3-3 3 3m-6 8 3 3 3-3" /></svg>} />
-            <IconButton tooltip={t('editor:preview.saveReport')} aria-pressed={preferences.saveReport} onClick={() => togglePreference('saveReport')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 4H5v17h14V4h-4M9 3h6v4H9zM8 14l3 3 5-6" /></svg>} />
-            <IconButton tooltip={t('editor:preview.saveOnly')} aria-pressed={preferences.saveOnly} onClick={() => togglePreference('saveOnly')} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5h16v12H4zM8 21h8m-4-4v4M8 11h8m-3-3 3 3-3 3" /></svg>} />
+          <IconButton tooltip={t(codeView?'preview.showResult':'preview.showCode')} aria-pressed={codeView} onClick={() => {
+            if (codeView) scrollResume.current = { context: codeContext, waiting: true };
+            setCodeMounted(true);
+            setCodeView(!codeView);
+          }} icon="code"/>
+          <PaneActions label={t('editor:preview.actions')}><IconButton tooltip={t(codeView?'preview.scrollSyncCodeUnavailable':'editor:preview.scrollSync')} disabled={codeView} aria-pressed={preferences.scrollSync} onClick={() => { scrollResume.current = null; togglePreference('scrollSync'); }} icon="align" />
+            <IconButton tooltip={t('editor:preview.saveReport')} aria-pressed={preferences.saveReport} onClick={() => togglePreference('saveReport')} icon="saveReport" />
+            <IconButton tooltip={t('editor:preview.saveOnly')} aria-pressed={preferences.saveOnly} onClick={() => togglePreference('saveOnly')} icon="savePreview" />
           </PaneActions>
-        </div>
+        </ButtonBar>
       </div>
       <div ref={referenceLayout.containerRef} className="flex min-h-0 flex-1 flex-col" style={referenceLayout.style}>
       <div data-open={referenceOpen} data-resizable={referenceLayout.wideEnough} className="flex min-h-0 shrink-0 flex-col data-[open=true]:flex-1 data-[open=true]:data-[resizable=true]:h-(--editor-reference-height) data-[open=true]:data-[resizable=true]:flex-none">{referencePanel}</div>
       {referenceOpen ? <ColumnSplitter layout={referenceLayout} label={t('workspace.resizeReference')} controls="editor-knowledge-content" /> : null}
       <div className="relative min-h-0 flex-1">
+        <div className="h-full data-[code=true]:pointer-events-none data-[code=true]:opacity-0" data-code={codeView} aria-hidden={codeView||undefined} inert={codeView}>
         <div className="h-full data-[hidden=true]:pointer-events-none data-[hidden=true]:absolute data-[hidden=true]:inset-0 data-[hidden=true]:opacity-0" data-hidden={frozenVisible} aria-hidden={frozenVisible || undefined} inert={frozenVisible}>
-          <ArticlePreviewCanvas input={workingInput} dark={frozenVisible ? false : dark} onOpenSourceFind={onOpenSourceFind} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} />
+          <ArticlePreviewCanvas input={workingInput} dark={frozenVisible ? false : dark} onOpenSourceFind={onOpenSourceFind} canonical rootRef={previewRef} viewportRef={liveViewportRef} onAttach={attachPreview} codeActive={codeView&&!frozenVisible} codeReady={compiledRevision!==null} onCode={onCode}/>
         </div>
-        {frozenVisible ? <ArticlePreviewCanvas input={frozen.input} dark={dark} onOpenSourceFind={onOpenSourceFind} canonical={false} rootRef={frozenRootRef} viewportRef={frozenViewportRef} /> : null}
+        {frozenVisible ? <ArticlePreviewCanvas input={frozen.input} dark={dark} onOpenSourceFind={onOpenSourceFind} canonical={false} rootRef={frozenRootRef} viewportRef={frozenViewportRef} codeActive={codeView} codeReady onCode={onCode}/> : null}
+        </div>
+        {codeMounted?<div className="absolute inset-0 data-[visible=false]:pointer-events-none data-[visible=false]:opacity-0" data-visible={codeView} aria-hidden={!codeView||undefined} inert={!codeView}><RenderedCodePane value={visibleCode} context={codeContext}/></div>:null}
       </div>
       </div>
       <div className="panel-body">
@@ -200,7 +221,7 @@ export function PreviewPanel({
             <div className="clipboard-dock-content">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="m-0 min-w-0 text-xs text-muted">{t('editor:clipboard.description')}</p>
-                <button className="button button-quiet shrink-0" type="button" onClick={() => void onPaste()} disabled={mediaBusy || readOnly || !parsed.canCopy || !article.themeValid}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 4h6v3H9zM7 5H5v15h14V5h-2" /><path d="M9 12h6M9 16h4" /></svg>{t('editor:clipboard.paste')}</button>
+                <ButtonBar label={t('editor:clipboard.paste')}><Button icon="clipboard" className="shrink-0" type="button" onClick={() => void onPaste()} disabled={mediaBusy || readOnly || !parsed.canCopy || !article.themeValid} label={t('editor:clipboard.paste')} /></ButtonBar>
               </div>
               <div ref={clipboardReceiverRef} className="clipboard-receiver before:pointer-events-none data-[empty=true]:before:content-[attr(aria-placeholder)]" contentEditable={!readOnly} suppressContentEditableWarning style={{ ...previewSurfaceStyle(false, liveFormatSnapshot), color: liveFormatSnapshot.bundle.formatter.preview.color }} role="textbox" aria-multiline="true" aria-label={t('editor:clipboard.aria')} aria-placeholder={t('editor:clipboard.placeholder')} />
             </div>

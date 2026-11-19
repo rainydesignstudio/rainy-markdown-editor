@@ -8,18 +8,20 @@ import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 
 import { PageHeading } from '../global/PageHeading';
 
+import { IconButton } from '../global/IconButton';
 import { ButtonBar } from '../global/ButtonBar';
 import { ContentIcon } from '../global/ContentIcon';
 import { PanelIcon } from '../global/CollapsiblePanel';
 import { ModeSwitch } from '../global/ModeSwitch';
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
+import { DialogActions, DialogButton, DialogFrame, DialogHeader } from '../global/DialogFrame';
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
 import { useDraftLocation, useEditingDraft, useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
 import { hasEditingDraft } from '../../lib/editingDrafts';
 import { FormatPackageControls } from './FormatPackageControls';
 import { FontDownloadSettings } from './FontDownloadSettings';
+import { RenderCacheControls, type RenderCacheQueue } from './RenderCacheControls';
 import { EditorThemeDesigner } from './EditorThemeDesigner';
 import type { NavigationGuard } from '../../hooks/useRouteNavigation';
 import type { ArticleSettings } from '../../lib/articleSettings';
@@ -32,8 +34,11 @@ import {
   type EditorColorMode,
   type EditorWorkspace,
 } from '../../lib/editorWorkspace';
+import { Button } from '../global/Button';
+import { ConfirmDialog } from '../global/ConfirmDialog';
 
 type Props = {
+  renderCacheQueue?: RenderCacheQueue;
   root: FileSystemDirectoryHandle | null;
   libraryReady?: boolean;
   directoryName: string | null;
@@ -66,27 +71,6 @@ type Props = {
   onPreviewAppearance: (appearance: EditorAppearance | null) => void;
   registerNavigationGuard: (guard: NavigationGuard) => () => void;
 };
-
-function SettingsIcon({ name }: { name: 'folder' | 'upload' | 'download' | 'export' | 'reset' | 'undo' | 'check' | 'save' | 'plus' | 'document' | 'theme' | 'history' | 'clock' | 'edit' | 'delete' }) {
-  const paths = {
-    edit: 'm4 16 12-12 4 4L8 20H4v-4Zm10-10 4 4',
-    delete: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
-    folder: 'M3 7V5h6l2 2h10v13H3V7Z',
-    upload: 'M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6',
-    download: 'M12 3v13m-5-5 5 5 5-5M4 15v6h16v-6',
-    export: 'M14 3h7v7M21 3l-9 9M10 4H4v16h16v-6',
-    reset: 'M4 10a8 8 0 1 1 1 8M4 4v6h6',
-    undo: 'm8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12',
-    check: 'm4 12 5 5L20 6',
-    save: 'M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6',
-    plus: 'M12 5v14M5 12h14',
-    document: 'M5 3h9l5 5v13H5V3ZM14 3v5h5M9 12h6M9 16h4',
-    theme: 'M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h3a5 5 0 0 0 5-5c0-3-4-5-9-5Z',
-    history: 'M4 10a8 8 0 1 1 1 8M4 4v6h6M12 7v5l3 2',
-    clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z',
-  };
-  return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={paths[name]} /></svg>;
-}
 
 function sameAppearance(left: EditorAppearance, right: EditorAppearance) {
   return left.themeId === right.themeId && left.colorMode === right.colorMode
@@ -163,12 +147,13 @@ function ThemeSample({ theme, kind = 'both', scheme = 'light' }: { theme: Editor
 
 const SETTINGS_TABS = [
   { id: 'library', icon: 'folder' },
-  { id: 'appearance', icon: 'theme' },
+  { id: 'appearance', icon: 'palette' },
   { id: 'workflow', icon: 'clock' },
 ] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number]['id'];
 
 export function SettingsPanel({
+  renderCacheQueue,
   root,
   libraryReady = true,
   directoryName,
@@ -374,11 +359,11 @@ export function SettingsPanel({
         <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-line px-4 py-3 md:px-6">
           <div className="flex w-max gap-1 rounded-lg bg-list p-1" role="tablist" aria-label={t('settings:ui.settingsCategories')}>
             {SETTINGS_TABS.map((item) => <button key={item.id} id={`settings-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} aria-controls={`settings-panel-${item.id}`} tabIndex={tab === item.id ? 0 : -1} disabled={tabBusy} onClick={() => setTab(item.id)} onKeyDown={(event) => onTabKeyDown(event, item.id)} className="flex min-h-9 items-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-selected:bg-panel aria-selected:text-accent-text">
-              {item.id === 'appearance' ? <PanelIcon kind="colors" className="" /> : <SettingsIcon name={item.icon} />}{t('settings:tabs.' + item.id)}{item.id === 'appearance' && appearanceDirty ? <UnsavedMark /> : null}
+              {item.id === 'appearance' ? <PanelIcon kind="colors" className="" /> : <ContentIcon name={item.icon} />}{t('settings:tabs.' + item.id)}{item.id === 'appearance' && appearanceDirty ? <UnsavedMark /> : null}
             </button>)}
           </div>
           <OperationFeedback hideTrigger id="settings-operation" notice={tab === 'appearance' ? appearanceNotice : null} />
-          <OperationFeedback id="settings-diagnostics" hideTrigger={!libraryReady} announce={libraryReady} label={t('common:feedback.libraryDiagnostics')} notice={diagnosticIssues.length ? productReference('shared.compose', { parts: productJoin(diagnosticIssues, '\n') }) : null} summary={themeDiagnosticCount && !directoryBookmarkIssue && !workspaceIssue && !issue ? productReference('feedback.filesRepair', { count: themeDiagnosticCount }) : undefined} tone="warning">{workspaceIssue ? <p>{t('settings:ui.appearanceRemainsReadOnly')}</p> : null}{issue ? <p>{t('settings:ui.repairSettingsJsonThenReopenTheLibrary')}</p> : null}</OperationFeedback>
+          <ButtonBar label={t('common:feedback.libraryDiagnostics')} className="empty:hidden"><OperationFeedback id="settings-diagnostics" hideTrigger={!libraryReady} announce={libraryReady} label={t('common:feedback.libraryDiagnostics')} notice={diagnosticIssues.length ? productReference('shared.compose', { parts: productJoin(diagnosticIssues, '\n') }) : null} summary={themeDiagnosticCount && !directoryBookmarkIssue && !workspaceIssue && !issue ? productReference('feedback.filesRepair', { count: themeDiagnosticCount }) : undefined} tone="warning">{workspaceIssue ? <p>{t('settings:ui.appearanceRemainsReadOnly')}</p> : null}{issue ? <p>{t('settings:ui.repairSettingsJsonThenReopenTheLibrary')}</p> : null}</OperationFeedback></ButtonBar>
         </div>
 
         <section id="settings-panel-library" role="tabpanel" aria-labelledby="settings-tab-library" hidden={tab !== 'library'} tabIndex={0} className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">
@@ -388,20 +373,20 @@ export function SettingsPanel({
               <section className="grid min-w-0 gap-4 rounded-xl border border-line bg-list/50 p-5" aria-labelledby="library-directory-name">
                 <div className="flex min-w-0 flex-wrap items-center justify-between gap-4">
                   <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text" aria-hidden="true"><SettingsIcon name="folder" /></span>
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent-text" aria-hidden="true"><ContentIcon name="folder" /></span>
                     <div className="flex min-w-0 flex-wrap items-center gap-3">
                       <h4 id="library-directory-name" className="min-w-0 break-words font-sub-heading text-lg font-semibold text-primary">{directoryName ?? rememberedDirectoryName ?? t('settings:ui.chooseYourLibrary')}</h4>
                       <span className="flex items-center gap-2 rounded-md bg-panel px-2.5 py-1 text-xs text-muted"><span className="size-1.5 rounded-full bg-faint data-[ready=true]:bg-success" data-ready={Boolean(root)} aria-hidden="true" />{root ? t('settings:ui.connectedReadWrite') : directoryRestoreState === 'checking' ? t('settings:ui.checkingPreviousDirectory') : rememberedDirectoryName ? t('settings:ui.waitingForPermission') : t('settings:ui.notConnected')}</span>
                     </div>
                   </div>
                   <ButtonBar label={t('settings:ui.libraryDirectoryActions')}>
-                    {onReopenGuide ? <button className="button button-quiet" type="button" disabled={tabBusy} aria-haspopup="dialog" onClick={() => setReopenGuideConfirm(true)}><SettingsIcon name="reset" />{t('settings:ui.reopenGuide')}</button> : null}
-                    {!root && rememberedDirectoryName ? <button className="button button-primary" type="button" disabled={!fileSystemReady || tabBusy} onClick={onReopenRememberedDirectory}><SettingsIcon name="folder" />{t('settings:ui.authorizeAndOpen')}</button> : null}
-                    <button className={!root && !rememberedDirectoryName ? 'button button-primary' : 'button button-quiet'} type="button" disabled={!fileSystemReady || tabBusy} onClick={onAuthorizeDirectory}><SettingsIcon name="export" />{t(root ? 'settings:ui.switchLibrary' : rememberedDirectoryName ? 'settings:ui.chooseAnotherLibrary' : 'settings:ui.openExistingLibrary')}</button>
-                    <button className="button button-quiet" type="button" disabled={!fileSystemReady || tabBusy} aria-haspopup="dialog" onClick={() => {
+                    {onReopenGuide ? <Button icon="reset"  type="button" disabled={tabBusy} aria-haspopup="dialog" onClick={() => setReopenGuideConfirm(true)} label={t('settings:ui.reopenGuide')} /> : null}
+                    {!root && rememberedDirectoryName ? <Button icon="folder" variant="primary"  type="button" disabled={!fileSystemReady || tabBusy} onClick={onReopenRememberedDirectory} label={t('settings:ui.authorizeAndOpen')} /> : null}
+                    <Button icon="folder" variant={!root && !rememberedDirectoryName ? 'primary' : 'quiet'} type="button" disabled={!fileSystemReady || tabBusy} onClick={onAuthorizeDirectory} label={t(root ? 'settings:ui.switchLibrary' : rememberedDirectoryName ? 'settings:ui.chooseAnotherLibrary' : 'settings:ui.openExistingLibrary')} />
+                    <Button icon="folderAdd"  type="button" disabled={!fileSystemReady || tabBusy} aria-haspopup="dialog" onClick={() => {
                       const proceed = () => onCreateDirectory();
                       if (appearanceGuardRef.current.dirty) setDeparture({ proceed }); else proceed();
-                    }}><SettingsIcon name="plus" />{t('settings:ui.newLibrary')}</button>
+                    }} label={t('settings:ui.newLibrary')} />
                   </ButtonBar>
                 </div>
                 <p className="border-t border-line pt-4 text-xs text-muted">{root ? t('settings:ui.thisDirectoryIsRememberedContinueAfterRefreshingWhile') : rememberedDirectoryName ? t('settings:ui.thePreviousDirectoryIsRememberedAuthorizeItTo') : t('settings:ui.theAppRemembersYourSelectionAndReopensIt')} <span className="text-faint">{t('settings:ui.switchLibraryKeepsFiles')}</span></p>
@@ -409,9 +394,14 @@ export function SettingsPanel({
               </section>
               <div className="grid min-w-0 gap-4 xl:grid-cols-2">
                 <FontDownloadSettings root={root} onRetry={onRetryFonts} />
+                <RenderCacheControls root={root} queue={renderCacheQueue} disabled={tabBusy} />
+                <div className="grid min-w-0 gap-4">
+                  <div className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-list/50 p-5"><span className="text-faint" aria-hidden="true"><ContentIcon name="document" /></span><div className="min-w-0"><h4 className="text-sm font-medium text-primary">{t('settings:ui.manuscriptsAndAssets')}</h4><p className="mt-2 text-xs text-muted">{t('settings:ui.bodyTextImagesAndArticleThemeSnapshotsAre')}</p></div></div>
+                  <div className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-list/50 p-5"><span className="text-faint" aria-hidden="true"><ContentIcon name="palette" /></span><div className="min-w-0"><h4 className="text-sm font-medium text-primary">{t('settings:ui.templatesAndPreferences')}</h4><p className="mt-2 text-xs text-muted">{t('settings:ui.snippetsStarterTemplatesProjectsAndEditorAppearanceAre')}</p></div></div>
+                </div>
                 <section className="flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-list/50 p-5" aria-label={t('settings:ui.validationAndAlgorithms')}>
                   <header className="border-b border-line pb-4">
-                    <div className="flex items-center justify-between gap-2"><h3 className="font-heading text-lg font-semibold text-primary">{t('settings:ui.validationAndAlgorithms')}</h3><OperationFeedback id="format-status" label={t('common:feedback.configProblems')} announce={false} notice={format.issue ?? format.error} summary={productReference('feedback.formatUnavailable')} tone="error">{format.issue || format.error ? <p>{t('messages:uiFeedback.repairFormat')}</p> : null}</OperationFeedback></div>
+                    <div className="flex items-center justify-between gap-2"><h3 className="font-heading text-lg font-semibold text-primary">{t('settings:ui.validationAndAlgorithms')}</h3><ButtonBar label={t('common:feedback.configProblems')} className="empty:hidden"><OperationFeedback id="format-status" label={t('common:feedback.configProblems')} announce={false} notice={format.issue ?? format.error} summary={productReference('feedback.formatUnavailable')} tone="error">{format.issue || format.error ? <p>{t('messages:uiFeedback.repairFormat')}</p> : null}</OperationFeedback></ButtonBar></div>
                     <p className="mt-1 text-xs text-muted">{t('settings:ui.currentLibraryConfiguration')}</p>
                   </header>
                   {!root ? <p className="text-sm text-muted">{t('settings:ui.notConnected')}</p>
@@ -426,10 +416,6 @@ export function SettingsPanel({
                   {root ? <FormatPackageControls root={root} /> : null}
                 </section>
               </div>
-              <div className="grid gap-5 border-t border-line pt-5 md:grid-cols-2">
-                <div className="flex min-w-0 items-start gap-3 rounded-xl border border-line bg-list/50 p-5"><span className="mt-0.5 text-faint" aria-hidden="true"><SettingsIcon name="document" /></span><div className="min-w-0"><h4 className="text-sm font-medium text-primary">{t('settings:ui.manuscriptsAndAssets')}</h4><p className="mt-2 text-xs text-muted">{t('settings:ui.bodyTextImagesAndArticleThemeSnapshotsAre')}</p></div></div>
-                <div className="flex min-w-0 items-start gap-3 rounded-xl border border-line bg-list/50 p-5"><span className="mt-0.5 text-faint" aria-hidden="true"><SettingsIcon name="theme" /></span><div className="min-w-0"><h4 className="text-sm font-medium text-primary">{t('settings:ui.templatesAndPreferences')}</h4><p className="mt-2 text-xs text-muted">{t('settings:ui.snippetsStarterTemplatesProjectsAndEditorAppearanceAre')}</p></div></div>
-              </div>
             </div>
           </div>
         </section>
@@ -437,7 +423,7 @@ export function SettingsPanel({
         <section id="settings-panel-appearance" role="tabpanel" aria-labelledby="settings-tab-appearance" hidden={tab !== 'appearance'} tabIndex={0} className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden p-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">
           <header className="flex shrink-0 flex-wrap items-end justify-between gap-4">
             <div className="min-w-0"><p className="eyebrow">{t('settings:ui.editorAppearance')}</p><h3 id="appearance-title" className="mt-1 font-heading text-xl font-semibold text-primary">{t('settings:ui.chooseAnEditorTheme')}</h3><p className="mt-3 text-sm text-muted">{t('settings:ui.clickAThemeToPreviewItSaveTo')}</p></div>
-            <ButtonBar label={t('settings:ui.editorThemeActions')}><button className="button button-quiet" type="button" disabled={appearanceDisabled} onClick={() => themeImportRef.current?.click()}><SettingsIcon name="upload" />{t('settings:ui.importJson')}</button><input ref={themeImportRef} className="sr-only" type="file" accept=".json,application/json" aria-label={t('settings:ui.importEditorThemeJson')} disabled={appearanceDisabled} onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void file.text().then(raw => JSON.parse(raw) as EditorTheme).then(theme => root ? onCreateEditorTheme(theme, undefined, root) : false).then(saved => setAppearanceNotice(saved ? productText("uiFeedback.themeImported") : productText("uiFeedback.themeImportFailed"))).catch(error => setAppearanceNotice(String(error))); }} /><button className="button button-quiet" type="button" disabled={appearanceDisabled} onClick={() => void onLoadDefaultEditorThemes().then(saved => setAppearanceNotice(saved ? productText("uiFeedback.themesAdded") : productText("uiFeedback.themesFailed")))}><SettingsIcon name="download" />{t('settings:ui.loadDefaultThemes')}</button><button className="button button-primary" type="button" disabled={appearanceDisabled} onClick={openThemeDesigner}><SettingsIcon name="plus" />{t('settings:ui.newEditorTheme')}</button></ButtonBar>
+            <ButtonBar label={t('settings:ui.editorThemeActions')}><Button icon="upload"  type="button" disabled={appearanceDisabled} onClick={() => themeImportRef.current?.click()} label={t('settings:ui.importJson')} /><input ref={themeImportRef} className="sr-only" type="file" accept=".json,application/json" aria-label={t('settings:ui.importEditorThemeJson')} disabled={appearanceDisabled} onChange={event => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void file.text().then(raw => JSON.parse(raw) as EditorTheme).then(theme => root ? onCreateEditorTheme(theme, undefined, root) : false).then(saved => setAppearanceNotice(saved ? productText("uiFeedback.themeImported") : productText("uiFeedback.themeImportFailed"))).catch(error => setAppearanceNotice(String(error))); }} /><Button icon="download"  type="button" disabled={appearanceDisabled} onClick={() => void onLoadDefaultEditorThemes().then(saved => setAppearanceNotice(saved ? productText("uiFeedback.themesAdded") : productText("uiFeedback.themesFailed")))} label={t('settings:ui.loadDefaultThemes')} /><Button icon="plus" variant="primary"  type="button" disabled={appearanceDisabled} onClick={openThemeDesigner} label={t('settings:ui.newEditorTheme')} /></ButtonBar>
           </header>
           {!root ? <p className="text-xs text-muted">{t('settings:ui.connectALibraryToChooseAndSaveEditor')}</p> : null}
           <fieldset className="min-w-0 shrink-0"><legend className="mb-2 text-sm font-medium text-primary">{t('settings:ui.displayMode')}</legend><div className="flex flex-wrap gap-2">{EDITOR_COLOR_MODES.map((mode) => <button key={mode.id} className="min-h-9 rounded-lg border border-line bg-panel px-4 py-2 text-sm text-muted transition-colors hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-accent-text" type="button" aria-pressed={appearanceDraft.colorMode === mode.id} disabled={appearanceDisabled} onClick={() => selectColorMode(mode.id)}>{t('settings:colorModes.' + mode.id)}</button>)}</div></fieldset>
@@ -450,23 +436,23 @@ export function SettingsPanel({
                   return <div key={theme.id} className="group relative min-w-0"><button className="grid w-full min-w-0 content-start gap-3 rounded-xl border border-line bg-panel p-3 text-left transition-colors hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:border-accent aria-pressed:ring-2 aria-pressed:ring-accent/20" type="button" aria-label={t('settings:templates.previewTheme', { name: theme.name })} aria-pressed={selected} disabled={appearanceDisabled} onClick={() => changeAppearance({ ...appearanceDraft, themeId: theme.id, custom: null })}>
                     <ThemeSample theme={theme} />
                     <span className="flex min-w-0 items-start justify-between gap-2 px-1"><strong className="break-words font-sub-heading text-sm font-medium text-primary">{theme.name}{hasEditingDraft(editingDrafts, root, 'settings', theme.id) ? <UnsavedMark className="ml-2 inline-block" /> : null}</strong>{selected ? <span className="shrink-0 text-xs text-accent-text">{appearanceDirty ? t('settings:ui.previewing') : t('settings:ui.selected')}</span> : null}</span><span className="break-all px-1 font-mono text-xs text-faint">{theme.id} · v{theme.version}</span>
-                  </button><ButtonBar label={t('settings:templates.themeActions', { name: theme.name })} className="absolute top-5 right-5 rounded-md bg-panel p-1 opacity-100 shadow-panel md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"><button className="button button-quiet size-9 min-h-0 p-0" type="button" aria-label={t('settings:templates.editTheme', { name: theme.name })} data-tooltip={t('settings:ui.edit')} disabled={appearanceDisabled} onClick={() => { setDesignerEditing(true); setDesignerSource(theme); }}><SettingsIcon name="edit" /></button><button className="button button-danger size-9 min-h-0 p-0" type="button" aria-label={t('settings:templates.deleteTheme', { name: theme.name })} data-tooltip={t('settings:ui.delete')} disabled={appearanceDisabled || theme.id === BASE_EDITOR_THEME.id || [workspace.appearance.themeId, workspace.appearance.custom?.colorThemeId, workspace.appearance.custom?.fontThemeId, appearanceDraft.themeId, appearanceDraft.custom?.colorThemeId, appearanceDraft.custom?.fontThemeId].includes(theme.id)} onClick={() => { deleteThemeRootRef.current = root; setDeleteThemeTarget(theme); }}><SettingsIcon name="delete" /></button></ButtonBar></div>;
+                  </button><ButtonBar label={t('settings:templates.themeActions', { name: theme.name })} className="absolute top-5 right-5 rounded-md bg-panel p-1 opacity-100 shadow-panel md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"><IconButton icon="edit" className="size-9 min-h-0 p-0" type="button" aria-label={t('settings:templates.editTheme', { name: theme.name })} tooltip={t('settings:ui.edit')} disabled={appearanceDisabled} onClick={() => { setDesignerEditing(true); setDesignerSource(theme); }} /><IconButton icon="delete" variant="danger" className="size-9 min-h-0 p-0" type="button" aria-label={t('settings:templates.deleteTheme', { name: theme.name })} tooltip={t('settings:ui.delete')} disabled={appearanceDisabled || theme.id === BASE_EDITOR_THEME.id || [workspace.appearance.themeId, workspace.appearance.custom?.colorThemeId, workspace.appearance.custom?.fontThemeId, appearanceDraft.themeId, appearanceDraft.custom?.colorThemeId, appearanceDraft.custom?.fontThemeId].includes(theme.id)} onClick={() => { deleteThemeRootRef.current = root; setDeleteThemeTarget(theme); }} /></ButtonBar></div>;
                 })}
                 <button className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-line-strong bg-list/50 p-5 text-center text-muted transition-colors hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-pressed:border-accent aria-pressed:text-accent-text" type="button" aria-pressed={Boolean(appearanceDraft.custom)} disabled={appearanceDisabled} onClick={() => setCombination(appearanceDraft.custom ?? { colorThemeId: appearanceDraft.themeId, fontThemeId: appearanceDraft.themeId })}>
-                  <span className="grid size-11 place-items-center rounded-lg border border-dashed border-line-strong"><SettingsIcon name="plus" /></span><strong className="font-sub-heading text-sm font-medium">{t('settings:ui.customCombination')}</strong><span className="text-xs">{t('settings:ui.chooseColorsAndFonts')}</span>{appearanceDraft.custom ? <span className="text-xs text-accent-text">{t('settings:templates.combinationSummary', { colors: findEditorTheme(editorThemes, appearanceDraft.custom.colorThemeId)?.name, fonts: findEditorTheme(editorThemes, appearanceDraft.custom.fontThemeId)?.name })}</span> : null}
+                  <span className="grid size-11 place-items-center rounded-lg border border-dashed border-line-strong"><ContentIcon name="plus" /></span><strong className="font-sub-heading text-sm font-medium">{t('settings:ui.customCombination')}</strong><span className="text-xs">{t('settings:ui.chooseColorsAndFonts')}</span>{appearanceDraft.custom ? <span className="text-xs text-accent-text">{t('settings:templates.combinationSummary', { colors: findEditorTheme(editorThemes, appearanceDraft.custom.colorThemeId)?.name, fonts: findEditorTheme(editorThemes, appearanceDraft.custom.fontThemeId)?.name })}</span> : null}
                 </button>
               </div>
             </div>
           </fieldset>
           <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <div className="flex flex-wrap items-center gap-3"><button className="button button-quiet" type="button" disabled={appearanceActionsDisabled} onClick={resetAppearance}><SettingsIcon name="reset" />{t('settings:ui.resetAppearance')}</button></div>
-            <ButtonBar label={t('settings:ui.appearanceSaveActions')}><button className="button button-quiet" type="button" disabled={appearanceActionsDisabled} onClick={cancelAppearance}><SettingsIcon name="undo" />{t('settings:ui.cancelChanges')}</button><button className="button button-primary" type="button" aria-label={appearanceSaved ? t('settings:ui.saved') : t('settings:ui.saveAppearance')} disabled={appearanceActionsDisabled || Boolean(missingThemeIds.length)} onClick={() => void saveAppearance()}><SettingsIcon name={appearanceSaved ? 'check' : 'save'} />{appearanceSaving ? t('settings:ui.saving') : appearanceSaved ? t('settings:ui.saved') : t('settings:ui.saveAppearance')}</button></ButtonBar>
+            <ButtonBar label={t('common:actions.group')}><Button icon="reset"  type="button" disabled={appearanceActionsDisabled} onClick={resetAppearance} label={t('settings:ui.resetAppearance')} /></ButtonBar>
+            <ButtonBar label={t('settings:ui.appearanceSaveActions')}><Button icon="close"  type="button" disabled={appearanceActionsDisabled} onClick={cancelAppearance} label={t('settings:ui.cancelChanges')} /><Button icon={appearanceSaved ? 'check' : 'save'} variant="primary"  type="button" aria-label={appearanceSaved ? t('settings:ui.saved') : t('settings:ui.saveAppearance')} disabled={appearanceActionsDisabled || Boolean(missingThemeIds.length)} onClick={() => void saveAppearance()} label={appearanceSaving ? t('settings:ui.saving') : appearanceSaved ? t('settings:ui.saved') : t('settings:ui.saveAppearance')} /></ButtonBar>
           </footer>
         </section>
 
         <section id="settings-panel-workflow" role="tabpanel" aria-labelledby="settings-tab-workflow" hidden={tab !== 'workflow'} tabIndex={0} className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:p-8">
           <div className="grid gap-6">
-            <header className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0"><p className="eyebrow">{t('settings:ui.savingHistory')}</p><h3 id="workflow-title" className="mt-1 font-heading text-xl font-semibold text-primary">{t('settings:ui.makeSavingPartOfWriting')}</h3><p className="mt-3 text-sm text-muted">{t('settings:ui.timersActOnlyOnTheCurrentArticleAnd')}</p></div><ButtonBar label={t('settings:ui.autoSaveSettingsActions')}><button className="button button-primary" type="submit" form="settings-workflow-form" disabled={!root || busy}><SettingsIcon name="save" />{t('settings:ui.saveSettings')}</button></ButtonBar></header>
+            <header className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0"><p className="eyebrow">{t('settings:ui.savingHistory')}</p><h3 id="workflow-title" className="mt-1 font-heading text-xl font-semibold text-primary">{t('settings:ui.makeSavingPartOfWriting')}</h3><p className="mt-3 text-sm text-muted">{t('settings:ui.timersActOnlyOnTheCurrentArticleAnd')}</p></div><ButtonBar label={t('settings:ui.autoSaveSettingsActions')}><Button icon="save" variant="primary"  type="submit" form="settings-workflow-form" disabled={!root || busy} label={t('settings:ui.saveSettings')} /></ButtonBar></header>
             {!root ? <p className="rounded-lg bg-list px-4 py-3 text-xs text-muted">{t('settings:ui.connectALibraryToChangeAndSaveAutomation')}</p> : null}
             <form id="settings-workflow-form" className="grid gap-6" onSubmit={handleSettingsSubmit}>
               <div className="grid gap-4 lg:grid-cols-3">
@@ -485,7 +471,7 @@ export function SettingsPanel({
                 <div className="grid min-w-0 gap-5 rounded-xl border border-line bg-list/50 p-5 md:p-6 lg:row-span-4 lg:grid-rows-subgrid">
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="eyebrow">{t('messages:trash.eyebrow')}</p><h4 className="mt-1 font-heading text-lg font-semibold text-primary">{t('messages:trash.title')}</h4></div><ModeSwitch label={t('messages:trash.enable')} checked={draft.trash?.enabled ?? true} onToggle={() => setDraft({ ...draft, trash: { enabled: !(draft.trash?.enabled ?? true) } })} disabled={!root || busy || trashBusy} start={null} end={null} /></div>
                   <p className="text-sm text-muted">{t(draft.trash?.enabled === false ? 'messages:trash.offDescription' : 'messages:trash.description')}</p>
-                  <div className="grid min-w-0 grid-cols-2 items-end gap-4"><div className="grid min-w-0 gap-2"><span className="field-label">{t('messages:trash.directory')}</span><code className="grid min-h-10 content-center break-all rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">{directoryName ?? '…'}/_trash/</code></div><button className="button button-quiet justify-self-end" type="button" disabled={!root || busy || trashBusy || Boolean(issue) || draft.trash?.enabled === false || settings.trash?.enabled === false || !trashCount || !onClearTrash} onClick={onClearTrash} data-tooltip={draft.trash?.enabled === false || settings.trash?.enabled === false ? t('messages:trash.saveFirst') : !trashCount ? t('messages:trash.empty') : t('messages:trash.clear')}><SettingsIcon name="delete" />{t('messages:trash.clear')}</button></div>
+                  <div className="grid min-w-0 grid-cols-2 items-end gap-4"><div className="grid min-w-0 gap-2"><span className="field-label">{t('messages:trash.directory')}</span><code className="grid min-h-10 content-center break-all rounded-lg border border-line bg-canvas px-3 py-2 text-xs text-muted">{directoryName ?? '…'}/_trash/</code></div><ButtonBar label={t('messages:trash.clear')} className="justify-self-end"><Button icon="delete" type="button" disabled={!root || busy || trashBusy || Boolean(issue) || draft.trash?.enabled === false || settings.trash?.enabled === false || !trashCount || !onClearTrash} onClick={onClearTrash} data-tooltip={draft.trash?.enabled === false || settings.trash?.enabled === false ? t('messages:trash.saveFirst') : !trashCount ? t('messages:trash.empty') : t('messages:trash.clear')} label={t('messages:trash.clear')} /></ButtonBar></div>
                   <p className="border-t border-line pt-4 text-xs text-faint">{t('messages:trash.clearDescription')}</p>
                 </div>
               </div>
@@ -493,14 +479,20 @@ export function SettingsPanel({
           </div>
         </section>
       </div>
-      {reopenGuideConfirm && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="guide-reopen-title" descriptionId="guide-reopen-description" onClose={() => setReopenGuideConfirm(false)}><DialogHeader titleId="guide-reopen-title" eyebrow="ENTRY GUIDE" title={t('settings:ui.reopenGuide')} onClose={() => setReopenGuideConfirm(false)} /><div className="dialog-content"><p id="guide-reopen-description" className="text-sm text-muted">{t('settings:ui.reopenGuideDescription')}</p></div><DialogFooter><DialogActions><DialogButton onClick={() => setReopenGuideConfirm(false)}><ContentIcon name="close" />{t('settings:ui.cancelOperation')}</DialogButton><DialogButton variant="primary" onClick={() => { setReopenGuideConfirm(false); onReopenGuide?.(); }}><ContentIcon name="reset" />{t('settings:ui.reopenGuide')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
+      {reopenGuideConfirm && typeof document !== 'undefined' ? createPortal(<ConfirmDialog titleId="guide-reopen-title" descriptionId="guide-reopen-description" onClose={() => setReopenGuideConfirm(false)} title={t('settings:ui.reopenGuide')} eyebrow={"ENTRY GUIDE"}
+        cancel={{ label: t('settings:ui.cancelOperation'), onClick: () => setReopenGuideConfirm(false) }} confirm={{ label: t('settings:ui.reopenGuide'), icon: "reset", onClick: () => { setReopenGuideConfirm(false); onReopenGuide?.(); }, variant: "primary" }}>
+        <div className="dialog-content"><p id="guide-reopen-description" className="text-sm text-muted">{t('settings:ui.reopenGuideDescription')}</p></div>
+      </ConfirmDialog>, document.body) : null}
       {designerSource && typeof document !== 'undefined' ? createPortal(<EditorThemeDesigner root={root} editing={designerEditing} appearanceScheme={previewScheme} source={designerSource} themes={editorThemes} navigationGuardRef={designerGuardRef} onClose={() => { designerGuardRef.current = null; setDesignerSource(null); }} onSave={async theme => { if (!await onCreateEditorTheme(theme, designerEditing ? designerSource : undefined, root ?? undefined)) return false; changeAppearance({ themeId: theme.id, colorMode: appearanceDraft.colorMode, custom: null }); return true; }} />, document.body) : null}
-      {deleteThemeTarget && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="editor-theme-delete-title" role="alertdialog" onClose={() => setDeleteThemeTarget(null)} dismissible={!workspaceBusy}><DialogHeader titleId="editor-theme-delete-title" eyebrow={t('common:eyebrows.deleteEditorTheme')} title={t('settings:ui.deleteEditorTheme')} onClose={() => setDeleteThemeTarget(null)} closeDisabled={workspaceBusy} /><div className="dialog-content"><p className="text-sm text-primary">「{deleteThemeTarget.name}」</p><p className="mt-3 text-sm text-muted">{t('settings:ui.removeThisThemeFromTheCurrentLibraryDefaults')}</p></div><DialogFooter><DialogActions><DialogButton disabled={workspaceBusy} onClick={() => setDeleteThemeTarget(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={workspaceBusy} onClick={() => void onDeleteEditorTheme(deleteThemeTarget.id, deleteThemeRootRef.current ?? undefined).then(removed => { if (removed) { setDeleteThemeTarget(null); setAppearanceNotice(productText("settingsPanel.themeDeleted")); } else setAppearanceNotice(productText("settingsPanel.deletionFailedTheThemeIsRetained")); })}>{t('settings:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
+      {deleteThemeTarget && typeof document !== 'undefined' ? createPortal(<ConfirmDialog titleId="editor-theme-delete-title" role="alertdialog" onClose={() => setDeleteThemeTarget(null)} dismissible={!workspaceBusy} title={t('settings:ui.deleteEditorTheme')} eyebrow={t('common:eyebrows.deleteEditorTheme')} closeDisabled={workspaceBusy}
+        cancel={{ label: t('common:actions.cancel'), onClick: () => setDeleteThemeTarget(null), disabled: workspaceBusy }} confirm={{ label: t('settings:ui.confirmDeletion'), icon: "delete", onClick: () => void onDeleteEditorTheme(deleteThemeTarget.id, deleteThemeRootRef.current ?? undefined).then(removed => { if (removed) { setDeleteThemeTarget(null); setAppearanceNotice(productText("settingsPanel.themeDeleted")); } else setAppearanceNotice(productText("settingsPanel.deletionFailedTheThemeIsRetained")); }), disabled: workspaceBusy, variant: "danger" }}>
+        <div className="dialog-content"><p className="text-sm text-primary">「{deleteThemeTarget.name}」</p><p className="mt-3 text-sm text-muted">{t('settings:ui.removeThisThemeFromTheCurrentLibraryDefaults')}</p></div>
+      </ConfirmDialog>, document.body) : null}
       {departure && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={[{ label: t('settings:ui.appearanceSettings'), detail: t('settings:templates.combination', { colors: findEditorTheme(editorThemes, appearanceDraft.custom?.colorThemeId ?? appearanceDraft.themeId)?.name ?? appearanceDraft.themeId, fonts: findEditorTheme(editorThemes, appearanceDraft.custom?.fontThemeId ?? appearanceDraft.themeId)?.name ?? appearanceDraft.themeId }) }]} description={t('settings:ui.appearancePreviewIsUnsavedLeavingRestoresSavedColors')} saveDisabled={appearanceDisabled || Boolean(missingThemeIds.length)} onCancel={() => setDeparture(null)} onContinue={resumeAppearance} onDiscard={() => { const proceed = departure.proceed; cancelAppearance(); setDeparture(null); proceed(); }} onSave={async () => { const proceed = departure.proceed; if (!await saveAppearance()) return false; setDeparture(null); proceed(); return true; }} />, document.body) : null}
       {combination && typeof document !== 'undefined' ? createPortal(<DialogFrame wide titleId="appearance-combination-title" descriptionId="appearance-combination-description" onClose={() => setCombination(null)}><DialogHeader titleId="appearance-combination-title" eyebrow={t('common:eyebrows.customEditorTheme')} title={t('settings:ui.combineColorsAndFonts')} onClose={() => setCombination(null)} /><div className="dialog-content"><p id="appearance-combination-description" className="text-sm text-muted">{t('settings:ui.chooseColorsAndFontsSeparatelyForALive')}</p><div className="grid min-w-0 gap-4 md:grid-cols-2">
         <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.colors')}</legend><div className="grid max-h-80 gap-2 overflow-x-clip overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseColors', { name: theme.name })} aria-pressed={combination.colorThemeId === theme.id} onClick={() => setCombination({ ...combination, colorThemeId: theme.id })}><ThemeSample theme={theme} kind="colors" scheme={previewScheme} /><span>{theme.name}</span></button>)}</div></fieldset>
         <fieldset className="min-w-0 rounded-xl border border-line bg-list/50 p-3"><legend className="px-1 text-sm font-medium text-primary">{t('settings:ui.fonts')}</legend><div className="grid max-h-80 gap-2 overflow-x-clip overflow-y-auto p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{editorThemes.map((theme) => <button key={theme.id} className="grid min-w-0 gap-2 rounded-lg border border-line bg-panel p-3 text-left text-sm text-primary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent aria-pressed:bg-accent-soft" type="button" aria-label={t('settings:templates.chooseFonts', { name: theme.name })} aria-pressed={combination.fontThemeId === theme.id} onClick={() => setCombination({ ...combination, fontThemeId: theme.id })}><ThemeSample theme={theme} kind="fonts" /><span className="text-xs text-faint">{theme.name}</span></button>)}</div></fieldset>
-      </div><DialogActions><DialogButton onClick={() => setCombination(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" disabled={appearanceDisabled} onClick={() => { changeAppearance({ ...appearanceDraft, custom: { ...combination } }); setCombination(null); }}>{t('settings:ui.applyCombinationAndPreview')}</DialogButton></DialogActions></div></DialogFrame>, document.body) : null}
+      </div><DialogActions><DialogButton icon="close" onClick={() => setCombination(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton icon="apply" variant="primary" disabled={appearanceDisabled} onClick={() => { changeAppearance({ ...appearanceDraft, custom: { ...combination } }); setCombination(null); }}>{t('settings:ui.applyCombinationAndPreview')}</DialogButton></DialogActions></div></DialogFrame>, document.body) : null}
     </section>
   );
 }

@@ -16,6 +16,7 @@ import { MarkdownPreview } from '../../lib/article-format/MarkdownPreview';
 import type { ArticleMediaContext } from '../../lib/article-format/MarkdownPreview';
 import { useArticleRenderMount } from '../../lib/article-format/useArticleRenderMount';
 import { ArticleDocument } from '../../lib/article-format/ArticleDocument';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function ContentRenderPreview({ source, theme, blocked = false, media = null, fill = false, bare = false, dark = false }: { source: string; theme: ThemeConfig; blocked?: boolean; media?: ArticleMediaContext | null; fill?: boolean; bare?: boolean; dark?: boolean }) {
   const { t } = useUITranslation('messages');
@@ -29,7 +30,7 @@ export function ContentRenderPreview({ source, theme, blocked = false, media = n
     return <section id={bare ? undefined : 'content-render-preview'} className={`relative flex ${fill ? 'min-h-0' : 'min-h-64'} min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-line group-data-[wide=true]/content-preview:min-h-0`} style={previewSurfaceStyle(dark)} aria-label={t("messages:uiFeedback.livePreview")}>
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-list px-4 py-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2"><span className="text-xs font-medium text-secondary">{t("messages:uiFeedback.livePreviewShort")}</span><span className="min-w-0 break-words text-xs text-faint" role="status">{blocked ? t("messages:uiFeedback.repairMetadata") : issue ? t("messages:uiFeedback.stylesFailed") : pending ? t("messages:uiFeedback.updating") : theme.name}</span></div>
-      <div className="ml-auto flex shrink-0 gap-2"><OperationFeedback id={`content-preview-${feedbackId}`} label={t('common:feedback.previewProblems')} announce={false} notice={issue || darkIssue} summary={productReference(darkIssue ? 'feedback.darkFailed' : 'feedback.compileFailed')} tone={issue ? "error" : "warning"} /><PreviewCssDetails css={css} ready={ready && !darkIssue && (!dark || !css || darkColors?.status === 'ready')} revision={result} snapshot={formatSnapshot} dark={dark} hostRef={hostRef} target={target} darkFrameRef={darkFrameRef} /></div>
+      <ButtonBar label={t('common:actions.group')} className="ml-auto"><OperationFeedback id={`content-preview-${feedbackId}`} label={t('common:feedback.previewProblems')} announce={false} notice={issue || darkIssue} summary={productReference(darkIssue ? 'feedback.darkFailed' : 'feedback.compileFailed')} tone={issue ? "error" : "warning"} /><PreviewCssDetails css={css} ready={ready && !darkIssue && (!dark || !css || darkColors?.status === 'ready')} revision={result} snapshot={formatSnapshot} dark={dark} hostRef={hostRef} target={target} darkFrameRef={darkFrameRef} /></ButtonBar>
     </header>
     <div className="min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
       <div ref={hostRef} hidden={blocked} data-preview-width={resourcePreviewWidth(formatSnapshot)} className={resourcePreviewHostClass(formatSnapshot)} style={previewSurfaceStyle()} aria-busy={pending} />

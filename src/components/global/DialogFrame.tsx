@@ -2,12 +2,13 @@
 
 import { useUITranslation } from './UILocaleProvider';
 
-import { useRef, type ButtonHTMLAttributes, type KeyboardEventHandler, type ReactNode } from 'react';
+import { useRef, type KeyboardEventHandler, type ReactNode } from 'react';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
-import { ActionMenuAnchorContext, ActionMenuContext } from './IconButton';
+import { ActionMenuAnchorContext, ActionMenuContext, IconButton } from './IconButton';
 import { ButtonBar } from './ButtonBar';
+export { Button as DialogButton } from './Button';
 
-type DialogFrameProps = {
+export type DialogFrameProps = {
   titleId: string;
   descriptionId?: string;
   role?: 'dialog' | 'alertdialog';
@@ -34,20 +35,6 @@ export function DialogFrame({ titleId, descriptionId, role = 'dialog', onClose, 
   );
 }
 
-type DialogButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
-  variant?: 'quiet' | 'primary' | 'danger';
-  iconOnly?: boolean;
-};
-
-export function DialogButton({ variant = 'quiet', iconOnly = false, type = 'button', children, ...props }: DialogButtonProps) {
-  const className = {
-    quiet: 'button button-quiet',
-    primary: 'button button-primary',
-    danger: 'button button-danger',
-  }[variant];
-  return <button {...props} type={type} className={iconOnly ? `${className} size-10 shrink-0 p-0` : className}>{children}</button>;
-}
-
 export function DialogHeader({ titleId, eyebrow, title, onClose, closeDisabled = false, actions }: {
   titleId: string;
   eyebrow: string;
@@ -60,9 +47,7 @@ export function DialogHeader({ titleId, eyebrow, title, onClose, closeDisabled =
   return (
     <header className="dialog-header">
       <div className="min-w-0"><p className="eyebrow">{eyebrow}</p><h2 className="font-heading dialog-title" id={titleId}>{title}</h2></div>
-      <ButtonBar label={actions ? t('dialogs:ui.dialogActions') : t('dialogs:ui.closeDialog')}>{actions}<DialogButton iconOnly aria-label={t('dialogs:ui.closeDialog')} disabled={closeDisabled} onClick={onClose}>
-        <svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M5 5l14 14M19 5 5 19" /></svg>
-      </DialogButton></ButtonBar>
+      <ButtonBar label={actions ? t('dialogs:ui.dialogActions') : t('dialogs:ui.closeDialog')}>{actions}<IconButton variant="dialog" icon="close" label={t('dialogs:ui.closeDialog')} disabled={closeDisabled} tabIndex={closeDisabled ? -1 : undefined} onClick={onClose} /></ButtonBar>
     </header>
   );
 }

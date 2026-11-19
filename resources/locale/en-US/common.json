@@ -25,6 +25,7 @@
     "system": "Follow system"
   },
   "actions": {
+    "group": "Actions",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "close": "Close",

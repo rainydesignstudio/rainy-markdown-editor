@@ -35,7 +35,9 @@ export function HistorySnapshotPreview({ snapshot, root, article, articleTitle, 
       if (snapshot.renderRecord && root) {
         const restored = await restoreRenderEnvironment(root, snapshot.renderRecord, live);
         dispose = restored.dispose;
-        if (active) setRendition({ id: snapshot.id, css: restored.css, html: restored.html, format: restored.snapshot });
+        const rebuild = restored.html === undefined;
+        const compiled = rebuild ? await compileArticleStyles(snapshot.source, snapshot.theme, { snapshot: restored.snapshot, root }) : null;
+        if (active) setRendition({ id: snapshot.id, css: compiled?.css ?? restored.css, ...(rebuild ? {} : { html: restored.html }), format: restored.snapshot });
         else dispose();
       } else {
         if (live.renderer && !reference) throw new Error(t('dialogs:history.packageDependenciesMissing'));

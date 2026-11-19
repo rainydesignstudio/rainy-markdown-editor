@@ -177,6 +177,20 @@ The bundled interpreter also declares archive, PNG and PDF exports. For export r
 
 Deep validation can call api.service("measure-v1", {html, css, widths}) for actual layout in script-free documents. The result is {screens}; each screen contains width, boxes in first-root-and-descendant DOM order (left/right/top/bottom/width/height and parent.left/right/width), and images (complete/width/height). Packages decide overflow, alignment and other business outcomes. Requests allow up to eight integer widths from 64–4096px and 20,000 elements per document; viewport height is 2000px and images wait up to five seconds, with unavailable images still marked incomplete. The service exposes no directory or element handles and retains declared resource permissions and cancellation guards.
 
+<a name="doc-svg-adoption"></a>
+
+### Declarative SVG and code inspection
+
+The host safety floor permits `set` only for visibility and finite opacity; `animate` targets a fixed paint/geometry allowlist, and `animateTransform` accepts translate/scale/rotate/skew. URL/executable values, scripts and handler attributes remain blocked. The bundled Markdown pipeline retains hit areas, clipping, dash/path proportions and event timing; marked built-in fragments scope event IDs on each insertion. Copy and legacy dark cloning skip computed properties driven by SVG animations so the current frame does not replace authored initial state. An older library environment retains its existing parser/sanitizer until explicitly updated; changing the host does not silently migrate article render records.
+
+Adopt into an existing library in separate steps:
+
+1. Use **Templates → Load defaults** to add missing snippets and starters. This does not update the renderer.
+2. Back up the existing configuration and dependencies; have the maintainer identify custom changes. A separate reference library created with this app and the same preset provides the complete `format/` package and declared dependencies. Compare and adopt only within the user's authorization; never overwrite a custom environment with the reference package blindly.
+3. Use **Settings → Local directory → Reload rendering configuration**, then **Update styles** and save only the articles intended to adopt that environment. Verify real clicks, rich-text reception and HTML output. Other saved articles and history keep their original environment.
+
+The right-hand code view inspects successful visible HTML plus required CSS from that same immutable source/theme/environment identity and light/dark mode. It does not invoke a new package action or replace existing check/save/copy/export inputs. Retained save-only previews show their retained code; pending, failed or stale identities are not presented as current success. Read-only inspection does not remove the output canvas or serialize on each animation frame.
+
 ### Resource previews and isolation boundaries
 
 The host applies generic safety, isolated mounting, request identity protection and authorized resource/save operations. It does not run a hidden WeChat cleanup or fixed formatting chain after a package result. Scripts, event attributes, executable URLs and code imports remain blocked. A dedicated script-free preview document loads external images, CSS and fonts only according to package permissions; the workspace and computation sandbox retain their network restrictions. Unavailable resources and Copy anyway are not successful validation. Authored URLs remain separate from local preview resource URLs. Source retains authored references; portable webpages inline local resources as described above, with external-link policy unchanged.
@@ -729,19 +743,17 @@ Pane layout, toolbars, drafts, save/delete workflows and library permissions sta
 
 <a name="doc-render-records"></a>
 
-### Render records and historical dependencies
+### Rendering records and historical dependencies
 
-### Creation and backup
+Rebuildable HTML/CSS, compiler output and resource-read copies belong in browser cache partitions render, compile and resources, with a byte budget and eviction. Cache clearing/unavailability never removes manuscripts or historical dependencies. New render.json files retain body/theme/environment identities and necessary references. Portable historical manifests live under cache/render/manifests/; renderer programs, algorithms, styles and resources share content-addressed objects under cache/render/objects/. Preserve any indispensable output that cannot reliably be regenerated.
 
-After normal source saving, optional `render.json` records body/theme hashes, processing steps, HTML/CSS and dependency versions. Manifests live at `styles/.versions/<hash>/manifest.json`, and resources at `assets/.objects/<hash>`. Identical content is reused; history retains references and document packages include only required objects.
+cache/render/owner.json binds directory ownership using canonical JSON with owner=wechat-article-editor-render and schemaVersion=2. Only an empty directory may be claimed; unrecognized contents or mismatched ownership are not overwritten. Preserve this marker in migration, packages and backups. A legacy host-compiler resultHash points to required html/css output so replay does not depend on a future host compiler; rebuildable package-renderer output stays in browser cache.
 
-### Reopening and explicit updates
+Storage schemaVersion 2 render.json retains owner wechat-article-editor-render and required bodyHash, themeHash and environmentHash; legacy routes without a portable compiler additionally retain resultHash. Version-2 manifest parts reference rawFormatter, rawFiles, policy, candidates, compilerVersion and applicable algorithms/renderer/configuration by hash; assets retain path/hash/mime. Verify objects/manifests before publishing pointers. Read schemaVersion 1 under its original contract. Browser payload cache has a 128MiB budget and at most 512 entries; unavailable caches cause reconstruction, without disposable library copies. Keep legacy recycle-bin records unchanged because their entry manifests bind file integrity; reclamation still protects their references.
 
-Complete records use their retained environment. **Update styles** explicitly rereads current configuration/dependencies; verify and save to record the new environment, while older history retains its versions. Opening/preview/list operations do not backfill or migrate records. Older history without records explains that dependencies were not retained.
+Read legacy render.json, styles/.versions and assets/.objects without migration on open. Explicit migration copies and verifies dependencies/references before switching; failure or cancellation retains originals and supports retry. Cleanup only removes application-owned objects proven unreferenced by current articles, all history and the recycle bin; unresolved or damaged references block deletion. Never substitute today's environment for an unavailable historical version.
 
-### Failures and protection
-
-Source, index and render retention have separate feedback. Dependency failure does not roll back source or pass an old record off as current success. Missing objects, damaged manifests and body/theme mismatches produce diagnostics. Do not manually change hashes or automatically delete historical objects; keep these directories in backups.
+Document packages include only the required dependency closure. Full-library backups retain referenced persistent objects even though their directory is named cache. Browser working caches and unrelated old versions are excluded. Source, index, required dependency persistence and optional cache failures are reported separately.
 
 For a website that accepts Markdown, **Export article → Markdown body** extracts the reliably parsed body, retaining Markdown, HTML, classes and anchors. The publisher handles image addresses. Reports use current library rules; replaying history is not proof of present platform compliance.
 

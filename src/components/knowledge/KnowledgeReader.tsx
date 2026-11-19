@@ -9,11 +9,12 @@ import { IconButton } from '../global/IconButton';
 import { TooltipButton } from '../global/TooltipButton';
 import { KnowledgeHoverPreview } from './KnowledgeHoverPreview';
 import { ScrollViewport } from '../global/ScrollViewport';
-import { PanelIcon } from '../global/CollapsiblePanel';
+
 import { LibraryArticleImage } from '../../lib/article-format/LibraryArticleImage';
 import { knowledgeReferencePath, isMarkdownPath, type KnowledgeManifest } from '../../lib/knowledge/model';
 import { remarkHeadingIds, rehypeAlignSanitizedFragmentLinks } from '../../lib/articleTableOfContents';
 import type { ReadonlyKnowledgeSource } from '../../lib/knowledge/source';
+import { ButtonBar } from '../global/ButtonBar';
 
 type ReaderContext = { source: ReadonlyKnowledgeSource; path: string; paths: ReadonlyMap<string, string>; open: (path: string, line?: number, fragment?: string) => void; download: (path: string) => void };
 const Context = createContext<ReaderContext | null>(null);
@@ -111,6 +112,6 @@ export const KnowledgeReader = memo(function KnowledgeReader({ source, path, tex
   const context = useMemo(() => ({ source, path, paths, open: onOpen, download: onDownload }), [source, path, paths, onOpen, onDownload]);
   return <Context.Provider value={context}><div className="relative flex min-h-0 min-w-0 flex-1">
     <ScrollViewport ref={scrollRef} className="flex-1"><div ref={contentRef} data-knowledge-content data-variant={variant} data-line-numbers={showLineNumbers} className="relative mx-auto w-full max-w-4xl p-4 md:p-6 data-[variant=reference]:max-w-none data-[variant=reference]:px-4 data-[line-numbers=true]:pl-18"><Body text={text} />{showLineNumbers ? <div ref={markerRef} aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-4 w-10 select-none text-right font-mono text-xs text-faint">{markers.map((marker, index) => <span key={index} data-origin-line={marker.line} className="absolute inset-x-0 before:content-[attr(data-origin-line)]" style={{ top: marker.top }} />)}</div> : null}</div></ScrollViewport>
-    {headings.length ? <><aside data-open={contentsOpen} className="hidden min-h-0 w-32 shrink-0 flex-col border-l border-line bg-list/50 p-3 pt-14 data-[open=true]:flex md:w-52"><nav aria-label={t('contents')} className="grid min-h-0 content-start gap-2 overflow-y-auto overflow-x-clip scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{headings.map(item => <button type="button" key={item.id} className="truncate rounded text-left text-sm text-accent-text hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent" onClick={() => onOpen(path, 1, item.id)}>{item.title}</button>)}</nav></aside><IconButton tooltip={t('contents')} aria-expanded={contentsOpen} className="absolute right-3 top-3 opacity-30 hover:opacity-100 focus-visible:opacity-100" icon={<PanelIcon kind="nodes" />} onClick={() => setContentsOpen(value => !value)} /></> : null}
+    {headings.length ? <><aside data-open={contentsOpen} className="hidden min-h-0 w-32 shrink-0 flex-col border-l border-line bg-list/50 p-3 pt-14 data-[open=true]:flex md:w-52"><nav aria-label={t('contents')} className="grid min-h-0 content-start gap-2 overflow-y-auto overflow-x-clip scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{headings.map(item => <button type="button" key={item.id} className="truncate rounded text-left text-sm text-accent-text hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent" onClick={() => onOpen(path, 1, item.id)}>{item.title}</button>)}</nav></aside><ButtonBar label={t('contents')} className="absolute right-3 top-3"><IconButton tooltip={t('contents')} aria-expanded={contentsOpen} className="opacity-30 hover:opacity-100 focus-visible:opacity-100" icon="lines" onClick={() => setContentsOpen(value => !value)} /></ButtonBar></> : null}
   </div></Context.Provider>;
 });

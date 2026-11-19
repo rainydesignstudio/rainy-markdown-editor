@@ -21,7 +21,6 @@ import { PaneActions } from './PaneActions';
 import { InsertElementsMenu } from './InsertElementsMenu';
 import type { InlineFormat } from '../../lib/editor/inlineFormatting';
 import { IconButton } from '../global/IconButton';
-import { FindIcon } from '../content/SourceFindBar';
 import { useFormatSnapshot } from '../../hooks/useFormatSnapshot';
 import { InformationButton, InformationIcon } from '../global/InformationButton';
 import { articleSourceLayout, type parseArticle } from '../../lib/frontMatter';
@@ -185,10 +184,10 @@ export function SourcePanel({
         <InformationButton icon={<InformationIcon />} title={fileName} subtitle={t('editor:source.info')} onClick={onOpenInfo} disabled={!directory || readOnly || mediaBusy || parsed.diagnostics.some((item) => item.level === 'error')} />
         <PaneActions label={t('editor:source.actions')}>
           <input ref={imagePickerRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/avif" multiple hidden onChange={handleImageFiles} />
-          <IconButton tooltip={t('editor:source.wrapToggle')} menuLabel={t('editor:source.wordWrap')} shortcut="⌥ Z / Alt Z" aria-pressed={sourcePreferences.wrap} onClick={() => toggleSourcePreference('wrap')} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18M3 10h13a4 4 0 0 1 0 8h-4m3-3-3 3 3 3M3 15h4M3 20h4" /></svg>} />
-          <IconButton tooltip={t('editor:source.syntaxHighlight')} aria-pressed={sourcePreferences.highlight} onClick={() => toggleSourcePreference('highlight')} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m7 7-5 5 5 5m10-10 5 5-5 5m-4-14-2 18" /></svg>} />
-          <IconButton menuLabel={t('editor:source.lineNumbers')} shortcut="⌘ / / Ctrl /" tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon={<svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 5h13M8 12h13M8 19h13" /><path d="M3 4h1v4M3 11h1v4M3 18h1v3" /></svg>} />
-          <IconButton menuLabel={t('editor:source.findLabel')} shortcut="⌘ F / Ctrl F" tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={() => openFindRef.current?.()} />
+          <IconButton tooltip={t('editor:source.wrapToggle')} menuLabel={t('editor:source.wordWrap')} shortcut="⌥ Z / Alt Z" aria-pressed={sourcePreferences.wrap} onClick={() => toggleSourcePreference('wrap')} icon="wrap" />
+          <IconButton tooltip={t('editor:source.syntaxHighlight')} aria-pressed={sourcePreferences.highlight} onClick={() => toggleSourcePreference('highlight')} icon="highlight" />
+          <IconButton menuLabel={t('editor:source.lineNumbers')} shortcut="⌘ / / Ctrl /" tooltip={t('editor:source.lineToggle', { action: showLineNumbers ? t('editor:source.hideLines') : t('editor:source.showLines') })} aria-pressed={showLineNumbers} onClick={toggleLineNumbers} icon="lines" />
+          <IconButton menuLabel={t('editor:source.findLabel')} shortcut="⌘ F / Ctrl F" tooltip={t('editor:source.find')} icon="search" onClick={() => openFindRef.current?.()} />
           {citationTools}
           <InsertElementsMenu
             disabled={readOnly || mediaBusy || parsed.diagnostics.some(item => item.level === 'error')}

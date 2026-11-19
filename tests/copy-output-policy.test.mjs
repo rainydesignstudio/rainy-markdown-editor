@@ -1,3 +1,4 @@
+import * as svgAnimation from '../src/lib/article-format/svgAnimation.ts';
 import * as previewImages from '../src/lib/article-format/previewImages.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,7 +31,7 @@ function harness(raw = DEFAULT_FORMAT_BUNDLE, html = markup) {
   const snapshot = { ...runtime.getFormatSnapshot(), bundle: compileFormatBundle(raw) };
   const purifier = createDOMPurify(dom.window), module = { exports: {} };
   vm.runInNewContext(code, { module, exports: module.exports, window: dom.window,
-    require: id => (id.endsWith('/article-format/previewImages') || id === './previewImages') ? previewImages : (id.endsWith('/article-format/runtime') || id === './runtime') ? { getFormatSnapshot: () => snapshot, assertFormatReady: runtime.assertFormatReady }
+    require: id => id === './svgAnimation' ? svgAnimation : (id.endsWith('/article-format/previewImages') || id === './previewImages') ? previewImages : (id.endsWith('/article-format/runtime') || id === './runtime') ? { getFormatSnapshot: () => snapshot, assertFormatReady: runtime.assertFormatReady }
       : (id.endsWith('/article-format/sanitize') || id === './sanitize') ? { sanitizeHtml: html => purifier.sanitize(html) }
         : id.endsWith('/articleDarkPreview') ? { createArticleColorNormalizer: () => ({ normalizePaint: value => value }) }
           : id.endsWith('/articleFormat') ? { articleFormatAllowsCssProperty: property => !snapshot.bundle.formatter.output.dropCssProperties.includes(property) }

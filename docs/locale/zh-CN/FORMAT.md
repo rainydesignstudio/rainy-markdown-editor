@@ -177,6 +177,20 @@ render 必须返回 `{html, css}`。validate 必须返回 `{complete, issues, pa
 
 深度校验请求可调用api.service("measure-v1", {html, css, widths})读取无脚本文档的真实布局。结果为{screens}，每项包含width、按首个根元素及后代DOM顺序排列的boxes（left/right/top/bottom/width/height及parent.left/right/width），以及images（complete/width/height）。包自行判断溢出、居中或其他业务结果。每次最多8个64–4096px的整数宽度、每份最多20000个元素；视口高2000px，图片最多等待5秒，未加载图片仍标为未完成。服务没有目录或元素句柄，沿用声明的资源权限和取消保护。
 
+<a name="doc-svg-adoption"></a>
+
+### 声明式SVG与代码查看
+
+宿主安全底线仅允许 `set` 修改显隐及有限透明度，`animate` 使用固定绘图/几何属性白名单，`animateTransform` 限位移/缩放/旋转/斜切。URL/可执行值、脚本及事件处理属性仍被拒绝。随附Markdown链保留命中区、裁切、描边/路径比例和事件时序；带内置标记的片段每次插入隔离事件ID。复制和旧深色克隆跳过被SVG动画驱动的computed属性，避免把当前帧覆盖到作者初始状态。旧库继续使用既有解析/净化环境，须显式更新；宿主升级不静默迁移文章渲染记录。
+
+旧库采用分开办理：
+
+1. 在“模板 → 载入默认”补齐片段与起稿模板；这一步不更新渲染器。
+2. 先备份旧库的配置与依赖，由维护者核对是否自定义。可用当前应用新建同预设的隔离参考库，取得完整`format/`及其声明依赖；仅在用户授权范围内比较、采用，不能把参考包硬盖到自定义环境。
+3. 点击“设置 → 本地目录 → 重新加载渲染配置”，再对需要采用新环境的文稿点击“更新样式”并保存。检查实际点击、复制接收及HTML输出；其余旧稿和历史继续留存原环境。
+
+右侧代码视图读取同一不可变正文/主题/环境身份及明暗模式下的成功可见HTML和必要CSS，不要求包新增动作，也不改变既有检查/保存/复制/导出的输入。仅保存刷新的留存预览对应留存代码；未就绪、失败或过期身份不冒充当前成功。只读查看保留输出画布，不在动画每帧重新序列化。
+
 ### 资源预览与隔离边界
 
 宿主只进行通用安全处理、隔离挂载、输入身份保护及授权的资源/保存操作；不在包结果之后追加微信清洗或固定格式化链。脚本、事件属性、可执行 URL、代码导入等安全底线继续生效。外链图片、CSS和字体只在无脚本的专用预览文档按本包 permissions 加载，工作台主文档和计算沙箱的网络限制保持。外部资源可能不可用，不将其失败或“仍然复制”视为校验通过；作者原始URL与预览本地URL分开；原稿保留作者地址，网页成品按上文消解本地资源，外链策略保持。
@@ -700,11 +714,15 @@ viewport设null时按实际预览栏宽响应式排版，使用可用高度滚�
 
 ### 生成与备份
 
-正常保存原文后另存可选render.json，记录正文／主题hash、渲染步骤、HTML/CSS及依赖版本。清单在styles/.versions/<hash>/manifest.json，资源在assets/.objects/<hash>；相同内容复用，历史目录携带对应引用，文档包只带所需对象。
+可重建的HTML/CSS、编译中间产物及资源读取副本优先存浏览器cache的render／compile／resources分区；有容量上限，清除或配额不足时重建，不影响原文和历史。新库内render.json仅留正文／主题／环境身份及必要引用；必须随库保留的历史环境统一放cache/render/manifests/，渲染程序、算法、样式和资源在cache/render/objects/按内容哈希共享，不能可靠再生的必要产物仍持久保留。文档包只携带对应依赖闭包；整库备份必须包含被引用的持久对象，不得整目录排除cache。
+
+cache/render/owner.json是目录所有权标记，内容为owner=wechat-article-editor-render、schemaVersion=2的规范JSON；仅空目录可首次认领，已有未知内容或标记失配不覆盖。迁移、文档包及备份保留该标记。旧宿主编译路线的resultHash指向必要的html/css结果对象，避免依赖未来宿主编译器复原；新渲染包路线的可重建结果留浏览器。
+
+新存储的render.json为schemaVersion 2，owner保留wechat-article-editor-render，必填bodyHash、themeHash、environmentHash；无随库编译器的旧路线另存resultHash。清单schemaVersion 2的parts按哈希引用rawFormatter、rawFiles、policy、candidates、compilerVersion及适用的algorithms／renderer／configuration；assets保留path／hash／mime。对象与清单写入后校验，再发布记录引用。旧schemaVersion 1继续按原协议读，不改owner或版本冒充迁移。浏览器缓存的载荷预算为128MiB、最多512项；缓存不可用则重建，不额外向库中回填可丢弃缓存。回收站旧记录受条目完整性清单保护，迁移保留原件且回收继续保护其引用。
 
 ### 重开与显式更新
 
-已有完整记录使用留存环境。点击“更新样式”显式重读当前配置和依赖，核对后保存新记录；旧历史保留原版本。打开、预览、列表不补写或迁移；无记录旧历史提示依赖未留存。
+旧render.json、styles/.versions及assets/.objects兼容读取，打开不迁移；显式迁移先复制、校验依赖与引用再切换，失败/取消保留原件，可重试续接。仅删除确认无当前稿、历史或回收站引用的本应用对象，损坏/引用不全不清理。已有完整记录使用留存环境。点击“更新样式”显式重读当前配置和依赖，核对后保存新记录；旧历史保留原版本。打开、预览、列表不补写或迁移；无记录旧历史提示依赖未留存。
 
 ### 失败与保护
 

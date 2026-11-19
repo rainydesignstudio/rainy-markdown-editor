@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import ts from 'typescript';
+import * as svgAnimation from '../../src/lib/article-format/svgAnimation.ts';
 
 const source = await readFile(new URL('../../src/lib/article-format/sanitize.ts', import.meta.url), 'utf8');
 const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -19,6 +20,7 @@ test('historical Blob exceptions stay private and apply only to static HTML imag
     if (id === 'inline-style-parser') return { __esModule: true, default: () => [] };
     if (id === 'rehype-sanitize') return { defaultSchema: {} };
     if (id === './runtime') return { getFormatSnapshot: () => snapshot };
+    if (id === './svgAnimation') return svgAnimation;
     throw new Error(id);
   } });
   assert.equal(module.exports.sanitizeHtml('<img src="blob:http://localhost:3501/a">'), 'clean');

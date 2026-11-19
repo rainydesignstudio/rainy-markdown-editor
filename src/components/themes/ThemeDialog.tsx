@@ -12,6 +12,8 @@ import { ContentRenderPreview } from '../content/ContentRenderPreview';
 import { availableArticleThemeUpdate } from '../../lib/articleThemeUpdate';
 import { ThemeUpdateTag } from './ThemeUpdateTag';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function ThemeDialog({ current, themes, source, media, busy = false, blockedReason: suppliedBlockedReason = '', issue = '', onClose, onSelect: selectTheme }: {
   current: ThemeConfig; themes: ThemeConfig[]; source: string; media?: ArticleMediaContext | null;
@@ -39,7 +41,7 @@ export function ThemeDialog({ current, themes, source, media, busy = false, bloc
             <button type="button" aria-pressed={selected.key === key} onClick={() => setSelectedKey(key)} disabled={busy} className="flex h-full w-full min-w-0 items-start gap-3 rounded-lg border border-transparent p-3 text-left hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent aria-pressed:border-accent-line aria-pressed:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50">
               <span className="information-badge mt-0.5"><InformationIcon book /></span><span className="flex min-w-0 flex-1 flex-col gap-1"><strong className="truncate font-sub-heading text-sm font-semibold text-primary">{theme.name}</strong><small className="flex flex-wrap items-center gap-1 text-xs text-muted">v{theme.version}{key === 'current' && latestTheme ? <ThemeUpdateTag /> : null}</small>{key === 'current' ? <span className="text-2xs text-accent-text">{t('dialogs:ui.currentArticle')}</span> : null}</span>
             </button>
-            {key === 'current' && latestTheme ? <button type="button" className="button button-quiet absolute right-2 bottom-2 min-h-7 gap-1 px-2 py-1 text-2xs" onClick={() => onSelect(latestTheme)} disabled={busy || Boolean(blockedReason)} aria-label={t('dialogs:templates.updateTheme', { name: theme.name, version: latestTheme.version })}><svg className="size-3.5" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7v5h-5M4 17v-5h5" /><path d="M5.5 9a7 7 0 0 1 12-2L20 12M4 12l2.5 5a7 7 0 0 0 12-2" /></svg>{t('dialogs:ui.updateTheme')}</button> : null}
+            {key === 'current' && latestTheme ? <ButtonBar label={t('dialogs:ui.updateTheme')} className="absolute right-2 bottom-2"><Button icon="reset" type="button" className="min-h-7 gap-1 px-2 py-1 text-2xs" onClick={() => onSelect(latestTheme)} disabled={busy || Boolean(blockedReason)} aria-label={t('dialogs:templates.updateTheme', { name: theme.name, version: latestTheme.version })} label={t('dialogs:ui.updateTheme')} /></ButtonBar> : null}
           </div>)}</div>
           {!visible.length ? <p className="px-3 py-4 text-sm text-muted">{t('dialogs:ui.noMatchingThemes')}</p> : null}
         </div>
@@ -51,6 +53,6 @@ export function ThemeDialog({ current, themes, source, media, busy = false, bloc
         {blockedReason || issue ? <p className="shrink-0 rounded-lg border border-warning-line bg-warning-surface px-3 py-2 text-xs text-warning-strong" role="status">{blockedReason || issue}</p> : null}
       </section>
     </div>
-    <DialogFooter><DialogActions><DialogButton onClick={onClose} disabled={busy}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m10 5-7 7 7 7M3 12h18" /></svg>{t('dialogs:ui.backToEditor')}</DialogButton><DialogButton variant="primary" onClick={() => onSelect(selected.theme)} disabled={busy || Boolean(blockedReason) || selected.key === 'current'}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m4 12 5 5L20 6" /></svg>{busy ? t('dialogs:ui.applying') : t('dialogs:ui.applyTheme')}</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton icon="back" onClick={onClose} disabled={busy}>{t('dialogs:ui.backToEditor')}</DialogButton><DialogButton icon="check" variant="primary" onClick={() => onSelect(selected.theme)} disabled={busy || Boolean(blockedReason) || selected.key === 'current'}>{busy ? t('dialogs:ui.applying') : t('dialogs:ui.applyTheme')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

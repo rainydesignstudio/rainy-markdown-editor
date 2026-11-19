@@ -96,7 +96,7 @@ export function SelectField({ label, value, options, onChange, disabled = false,
     {name ? <input type="hidden" name={name} value={String(value)} disabled={disabled} /> : null}
     <IconPopover label={disabled && selected ? `${label}: ${selected.option.label}` : label} tooltip={props.title ?? label} kind="dialog" triggerVariant="field" open={open} disabled={disabled} onToggle={toggle} onClose={() => setOpen(false)} onMeasure={measure} onKeyDown={keyDown}
       triggerProps={{ ...props, className, onKeyDown: event => { props.onKeyDown?.(event); if (!event.defaultPrevented && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) { event.preventDefault(); if (!open) toggle(); } } }}
-      icon={<svg className="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>}
+      icon="chevronDown"
       triggerChildren={<>{selected?.option.icon}<span className="min-w-0 flex-1 truncate">{selected?.option.label ?? label}</span></>}>
       <div ref={nodes} data-select-mode={mode}>
         {mode === 'drill' && directories.length ? <button type="button" className="flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-muted hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent" onClick={back}><span aria-hidden="true">←</span>{t('selection.back')}<span className="min-w-0 truncate">{directories.at(-1)?.label}</span></button> : null}

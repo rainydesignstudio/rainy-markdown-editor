@@ -1,8 +1,8 @@
 'use client';
 
-import { useUITranslation } from '../global/UILocaleProvider';
+import { ConfirmDialog } from '../global/ConfirmDialog';
 
-import { DialogActions, DialogButton, DialogFrame, DialogHeader } from '../global/DialogFrame';
+import { useUITranslation } from '../global/UILocaleProvider';
 
 export function ProjectDeleteDialog({
   name,
@@ -17,12 +17,11 @@ export function ProjectDeleteDialog({
 }) {
   const { t } = useUITranslation('dialogs');
   return (
-    <DialogFrame titleId="project-delete-title" descriptionId="project-delete-description" role="alertdialog" onClose={onClose} dismissible={!busy} wide>
-      <DialogHeader titleId="project-delete-title" eyebrow={t('common:eyebrows.deleteProject')} title={t('dialogs:templates.deleteProject', { name: name })} onClose={onClose} closeDisabled={busy} />
-      <div className="grid gap-4 p-4">
-        <p id="project-delete-description">{t('dialogs:ui.projectArticlesMoveToUngroupedBodyCategoriesImages')}</p>
-        <DialogActions><DialogButton autoFocus disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy} onClick={onConfirm}>{busy ? t('dialogs:ui.savingAlternative') : t('dialogs:ui.deleteProject')}</DialogButton></DialogActions>
-      </div>
-    </DialogFrame>
+    <ConfirmDialog titleId="project-delete-title" descriptionId="project-delete-description" role="alertdialog" onClose={onClose} dismissible={!busy} wide closeDisabled={busy}
+      eyebrow={t('common:eyebrows.deleteProject')} title={t('dialogs:templates.deleteProject', { name })}
+      cancel={{ label: t('common:actions.cancel'), autoFocus: true, disabled: busy, onClick: onClose }}
+      confirm={{ label: busy ? t('dialogs:ui.savingAlternative') : t('dialogs:ui.deleteProject'), icon: 'delete', variant: 'danger', disabled: busy, onClick: onConfirm }}>
+      <div className="dialog-content"><p id="project-delete-description">{t('dialogs:ui.projectArticlesMoveToUngroupedBodyCategoriesImages')}</p></div>
+    </ConfirmDialog>
   );
 }

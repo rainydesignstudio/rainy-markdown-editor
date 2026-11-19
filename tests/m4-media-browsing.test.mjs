@@ -82,7 +82,7 @@ test('preview buttons and keyboard obey directory boundaries, modifiers and edit
   key('ArrowRight',new Element(true));assert.equal(image().fileName,'a.png');key('ArrowRight',new Element(),true);assert.equal(image().fileName,'a.png');
   key('ArrowRight');assert.equal(image().fileName,'b.png');key('ArrowRight');assert.equal(image().fileName,'b.png');
   assert.equal(find(view(),node=>node.props['aria-label']==='下一张图片').props.disabled,true);
-  image().onDimensions(1000,1500);find(view(),node=>node.type==='button'&&node.props.children==='100%').props.onClick();
+  image().onDimensions(1000,1500);find(view(),node=>node.type==='button'&&[].concat(node.props.children).includes('100%')).props.onClick();
   assert.deepEqual({...image().imageProps.style},{width:1000,height:1500});find(view(),node=>node.props['aria-label']==='放大图片').props.onClick();assert.deepEqual({...image().imageProps.style},{width:1250,height:1875});
   key('ArrowLeft');assert.equal(image().fileName,'a.png');assert.equal(image().imageProps.style,undefined);
   props.images=[...images,{fileName:'c.png',handle:{}}];

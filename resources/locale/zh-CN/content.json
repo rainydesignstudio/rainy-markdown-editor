@@ -64,7 +64,8 @@
     "loading": "读取中",
     "editingUnavailable": "暂不可编辑",
     "unnamed": "尚未命名",
-    "snippetCopyName": "{{name}} 副本"
+    "snippetCopyName": "{{name}} 副本",
+    "loadDefaults": "载入默认"
   },
   "templates": {
     "articleCategories": "文章分类：{{categories}}",

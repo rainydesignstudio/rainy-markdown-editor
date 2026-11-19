@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, u
 import { createPortal } from 'react-dom';
 import { ActionMenuAnchorContext, ActionMenuContext, IconButton } from './IconButton';
 import { TooltipButton } from './TooltipButton';
+import { ContentIcon, type IconGraphic } from './ContentIcon';
 
 const PopoverOwner = createContext<string | null>(null);
 
@@ -11,7 +12,7 @@ export type PopoverSpace = { width: number; height: number };
 
 /** Controlled by the toolbar so opening one control closes its sibling. */
 export function IconPopover({ label, tooltip = label, icon, open, disabled = false, kind = 'menu', triggerVariant = 'surface', triggerChildren, triggerProps, inline, anchorRef, align = 'start', panelClassName, onMeasure, onKeyDown, onToggle, onClose, children }: {
-  label: string; tooltip?: ReactNode; icon: ReactNode; open: boolean; disabled?: boolean;
+  label: string; tooltip?: ReactNode; icon: IconGraphic; open: boolean; disabled?: boolean;
   kind?: 'menu' | 'dialog'; onToggle: () => void; onClose: () => void; children: ReactNode;
   triggerVariant?: 'surface' | 'inline' | 'preference' | 'field'; triggerChildren?: ReactNode;
   inline?: boolean;
@@ -103,13 +104,13 @@ export function IconPopover({ label, tooltip = label, icon, open, disabled = fal
 
   return <>
     <span ref={triggerRef} hidden={inline} className={inline ? 'hidden' : field ? 'contents' : triggerVariant === 'preference' ? 'flex w-full shrink-0' : 'inline-flex shrink-0'}>{field
-      ? <TooltipButton {...triggerProps} tooltip={tooltip} aria-label={label} role="combobox" aria-haspopup={kind} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={onToggle} className={`field flex min-w-0 items-center gap-2 text-left aria-disabled:cursor-not-allowed aria-disabled:opacity-55 ${triggerProps?.className ?? ''}`}>{triggerChildren}{icon}</TooltipButton>
+      ? <TooltipButton {...triggerProps} tooltip={tooltip} aria-label={label} role="combobox" aria-haspopup={kind} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={onToggle} className={`field flex min-w-0 items-center gap-2 text-left aria-disabled:cursor-not-allowed aria-disabled:opacity-55 ${triggerProps?.className ?? ''}`}>{triggerChildren}{typeof icon === 'string' ? <ContentIcon name={icon} /> : icon}</TooltipButton>
       : <IconButton variant={triggerVariant} icon={icon} tooltip={tooltip} aria-label={label} aria-haspopup={kind} aria-expanded={open} aria-controls={open ? id : undefined} disabled={disabled} onClick={onToggle}>{triggerChildren}</IconButton>}</span>
     {(open || responsive) && typeof document !== 'undefined' ? (responsive ? renderPanel() : createPortal(renderPanel(), target ?? document.body)) : null}
   </>;
 
   // Geometry rationale: compact menus retain an 8px viewport margin on both sides, including very narrow windows.
-  function renderPanel() { return <div ref={panelRef} id={id} data-popover-owner={parentId ?? undefined} data-variant={triggerVariant} popover={topLayer && native && !inline ? 'manual' : undefined} role={inline ? undefined : kind} aria-label={label} tabIndex={-1} className={inline ? 'flex min-w-0 items-center gap-1.5' : responsive && !open ? 'hidden' : `fixed z-60 m-0 grid gap-0.5 overflow-x-clip overflow-y-auto rounded-lg border border-line-strong bg-popup-bg p-1.5 text-xs text-popup-text shadow-(--editor-popup-shadow) scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent ${field ? '' : panelClassName ?? (responsive ? 'max-h-80 w-80 max-w-[calc(100vw-1rem)]' : 'max-h-80 w-56 data-[variant=preference]:w-max data-[variant=preference]:min-w-36 data-[variant=preference]:gap-1')}`} style={inline ? undefined : position} onKeyDown={event => {
+  function renderPanel() { return <div ref={panelRef} id={id} data-popover-owner={parentId ?? undefined} data-variant={triggerVariant} popover={topLayer && native && !inline ? 'manual' : undefined} role={inline ? undefined : kind} aria-label={label} tabIndex={-1} className={inline ? 'min-w-0' : responsive && !open ? 'hidden' : `fixed z-60 m-0 grid gap-0.5 overflow-x-clip overflow-y-auto rounded-lg border border-line-strong bg-popup-bg p-1.5 text-xs text-popup-text shadow-(--editor-popup-shadow) scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent ${field ? '' : panelClassName ?? (responsive ? 'max-h-80 w-80 max-w-[calc(100vw-1rem)]' : 'max-h-80 w-56 data-[variant=preference]:w-max data-[variant=preference]:min-w-36 data-[variant=preference]:gap-1')}`} style={inline ? undefined : position} onKeyDown={event => {
       if (inline) return;
       onKeyDown?.(event); if (event.defaultPrevented) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closeRef.current(); return; }

@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nextProvider } from 'react-i18next';
 import { createUII18n } from '../src/lib/i18n/runtime.ts';
 import { articleCollectionLabel } from '../src/lib/i18n/articleLabels.ts';
+import { withActionComponents } from './action-ui-fixture.mjs';
 
 test('collection IDs translate product labels without translating colliding user project names', () => {
   const instance = createUII18n('en-US'), t = instance.t.bind(instance);
@@ -36,7 +37,7 @@ test('English find fields expose English labels while query and replacement stay
   const file = await readFile(new URL('../src/components/content/SourceFindBar.tsx', import.meta.url), 'utf8');
   const code = ts.transpileModule(file, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const instance = createUII18n('en-US'), module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, require: withActionComponents(function(id) {
     if (id === 'react') return React;
     if (id === 'react/jsx-runtime') return { jsx, jsxs, Fragment };
     if (id === 'react-dom') return { createPortal: node => node };
@@ -46,7 +47,7 @@ test('English find fields expose English labels while query and replacement stay
     if (id.endsWith('/IconButton')) return { IconButton: ({ tooltip }) => React.createElement('button', { 'aria-label': tooltip }) };
     if (id.endsWith('/DialogFrame')) return {};
     throw new Error(id);
-  } });
+  }) });
   const query = '查找_Alpha_😀', replacement = '<section>保留用户文字</section>';
   const props = { query, replacement, count: 1, index: 0, matchCase: false, composing: false, disabled: false, onClose() {}, onMove() {}, onReplace() {} };
   const html = renderToStaticMarkup(React.createElement(I18nextProvider, { i18n: instance }, React.createElement(module.exports.SourceFindBar, props)));
@@ -71,13 +72,13 @@ test('changing UI language updates iframe title without remounting, replacing th
   const effect = (fn, deps) => { const i = cursor++, old = cells[i]; if (old && deps.every((x, j) => Object.is(x, old.deps[j]))) return; effects.push(() => { old?.cleanup?.(); cells[i] = { deps, cleanup: fn() }; }); };
   const react = { useEffect: effect, useLayoutEffect: effect, useRef(value) { return cells[cursor++] ??= { current: value }; }, useState(value) { const i = cursor++; if (!(i in cells)) cells[i] = value; return [cells[i], value => { cells[i] = value; }]; } };
   const module = { exports: {} };
-  vm.runInNewContext(code, { module, exports: module.exports, CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } }, document: { createElement() { creations++; return { ...element(), contentDocument: doc, setAttribute() {} }; } }, ResizeObserver: class { observe() {} disconnect() {} }, require(id) {
+  vm.runInNewContext(code, { module, exports: module.exports, CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } }, document: { createElement() { creations++; return { ...element(), contentDocument: doc, setAttribute() {} }; } }, ResizeObserver: class { observe() {} disconnect() {} }, require: withActionComponents(function(id) {
     if (id === 'react') return react;
     if (id.endsWith('/editor/previewScrolling')) return previewScrolling;
     if (id.endsWith('/i18n/formatters')) return uiFormatters;
       if (id.endsWith('/UILocaleProvider')) return { useUILocale: () => ({ locale: 'en-US' }), useUITranslation: () => ({ t: titles[language] }) };
     return {};
-  } });
+  }) });
   const snapshot = { id: 'same', bundle: { formatter: { document: { language: 'zh-CN', viewport: { width: 1606, height: 959, contentWidth: 996 } }, preview: { light: { background: 'white' }, dark: { transform: 'preserve' }, color: 'black', fontFamily: 'serif' } } } };
   const render = () => { cursor = 0; const result = module.exports.useArticleRenderMount(hostRef, snapshot, '.unchanged{}', false, { onSourceFind: () => findCalls++ }); while (effects.length) effects.shift()(); return result; };
   render(); const before = render(), target = before.target;

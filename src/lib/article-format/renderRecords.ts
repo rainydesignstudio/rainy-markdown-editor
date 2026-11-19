@@ -11,11 +11,13 @@ import { TAILWIND_COMPILER_VERSION } from '../tailwind-assets';
 import { ALGORITHM_LIMITS, DEFAULT_ALGORITHMS, validateAlgorithmPackage } from './algorithms';
 import type { AlgorithmPackage } from './algorithmTypes';
 import { DEFAULT_LIBRARY_CONFIGURATION, validateResolvedLibraryConfiguration, assertConfigurationCompatible, type ResolvedLibraryConfiguration } from './libraryConfiguration';
+import { libraryCacheScope, readBrowserCache, writeBrowserCache } from '../browserCache';
+import { RENDER_STORE, expandRenderManifest, storeRenderManifest, storeRenderObject, readRenderObject, loadStoredRenderManifest, ensureRenderStore } from './renderStore';
 
 const OWNER = 'wechat-article-editor-render';
 const HASH = /^[a-f0-9]{64}$/;
 export type RenderAssetReference = { hash: string; mime: string; path: string };
-export type RenderRecord = {
+export type LegacyRenderRecord = {
   owner: typeof OWNER; schemaVersion: 1;
   bodyHash: string; themeHash: string; environmentHash: string;
   rawFormatter: RawFormatter; formatter: FormatFormatter;
@@ -25,7 +27,9 @@ export type RenderRecord = {
   rendererHash?: string;
   configuration?: ResolvedLibraryConfiguration;
 };
-type RenderManifest = {
+export type RenderPointer = { owner: typeof OWNER; schemaVersion: 2; bodyHash: string; themeHash: string; environmentHash: string; resultHash?: string };
+export type RenderRecord = LegacyRenderRecord | RenderPointer;
+export type RenderManifest = {
   owner: typeof OWNER; schemaVersion: 1; rawFormatter: RawFormatter;
   rawFiles: Record<string, string>; policy: FormatFormatter['stylesheets'] | null;
   candidates: string[]; assets: RenderAssetReference[];
@@ -34,12 +38,7 @@ type RenderManifest = {
   renderer?: RendererPackage;
   configuration?: ResolvedLibraryConfiguration;
 };
-export type PreparedRenderRecord = { record: RenderRecord; assets: readonly CssAsset[]; manifest: RenderManifest };
-async function directory(root: FileSystemDirectoryHandle, path: string, create = false) {
-  let current = root;
-  for (const part of normalizeLibraryPath(path).split('/')) current = await current.getDirectoryHandle(part, { create });
-  return current;
-}
+export type PreparedRenderRecord = { record: LegacyRenderRecord; assets: readonly CssAsset[]; manifest: RenderManifest };
 async function write(target: FileSystemDirectoryHandle, name: string, value: string | Blob) {
   const stream = await (await target.getFileHandle(name, { create: true })).createWritable();
   try { await stream.write(value); await stream.close(); }
@@ -55,7 +54,12 @@ function checkedFormatter(raw: RawFormatter): FormatFormatter {
 }
 export function validateRenderRecord(value: unknown): RenderRecord {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ProductError("renderRecords.renderJsonMustBeAnObject");
-  const record = value as RenderRecord;
+  const pointer = value as RenderPointer;
+  if (pointer.schemaVersion === 2) {
+    if (pointer.owner !== OWNER || !HASH.test(pointer.bodyHash) || !HASH.test(pointer.themeHash) || !HASH.test(pointer.environmentHash) || pointer.resultHash !== undefined && !HASH.test(pointer.resultHash) || Object.keys(pointer).some(key => !['owner','schemaVersion','bodyHash','themeHash','environmentHash','resultHash'].includes(key))) throw new ProductError('renderCache.corrupt');
+    return pointer;
+  }
+  const record = value as LegacyRenderRecord;
   if (record.owner !== OWNER || record.schemaVersion !== 1 || !HASH.test(record.bodyHash) || !HASH.test(record.themeHash) || !HASH.test(record.environmentHash) ||
       typeof record.html !== 'string' || typeof record.css !== 'string' || !Array.isArray(record.assets) || record.assets.length > STYLE_LIMITS.assets) throw new ProductError("renderRecords.theRenderRecordProtocolIsInvalid");
   if (record.html.length + record.css.length > STYLE_LIMITS.cssBytes) throw new ProductError("renderRecords.theRenderRecordExceedsTheSizeLimit");
@@ -140,29 +144,29 @@ export async function prepareRenderRecord(source: string, theme: ThemeConfig, el
   const environmentHash = await contentHash(canonicalFormatJson(manifest));
   return { record: { owner: OWNER, schemaVersion: 1, bodyHash: await contentHash(parseArticle(source).body), themeHash: await contentHash(canonicalFormatJson(theme)), environmentHash, rawFormatter, formatter, algorithmHash: algorithms.fingerprint, ...(renderer ? { rendererHash: renderer.fingerprint } : {}), html, css: storedCss, assets: refs, ...(configuration ? { configuration } : {}) }, assets, manifest };
 }
-export async function persistRenderRecord(root: FileSystemDirectoryHandle, target: FileSystemDirectoryHandle, prepared: PreparedRenderRecord) {
-  const record = validateRenderRecord(prepared.record);
+export async function retainRenderDependencies(root: FileSystemDirectoryHandle, prepared: PreparedRenderRecord): Promise<RenderPointer> {
+  const record = validateRenderRecord(prepared.record) as LegacyRenderRecord;
   if (prepared.manifest.renderer ? (await validateRendererPackage(prepared.manifest.renderer)).fingerprint !== record.rendererHash : record.rendererHash !== undefined) throw new Error('Render package manifest mismatch');
   if (prepared.manifest.algorithms) {
     const algorithms = await validateAlgorithmPackage(prepared.manifest.algorithms, record.configuration);
     if (record.algorithmHash !== algorithms.fingerprint) throw new ProductError('algorithms.hashMismatch', { path: 'render.json' });
   } else if (record.algorithmHash !== undefined) throw new ProductError('algorithms.invalidPackage');
-  const objects = await directory(root, 'assets/.objects', true);
   for (const asset of prepared.assets) {
-    let file: File | null = null;
-    try { file = await (await objects.getFileHandle(asset.hash)).getFile(); } catch (error) { if (!missing(error)) throw error; }
-    if (file && await contentHash(file) !== asset.hash) throw new ProductError('shared.compose', { parts: productJoin([productReference("renderRecords.existingRenderObjectVerificationFailed"), asset.hash]) });
-    if (!file) { await write(objects, asset.hash, asset.blob); if (await contentHash(await (await objects.getFileHandle(asset.hash)).getFile()) !== asset.hash) throw new ProductError("renderRecords.renderObjectWriteVerificationFailed"); }
+    if (await contentHash(asset.blob) !== asset.hash) throw new ProductError('renderCache.corrupt');
+    await storeRenderObject(root, asset.blob);
   }
-  const version = await directory(root, 'styles/.versions/' + record.environmentHash, true);
   const manifest = canonicalFormatJson(prepared.manifest);
   if (await contentHash(manifest) !== record.environmentHash) throw new ProductError("renderRecords.renderDependencyVersionVerificationFailed");
-  let existing: string | null = null;
-  try { existing = await (await version.getFileHandle('manifest.json')).getFile().then(file => file.text()); } catch (error) { if (!missing(error)) throw error; }
-  if (existing !== null && existing !== manifest) throw new ProductError("renderRecords.theImmutableRenderVersionIsDamagedAndWasNotOverwritten");
-  if (existing === null) await write(version, 'manifest.json', manifest);
-  if (await contentHash(await (await version.getFileHandle('manifest.json')).getFile().then(file => file.text())) !== record.environmentHash) throw new ProductError("renderRecords.renderManifestWriteVerificationFailed");
-  await writeRenderRecord(target, record);
+  const environmentHash = await storeRenderManifest(root, prepared.manifest as unknown as Record<string, unknown>);
+  // Legacy compilers are application-owned; retain their result rather than promise an unavailable old compiler.
+  const resultHash = record.rendererHash ? undefined : await storeRenderObject(root, { html: record.html, css: record.css });
+  return { owner: OWNER, schemaVersion: 2, bodyHash: record.bodyHash, themeHash: record.themeHash, environmentHash, ...(resultHash ? { resultHash } : {}) };
+}
+export async function persistRenderRecord(root: FileSystemDirectoryHandle, target: FileSystemDirectoryHandle, prepared: PreparedRenderRecord) {
+  const pointer = await retainRenderDependencies(root, prepared), record = prepared.record;
+  await writeRenderRecord(target, pointer);
+  await writeBrowserCache('render', libraryCacheScope(root), canonicalFormatJson(pointer), JSON.stringify({ html: record.html, css: record.css }));
+  return pointer;
 }
 export async function writeRenderRecord(target: FileSystemDirectoryHandle, record: RenderRecord | null) {
   if (record) await write(target, 'render.json', JSON.stringify(validateRenderRecord(record)));
@@ -173,7 +177,12 @@ export async function copyRenderRecord(source: FileSystemDirectoryHandle, destin
   if (record) await writeRenderRecord(destination, record);
   return record;
 }
-async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecord): Promise<RenderManifest> {
+export async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecord): Promise<RenderManifest> {
+  if (record.schemaVersion === 2) {
+    const value = await expandRenderManifest(root, record.environmentHash) as unknown as RenderManifest;
+    if (!value.rawFiles || !Array.isArray(value.candidates) || value.candidates.some(value => typeof value !== 'string' || value.length > 256)) throw new ProductError('renderCache.corrupt');
+    return value;
+  }
   const file = await readLibraryFile(root, 'styles/.versions/' + record.environmentHash + '/manifest.json');
   if (file.size > STYLE_LIMITS.cssBytes + ALGORITHM_LIMITS.totalBytes * 2 + PACKAGE_LIMITS.totalBytes * 2) throw new ProductError("renderRecords.theRenderManifestIsTooLarge");
   const text = await file.text();
@@ -184,17 +193,31 @@ async function readManifest(root: FileSystemDirectoryHandle, record: RenderRecor
       canonicalFormatJson(manifest.assets) !== canonicalFormatJson(record.assets) || !manifest.rawFiles || !Array.isArray(manifest.candidates) || manifest.candidates.some(value => typeof value !== 'string' || value.length > 256)) throw new ProductError("renderRecords.theHistoricalDependencyManifestIsInvalid");
   return manifest;
 }
-export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, value: RenderRecord, live = getFormatSnapshot()): Promise<{ snapshot: FormatSnapshot; html: string; css: string; dispose: () => void }> {
-  const record = validateRenderRecord(value), manifest = await readManifest(root, record);
+export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, value: RenderRecord, live = getFormatSnapshot()): Promise<{ snapshot: FormatSnapshot; html?: string; css: string; dispose: () => void }> {
+  const saved = validateRenderRecord(value), manifest = await readManifest(root, saved);
+  let result: { html?: string; css: string } = { css: '' };
+  if (saved.schemaVersion === 2) {
+    if (saved.resultHash) result = JSON.parse(await (await readRenderObject(root, saved.resultHash)).text());
+    else {
+      const cached = await readBrowserCache('render', libraryCacheScope(root), canonicalFormatJson(saved));
+      if (typeof cached === 'string') try { const data = JSON.parse(cached); if (typeof data.html === 'string' && typeof data.css === 'string') result = data; } catch { /* Rebuild a discarded result from its pinned renderer. */ }
+    }
+  }
+  const record: LegacyRenderRecord = saved.schemaVersion === 1 ? saved : { ...saved, schemaVersion: 1, rawFormatter: manifest.rawFormatter, formatter: checkedFormatter(manifest.rawFormatter), html: result.html ?? '', css: result.css, assets: manifest.assets, algorithmHash: manifest.algorithms?.fingerprint, rendererHash: manifest.renderer?.fingerprint, ...(manifest.configuration ? { configuration: manifest.configuration } : {}) };
+  if (saved.schemaVersion === 2 && !manifest.renderer && !saved.resultHash) throw new ProductError('renderCache.corrupt');
   const renderer = manifest.renderer ? await validateRendererPackage(manifest.renderer) : undefined;
-  if (renderer) assertPackageCss(record.css, renderer.declaration.permissions);
+  try { validateRenderRecord(record); if (renderer) assertPackageCss(record.css, renderer.declaration.permissions); }
+  catch (error) {
+    if (saved.schemaVersion === 1 || saved.resultHash) throw error;
+    result = { css: '' }; record.html = ''; record.css = ''; validateRenderRecord(record);
+  }
   if (renderer?.fingerprint !== record.rendererHash) throw new Error('Historical format package mismatch');
   const algorithms = manifest.algorithms ? await validateAlgorithmPackage(manifest.algorithms, record.configuration) : DEFAULT_ALGORITHMS;
   if (record.algorithmHash !== undefined && record.algorithmHash !== algorithms.fingerprint || manifest.algorithms && record.algorithmHash === undefined) throw new ProductError('algorithms.hashMismatch', { path: 'render.json' });
   const files = new Map<string, Blob>();
   let bytes = 0;
   for (const asset of record.assets) {
-    const file = await readLibraryFile(root, 'assets/.objects/' + asset.hash);
+    const file = saved.schemaVersion === 2 ? await readRenderObject(root, asset.hash) : await readLibraryFile(root, 'assets/.objects/' + asset.hash);
     bytes += file.size;
     if (bytes > STYLE_LIMITS.assetBytes || await contentHash(file) !== asset.hash) throw new ProductError('shared.compose', { parts: productJoin([productReference("renderRecords.historicalRenderResourceIsMissingOrFailedVerification"), asset.path]) });
     files.set(asset.path, new Blob([await file.arrayBuffer()], { type: asset.mime }));
@@ -230,6 +253,26 @@ export async function restoreRenderEnvironment(root: FileSystemDirectoryHandle, 
   const dispose = () => { environment?.dispose(); urls.forEach(url => URL.revokeObjectURL(url)); };
   const snapshot: FormatSnapshot = { ...live, renderer, resources: renderer ? extraAssets : undefined, rawBundle: renderer ? rendererPolicy(renderer) : undefined, configuration: record.configuration ?? DEFAULT_LIBRARY_CONFIGURATION, rawFormatter: record.rawFormatter, bundle: { ...live.bundle, formatter: record.formatter }, algorithms, algorithmSource: manifest.algorithms ? 'library' : 'legacy', officialDefault: live.officialDefault && algorithms.fingerprint === DEFAULT_ALGORITHMS.fingerprint && canonicalFormatJson(record.rawFormatter) === canonicalFormatJson(DEFAULT_FORMAT_BUNDLE.formatter),
     ...(environment ? { environment: { ...environment, get assets() { return [...environment.assets, ...extraAssets]; }, rawFiles: manifest.rawFiles, candidates: manifest.candidates, fingerprint: record.environmentHash } } : { environment: undefined }) };
-  return { snapshot, html, css, dispose };
+  return { snapshot, html: saved.schemaVersion === 2 && !saved.resultHash && result.html === undefined ? undefined : html, css, dispose };
 }
 export const materializeRenderRecord = restoreRenderEnvironment;
+
+export async function renderRecordFiles(root: FileSystemDirectoryHandle, record: RenderRecord): Promise<Map<string, File>> {
+  const files = new Map<string, File>();
+  const manifest = await readManifest(root, record);
+  if (record.schemaVersion === 1) {
+    files.set('styles/.versions/' + record.environmentHash + '/manifest.json', await readLibraryFile(root, 'styles/.versions/' + record.environmentHash + '/manifest.json'));
+    for (const asset of manifest.assets) {
+      const file = await readLibraryFile(root, 'assets/.objects/' + asset.hash);
+      if (await contentHash(file) !== asset.hash) throw new ProductError('renderCache.corrupt');
+      files.set('assets/.objects/' + asset.hash, file);
+    }
+  } else {
+    const stored = await loadStoredRenderManifest(root, record.environmentHash);
+    files.set(RENDER_STORE + '/owner.json', await (await (await ensureRenderStore(root)).getFileHandle('owner.json')).getFile());
+    files.set(RENDER_STORE + '/manifests/' + record.environmentHash + '.json', await readLibraryFile(root, RENDER_STORE + '/manifests/' + record.environmentHash + '.json'));
+    const hashes = new Set([...Object.values(stored.parts), ...stored.assets.map(asset => asset.hash), ...(record.resultHash ? [record.resultHash] : [])]);
+    for (const hash of hashes) files.set(RENDER_STORE + '/objects/' + hash, await readRenderObject(root, hash));
+  }
+  return files;
+}

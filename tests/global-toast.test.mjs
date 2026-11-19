@@ -438,7 +438,7 @@ test('single results are direct, optional details exclude empty and duplicate te
       await f.sendStructured({ key:'plain', label:'Done', details, tone:'success', actions:[{ id:'retry', label:messages.productReference('feedback.retryRefresh'), presentation:'icon', icon:'reset', run:() => retried++ }] });
       assert.equal(f.cards[0].querySelector('[aria-expanded]'), null);
     }
-    const action = f.cards[0].querySelector('.toast-actions button');
+    const action = f.cards[0].querySelector('.button-bar[data-toast-anchor="actions"] button');
     await React.act(async () => action.click()); assert.equal(retried,1);
     await f.sendStructured({ key:'plain', label:'2 completed, 1 failed', details:'item.md: permission denied', tone:'warning' });
     assert.ok(f.cards[0].querySelector('[aria-expanded="false"]'));

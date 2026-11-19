@@ -69,8 +69,8 @@ export function SnippetCategoryDialog({ value, existing, kind = 'snippets', coun
         </aside>
       </div>
       <DialogFooter>{error ? <p className="mb-3 text-sm text-danger" role="alert">{formatProductMessage(error, t)}</p> : null}<DialogActions>
-        <DialogButton disabled={busy} onClick={onClose}><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg>{t('common:actions.cancel')}</DialogButton>
-        <DialogButton type="submit" variant="primary" disabled={busy}><svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6" /></svg>{busy ? t('dialogs:ui.saving') : t('dialogs:ui.saveCategory')}</DialogButton>
+        <DialogButton icon="close" disabled={busy} onClick={onClose}>{t('common:actions.cancel')}</DialogButton>
+        <DialogButton icon="save" type="submit" variant="primary" disabled={busy}>{busy ? t('dialogs:ui.saving') : t('dialogs:ui.saveCategory')}</DialogButton>
       </DialogActions></DialogFooter>
     </form>
   </DialogFrame>;

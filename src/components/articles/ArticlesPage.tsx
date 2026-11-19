@@ -1,9 +1,11 @@
 'use client';
 
+import { ConfirmDialog } from '../global/ConfirmDialog';
+
 import { OperationFeedback } from '../global/OperationFeedback';
 import { productReference, productJoin, productDiagnosticReference } from '../../lib/i18n/productMessages';
 import { ARTICLE_SORTS, sortArticleList, type ArticleSort } from '../../lib/articleListSorting';
-import { ContentIcon } from '../global/ContentIcon';
+
 import { IconPopover } from '../global/IconPopover';
 import { SelectField } from '../global/SelectField';
 import { useEditingDrafts, UnsavedMark } from '../global/EditingDrafts';
@@ -17,7 +19,7 @@ import type { UILocale } from '../../lib/i18n/preferences';
 
 import { PageHeading } from '../global/PageHeading';
 import { IconButton } from '../global/IconButton';
-import { DialogActions, DialogButton, DialogFrame, DialogHeader } from '../global/DialogFrame';
+
 import { createPortal } from 'react-dom';
 import { summarizeArticleListChecks, type ArticleListCheck } from '../../lib/articleListChecks';
 
@@ -30,6 +32,7 @@ import { availableArticleThemeUpdate } from '../../lib/articleThemeUpdate';
 import { ThemeUpdateTag } from '../themes/ThemeUpdateTag';
 import { ArticleActionsMenu } from './ArticleActionsMenu';
 import { articleCollectionLabel } from '../../lib/i18n/articleLabels';
+import { Button } from '../global/Button';
 
 function formatDate(value: string, locale: UILocale, invalid: string): string {
   return formatUIDate(value, locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }, invalid);
@@ -199,7 +202,7 @@ export function ArticlesPage({
           <p id="articles-empty-kicker" className="eyebrow">{t('articles:eyebrow.library')}</p>
           <h2 id="articles-empty-title" className="page-title font-heading">{directoryRestoreState === 'checking' ? t('articles:directory.restoring') : rememberedDirectoryName ? t('articles:directory.reauthorize') : t('articles:directory.choose')}</h2>
           <p className="m-0 max-w-lg text-sm text-muted mt-3">{directoryRestoreState === 'checking' ? t('articles:directory.checking') : rememberedDirectoryName ? t('articles:directory.remembered', { name: rememberedDirectoryName }) : t('articles:directory.description')}</p>
-          {directoryRestoreState === 'checking' ? null : rememberedDirectoryName ? <div className="mt-2 flex flex-wrap gap-2"><button className="button button-primary" type="button" onClick={onReopenRememberedDirectory}>{t('articles:directory.authorize')}</button><button className="button button-quiet" type="button" onClick={onGoToSettings}>{t('articles:directory.other')}</button></div> : <button className="button button-primary mt-2" type="button" onClick={onGoToSettings}>{t('articles:directory.settings')}</button>}
+          {directoryRestoreState === 'checking' ? null : rememberedDirectoryName ? <ButtonBar label={t('common:actions.group')} className="mt-2"><Button icon="folder" variant="primary"  type="button" onClick={onReopenRememberedDirectory} label={t('articles:directory.authorize')} /><Button icon="folder"  type="button" onClick={onGoToSettings} label={t('articles:directory.other')} /></ButtonBar> : <ButtonBar label={t('articles:directory.settings')}><Button icon="settings" variant="primary" className="mt-2" type="button" onClick={onGoToSettings} label={t('articles:directory.settings')} /></ButtonBar>}
         </div>
       </section>
     );
@@ -218,7 +221,7 @@ export function ArticlesPage({
               <strong className="font-mono text-3xl font-medium tracking-tight text-accent-text">{formatUINumber(filtered.length, locale, { minimumIntegerDigits: 2, useGrouping: false })}</strong>
               <span className="text-xs text-muted">{t('articles:documentUnit', { count: filtered.length })}</span>
             </div>
-            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportTasks ? <button className="button button-quiet" type="button" onClick={onImportTasks}><ContentIcon name="changes" />{t('messages:imports.tasksTitle')}</button> : null}{onImportMarkdown ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={onImportMarkdown}><ContentIcon name="apply" />{t('messages:imports.title')}</button> : null}<button className="button button-primary" type="button" data-create-article-trigger="overview" onClick={onNew}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 4v16M4 12h16" /></svg>{t('articles:newArticle')}</button></ButtonBar> : null}
+            {collection !== 'archived' ? <ButtonBar label={t('articles:actions.label')}>{onImportMarkdown||onImportTasks ? <Button icon="apply"  type="button" onClick={onImportMarkdown??onImportTasks} label={t('messages:imports.title')} /> : null}<Button icon="plus" variant="primary"  type="button" data-create-article-trigger="overview" onClick={onNew} label={t('articles:newArticle')} /></ButtonBar> : null}
           </div>
         </PageHeading>
 
@@ -245,33 +248,33 @@ export function ArticlesPage({
                 <h3 className="font-sub-heading text-sm font-semibold text-primary">{t('articles:list.title')}</h3>
                 <span className="text-xs text-faint">{selectionActive ? t('articles:selection.count', { selected: selectedArticles.length, total: filtered.length }) : t('articles:list.count', { shown: filtered.length, total: articles.length })}</span>
               </div>
-              <div className="flex min-w-0 flex-1 items-center gap-1" role="group" aria-label={t('articles:categories.title')}>
+              <ButtonBar label={t('articles:categories.title')} className="min-w-0 flex-1 flex-nowrap">
                 {categories.slice(0, 5).map(category => <button key={category} type="button" title={category} className="min-w-0 max-w-32 truncate rounded-full border border-line bg-panel px-2.5 py-1 text-xs text-muted transition hover:border-accent-line hover:text-secondary aria-pressed:border-accent-line aria-pressed:bg-accent-soft aria-pressed:text-accent-text focus-visible:outline-2 focus-visible:outline-accent" aria-pressed={selectedCategories.includes(category)} disabled={listBusy} onClick={() => toggleCategory(category)}>{category}</button>)}
-                {categories.length > 5 ? <IconPopover label={t('articles:categories.more')} icon={<ContentIcon name="more" />} kind="dialog" open={moreTagsOpen} disabled={listBusy} onToggle={() => setMoreTagsOpen(value => !value)} onClose={() => setMoreTagsOpen(false)}><div className="grid gap-1">{categories.slice(5).map(category => <button key={category} type="button" className="min-w-0 truncate rounded px-3 py-2 text-left text-xs hover:bg-hover aria-pressed:bg-accent-soft aria-pressed:text-accent-text focus-visible:outline-2 focus-visible:outline-accent" aria-pressed={selectedCategories.includes(category)} title={category} onClick={() => toggleCategory(category)}>{category}</button>)}</div></IconPopover> : null}
-                {hasActiveFilters ? <IconButton variant="inline" tooltip={t('articles:filter.clear')} icon={<ContentIcon name="close" />} onClick={() => { setQuery(''); setMonth('all'); setSelectedCategories([]); }} /> : null}
-              </div>
+                {categories.length > 5 ? <IconPopover label={t('articles:categories.more')} icon="more" kind="dialog" open={moreTagsOpen} disabled={listBusy} onToggle={() => setMoreTagsOpen(value => !value)} onClose={() => setMoreTagsOpen(false)}><div className="grid gap-1">{categories.slice(5).map(category => <button key={category} type="button" className="min-w-0 truncate rounded px-3 py-2 text-left text-xs hover:bg-hover aria-pressed:bg-accent-soft aria-pressed:text-accent-text focus-visible:outline-2 focus-visible:outline-accent" aria-pressed={selectedCategories.includes(category)} title={category} onClick={() => toggleCategory(category)}>{category}</button>)}</div></IconPopover> : null}
+                {hasActiveFilters ? <IconButton variant="inline" tooltip={t('articles:filter.clear')} icon="close" onClick={() => { setQuery(''); setMonth('all'); setSelectedCategories([]); }} /> : null}
+              </ButtonBar>
               {selectionActive && filtered.length ? <button className="rounded-md border-0 bg-transparent px-1 text-xs text-muted underline underline-offset-2 transition-colors hover:text-secondary focus-visible:outline-2 focus-visible:outline-accent" type="button" onClick={() => setSelectedIds(allFilteredSelected ? [] : filtered.map((item) => item.id))}>{allFilteredSelected ? t('articles:selection.clear') : t('articles:selection.all')}</button> : null}
             </div>
             {selectionActive ? <ButtonBar label={collection === 'archived' ? t('articles:selection.archiveActions') : t('articles:selection.actions')}>
               {collection === 'archived' ? <>
-                <button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onArchiveMany(selectedArticles, false)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 13v6h16v-6M12 16V4m0 0-4 4m4-4 4 4" /></svg>{t('articles:unarchive')}</button>
-                <button className="button button-danger min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onDeleteMany(selectedArticles)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>{t('common:actions.delete')}</button>
+                <Button icon="restore" className="min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onArchiveMany(selectedArticles, false)} label={t('articles:unarchive')} />
+                <Button icon="delete" variant="danger" className="min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onDeleteMany(selectedArticles)} label={t('common:actions.delete')} />
               </> : <>
                 <div ref={projectMenuRef} className="relative">
-                  <button ref={projectMenuButtonRef} className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" aria-expanded={projectMenuOpen} aria-controls="bulk-project-menu" disabled={!selectedArticles.length || busy} onClick={() => setProjectMenuOpen((open) => !open)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h7l2 2h9v11H3zM3 7V4h7l2 3" /></svg>{t('articles:selection.group')}</button>
+                  <Button icon="folder" ref={projectMenuButtonRef} className="min-h-8 px-2 py-1 text-xs" type="button" aria-expanded={projectMenuOpen} aria-controls="bulk-project-menu" disabled={!selectedArticles.length || busy} onClick={() => setProjectMenuOpen((open) => !open)} label={t('articles:selection.group')} />
                   {projectMenuOpen ? <div id="bulk-project-menu" className="absolute top-full left-0 z-20 mt-2 grid w-56 max-h-56 gap-0.5 overflow-x-clip overflow-y-auto rounded-md border border-line bg-panel p-1 shadow-panel scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" role="group" aria-label={t('articles:selection.targetProject')}>
                     {[{ id: null, name: t('articles:collections.unclassified') }, ...projectsInOrder].map((project) => <button key={project.id ?? 'unclassified'} className="w-full break-words rounded-sm px-3 py-2 text-left text-xs text-secondary hover:bg-hover focus-visible:outline-2 focus-visible:outline-accent" type="button" onClick={() => { setProjectMenuOpen(false); void onClassifyMany(selectedArticles, project.id); }}>{project.name}</button>)}
                   </div> : null}
                 </div>
-                <button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onArchiveMany(selectedArticles, true)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v12h14V8M10 12h4" /></svg>{t('articles:collections.archived')}</button>
+                <Button icon="archive" className="min-h-8 px-2 py-1 text-xs" type="button" disabled={!selectedArticles.length || busy} onClick={() => onArchiveMany(selectedArticles, true)} label={t('articles:collections.archived')} />
               </>}
             </ButtonBar> : null}
-            <div className="ml-auto flex min-w-0 flex-wrap items-center gap-3"><OperationFeedback id="article-list-operation" notice={listNotice.label ? listNotice : null} tone={listNotice.tone} /><OperationFeedback id="article-index-diagnostics" label={t('common:feedback.indexDiagnostics') + ' (' + indexIssues.length + ')'} notice={indexIssues.length ? productReference('shared.compose', { parts: productJoin(indexIssues.map(issue => productJoin([`articles/${issue.month}/index.json`, ' · ', productDiagnosticReference(issue)])), '\n') }) : null} summary={productReference('feedback.filesRepair', { count: indexIssues.length })} tone="warning">{indexIssues.length ? <button className="button button-quiet" type="button" disabled={listBusy} onClick={() => setIndexDecision([...new Set(indexIssues.map(item => item.month))])}>{t('articles:index.rebuild')}</button> : null}</OperationFeedback>
+            <ButtonBar label={t('common:actions.group')} className="ml-auto min-w-0"><OperationFeedback id="article-list-operation" notice={listNotice.label ? listNotice : null} tone={listNotice.tone} /><OperationFeedback id="article-index-diagnostics" label={t('common:feedback.indexDiagnostics') + ' (' + indexIssues.length + ')'} notice={indexIssues.length ? productReference('shared.compose', { parts: productJoin(indexIssues.map(issue => productJoin([`articles/${issue.month}/index.json`, ' · ', productDiagnosticReference(issue)])), '\n') }) : null} summary={productReference('feedback.filesRepair', { count: indexIssues.length })} tone="warning">{indexIssues.length ? <Button icon="reset"  type="button" disabled={listBusy} onClick={() => setIndexDecision([...new Set(indexIssues.map(item => item.month))])} label={t('articles:index.rebuild')} /> : null}</OperationFeedback>
               <span className="status-copy" data-tone={totals.error || totals.failed ? 'error' : totals.warning || totals.stale ? 'warning' : 'neutral'} role="status">{filtered.length ? t('articles:checks.summary', totals) + (totals.stale ? t('articles:checks.staleSummary', { count: totals.stale }) : '') + (totals.failed ? t('articles:checks.failedSummary', { count: totals.failed }) : '') : t('articles:checks.empty')}</span>
-              {listWork?.kind === 'check' ? <><span className="text-xs text-muted">{t('articles:checks.progress', listWork)}</span><button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" onClick={() => onCancelCheck()}>{t('articles:checks.cancel')}</button></> : <button className="button button-quiet min-h-8 px-2 py-1 text-xs" type="button" disabled={!filtered.length || listBusy} onClick={() => void onCheck([...filtered])}>{t('articles:checks.run')}</button>}
-              <IconButton tooltip={t('articles:index.rebuildCurrent')} disabled={listBusy || !indexMonths.length} onClick={() => setIndexDecision(month === 'all' ? [...indexMonths] : [month])} icon={<svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8l5 5v2M13 3v5h5M7 11h4M7 15h2" /><path d="M21 13v4h-4M21 17a4 4 0 1 1-1.17-2.83" /></svg>} />
-              <IconButton tooltip={t('common:actions.refresh')} icon={<ContentIcon name="reset" />} disabled={listBusy} onClick={onRefresh} />
-            </div>
+              {listWork?.kind === 'check' ? <><span className="text-xs text-muted">{t('articles:checks.progress', listWork)}</span><Button icon="close" className="min-h-8 px-2 py-1 text-xs" type="button" onClick={() => onCancelCheck()} label={t('articles:checks.cancel')} /></> : <Button icon="check" className="min-h-8 px-2 py-1 text-xs" type="button" disabled={!filtered.length || listBusy} onClick={() => void onCheck([...filtered])} label={t('articles:checks.run')} />}
+              <IconButton tooltip={t('articles:index.rebuildCurrent')} disabled={listBusy || !indexMonths.length} onClick={() => setIndexDecision(month === 'all' ? [...indexMonths] : [month])} icon="reset" />
+              <IconButton tooltip={t('common:actions.refresh')} icon="reset" disabled={listBusy} onClick={onRefresh} />
+            </ButtonBar>
           </div>
 
           {filtered.length ? (
@@ -317,11 +320,15 @@ export function ArticlesPage({
             <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-8 text-center" aria-live="polite">
               <strong className="font-sub-heading text-sm font-semibold text-primary">{indexIssues.length && !articles.length ? t('articles:list.fixIndex') : articles.length ? t('articles:list.noMatches') : collection === 'archived' ? t('articles:list.archiveEmpty') : t('articles:list.empty')}</strong>
               <p className="m-0 max-w-112 text-sm text-muted mt-3">{indexIssues.length && !articles.length ? t('articles:list.fixIndexHelp') : articles.length ? t('articles:list.noMatchesHelp') : collection === 'archived' ? t('articles:list.archiveEmptyHelp') : t('articles:list.emptyHelp')}</p>
-              {!indexIssues.length && !articles.length && collection !== 'archived' ? <button className="button button-quiet" type="button" data-create-article-trigger="empty" onClick={onNew}>{t('articles:newArticle')}</button> : null}
+              {!indexIssues.length && !articles.length && collection !== 'archived' ? <ButtonBar label={t('articles:newArticle')}><Button icon="plus"  type="button" data-create-article-trigger="empty" onClick={onNew} label={t('articles:newArticle')} /></ButtonBar> : null}
             </div>
           )}
         </section>
-        {indexDecision && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="rebuild-index-title" onClose={() => setIndexDecision(null)}><DialogHeader titleId="rebuild-index-title" eyebrow={t('articles:index.eyebrow')} title={t('articles:index.rebuild')} onClose={() => setIndexDecision(null)} /><div className="grid gap-4 p-4"><p className="text-sm text-primary">{t('articles:index.targets', { months: indexDecision.map(value => formatUIMonth(value, locale)).join(locale === 'en-US' ? ', ' : '、') })}</p><p className="text-xs text-muted">{t('articles:index.description')}</p><DialogActions><DialogButton autoFocus onClick={() => setIndexDecision(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" onClick={() => { const months = indexDecision; setIndexDecision(null); void onRebuildIndexes(months); }}>{t('articles:index.start')}</DialogButton></DialogActions></div></DialogFrame>, document.body) : null}
+        {indexDecision && typeof document !== 'undefined' ? createPortal(<ConfirmDialog titleId="rebuild-index-title" onClose={() => setIndexDecision(null)} title={t('articles:index.rebuild')} eyebrow={t('articles:index.eyebrow')}
+          cancel={{ label: t('common:actions.cancel'), autoFocus: true, onClick: () => setIndexDecision(null) }}
+          confirm={{ label: t('articles:index.start'), icon: 'reset', onClick: () => { const months = indexDecision; setIndexDecision(null); void onRebuildIndexes(months); } }}>
+          <div className="grid gap-4 p-4"><p className="text-sm text-primary">{t('articles:index.targets', { months: indexDecision.map(value => formatUIMonth(value, locale)).join(locale === 'en-US' ? ', ' : '、') })}</p><p className="text-xs text-muted">{t('articles:index.description')}</p></div>
+        </ConfirmDialog>, document.body) : null}
     </section>
   );
 }

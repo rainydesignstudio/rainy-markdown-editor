@@ -75,10 +75,14 @@ test('packages without a stylesheet policy retain immutable image bytes when the
   bindPackageInput(mount, { source: 'body', theme: BASIC_THEME, snapshot: format, css: 'p{}', assets: [asset] });
   const prepared = await prepareRenderRecord('body', BASIC_THEME, outer, 'p{}', { snapshot: format, root });
   assert.equal(prepared.manifest.policy, null);
-  await persistRenderRecord(root, await root.getDirectoryHandle('saved', { create: true }), prepared);
-  const restored = await restoreRenderEnvironment(root, prepared.record, format);
+  const pointer = await persistRenderRecord(root, await root.getDirectoryHandle('saved', { create: true }), prepared);
+  const restored = await restoreRenderEnvironment(root, pointer, format);
   assert.equal(restored.snapshot.environment, undefined);
   assert.deepEqual(new Uint8Array(await restored.snapshot.resources[0].blob.arrayBuffer()), bytes);
+  const {writeBrowserCache,libraryCacheScope}=await import('../src/lib/browserCache.ts');
+  const {canonicalFormatJson}=await import('../src/lib/article-format/config.ts');
+  await writeBrowserCache('render',libraryCacheScope(root),canonicalFormatJson(pointer),JSON.stringify({html:'<p>bad cache</p>',css:'a{background:url(javascript:bad)}'}));
+  const invalidCached=await restoreRenderEnvironment(root,pointer,format);assert.equal(invalidCached.html,undefined,'invalid optional cache becomes a miss, not an empty successful historical result');invalidCached.dispose();
   const retained = retainPreviewInput({ snapshot: restored.snapshot, compiledCss: '', article: {}, parsed: {}, media: null });
   assert.notEqual(retained.input.snapshot.resources[0].url, restored.snapshot.resources[0].url);
   assert.equal(retained.input.snapshot.resources[0].blob, restored.snapshot.resources[0].blob);

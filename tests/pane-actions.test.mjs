@@ -45,10 +45,12 @@ test('pane actions cross 480px without remounting state, lose no focus and invok
   try {
     await act(async () => root.render(React.createElement(PaneActions, { label: 'Source actions' }, React.createElement(Action), React.createElement(InsertElementsMenu, { disabled: false, readOnly: false, onChooseImage() {}, onOpenMediaPicker() { images++; }, onOpenSnippetPicker() {}, onInsert() {}, onFormat() {} }))));
     const action = () => [...document.querySelectorAll('button')].find(button => button.textContent.includes('Original action') || button.getAttribute('aria-label') === 'Original action');
+    assert.ok(action().closest('.button-bar'));
     await act(async () => action().focus());
     await act(async () => { width = 480; observers[0].callback(); });
     assert.equal(document.querySelector('[data-pane-actions]').dataset.compact, 'true');
     assert.equal(document.activeElement.getAttribute('aria-label'), 'Source actions');
+    assert.ok(document.activeElement.closest('.button-bar'));
     await act(async () => document.activeElement.click());
     assert.equal(document.activeElement.getAttribute('role'), 'menuitem');
     await act(async () => action().click()); assert.equal(calls, 1);

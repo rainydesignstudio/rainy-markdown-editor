@@ -12,6 +12,8 @@ import { ScrollViewport } from '../global/ScrollViewport';
 import { KnowledgeReader } from './KnowledgeReader';
 import { useToast } from '../global/Toast';
 import { captureKnowledgeSelection } from '../../lib/knowledge/selection';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function KnowledgeReferencePanel({ root, sessionKey, scope, isRootCurrent, disabled, onCite }: {
   root: FileSystemDirectoryHandle | null; sessionKey: number; scope: string | number;
@@ -56,14 +58,14 @@ export function KnowledgeReferencePanel({ root, sessionKey, scope, isRootCurrent
         {active ? <><span aria-hidden="true">›</span><button type="button" className="min-w-0 truncate rounded hover:text-primary focus-visible:outline-2 focus-visible:outline-accent" title={active.name} onClick={browse}>{active.name}</button></> : null}
         {reading && doc ? <><span aria-hidden="true">›</span><span className="min-w-0 truncate" aria-current="page" title={doc.path}>{doc.title}</span></> : null}
       </nav><h3 className="mt-1 truncate font-sub-heading text-sm font-semibold text-primary">{reading && doc ? doc.title : library.reading ? t('reading') : t('noDocumentSelected')}</h3></div>
-      <div className="flex shrink-0 gap-1" role="group" aria-label={t('referenceActions')}>
-        <IconButton tooltip={t('adoptExcerpt')} icon={<ContentIcon name="copy" />} disabled={disabled || !reading || !selection || library.reading} onPointerDown={event => event.preventDefault()} onClick={() => cite(true)} />
-        <IconButton tooltip={t('addCitation')} icon={<ContentIcon name="link" />} disabled={disabled || library.reading} onPointerDown={event => event.preventDefault()} onClick={() => cite(false)} />
-      </div>
+      <ButtonBar label={t('referenceActions')}>
+        <IconButton tooltip={t('adoptExcerpt')} icon="copy" disabled={disabled || !reading || !selection || library.reading} onPointerDown={event => event.preventDefault()} onClick={() => cite(true)} />
+        <IconButton tooltip={t('addCitation')} icon="link" disabled={disabled || library.reading} onPointerDown={event => event.preventDefault()} onClick={() => cite(false)} />
+      </ButtonBar>
     </header>
     <div hidden={reading} className="flex min-h-0 min-w-0 flex-1">
       <aside data-collapsed={collapsed} className="group/reference-sources flex w-40 min-h-0 shrink-0 flex-col border-r border-line bg-list/50 data-[collapsed=true]:w-14" aria-label={t('sources')}>
-        <div className="flex h-10 shrink-0 items-center justify-between gap-1 px-4 group-data-[collapsed=true]/reference-sources:px-2"><span className="truncate text-xs text-muted group-data-[collapsed=true]/reference-sources:sr-only">{t('sources')}</span><IconButton variant="inline" tooltip={t(collapsed ? 'expandSources' : 'collapseSources')} icon={<ContentIcon name={collapsed ? 'expand' : 'collapse'} />} onClick={() => setCollapsed(value => !value)} /></div>
+        <div className="flex h-10 shrink-0 items-center justify-between gap-1 px-4 group-data-[collapsed=true]/reference-sources:px-2"><span className="truncate text-xs text-muted group-data-[collapsed=true]/reference-sources:sr-only">{t('sources')}</span><IconButton variant="inline" tooltip={t(collapsed ? 'expandSources' : 'collapseSources')} icon={collapsed ? 'expand' : 'collapse'} onClick={() => setCollapsed(value => !value)} /></div>
         <div className="grid min-h-0 content-start gap-1 overflow-y-auto overflow-x-clip p-1 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent group-data-[collapsed=true]/reference-sources:scrollbar-none">
           {library.bindings.map(item => <LibraryCard key={item.sourceId} icon={<ContentIcon name="book" />} collapsed={collapsed} title={item.name} aria-pressed={item.sourceId === library.selectedId} onClick={() => { browse(); void library.select(item.sourceId); }}><span className="truncate text-2xs text-faint">{t(library.indexed[item.sourceId] ? 'indexReady' : 'indexMissing')}</span></LibraryCard>)}
         </div>
@@ -73,8 +75,8 @@ export function KnowledgeReferencePanel({ root, sessionKey, scope, isRootCurrent
         <div className="grid min-h-0 content-start grid-cols-[repeat(auto-fill,minmax(min(100%,12rem),1fr))] gap-2 overflow-y-auto overflow-x-clip p-2 scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
           {documents.slice((page - 1) * 100, page * 100).map(item => <LibraryCard key={item.path} icon={<ContentIcon name="document" />} title={item.title} aria-pressed={doc?.path === item.path} disabled={library.loading || !ready} onClick={() => open(item.path)}><span className="truncate font-mono text-2xs text-faint">{item.path}</span></LibraryCard>)}
         </div>
-        {library.loading || !documents.length ? <div className="grid min-h-0 flex-1 content-center justify-items-start gap-2 p-3 text-xs text-muted"><p>{library.loading ? t('loading') : !root ? t('libraryRequired') : !active ? library.bindings.length ? t('chooseSource') : t('unbound') : !ready ? t(library.connection?.status === 'needs-permission' ? 'needsPermission' : 'needsSource') : t('indexMissing')}</p>{library.connection?.status === 'needs-permission' ? <button type="button" className="button button-quiet" onClick={() => void library.authorize()}>{t('authorize')}</button> : null}</div> : null}
-        {pages > 1 ? <div className="mt-auto flex shrink-0 items-center justify-between gap-2 border-t border-line p-2"><IconButton tooltip={t('previous')} icon={<ContentIcon name="collapse" />} disabled={page <= 1} onClick={() => setPage(value => value - 1)} /><span className="text-2xs text-muted">{t('page', { page, pages })}</span><IconButton tooltip={t('next')} icon={<ContentIcon name="expand" />} disabled={page >= pages} onClick={() => setPage(value => value + 1)} /></div> : null}
+        {library.loading || !documents.length ? <div className="grid min-h-0 flex-1 content-center justify-items-start gap-2 p-3 text-xs text-muted"><p>{library.loading ? t('loading') : !root ? t('libraryRequired') : !active ? library.bindings.length ? t('chooseSource') : t('unbound') : !ready ? t(library.connection?.status === 'needs-permission' ? 'needsPermission' : 'needsSource') : t('indexMissing')}</p>{library.connection?.status === 'needs-permission' ? <ButtonBar label={t('authorize')}><Button icon="folder" type="button"  onClick={() => void library.authorize()} label={t('authorize')} /></ButtonBar> : null}</div> : null}
+        {pages > 1 ? <ButtonBar label={t('common:actions.group')} className="mt-auto justify-between border-t border-line p-2 flex-nowrap"><IconButton tooltip={t('previous')} icon="collapse" disabled={page <= 1} onClick={() => setPage(value => value - 1)} /><span className="text-2xs text-muted">{t('page', { page, pages })}</span><IconButton tooltip={t('next')} icon="expand" disabled={page >= pages} onClick={() => setPage(value => value + 1)} /></ButtonBar> : null}
       </div>
     </div>
     <div ref={host} hidden={!reading} className="flex min-h-0 min-w-0 flex-1 flex-col">

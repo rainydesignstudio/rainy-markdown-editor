@@ -9,6 +9,8 @@ import { createToastCountdown, type ToastCountdown } from '../../lib/toastCountd
 import { ContentIcon } from './ContentIcon';
 import { IconButton } from './IconButton';
 import { useUILocale, useUITranslation } from './UILocaleProvider';
+import { Button } from './Button';
+import { ButtonBar } from './ButtonBar';
 
 export type ToastLifetime = { mode: 'auto'; durationMs: number; countdown?: ToastCountdown } | { mode: 'manual' } | { mode: 'locked' };
 export type ToastAction = { id: string; label: ProductMessageInfo; presentation: 'icon' | 'text' | 'icon-text'; icon?: ComponentProps<typeof ContentIcon>['name']; disabled?: boolean; run: () => void | Promise<void> };
@@ -247,17 +249,17 @@ export function ToastCard({ item, dismiss, remove = dismiss, enterFrom = 'top', 
         <p className="toast-heading"><span className="toast-label">{label}</span></p>
         {details ? <div id={detailsId} data-open={expanded} aria-hidden={!expanded} inert={!expanded} className="toast-details">{details}</div> : null}
       </div>
-      <div ref={actionsAnchor} data-toast-anchor="actions" className="toast-actions">
-        {details ? <IconButton variant="inline" tooltip={t(expanded ? 'feedback.hideDetails' : 'feedback.showDetails')} aria-expanded={expanded} aria-controls={detailsId} onClick={() => setOpen(value => !value)} icon={<ContentIcon name="info" />} /> : null}
+      <ButtonBar label={t('actions.group')} className="flex-nowrap" ref={actionsAnchor} data-toast-anchor="actions">
+        {details ? <IconButton variant="inline" tooltip={t(expanded ? 'feedback.hideDetails' : 'feedback.showDetails')} aria-expanded={expanded} aria-controls={detailsId} onClick={() => setOpen(value => !value)} icon="info" /> : null}
         {item.actions?.map(action => {
           const caption = formatProductMessage(action.label, t), disabled = action.disabled || busy !== null;
-          return action.presentation === 'icon' ? <IconButton key={action.id} variant="inline" disabled={disabled} aria-busy={busy === action.id} tooltip={caption} onClick={() => void runAction(action)} icon={<ContentIcon name={action.icon ?? 'reset'} />} /> : <button key={action.id} type="button" className="button button-quiet" disabled={disabled} aria-busy={busy === action.id} onClick={() => void runAction(action)}>{action.presentation === 'icon-text' && action.icon ? <ContentIcon name={action.icon} /> : null}{caption}</button>;
+          return action.presentation === 'icon' ? <IconButton key={action.id} variant="inline" disabled={disabled} aria-busy={busy === action.id} tooltip={caption} onClick={() => void runAction(action)} icon={action.icon ?? 'reset'} /> : <Button icon={action.presentation === 'icon-text' ? action.icon : undefined} key={action.id} type="button"  disabled={disabled} aria-busy={busy === action.id} onClick={() => void runAction(action)} label={caption} />;
         })}
         <IconButton variant="inline" className="relative" disabled={locked || busy !== null} tooltip={t(locked ? 'feedback.locked' : 'feedback.dismiss')} onClick={() => dismiss(item.id)} icon={<>
           {countdown ? <svg className="toast-countdown" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><circle cx="12" cy="12" r="10" className="opacity-25" /><circle ref={ring} cx="12" cy="12" r="10" pathLength="1" strokeDasharray="1" strokeDashoffset="0" /></svg> : null}
           <ContentIcon name="close" />
         </>} />
-      </div>
+      </ButtonBar>
     </div>
   </ToastSurface>;
 }

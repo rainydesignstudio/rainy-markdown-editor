@@ -109,16 +109,15 @@ export function InsertElementsMenu({
     onInsert(text, marker < 0 ? fallbackCaret : marker);
   };
 
-  const triggerIcon = <svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 7v10M7 12h10" /></svg>;
 
   if (disabled) {
     const reason = readOnly ? t('editor:insert.readOnly') : t('editor:insert.unavailable');
-    return <IconButton disabled tooltip={t('editor:insert.disabled', { reason: reason })} icon={triggerIcon} />;
+    return <IconButton disabled tooltip={t('editor:insert.disabled', { reason: reason })} icon="insert" />;
   }
 
   return (
     // Geometry rationale: retain the existing insert menu's 32rem/70dvh cap in both toolbar presentations.
-    <IconPopover label={t('editor:insert.label')} icon={triggerIcon} open={open} onToggle={toggle} onClose={() => setOpen(false)} anchorRef={anchor} align="end" panelClassName="max-h-[min(32rem,70dvh)] w-56">
+    <IconPopover label={t('editor:insert.label')} icon="insert" open={open} onToggle={toggle} onClose={() => setOpen(false)} anchorRef={anchor} align="end" panelClassName="max-h-[min(32rem,70dvh)] w-56">
       <div className="insert-elements-panel contents" role="group" aria-label={t('editor:insert.label')}>
         <p className="insert-menu-label">{t('editor:insert.markdown')}</p>
         {STANDARD_GROUPS.map((group) => (

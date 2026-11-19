@@ -40,7 +40,7 @@ export async function runImportResources(root: FileSystemDirectoryHandle, source
       const resource = task.resources[index++];
       if (resource.state !== 'pending') continue;
       if (pause || options.signal.aborted || !current()) return;
-      resource.state = 'running'; resource.receivedBytes = 0; delete resource.error;
+      resource.state = 'running'; resource.receivedBytes = 0; delete resource.totalBytes; delete resource.error;
       notify(); save();
       let headerTimer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new AbortController();

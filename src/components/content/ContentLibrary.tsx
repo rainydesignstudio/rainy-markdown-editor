@@ -1,6 +1,7 @@
 'use client';
 
 import { OperationFeedback } from '../global/OperationFeedback';
+import { useToast } from '../global/Toast';
 import { formatDiagnosticMessage, formatProductMessage, productCause, productLabel, productText, productReference, productJoin, productDiagnosticReference, productErrorLabel, type ProductMessageInfo } from "../../lib/i18n/productMessages";
 
 import { useUITranslation } from '../global/UILocaleProvider';
@@ -18,13 +19,13 @@ import { createPortal } from 'react-dom';
 import { createArticleSource, parseArticle, replaceArticleBody, updateFrontMatter } from '../../lib/frontMatter';
 import { refreshRootSession } from '../../lib/rootSession';
 import {
-  deleteArticleSnippet, deleteArticleTemplate, loadArticleSnippets, loadArticleTemplates,
+  deleteArticleSnippet, deleteArticleTemplate, loadArticleSnippets, loadArticleTemplates, initializeContentLibraries,
   saveArticleSnippet, saveArticleTemplate, saveSnippetCategory, saveTemplateCategory, isContentFileId, type ContentLibraryIssue,
 } from '../../lib/contentLibraries';
 import { readTemplateTab, templateHref, type TemplateTab } from '../../lib/templateNavigation';
 import type { NavigationGuard } from '../../hooks/useRouteNavigation';
 import type { ArticleSnippet, ArticleTemplate, SnippetCategory, SnippetCategoryIcon, ThemeConfig } from '../../lib/types';
-import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
+
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
 import { useDraftLocation, useEditingDraft, UnsavedMark } from '../global/EditingDrafts';
 import type { EditingLocation } from '../../lib/editingLocation';
@@ -40,6 +41,8 @@ import { ArticleThemeSelect } from '../themes/ArticleThemeSelect';
 import { useArticlePreviewMode } from '../../hooks/useArticlePreviewMode';
 import { useResizableColumns } from '../../hooks/useResizableColumns';
 import { ColumnSplitter } from '../global/ColumnSplitter';
+import { Button } from '../global/Button';
+import { ConfirmDialog } from '../global/ConfirmDialog';
 
 type Tone = 'neutral' | 'success' | 'warning' | 'error';
 type Notice = { label: string; tone: Tone };
@@ -70,13 +73,6 @@ const TABS: { id: TemplateTab }[] = [
   { id: 'snippets' }, { id: 'templates' },
 ];
 
-function Icon({ name }: { name: 'snippet' | 'document' | 'plus' | 'edit' | 'delete' | 'save' | 'cancel' | 'arrow' | 'check' }) {
-  return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    {name === 'snippet' ? <><path d="m8 7-5 5 5 5m8-10 5 5-5 5M14 4l-4 16" /></> : name === 'document' ? <><path d="M5 3h10l4 4v14H5V3ZM14 3v5h5M9 12h6M9 16h4" /></> : name === 'plus' ? <path d="M12 4v16M4 12h16" /> : name === 'edit' ? <path d="m4 20 4-.8L20 7l-3-3L4.8 16 4 20ZM14 7l3 3" /> : name === 'delete' ? <><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7" /></> : name === 'save' ? <path d="M4 4h13l3 3v13H4V4ZM8 4v6h8V4M8 20v-6h8v6" /> : name === 'cancel' ? <path d="m6 6 12 12M6 18 18 6" /> : name === 'check' ? <path d="m5 12 4 4L19 6" /> : <path d="m9 5 7 7-7 7" />}
-  </svg>;
-}
-
-
 function upsert<T extends { id: string; name: string }>(items: T[], next: T): T[] {
   return [...items.filter((item) => item.id !== next.id), next].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 }
@@ -94,7 +90,7 @@ function fileIdentity(draft: Draft, unnamed = productText("contentLibrary.notNam
 }
 
 export function ContentLibrary(props: Props) {
-  const { t } = useUITranslation('content');
+  const { t } = useUITranslation('content'), notify = useToast();
   const { root, librariesState, sessionKey, themes, defaultTheme, snippets, snippetCategories = [], templates, templateCategories = [], snippetIssues, templateIssues, registerNavigationGuard, isRootCurrent, onSnippetsChange, onTemplatesChange } = props;
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [categoryDraft, setCategoryDraft] = useState<{ value: SnippetCategory; tab: TemplateTab; originalId: string | null } | null>(null);
@@ -386,6 +382,42 @@ export function ContentLibrary(props: Props) {
     }
   };
 
+  const loadDefaults = async (retryTabs?: TemplateTab[]) => {
+    if (!root || !canManage || operationLock.current || !isCurrent(root)) return;
+    const operationRoot = root, kind = tab;
+    operationLock.current = true;
+    setOperation({ tab: kind, action: 'refresh' });
+    const key = 'content-load-defaults';
+    try {
+      if (!retryTabs) await initializeContentLibraries(operationRoot);
+      if (!isCurrent(operationRoot)) return;
+      const failed: TemplateTab[] = [];
+      for (const target of retryTabs ?? TABS.map(item => item.id)) {
+        try {
+          const result = await refresh(target, operationRoot);
+          if (!isCurrent(operationRoot) || result.kind === 'stale') return;
+          if (result.kind === 'failed') failed.push(target);
+        } catch {
+          if (!isCurrent(operationRoot)) return;
+          failed.push(target);
+        }
+      }
+      const summary = productReference(failed.length ? 'contentLibrary.defaultsRefreshFailed'
+        : retryTabs ? 'contentLibrary.defaultsRefreshed' : 'contentLibrary.defaultsAdded');
+      notify({ key, label: formatProductMessage(summary, t), summary, tone: failed.length ? 'warning' : 'success',
+        details: failed.length ? failed.map(target => t('content:nouns.' + target)).join(' / ') : undefined,
+        actions: failed.length ? [{ id: 'retry', label: productReference('contentLibrary.retryDefaultsRefresh'), presentation: 'icon', icon: 'reset', run: () => loadDefaults(failed) }] : undefined });
+    } catch (error) {
+      if (isCurrent(operationRoot)) {
+        const summary = productReference('contentLibrary.defaultsFailed');
+        notify({ key, label: formatProductMessage(summary, t), summary, tone: 'error', details: productCause(error) });
+      }
+    } finally {
+      operationLock.current = false;
+      if (isCurrent(operationRoot)) setOperation(null);
+    }
+  };
+
   const retryRefresh = async () => {
     if (!root || !canManage || !refreshPending[tab] || operationLock.current || !isCurrent(root)) return;
     const operationRoot = root;
@@ -442,7 +474,7 @@ export function ContentLibrary(props: Props) {
     const selectedEntry = (draft?.value.id ?? selected?.id) === entry.id;
     return <div key={entry.id} className="group/entry relative min-w-0">
       <PanelHeading title={<span className="flex min-w-0 items-center gap-2"><span>{entry.name}</span>{registered(tab) && (originalId(managedDraft(tab)!) ?? managedDraft(tab)!.value.id) === entry.id ? <UnsavedMark /> : null}</span>} icon={<CategoryIcon name={snippet ? snippet.icon : (entry as ArticleTemplate).icon ?? 'document'} />} reserveAction={canManage} aria-label={entry.name} aria-description={parsed ? t('content:templates.articleCategories', { categories: parsed.metadata.categories.length ? parsed.metadata.categories.join('、') : t('content:ui.notSet') }) : undefined} aria-current={selectedEntry ? 'true' : undefined} data-current={selectedEntry} disabled={busy} onClick={() => requestDecision(productText("contentLibrary.switchContent"), () => { replaceDraft(tab, null); setSelectedIds(previous => ({ ...previous, [tab]: entry.id })); })} className="flex-col items-stretch gap-2 rounded-lg border border-transparent px-3 py-3 data-[current=true]:border-accent-line data-[current=true]:bg-accent-soft aria-[current=true]:text-accent-text disabled:cursor-not-allowed disabled:opacity-50" details={<span className="grid min-w-0 gap-1.5 text-left font-sans font-normal"><span className="break-words text-xs text-muted">{snippet?.description || parsed?.metadata.description || (tab === 'snippets' ? t('content:ui.reusableContentSnippet') : t('content:ui.markdownStarterStructure'))}</span>{parsed ? <TemplateArticleCategoryTags categories={parsed.metadata.categories} /> : null}<code className="break-all font-mono text-xs text-faint">{snippet?.trigger || `${entry.id}.md`}</code>{parsed?.diagnostics.some(diagnostic => diagnostic.level === 'error') ? <span className="text-xs text-danger">{t('content:ui.formatErrorsOpenSourceToRepair')}</span> : null}</span>} />
-      {canManage ? <TooltipButton tooltip={t('content:templates.editInfo', { type: uiName })} type="button" aria-label={t('content:templates.editNamed', { type: uiName, name: entry.name })} disabled={busy} onClick={() => editEntry(entry)} className="button button-quiet pointer-events-none absolute top-3 right-3 size-8 min-h-0 p-0 opacity-0 transition-opacity duration-300 group-hover/entry:pointer-events-auto group-hover/entry:opacity-100 group-focus-within/entry:pointer-events-auto group-focus-within/entry:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 motion-reduce:duration-0"><Icon name="edit" /></TooltipButton> : null}
+      {canManage ? <ButtonBar label={t('content:templates.editNamed', { type: uiName, name: entry.name })} className="absolute top-3 right-3"><TooltipButton tooltip={t('content:templates.editInfo', { type: uiName })} type="button" aria-label={t('content:templates.editNamed', { type: uiName, name: entry.name })} disabled={busy} onClick={() => editEntry(entry)} className="button button-quiet pointer-events-none size-8 min-h-0 p-0 opacity-0 transition-opacity duration-300 group-hover/entry:pointer-events-auto group-hover/entry:opacity-100 group-focus-within/entry:pointer-events-auto group-focus-within/entry:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100 motion-reduce:duration-0"><ContentIcon name="edit" /></TooltipButton></ButtonBar> : null}
     </div>;
   };
   const selectedSource = selected ? tab === 'snippets' ? (selected as ArticleSnippet).content : (selected as ArticleTemplate).source : '';
@@ -534,11 +566,11 @@ export function ContentLibrary(props: Props) {
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3 md:px-5">
             <div className="flex min-w-0 gap-1 rounded-lg bg-list p-1" role="tablist" aria-label={t('content:ui.templateType')}>
               {TABS.map((item) => <button key={item.id} id={`template-tab-${item.id}`} type="button" role="tab" aria-selected={tab === item.id} aria-controls={`template-panel-${item.id}`} tabIndex={tab === item.id ? 0 : -1} disabled={busy} onClick={() => switchTab(item.id)} onKeyDown={(event) => onTabKeyDown(event, item.id)} className="flex min-h-9 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-hover hover:text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 aria-selected:bg-panel aria-selected:text-accent-text">
-                <Icon name={item.id === 'snippets' ? 'snippet' : 'document'} /><span>{t('content:tabs.' + item.id)}</span><span className="font-mono text-xs text-faint">{item.id === 'snippets' ? snippets.length : templates.length}</span>
+                <ContentIcon name={item.id === 'snippets' ? 'code' : 'document'} /><span>{t('content:tabs.' + item.id)}</span><span className="font-mono text-xs text-faint">{item.id === 'snippets' ? snippets.length : templates.length}</span>
                 {registered(item.id) ? <UnsavedMark /> : null}
               </button>)}
             </div>
-            <ButtonBar label={t('content:ui.createLibraryContent')}><OperationFeedback hideTrigger revision={feedbackEvent.current[tab]} id={`content-operation-${tab}`} notice={notice.label ? notice : null} tone={notice.tone} onRetry={refreshPending[tab] ? retryRefresh : undefined} retryDisabled={!canManage || busy} /><OperationFeedback id={`content-files-${tab}`} label={t('common:feedback.fileProblems', { count: issues.length })} notice={issues.length ? productReference('shared.compose', { parts: productJoin(issues.map(issue => productJoin([issue.file, ' · ', productDiagnosticReference(issue)])), '\n') }) : null} summary={productReference('feedback.filesRepair', { count: issues.length })} tone="warning" /><button className="button button-quiet" type="button" onClick={() => openCategory()} disabled={!canManage || busy}><Icon name="plus" />{t('content:ui.newCategory')}</button>{tab === 'snippets' ? <button className="button button-quiet" type="button" onClick={copySnippet} disabled={!canManage || busy || !selected || draft?.original === null}><ContentIcon name="copy" />{t('messages:contentLibrary.copySnippet')}</button> : null}<button className="button button-primary" type="button" onClick={beginCreate} disabled={!canManage || busy}><Icon name="plus" />{t('content:templates.newType', { type: t(tab === 'snippets' ? 'messages:snippetCategoryIcons.snippet' : 'messages:contentLibrary.starterTemplate') })}</button></ButtonBar>
+            <ButtonBar label={t('content:ui.createLibraryContent')}><OperationFeedback hideTrigger revision={feedbackEvent.current[tab]} id={`content-operation-${tab}`} notice={notice.label ? notice : null} tone={notice.tone} onRetry={refreshPending[tab] ? retryRefresh : undefined} retryDisabled={!canManage || busy} /><OperationFeedback id={`content-files-${tab}`} label={t('common:feedback.fileProblems', { count: issues.length })} notice={issues.length ? productReference('shared.compose', { parts: productJoin(issues.map(issue => productJoin([issue.file, ' · ', productDiagnosticReference(issue)])), '\n') }) : null} summary={productReference('feedback.filesRepair', { count: issues.length })} tone="warning" /><Button icon="download"  type="button" onClick={() => void loadDefaults()} disabled={!canManage || busy} label={t('content:ui.loadDefaults')} /><Button icon="folderAdd"  type="button" onClick={() => openCategory()} disabled={!canManage || busy} label={t('content:ui.newCategory')} />{tab === 'snippets' ? <Button icon="copy"  type="button" onClick={copySnippet} disabled={!canManage || busy || !selected || draft?.original === null} label={t('messages:contentLibrary.copySnippet')} /> : null}<Button icon={tab === 'snippets' ? 'code' : 'document'} variant="primary"  type="button" onClick={beginCreate} disabled={!canManage || busy} label={t('content:templates.newType', { type: t(tab === 'snippets' ? 'messages:snippetCategoryIcons.snippet' : 'messages:contentLibrary.starterTemplate') })} /></ButtonBar>
           </div>
 
           {!root || librariesState !== 'ready' ? <div className="shrink-0 border-b border-line bg-list px-5 py-3 text-xs text-muted" role="status">
@@ -552,10 +584,10 @@ export function ContentLibrary(props: Props) {
                   <p className="shrink-0 px-3 py-3 text-xs font-medium tracking-wide text-faint">{tab === 'snippets' ? t('content:ui.reusablePassages') : t('content:ui.startingPointsForArticles')}</p>
                   <div aria-label={t('content:templates.listScroll', { type: uiName })} className="flex min-h-0 min-w-0 flex-1 flex-col gap-1 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">
                     <>
-                      {items.some(entry => !entry.categoryId) ? <CollapsiblePanel id={`${tab}-legacy`} title={t('content:ui.uncategorized')} icon={<Icon name={tab === 'snippets' ? 'snippet' : 'document'} />} count={items.filter(entry => !entry.categoryId).length} open={Boolean(expandedCategories[`${tab}:legacy`])} onToggle={() => setExpandedCategories(previous => ({ ...previous, [`${tab}:legacy`]: !previous[`${tab}:legacy`] }))} className="mt-2 shrink-0 rounded-lg" contentClassName="shrink-0 px-2 pb-2"><div className="grid gap-1">{items.filter(entry => !entry.categoryId).map(renderEntry)}</div></CollapsiblePanel> : null}
+                      {items.some(entry => !entry.categoryId) ? <CollapsiblePanel id={`${tab}-legacy`} title={t('content:ui.uncategorized')} icon={<ContentIcon name={tab === 'snippets' ? 'code' : 'document'} />} count={items.filter(entry => !entry.categoryId).length} open={Boolean(expandedCategories[`${tab}:legacy`])} onToggle={() => setExpandedCategories(previous => ({ ...previous, [`${tab}:legacy`]: !previous[`${tab}:legacy`] }))} className="mt-2 shrink-0 rounded-lg" contentClassName="shrink-0 px-2 pb-2"><div className="grid gap-1">{items.filter(entry => !entry.categoryId).map(renderEntry)}</div></CollapsiblePanel> : null}
                       {categories.map(category => {
                         const grouped = items.filter(entry => entry.categoryId === category.id);
-                        return <CollapsiblePanel key={category.id} id={`${tab === 'snippets' ? 'snippet' : 'template'}-category-${category.id}`} title={category.name} icon={<CategoryIcon name={category.icon} />} count={grouped.length} open={Boolean(expandedCategories[`${tab}:${category.id}`])} onToggle={() => setExpandedCategories(previous => ({ ...previous, [`${tab}:${category.id}`]: !previous[`${tab}:${category.id}`] }))} className="mt-2 shrink-0" contentClassName="shrink-0 px-2 pb-2" headingActions={<TooltipButton tooltip={t('content:ui.editCategory')} className="button button-quiet size-8 min-h-0 shrink-0 p-0 opacity-0 group-hover/panel-heading:opacity-100 group-focus-within/panel-heading:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100" type="button" aria-label={t('content:templates.editCategory', { name: category.name })} disabled={!canManage || busy} onClick={() => openCategory(category)}><Icon name="edit" /></TooltipButton>}>
+                        return <CollapsiblePanel key={category.id} id={`${tab === 'snippets' ? 'snippet' : 'template'}-category-${category.id}`} title={category.name} icon={<CategoryIcon name={category.icon} />} count={grouped.length} open={Boolean(expandedCategories[`${tab}:${category.id}`])} onToggle={() => setExpandedCategories(previous => ({ ...previous, [`${tab}:${category.id}`]: !previous[`${tab}:${category.id}`] }))} className="mt-2 shrink-0" contentClassName="shrink-0 px-2 pb-2" headingActions={<TooltipButton tooltip={t('content:ui.editCategory')} className="button button-quiet size-8 min-h-0 shrink-0 p-0 opacity-0 group-hover/panel-heading:opacity-100 group-focus-within/panel-heading:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100" type="button" aria-label={t('content:templates.editCategory', { name: category.name })} disabled={!canManage || busy} onClick={() => openCategory(category)}><ContentIcon name="edit" /></TooltipButton>}>
                           {category.description ? <p className="mb-3 px-1 text-xs text-muted">{category.description}</p> : null}
                           <div className="grid gap-1">{grouped.map(renderEntry)}{!grouped.length ? <p className="px-3 py-3 text-xs text-faint">{t('content:templates.emptyCategory', { type: uiName })}</p> : null}</div>
                         </CollapsiblePanel>;
@@ -572,8 +604,8 @@ export function ContentLibrary(props: Props) {
                       <ButtonBar label={t('content:ui.templateEditingActions')} className="justify-end">
                         <ArticleThemeSelect themes={themes} value={previewTheme.id} onChange={setSelectedThemeId} />
                         <PreviewModeSwitch dark={dark} onToggle={toggle} />
-                        <button className="button button-quiet" type="button" disabled={!canManage || busy} onClick={edit}><Icon name="edit" />{t('content:ui.edit')}</button>
-                        {selected && (!draft || draft.original !== null) ? <button className="button button-danger" type="button" aria-label={t('content:templates.deleteNamed', { type: uiName, name: selected.name })} disabled={!canManage || busy || dirty(draft)} onClick={() => setConfirmDelete({ tab, id: selected.id, name: selected.name })}><Icon name="delete" />{t('content:ui.delete')}</button> : null}
+                        <Button icon="edit"  type="button" disabled={!canManage || busy} onClick={edit} label={t('content:ui.edit')} />
+                        {selected && (!draft || draft.original !== null) ? <Button icon="delete" variant="danger"  type="button" aria-label={t('content:templates.deleteNamed', { type: uiName, name: selected.name })} disabled={!canManage || busy || dirty(draft)} onClick={() => setConfirmDelete({ tab, id: selected.id, name: selected.name })} label={t('content:ui.delete')} /> : null}
                       </ButtonBar>
                     </header>
                     <div ref={sourceLayout.containerRef} className="editor-grid group/content-preview shrink-0 lg:shrink" data-wide={sourceLayout.wideEnough} data-dragging={sourceLayout.dragging} style={sourceLayout.style}>
@@ -586,10 +618,10 @@ export function ContentLibrary(props: Props) {
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
                       <p id="template-source-help" className="min-w-0 flex-1 text-xs text-muted">{draft && !isContentFileId(draft.value.id) ? t('content:ui.clickEditToEnterAFilenameBeforeSaving') : tab === 'snippets' ? (draft?.tab === 'snippets' && !draft.value.categoryId && !draft.original ? t('content:ui.chooseACategoryInTheInformationDialogBefore') : t('content:ui.triggersStartWithUseOneMarkerToSet')) : invalidMetadata ? t('content:ui.metadataHasErrorsClickEditToRepairIt') : t('content:ui.editTheBodyInSourceUseEditFor')}{' '}{t(tab === 'snippets' ? 'messages:contentLibrary.typeASnippetTriggerInTheBodyThenPressSpaceToExpand' : 'messages:contentLibrary.chooseAStarterTemplateWhenCreatingAnArticleItsStructureIsRetained')}</p>
-                      <ButtonBar label={t('content:ui.contentSaveActions')} className="justify-end"><button className="button button-quiet" type="button" disabled={!draft || busy} onClick={() => requestDecision(productText("contentLibrary.cancelEditing"), () => { replaceDraft(tab, null); })}><Icon name="cancel" />{t('content:ui.cancelEditing')}</button><button className="button button-quiet" type="button" disabled={!canManage || busy || invalidMetadata} onClick={() => validate()}><Icon name="check" />{operation?.action === 'validate' ? t('content:ui.validating') : t('content:ui.validateContent')}</button><button className="button button-primary" type="submit" aria-keyshortcuts="Meta+S Control+S" title={validated(draft) ? t('content:ui.saveContentSCtrlS') : t('content:ui.validateFirstSCtrlSValidatesAndSaves')} disabled={!canManage || busy || !dirty(draft) || !validated(draft) || invalidMetadata || Boolean(draft && !draft.original && !draft.value.categoryId)}><Icon name="save" />{operation?.action === 'save' ? t('content:ui.saving') : t('content:ui.saveContent')}</button></ButtonBar>
+                      <ButtonBar label={t('content:ui.contentSaveActions')} className="justify-end"><Button icon="close"  type="button" disabled={!draft || busy} onClick={() => requestDecision(productText("contentLibrary.cancelEditing"), () => { replaceDraft(tab, null); })} label={t('content:ui.cancelEditing')} /><Button icon="check"  type="button" disabled={!canManage || busy || invalidMetadata} onClick={() => validate()} label={operation?.action === 'validate' ? t('content:ui.validating') : t('content:ui.validateContent')} /><Button icon="save" variant="primary"  type="submit" aria-keyshortcuts="Meta+S Control+S" title={validated(draft) ? t('content:ui.saveContentSCtrlS') : t('content:ui.validateFirstSCtrlSValidatesAndSaves')} disabled={!canManage || busy || !dirty(draft) || !validated(draft) || invalidMetadata || Boolean(draft && !draft.original && !draft.value.categoryId)} label={operation?.action === 'save' ? t('content:ui.saving') : t('content:ui.saveContent')} /></ButtonBar>
                     </div>
                     {draftDiagnostics.some((diagnostic) => diagnostic.level === 'error') ? <div className="grid max-h-20 shrink-0 gap-2 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent" role="status" aria-label={t('content:ui.templateSourceDiagnostics')}>{draftDiagnostics.filter((diagnostic) => diagnostic.level === 'error').map((diagnostic, index) => <p key={index} className="break-words text-xs text-danger">{formatDiagnosticMessage(diagnostic, t)}</p>)}</div> : null}
-                  </form> : <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 text-muted"><Icon name={tab === 'snippets' ? 'snippet' : 'document'} /><h3 className="font-heading text-lg font-semibold text-primary">{t('content:templates.choose', { type: uiName })}</h3><p className="text-sm">{t('content:ui.browseTheListOrCreateYourOwnContent')}</p></div>}
+                  </form> : <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 text-muted"><ContentIcon name={tab === 'snippets' ? 'code' : 'document'} /><h3 className="font-heading text-lg font-semibold text-primary">{t('content:templates.choose', { type: uiName })}</h3><p className="text-sm">{t('content:ui.browseTheListOrCreateYourOwnContent')}</p></div>}
 
                 </div>
               </div>
@@ -598,7 +630,10 @@ export function ContentLibrary(props: Props) {
           </div>)}
         </div>
 
-      {confirmDelete && typeof document !== 'undefined' ? createPortal(<DialogFrame titleId="template-delete-title" descriptionId="template-delete-description" role="alertdialog" dismissible={!busy} onClose={() => setConfirmDelete(null)}><DialogHeader titleId="template-delete-title" eyebrow={t('common:eyebrows.deleteTemplate')} title={t('content:templates.deleteType', { type: confirmDelete.tab === 'snippets' ? t('content:ui.snippets') : t('content:ui.starterTemplates') })} closeDisabled={busy} onClose={() => setConfirmDelete(null)} /><div className="dialog-content"><p className="break-words text-sm font-medium text-primary">「{confirmDelete.name}」</p><p id="template-delete-description" className="mt-3 text-sm text-muted">{t('content:ui.deletionCannotBeUndone')}{confirmDelete.tab === 'snippets' ? t('content:ui.contentAlreadyInsertedIntoArticles') : t('content:ui.articlesAlreadyCreated')}{t('content:ui.remainUnaffected')}</p></div><DialogFooter><DialogActions><DialogButton disabled={busy} onClick={() => setConfirmDelete(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy} onClick={() => void remove()}>{busy ? t('content:ui.deleting') : t('content:ui.confirmDeletion')}</DialogButton></DialogActions></DialogFooter></DialogFrame>, document.body) : null}
+      {confirmDelete && typeof document !== 'undefined' ? createPortal(<ConfirmDialog titleId="template-delete-title" descriptionId="template-delete-description" role="alertdialog" dismissible={!busy} onClose={() => setConfirmDelete(null)} title={t('content:templates.deleteType', { type: confirmDelete.tab === 'snippets' ? t('content:ui.snippets') : t('content:ui.starterTemplates') })} eyebrow={t('common:eyebrows.deleteTemplate')} closeDisabled={busy}
+        cancel={{ label: t('common:actions.cancel'), onClick: () => setConfirmDelete(null), disabled: busy }} confirm={{ label: busy ? t('content:ui.deleting') : t('content:ui.confirmDeletion'), icon: "delete", onClick: () => void remove(), disabled: busy, variant: "danger" }}>
+        <div className="dialog-content"><p className="break-words text-sm font-medium text-primary">「{confirmDelete.name}」</p><p id="template-delete-description" className="mt-3 text-sm text-muted">{t('content:ui.deletionCannotBeUndone')}{confirmDelete.tab === 'snippets' ? t('content:ui.contentAlreadyInsertedIntoArticles') : t('content:ui.articlesAlreadyCreated')}{t('content:ui.remainUnaffected')}</p></div>
+      </ConfirmDialog>, document.body) : null}
       {decision && typeof document !== 'undefined' ? createPortal(<UnsavedChangesDialog entries={pendingDrafts.map((target) => ({ label: target.tab === 'snippets' ? target.value.name : parseArticle(target.value.source).metadata.title || t('content:ui.untitledStarterTemplate'), detail: fileIdentity(target, t('content:ui.unnamed')) }))} description={t('content:templates.leaving', { action: formatProductMessage(decision.label, t) })} saveDisabled={!canManage || busy} saveLabel={decision.scope === 'page' ? t('content:ui.saveAndLeave') : t('content:ui.saveAndContinue')} onCancel={() => setDecision(null)} onContinue={() => resumeContent(decision.scope === 'info' ? infoDraft!.tab : decision.scope === 'tab' ? tab : pendingDrafts.find(target => target.tab === lastEditedTab.current)?.tab ?? pendingDrafts[0]?.tab ?? tab)} onDiscard={() => { const run = decision.run; setDecision(null); run(); }} onSave={async () => { const run = decision.run; if (decision.scope === 'info') { if (!await saveInfo(true)) return false; } else for (const target of pendingDrafts) if (!await save(target, false, true)) return false; setDecision(null); run(); return true; }} />, document.body) : null}
 
       {categoryDraft && typeof document !== 'undefined' ? createPortal(<SnippetCategoryDialog value={categoryDraft.value} existing={categoryDraft.originalId !== null} kind={categoryDraft.tab} count={(categoryDraft.tab === 'snippets' ? snippets : templates).filter(item => item.categoryId === categoryDraft.originalId).length} busy={busy} error={categoryError} onChange={value => setCategoryDraft({ ...categoryDraft, value })} onClose={() => { if (!busy) setCategoryDraft(null); }} onSave={() => void saveCategory()} />, document.body) : null}

@@ -86,11 +86,12 @@ function workspace() {
   let cursor = 0;
   const cells = [];
   const effects = [];
-  const calls = { saves: 0, refreshes: 0, commits: 0, writes: [], categoryWrites: [] };
+  const calls = { saves: 0, refreshes: 0, commits: 0, writes: [], categoryWrites: [], defaults: 0, notices: [], defaultRefreshes: [] };
   const root = { name: 'isolated-memory-library' };
   let currentRoot = root;
   let saveError = false;
   let refreshError = false;
+  let failedDefaultTab;
   let deferSave;
   let formatIssues = [];
   let tree;
@@ -119,8 +120,9 @@ function workspace() {
     async saveTemplateCategory(expected, value, originalId) { calls.categoryWrites.push({ kind: 'templates', value: { ...value }, originalId }); return { ...value }; },
     async saveArticleSnippet(expected, draft, originalId, onFormatIssues) { calls.writes.push({ kind: 'snippets', draft: { ...draft }, originalId }); calls.saves += 1; if (deferSave) await deferSave; if (saveError) throw new Error('fixture save denied'); if (formatIssues.length) onFormatIssues?.(formatIssues); return { ...draft }; },
     async saveArticleTemplate(expected, id, source, originalId, categoryId, onFormatIssues) { calls.writes.push({ kind: 'templates', draft: { id, source, categoryId }, originalId }); calls.saves += 1; if (deferSave) await deferSave; if (saveError) throw new Error('fixture save denied'); if (formatIssues.length) onFormatIssues?.(formatIssues); const metadata = frontMatter.parseArticle(source).metadata; return { id, source, name: metadata.title || id, ...(categoryId ? { categoryId } : {}), ...(typeof metadata.templateIcon === 'string' ? { icon: metadata.templateIcon } : {}) }; },
-    async loadArticleTemplates() { calls.refreshes += 1; if (refreshError) throw new Error('fixture refresh failed'); return { templates: props.templates, categories: props.templateCategories, issues: [] }; },
-    async loadArticleSnippets() { calls.refreshes += 1; if (refreshError) throw new Error('fixture refresh failed'); return { snippets: props.snippets, categories: props.snippetCategories, issues: [] }; },
+    async initializeContentLibraries() { calls.defaults += 1; },
+    async loadArticleTemplates() { calls.refreshes += 1; calls.defaultRefreshes.push('templates'); if (refreshError || failedDefaultTab === 'templates') throw new Error('fixture refresh failed'); return { templates: props.templates, categories: props.templateCategories, issues: [] }; },
+    async loadArticleSnippets() { calls.refreshes += 1; calls.defaultRefreshes.push('snippets'); if (refreshError || failedDefaultTab === 'snippets') throw new Error('fixture refresh failed'); return { snippets: props.snippets, categories: props.snippetCategories, issues: [] }; },
   };
   const Dialog = (props) => jsx('dialog', props);
   const module = { exports: {} };
@@ -145,6 +147,7 @@ function workspace() {
       if (id === 'react/jsx-runtime') return { jsx, jsxs };
       if (id === 'react-dom') return { createPortal: children => children };
       if (id.endsWith('/ButtonBar')) return { ButtonBar: 'button-bar' };
+      if (id.endsWith('/Toast')) return { useToast: () => notice => calls.notices.push(notice) };
       if (id.endsWith('/PageHeading')) return { PageHeading: Dialog };
       if (id.endsWith('/CollapsiblePanel')) return { CollapsiblePanel: 'collapsible-panel', PanelHeading: 'panel-heading' };
       if (id.endsWith('/ContentMetadataEditor')) return { ContentMetadataEditor: 'metadata-editor' };
@@ -182,6 +185,7 @@ function workspace() {
     render, calls, find, props, nodes: () => all(tree),
     get guard() { return guard; },
     set saveError(value) { saveError = value; }, set refreshError(value) { refreshError = value; },
+    set failedDefaultTab(value) { failedDefaultTab = value; },
     set deferSave(value) { deferSave = value; }, set currentRoot(value) { currentRoot = value; },
     set formatIssues(value) { formatIssues = value; },
     create(fileId = 'named-draft') {
@@ -203,6 +207,26 @@ function workspace() {
     async shortcut(props = {}) { const event = this.key(props); await event.completed; render(); return event; },
   };
 }
+
+test('loading defaults announces once and retries only the list that failed to refresh', async () => {
+  const f = workspace();
+  f.failedDefaultTab = 'templates';
+  f.find(node => node.type === 'button' && Array.isArray(node.props.children) && node.props.children.includes('载入默认')).props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  f.render();
+  assert.equal(f.calls.defaults, 1);
+  assert.deepEqual(f.calls.defaultRefreshes, ['snippets', 'templates']);
+  assert.equal(f.calls.notices.length, 1);
+  assert.equal(f.calls.notices[0].tone, 'warning');
+  f.switch('templates');
+  assert.equal(f.calls.notices.length, 1);
+  assert.equal(f.find(node => node.props.id === 'content-operation-templates').props.notice, null);
+  f.failedDefaultTab = null;
+  await f.calls.notices[0].actions[0].run();
+  assert.equal(f.calls.defaults, 1);
+  assert.deepEqual(f.calls.defaultRefreshes, ['snippets', 'templates', 'templates']);
+  assert.equal(f.calls.notices.at(-1).tone, 'success');
+});
 
 test('each tab retains its own draft and returning to a tab restores its text', () => {
   const w = workspace();
@@ -641,7 +665,9 @@ test('each snippet and template card has a 300ms hover edit button that opens it
     w.switch(tab);
     const target = w.props[tab][1];
     const row = w.find(n => n.type === 'div' && n.props.className?.includes('group/entry') && n.props.children[0]?.props['aria-label'] === target.name);
-    const card = row.props.children[0], editButton = row.props.children[1];
+    const [card, actions] = row.props.children;
+    assert.equal(actions.type, 'button-bar');
+    const editButton = actions.props.children;
     assert.equal(card.type, 'panel-heading');
     assert.equal(card.props.reserveAction, true);
     assert.equal(editButton.type, 'tooltip-button');

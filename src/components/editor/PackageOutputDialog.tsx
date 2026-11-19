@@ -1,5 +1,7 @@
 'use client';
-import { ContentIcon } from '../global/ContentIcon';
+
+import { ConfirmDialog } from '../global/ConfirmDialog';
+
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { FormatSnapshot } from '../../lib/article-format/runtime';
 import type { ThemeConfig } from '../../lib/types';
@@ -12,7 +14,7 @@ import { getArticleRenderSnapshot, getFormatSnapshot } from '../../lib/article-f
 import type { ArticleFormatIssue } from '../../lib/articleFormat';
 import { formatDiagnosticMessage } from '../../lib/i18n/productMessages';
 import { assertInertPackageMarkup } from '../../lib/article-format/packageRendering';
-import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from '../global/DialogFrame';
+
 import { useUITranslation } from '../global/UILocaleProvider';
 import { ArticleExportForm } from './ArticleExportForm';
 
@@ -83,5 +85,9 @@ export function PackageOutputDialog({ snapshot, source, theme, title, root, mont
     finally { running.current = false; if (active.current) setBusy(false); }
   };
   const answer = (value: boolean) => { reviewAnswer.current?.(value); reviewAnswer.current = null; setReview(null); };
-  return <><ArticleExportForm choices={actions.map(item => ({ id: item.id, title: item.label, extension: item.extension, detail: item.mime }))} selected={selected} onSelect={setSelected} filename={{ base, name: action?.extension ? articleExportBaseName(base) + '.' + action.extension : undefined, onChange: setBase }} dirty={dirty} busy={busy} disabled={!action || !current()} error={error} focusActive={focusActive && !review} onSubmit={() => void run()} onClose={onClose} />{review ? <DialogFrame titleId="package-resources-title" onClose={() => answer(false)}><DialogHeader eyebrow="EXPORT" titleId="package-resources-title" title={t('resources.packageReview')} onClose={() => answer(false)} /><div className="grid gap-4 p-4"><p className="text-sm text-muted">{t('resources.packageReviewHelp')}</p><ul className="grid max-h-64 gap-2 overflow-x-clip overflow-y-auto text-xs text-warning">{review.map((issue, index) => <li key={index}>{formatDiagnosticMessage(issue, t)}</li>)}</ul></div><DialogFooter><DialogActions><DialogButton onClick={() => answer(false)}><ContentIcon name="close" />{t('formatPackage.cancel')}</DialogButton><DialogButton variant="primary" onClick={() => answer(true)}>{t('resources.continuePartialPackage')}</DialogButton></DialogActions></DialogFooter></DialogFrame> : null}</>;
+  return <><ArticleExportForm choices={actions.map(item => ({ id: item.id, title: item.label, extension: item.extension, detail: item.mime }))} selected={selected} onSelect={setSelected} filename={{ base, name: action?.extension ? articleExportBaseName(base) + '.' + action.extension : undefined, onChange: setBase }} dirty={dirty} busy={busy} disabled={!action || !current()} error={error} focusActive={focusActive && !review} onSubmit={() => void run()} onClose={onClose} />{review ? <ConfirmDialog titleId="package-resources-title" title={t('resources.packageReview')} eyebrow="EXPORT" onClose={() => answer(false)}
+      cancel={{ label: t('formatPackage.cancel'), onClick: () => answer(false) }}
+      confirm={{ label: t('resources.continuePartialPackage'), icon: 'apply', onClick: () => answer(true) }}>
+      <div className="grid gap-4 p-4"><p className="text-sm text-muted">{t('resources.packageReviewHelp')}</p><ul className="grid max-h-64 gap-2 overflow-x-clip overflow-y-auto text-xs text-warning">{review.map((issue, index) => <li key={index}>{formatDiagnosticMessage(issue, t)}</li>)}</ul></div>
+    </ConfirmDialog> : null}</>;
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { ContentIcon } from '../global/ContentIcon';
+
 import { SelectField } from '../global/SelectField';
 import { formatProductMessage } from "../../lib/i18n/productMessages";
 
@@ -11,11 +13,6 @@ import { normalizeDataDirectoryName } from '../../lib/fileSystem';
 import { DEFAULT_PLATFORM_PRESET_ID, PUBLIC_PLATFORM_PRESETS, type PlatformPresetId } from '../../lib/article-format/library';
 import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
 
-function LibraryIcon({ cancel = false }: { cancel?: boolean }) {
-  return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    {cancel ? <path d="m6 6 12 12M6 18 18 6" /> : <path d="M3 7V4h6l2 3h10v13H3V7Zm9 4v6m-3-3h6" />}
-  </svg>;
-}
 
 export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: string, presetId: PlatformPresetId) => Promise<LibraryCreationResult>; onClose: () => void }) {
   const { t } = useUITranslation('dialogs');
@@ -62,14 +59,14 @@ export function CreateLibraryDialog({ onCreate, onClose }: { onCreate: (name: st
         </label>
         <div className="grid min-w-0 gap-3 rounded-lg border border-line bg-list/50 p-4" aria-label={t('dialogs:ui.libraryLocationPreview')}>
           <p className="text-xs text-muted">{t('dialogs:ui.creationLocation')}</p>
-          <div className="flex min-w-0 items-start gap-2 text-sm"><span className="mt-0.5 text-accent-text"><LibraryIcon /></span><p className="min-w-0 break-all"><span className="text-muted">{t('dialogs:ui.chosenParentDirectory')} </span><strong className="font-medium text-primary">{normalizedName || t('dialogs:ui.libraryName')}</strong></p></div>
+          <div className="flex min-w-0 items-start gap-2 text-sm"><span className="mt-0.5 text-accent-text"><ContentIcon name="folder" /></span><p className="min-w-0 break-all"><span className="text-muted">{t('dialogs:ui.chosenParentDirectory')} </span><strong className="font-medium text-primary">{normalizedName || t('dialogs:ui.libraryName')}</strong></p></div>
           <p id="create-library-description" className="text-xs text-muted">{t('dialogs:ui.chooseTheParentInTheSystemDialogNext')}</p>
         </div>
         {feedback ? <p className="status-copy" data-tone={feedback.error ? 'error' : 'neutral'} role={feedback.error ? 'alert' : 'status'}>{formatProductMessage(feedback, t)}</p> : null}
       </div>
       <DialogFooter><DialogActions>
-        <DialogButton disabled={creating} onClick={close}><LibraryIcon cancel />{t('common:actions.cancel')}</DialogButton>
-        <DialogButton type="submit" variant="primary" disabled={creating || !normalizedName || Boolean(nameIssue)}><LibraryIcon />{creating ? t('dialogs:ui.creating') : t('dialogs:ui.chooseParentAndCreate')}</DialogButton>
+        <DialogButton icon="close" disabled={creating} onClick={close}>{t('common:actions.cancel')}</DialogButton>
+        <DialogButton icon="folderAdd" type="submit" variant="primary" disabled={creating || !normalizedName || Boolean(nameIssue)}>{creating ? t('dialogs:ui.creating') : t('dialogs:ui.chooseParentAndCreate')}</DialogButton>
       </DialogActions></DialogFooter>
     </form>
   </DialogFrame>;

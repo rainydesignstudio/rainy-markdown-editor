@@ -104,12 +104,12 @@ export function MainSidebar({ root, view, mediaOperation, collapsed, colorMode, 
 
       <footer className="sidebar-footer">
         <div className="mode-picker md:mb-2">
-          <IconPopover label={t('displayMode.current', { mode: t('displayMode.' + selectedMode.id) })} icon={<Icon name={selectedMode.icon} />} open={openPreference === 'mode'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{t('displayMode.' + selectedMode.id)}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('mode')} onClose={closePreference}>
+          <IconPopover label={t('displayMode.current', { mode: t('displayMode.' + selectedMode.id) })} icon={selectedMode.id === 'dark' ? 'moon' : selectedMode.id === 'light' ? 'sun' : 'monitor'} open={openPreference === 'mode'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{t('displayMode.' + selectedMode.id)}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('mode')} onClose={closePreference}>
             {COLOR_MODES.map(mode => <button key={mode.id} type="button" role="menuitemradio" aria-checked={colorMode === mode.id} className={preferenceOption} onClick={() => { onSetColorMode(mode.id); closePreference(); }}><span className="grid size-4 shrink-0 place-items-center [&_svg]:size-4"><Icon name={mode.icon} /></span><span>{t('displayMode.' + mode.id)}</span></button>)}
           </IconPopover>
         </div>
         <div className="mode-picker">
-          <IconPopover label={t('language.title')} tooltip={languageTooltip} icon={<Icon name="language" />} open={openPreference === 'language'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{languageName}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('language')} onClose={closePreference}>
+          <IconPopover label={t('language.title')} tooltip={languageTooltip} icon="language" open={openPreference === 'language'} triggerVariant="preference" triggerChildren={<><span className="mode-copy">{languageName}</span><Icon name="chevron" /></>} onToggle={() => togglePreference('language')} onClose={closePreference}>
             {UI_LOCALES.map(option => <button key={option} type="button" role="menuitemradio" aria-checked={locale === option} lang={option} className={preferenceOption} onClick={() => { closePreference(); void setLocale(option); }}><span className="grid size-4 shrink-0 place-items-center" aria-hidden="true">{locale === option ? '✓' : ''}</span><span>{t('language.' + option)}</span></button>)}
           </IconPopover>
         </div>

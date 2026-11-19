@@ -10,6 +10,7 @@ import { createUII18n } from '../src/lib/i18n/runtime.ts';
 import { themeBindingLabel, themeBindingToken } from '../src/lib/i18n/themeLabels.ts';
 import { SNIPPET_CATEGORY_ICONS } from '../src/lib/snippetCategoryIcons.ts';
 import { TAILWIND_ENDPOINTS, TAILWIND_PALETTE, TAILWIND_SHADES, tailwindColorToHex } from '../src/lib/tailwindPalette.ts';
+import { withActionComponents } from './action-ui-fixture.mjs';
 
 const nodes = tree => Array.isArray(tree) ? tree.flatMap(nodes) : tree?.props ? [tree, ...nodes(tree.props.children)] : [];
 const text = tree => Array.isArray(tree) ? tree.map(text).join('') : tree?.props ? text(tree.props.children) : typeof tree === 'string' || typeof tree === 'number' ? String(tree) : '';
@@ -29,7 +30,7 @@ async function dialog(file, imports = {}) {
   };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
 ...productMessages,
-    module, exports: module.exports, require(id) {
+    module, exports: module.exports, require: withActionComponents(function(id) {
 if (id.endsWith('/i18n/productMessages')) return productMessages;
       if (id === 'react') return react;
       if (id.endsWith('/SelectField')) return { SelectField: 'select-field' };
@@ -40,7 +41,7 @@ if (id.endsWith('/i18n/productMessages')) return productMessages;
       if (id.endsWith('/DialogFrame')) return { DialogFrame: 'frame', DialogHeader: 'header', DialogActions: 'actions', DialogButton: 'button', DialogFooter: 'footer' };
       for (const [suffix, value] of Object.entries(imports)) if (id.endsWith(suffix)) return value;
       throw new Error(id);
-    },
+    }),
   });
   return {
     render(name, props) { stateIndex = refIndex = 0; return module.exports[name](props); },

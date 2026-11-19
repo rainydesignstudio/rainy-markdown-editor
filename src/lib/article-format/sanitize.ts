@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify';
 import parseInlineStyle from 'inline-style-parser';
 import { defaultSchema } from 'rehype-sanitize';
 import { getFormatSnapshot } from './runtime';
+import { isSafeSvgAnimation, sanitizeSvgAnimations, SVG_ANIMATION_ATTRIBUTES, SVG_ANIMATION_TAGS } from './svgAnimation';
 
 type HastNode = {
   type: string;
@@ -13,7 +14,7 @@ type HastNode = {
 
 const FORBID_TAGS = ['base', 'embed', 'form', 'iframe', 'link', 'meta', 'object', 'script', 'style'];
 const FORBID_ATTR = ['onerror', 'onload', 'onclick', 'onmouseover', 'srcdoc'];
-const SVG_TAGS = ['svg', 'g', 'defs', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'pattern', 'image', 'use', 'animate', 'animateTransform'];
+const SVG_TAGS = ['svg', 'g', 'defs', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'linearGradient', 'radialGradient', 'stop', 'clipPath', 'mask', 'pattern', 'image', 'use', ...SVG_ANIMATION_TAGS];
 const SVG_ATTRIBUTES = ['viewBox', 'xmlns', 'width', 'height', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'd', 'points', 'fill', 'fillOpacity', 'stroke', 'strokeWidth', 'strokeLinecap', 'strokeLinejoin', 'strokeOpacity', 'transform', 'opacity', 'offset', 'stopColor', 'stopOpacity', 'gradientUnits', 'gradientTransform', 'clipPath', 'mask', 'patternUnits', 'patternTransform', 'preserveAspectRatio', 'attributeName', 'from', 'to', 'values', 'dur', 'begin', 'end', 'repeatCount', 'keyTimes', 'calcMode', 'additive', 'type'];
 const EXTRA_TAGS = ['article', 'aside', 'caption', 'col', 'colgroup', 'figcaption', 'figure', 'footer', 'header', 'main', 'mark', 'small', 'u'];
 type AttributeDefinition = NonNullable<NonNullable<typeof defaultSchema.attributes>>['*'][number];
@@ -27,7 +28,7 @@ export const SAFE_REHYPE_SCHEMA = {
   tagNames: [...(defaultSchema.tagNames ?? []), ...EXTRA_TAGS, ...SVG_TAGS],
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'style', 'colSpan', 'rowSpan', 'data*', 'leaf', 'nodeleaf', ...SVG_ATTRIBUTES],
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'className', 'style', 'colSpan', 'rowSpan', 'data*', 'leaf', 'nodeleaf', ...SVG_ATTRIBUTES, 'visibility', 'pointerEvents', 'pathLength', 'strokeDashArray', 'strokeDashOffset', 'restart', 'repeatDur', 'overflow', 'fontSize', 'fontWeight', 'textAnchor', 'dominantBaseline'],
     a: allowArbitraryClass(defaultSchema.attributes?.a),
     code: allowArbitraryClass(defaultSchema.attributes?.code),
     h2: allowArbitraryClass(defaultSchema.attributes?.h2),
@@ -68,31 +69,29 @@ export function sanitizeHtml(html: string, snapshot = getFormatSnapshot()): stri
     if (node.namespaceURI === 'http://www.w3.org/1999/xhtml' && node.localName === 'img' && data.attrName === 'src'
       && /^blob:(?:https?:\/\/|null\/)/i.test(data.attrValue) && !/[\u0000-\u0020\u007f]/.test(data.attrValue)) data.forceKeepAttr = true;
   });
-  return purifier.sanitize(html, {
+  return sanitizeSvgAnimations(purifier.sanitize(html, {
     USE_PROFILES: { html: true, svg: true, mathMl: Boolean(snapshot.bundle.formatter.math) },
-    ADD_TAGS: ['animate', 'animateTransform'],
-    ADD_ATTR: ['class', 'style', 'rowspan', 'colspan', 'target', 'rel', 'checked', 'disabled', 'data-theme', ...snapshot.bundle.formatter.output.preserveAttributes],
+    ADD_TAGS: [...SVG_ANIMATION_TAGS],
+    ADD_ATTR: ['class', 'style', 'rowspan', 'colspan', 'target', 'rel', 'checked', 'disabled', 'data-theme', ...SVG_ANIMATION_ATTRIBUTES, ...snapshot.bundle.formatter.output.preserveAttributes],
     FORBID_TAGS,
     FORBID_ATTR,
     // DOMPurify unwraps unsupported annotation by default, duplicating visible
     // TeX after the MathML. Plain-text copying has already captured that source.
     ADD_FORBID_CONTENTS: ['annotation', 'annotation-xml'],
-  });
+  }));
 }
 
 export function rehypeSafeStyles() {
   return (tree: HastNode) => {
-    const visit = (node: HastNode) => {
-      if (node.tagName === 'animate' || node.tagName === 'animateTransform') {
-        const name = String(node.properties?.attributeName ?? '');
-        if (!/^(?:opacity|fill|stroke|transform|x|y|cx|cy|r|rx|ry|width|height|stroke-width)$/.test(name)) { node.tagName = 'span'; node.properties = {}; node.children = []; }
-      }
+    const visit = (node: HastNode, insideSvg = false) => {
+      const svg = insideSvg || node.tagName === 'svg';
+      if (node.children) node.children = node.children.filter(child => !SVG_ANIMATION_TAGS.includes(child.tagName ?? '') || svg && isSafeSvgAnimation(child.tagName!, child.properties ?? {}));
       if (node.properties?.style && typeof node.properties.style === 'string') {
         const safe = sanitizeStyleValue(node.properties.style);
         if (safe) node.properties.style = safe;
         else delete node.properties.style;
       }
-      node.children?.forEach(visit);
+      node.children?.forEach(child => visit(child, svg));
     };
     visit(tree);
   };

@@ -11,7 +11,7 @@ import { useUILocale, useUITranslation } from './UILocaleProvider';
 import { EditingDraftsProvider } from './EditingDrafts';
 import { ToastProvider, ToastReadiness } from './Toast';
 import { formatProductMessage } from '../../lib/i18n/productMessages';
-import { ContentIcon } from './ContentIcon';
+
 import { EntryGuide } from '../onboarding/EntryGuide';
 import { GuideArrival } from '../onboarding/GuideArrival';
 import { guideProfile, readGuideCompletion, rememberGuideCompletion, type GuidePlan, type GuidePhase, type GuideProgress, type GuideResult } from '../../lib/entryGuide';
@@ -20,6 +20,8 @@ import { readStoredArticleById } from '../../lib/fileSystem';
 import { getFreshGuide } from '../../lib/preparedLibrary';
 import type { StoredArticle, ThemeConfig } from '../../lib/types';
 import { getFormatSnapshot } from '../../lib/article-format/runtime';
+import { Button } from './Button';
+import { ButtonBar } from './ButtonBar';
 
 type EditorController = ReturnType<typeof useEditorController> & {
   editorAppearancePreview: EditorAppearance | null;
@@ -278,11 +280,11 @@ function StartupLoading({ loading, issue, onReady, onRetry, onChoose, fromGuide 
           <p className="text-sm font-medium text-danger">{t('common:loading.failed')}</p>
         </div>
         <p className="max-h-48 max-w-xl overflow-x-clip overflow-y-auto whitespace-pre-wrap break-words text-center text-sm text-muted">{failure}</p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {onRetry ? <button className="button button-primary" onClick={onRetry}><ContentIcon name="reset" />{t('common:loading.retry')}</button> : null}
-          <button className="button button-quiet" onClick={onChoose}><ContentIcon name="folder" />{t('common:loading.choose')}</button>
-          <button className="button button-quiet" onClick={() => setDismissed(true)}><ContentIcon name="expand" />{t('common:loading.continue')}</button>
-        </div>
+        <ButtonBar label={t('common:actions.group')} className="flex flex-wrap justify-center gap-2">
+          {onRetry ? <Button icon="reset" variant="primary"  onClick={onRetry} label={t('common:loading.retry')} /> : null}
+          <Button icon="folder"  onClick={onChoose} label={t('common:loading.choose')} />
+          <Button icon="expand"  onClick={() => setDismissed(true)} label={t('common:loading.continue')} />
+        </ButtonBar>
       </> : <><svg className="size-8 animate-spin text-accent motion-reduce:animate-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle className="opacity-25" cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M12 3a9 9 0 0 1 9 9" /></svg><p className="text-sm text-muted" hidden={!ready}>{t('common:loading.message')}</p></>}
     </div>}
   </div>;

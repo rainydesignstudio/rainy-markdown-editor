@@ -63,3 +63,34 @@ test('native radio selection survives unrelated source edits, while authored che
   commitPreviewMarkup(target, before);
   assert.equal(a.checked, true); assert.equal(b.checked, false);
 });
+
+test('unchanged SVG timelines survive unrelated edits, while a changed animated graph starts with fresh nodes',()=>{
+  const {mount}=fixture();
+  const svg='<svg xmlns="http://www.w3.org/2000/svg"><g id="trigger"><rect width="20" height="20"/></g><g visibility="hidden"><set attributeName="visibility" to="visible" begin="trigger.click"/></g></svg>';
+  commitPreviewMarkup(mount,'<p>Before</p>'+svg);const original=mount.querySelector('svg'),animation=mount.querySelector('set');
+  commitPreviewMarkup(mount,'<p>After</p>'+svg);assert.equal(mount.querySelector('svg'),original);assert.equal(mount.querySelector('set'),animation);
+  commitPreviewMarkup(mount,'<p>After</p>'+svg.replace('to="visible"','to="hidden"'));
+  assert.notEqual(mount.querySelector('svg'),original);assert.notEqual(mount.querySelector('set'),animation);assert.equal(original.isConnected,false);
+});
+
+test('moving a source-line marker does not recreate an unchanged SVG timeline',()=>{
+  const {mount}=fixture();const before='<svg xmlns="http://www.w3.org/2000/svg" data-source-line="2"><g data-source-line="2"><set attributeName="visibility" to="hidden" begin="click"/></g></svg>';
+  commitPreviewMarkup(mount,before);const svg=mount.querySelector('svg'),animation=mount.querySelector('set');
+  commitPreviewMarkup(mount,before.replaceAll('data-source-line="2"','data-source-line="9"'));
+  assert.equal(mount.querySelector('svg'),svg);assert.equal(mount.querySelector('set'),animation);assert.equal(svg.getAttribute('data-source-line'),'9');
+});
+
+test('inserting text paragraphs before SVG wrappers preserves both independent timelines',()=>{
+  const {mount}=fixture();const svg=id=>`<svg xmlns="http://www.w3.org/2000/svg"><g id="${id}"><set attributeName="visibility" to="hidden" begin="click"/></g></svg>`;
+  commitPreviewMarkup(mount,'<article><p>First</p><p>'+svg('one')+'</p><p>Second</p><p>'+svg('two')+'</p></article>');
+  const [one,two]=mount.querySelectorAll('svg'),[a,b]=mount.querySelectorAll('set');
+  commitPreviewMarkup(mount,'<article><p>Outside</p><p>First</p><p>'+svg('one')+'</p><p>Second</p><p>'+svg('two')+'</p></article>');
+  assert.equal(mount.querySelectorAll('svg')[0],one);assert.equal(mount.querySelectorAll('svg')[1],two);assert.equal(mount.querySelectorAll('set')[0],a);assert.equal(mount.querySelectorAll('set')[1],b);
+});
+
+test('adding the first animated SVG does not replace the article, body or existing image',()=>{
+  const {mount}=fixture();const before='<article><div class="article-body"><p><img src="same.png"></p></div></article>';
+  commitPreviewMarkup(mount,before);const article=mount.firstChild,body=article.firstChild,image=mount.querySelector('img');
+  commitPreviewMarkup(mount,before.replace('</div>','<p><svg xmlns="http://www.w3.org/2000/svg"><g><set attributeName="visibility" to="hidden" begin="click"/></g></svg></p></div>'));
+  assert.equal(mount.firstChild,article);assert.equal(article.firstChild,body);assert.equal(mount.querySelector('img'),image);
+});

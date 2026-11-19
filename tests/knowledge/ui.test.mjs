@@ -14,6 +14,7 @@ import { createUII18n } from '../../src/lib/i18n/runtime.ts';
 import * as model from '../../src/lib/knowledge/model.ts';
 import * as messages from '../../src/lib/i18n/productMessages.ts';
 import * as contents from '../../src/lib/articleTableOfContents.ts';
+import { withActionComponents } from '../action-ui-fixture.mjs';
 
 async function moduleFrom(path, resolve) {
   const source = await readFile(new URL(path, import.meta.url), 'utf8'), module = { exports: {} };
@@ -23,7 +24,7 @@ async function moduleFrom(path, resolve) {
 }
 test('safe knowledge reading strips scripts, handler/style/class injection and remote media while reusing the scoped image loader', async () => {
   const instance = createUII18n('en-US'), images = [], links = [], opened = [];
-  const reader = await moduleFrom('../../src/components/knowledge/KnowledgeReader.tsx', id => {
+  const reader = await moduleFrom('../../src/components/knowledge/KnowledgeReader.tsx', withActionComponents(id => {
     if (id === 'react') return React; if (id === 'react/jsx-runtime') return jsx;
     if (id === 'react-markdown') return { default: ReactMarkdown, __esModule: true };
     if (id === 'remark-gfm') return { default: remarkGfm, __esModule: true };
@@ -39,7 +40,7 @@ test('safe knowledge reading strips scripts, handler/style/class injection and r
     if (id.endsWith('/articleTableOfContents')) return contents;
     if (id.endsWith('/LibraryArticleImage')) return { LibraryArticleImage: props => { images.push(props); return jsx.jsx('span', { 'data-scoped-image': props.path }); } };
     throw new Error(id);
-  });
+  }));
   let reads = 0, writes = 0;
   const source = { readFile: async () => { reads++; }, createWritable: () => { writes++; } };
   const text = '# Safe\n\n<script>window.stolen=true</script>\n\n<div class="fixed inset-0" style="position:fixed" onclick="steal()">Visible text</div>\n\n[evil](javascript:alert(1))\n\n![local](../assets/picture.png)\n\n![remote](https://example.com/tracker.png)\n\n<video src="https://example.com/movie.mp4" autoplay></video>';

@@ -5,7 +5,7 @@ import { formatProductMessage, productText } from "../../lib/i18n/productMessage
 import { useUITranslation } from '../global/UILocaleProvider';
 
 import { findSourceMatches, replaceAllSourceMatches } from '../../lib/sourceSearch';
-import { SourceFindBar, FindIcon, type ReplaceAllDecision } from './SourceFindBar';
+import { SourceFindBar, type ReplaceAllDecision } from './SourceFindBar';
 import { IconButton } from '../global/IconButton';
 import { ScrollViewport } from '../global/ScrollViewport';
 import { insertUndoableText } from '../../lib/nativeTextareaEdit';
@@ -20,6 +20,7 @@ import { tokenizeEditorSource } from '../../lib/editorSourceHighlight';
 import { logicalSourceLines, sourceLineMessages, sourceLineMessageLevels, type SourceLineConcern } from '../../lib/sourceLineDiagnostics';
 import type { ArticleSnippet, SnippetCategory } from '../../lib/types';
 import { CategoryIcon } from './SnippetCategoryDialog';
+import { ButtonBar } from '../global/ButtonBar';
 
 type Props = {
   value: string;
@@ -522,7 +523,7 @@ export const SnippetTextarea = forwardRef(function SnippetTextarea(
         onQuery={next => { setFindQuery(next); setFindIndex(0); }} onReplacement={setFindReplacement} onCase={() => { setFindCase(current => !current); setFindIndex(0); }} onMove={moveFind}
         onReplace={replaceCurrent} onReplaceAll={requestReplaceAll} onClose={closeFind} />
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      {!openFindRef && !findOpen ? <div className="absolute top-2 right-2 z-30"><IconButton tooltip={t('editor:source.find')} icon={<FindIcon />} onClick={openFind} /></div> : null}
+      {!openFindRef && !findOpen ? <ButtonBar label={t('editor:source.find')} className="absolute top-2 right-2 z-30"><IconButton tooltip={t('editor:source.find')} icon="search" onClick={openFind} /></ButtonBar> : null}
       {sourceHeader}
       <ScrollViewport ref={viewportRef} horizontal={!wrap} data-source-viewport="true" className="flex-1" onScroll={handleViewportScroll}>
       <div className="flex min-h-full min-w-0 flex-col">

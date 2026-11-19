@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.1"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.1-2563EB?style=for-the-badge" alt="Release v0.4.0.1" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.1.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.1.0-2563EB?style=for-the-badge" alt="Release v0.4.1.0" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -92,7 +92,7 @@ Copy this request into a clean Agent conversation with little unrelated context:
 
 **Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); consult the manuals for later operations under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).** Use the repository and branch you confirm for the installation source and version.
 
-The released installer is `0.4.0.1` (package `0.4.0+patch.1`). Features on an online page depend on its actual running version.
+The released installer is `0.4.1.0` (package `0.4.1`). Features on an online page depend on its actual running version.
 
 <a name="doc-run-yourself"></a>
 
@@ -156,7 +156,7 @@ Narrow windows can switch between source and preview. Directory authorization, a
 
 ### 👁️ Article preview controls
 
-The three icons in the preview header are ordered left to right. Hover or focus them for descriptions. Preferences are remembered per browser origin.
+After the preview light/dark switch, **View rendered code** toggles a read-only HTML/CSS view. It shows the same successful visible render, including a retained save-only preview; pending or failed output is identified. Result/code positions are independent, switching does not save or replay the result, and code view pauses scroll alignment while retaining its preference. This page session retains the view choice. The three existing controls follow in their original order; hover or focus for descriptions. Their preferences are remembered per browser origin.
 
 | Control | Default | Behavior |
 |---|---|---|
@@ -170,7 +170,7 @@ Auto-save defaults to off for new libraries, preserving explicit existing prefer
 
 Before an external Agent modifies a library, it turns off auto-save and automatic snapshots, saves settings and verifies adoption, then manages explicit saves and history checkpoints. At handback it reports their state; automatic features resume by your choice. See [Agent write takeover](AGENT-GUIDE.md#doc-agent-write-handoff).
 
-The preview light/dark switch sits to the left of the three preview controls, whose order is unchanged.
+Toolbar order: light/dark → rendered code/result → scroll alignment → save report → save-only refresh.
 
 The source toolbar offers **Word wrap** and **Syntax highlighting** to the left of line numbers. Use `Alt/Option + Z` to toggle wrapping; turning it off enables horizontal scrolling. Highlighting uses the editor theme to color Markdown, HTML and CSS; fenced code and code/pre contents stay plain. Source and article themes remain unchanged. The browser remembers both choices.
 
@@ -227,7 +227,7 @@ After a lost browser bookmark, relocating the original knowledge source retains 
 
 ## 📥 Import Markdown and resources
 
-Choose **Import Markdown** on the article page and select a UTF-8 `.md` or `.markdown` file (2MiB limit). The library's article theme is preselected and can be changed. Import creates an independent manuscript and theme snapshot while retaining the original file.
+Choose **Import articles**, then drag files into the upload area or click it to select one or more UTF-8 `.md`/`.markdown` files (2MiB each). Cards retain article names and show attachment counts. The status icon popup identifies waiting, uploading or uploaded; a ring represents real work. Remove selections and review the theme, collisions and resource directory before **Import N articles** creates manuscripts. No target writes occur before confirmation. Originals are kept; use status icons for file causes and recovery.
 
 To include local images or attachments, choose their source directory in the import dialog and grant read access. Selecting only the Markdown file cannot read neighboring resources. Originals remain while resources are copied into the new article. Website permissions or access restrictions can prevent network downloads; select local replacement files when needed.
 
@@ -238,7 +238,7 @@ Body images, audio/video resources and explicit attachment links can be copied w
 ### ⏳ Background tasks and recovery
 
 - Body editing, undo and save remain available while resources copy in the background with progress. Resources arriving later do not overwrite your edits.
-- **Import tasks** shows failures and offers pause/cancel, retry, source file/directory selection and replacement files. Switching articles in the same library continues; switching libraries/losing permission pauses, deleting the target cancels. Closing the page stops work; reopen and retry manually. A retry may download the file again from the beginning.
+- One surface lists article cards without a records tab or inline details. Open article is unavailable before creation. Status icons retain causes, source/replacement selection, retry and applicable pause/stop actions. A missing task record can be saved independently without recreating an article. **Cancel operation** stops unfinished work from this batch and closes the dialog, retaining saved text/resources; the header close button and Escape only hide it. Article switches continue within a library; library/permission changes pause. Closing the page interrupts work; resume explicitly after reopening.
 - Recovery verifies source, target and existing files. Unverified same-name files remain and report conflicts; replacements record provenance. A task-record failure retains the created manuscript with a retry notice.
 - Images and attachments can be filtered, searched, adopted and downloaded in Assets. General attachments are limited to 64MiB; images use the supported formats and size limits. Supported images can be previewed; SVG, PDF, audio/video and similar attachments do not preview or execute automatically.
 - Dropping/choosing files first confirms the list and target; cancellation writes nothing. Adopting shared assets makes independent article copies. Rename updates current references and keeps originals needed by history; deletion checks references. Cards and details show reference status. **Move or copy** retains originals referenced by manuscripts, history or shared locations and moves unreferenced resources. Unknown reference status disables the action, and execution rechecks it. Escape exits selection mode.
@@ -320,9 +320,12 @@ library/
 │           ├── theme.json            # Independent article-theme snapshot
 │           ├── media/image/          # Article images and optional description index
 │           ├── media/file/           # Attachments and index.json descriptions, on demand
-│           ├── render.json           # Optional rendered output/dependency references
+│           ├── render.json           # Optional render identity/dependency references
 │           └── history/snapshot-…/    # Source, theme, manifest and optional render record
-├── styles/                          # Optional CSS and immutable rendering versions
+├── cache/render/                    # Required historical dependencies, deduplicated
+│   ├── manifests/<hash>.json
+│   └── objects/<hash>
+├── styles/                          # Editable CSS; .versions is legacy storage
 │   ├── globals.css
 │   └── .versions/<hash>/manifest.json
 ├── assets/                          # Library images/SVG/fonts, as needed
@@ -339,6 +342,8 @@ library/
 │       └── research-<sourceId>.json # Topics, collections and citation records
 └── imports/tasks/<id>.json          # Independent resource tasks
 ```
+Browser caches are disposable and rebuildable. cache/render/manifests and objects retain deduplicated dependencies required by history and must be backed up. Legacy styles/.versions and assets/.objects migrate only through an explicit verified operation; do not delete those directories manually.
+
 
 New-library creation installs the selected preset’s configuration, bundled renderer, themes and starter content, and immediately writes version 2 settings.json. Ordinary creation uses defaults; the entry guide uses confirmed preferences and additionally prepares the selected starter and an independent example. Ordinary creation starts with an empty articles/ directory. Complete fonts are downloaded from the selected source only when missing; existing fonts remain intact.
 

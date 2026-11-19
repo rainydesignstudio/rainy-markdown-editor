@@ -9,6 +9,7 @@ import * as jsx from 'react/jsx-runtime';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
 import { createUII18n } from '../../src/lib/i18n/runtime.ts';
+import { withActionComponents } from '../action-ui-fixture.mjs';
 
 test('light reference navigation preserves the grid and only adopts a real in-document selection', async () => {
   const dom = new JSDOM('<div id="app"></div><p id="outside">Other content</p>');
@@ -24,7 +25,7 @@ test('light reference navigation preserves the grid and only adopts a real in-do
   const source = await readFile(new URL('../../src/components/knowledge/KnowledgeReferencePanel.tsx', import.meta.url), 'utf8');
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
     module, exports: module.exports, window: dom.window, document, Node: dom.window.Node,
-    require(id) {
+    require: withActionComponents(function(id) {
       if (id === 'react') return React;
       if (id === 'react/jsx-runtime') return jsx;
       if (id.endsWith('/useKnowledgeLibrary')) return { useKnowledgeLibrary: () => library };
@@ -38,7 +39,7 @@ test('light reference navigation preserves the grid and only adopts a real in-do
       if (id.endsWith('/LibraryCard')) return { LibraryCard: ({ title, icon, collapsed, ...props }) => jsx.jsx('button', { ...props, 'aria-label': title, children: title }) };
       if (id.endsWith('/KnowledgeReader')) return { KnowledgeReader: () => jsx.jsxs('div', { 'data-knowledge-content': '', children: [jsx.jsx('p', { 'data-line': 1, children: 'Repeat' }), jsx.jsx('p', { 'data-line': 3, children: 'Repeat' })] }) };
       throw new Error(id);
-    },
+    }),
   });
   const Component = module.exports.KnowledgeReferencePanel, root = createRoot(document.getElementById('app'));
   const props = { root: {}, sessionKey: 1, scope: 'article', isRootCurrent: () => true, disabled: false, onCite: (...args) => cite.push(args) };

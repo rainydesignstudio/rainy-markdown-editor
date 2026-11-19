@@ -25,6 +25,7 @@
     "system": "跟随系统"
   },
   "actions": {
+    "group": "操作",
     "cancel": "取消",
     "confirm": "确认",
     "close": "关闭",

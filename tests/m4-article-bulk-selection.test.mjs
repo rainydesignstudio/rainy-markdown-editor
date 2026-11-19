@@ -209,7 +209,7 @@ test('tags filter only the current collection and the header shows at most five 
   const view = page('all', { articles: members, allArticles: [...members, other] });
   assert.equal(view.render().some(node => node.type === 'button' && view.text(node) === '其他组标签'), false);
   assert.equal(view.render().some(node => node.props.tooltip === '选择标签'), false, 'the obsolete tag-management toggle is removed');
-  const group = view.render().find(node => node.props.role === 'group' && node.props['aria-label'] === '分类');
+  const group = view.render().find(node => node.type === 'button-bar' && node.props.label === '分类');
   const visible = group.props.children[0]; assert.equal(visible.length, 5); assert.ok(visible.every(node => node.props.className.includes('truncate')));
   const more = view.render().find(node => node.type === 'icon-popover'); more.props.onToggle();
   assert.equal(view.render().find(node => node.type === 'icon-popover').props.open, true);

@@ -3,10 +3,12 @@
 import { Children, isValidElement, useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatProductMessage, isProductMessage, type ProductMessageInfo } from '../../lib/i18n/productMessages';
 import { feedbackNotice, formatBriefFeedback } from '../../lib/i18n/feedback';
-import { ContentIcon } from './ContentIcon';
+
 import { IconPopover } from './IconPopover';
 import { useToast, useToastReady, type ToastLifetime, type ToastTone } from './Toast';
 import { useUILocale, useUITranslation } from './UILocaleProvider';
+import { Button } from './Button';
+import { ButtonBar } from './ButtonBar';
 
 function containsContent(node: ReactNode): boolean {
   return Children.toArray(node).some(child => typeof child === 'string' ? Boolean(child.trim()) : typeof child === 'number' || isValidElement<{ children?: ReactNode }>(child) && containsContent(child.props.children));
@@ -36,8 +38,8 @@ export function OperationFeedback({ id, notice, tone, summary, lifetime, childre
   }, [id, revision ?? signature, notify, announce, lifetime?.mode, retryDisabled, label ? ready : undefined]);
   useEffect(() => { if (!hasDetails) setOpen(false); }, [hasDetails]);
   if (hideTrigger || !hasDetails) return null;
-  return <IconPopover label={caption} tooltip={caption} icon={<ContentIcon name="info" />} kind="dialog" open={open && hasDetails} onToggle={() => setOpen(value => !value)} onClose={() => setOpen(false)}><div className="grid max-h-80 gap-3 overflow-x-clip overflow-y-auto p-3 text-xs text-secondary">
+  return <IconPopover label={caption} tooltip={caption} icon="info" kind="dialog" open={open && hasDetails} onToggle={() => setOpen(value => !value)} onClose={() => setOpen(false)}><div className="grid max-h-80 gap-3 overflow-x-clip overflow-y-auto p-3 text-xs text-secondary">
     {full ? <p className="whitespace-pre-wrap break-words">{full}</p> : children ? null : <p>{t('feedback.noDetails')}</p>}{children}
-    {onRetry ? <button type="button" className="button button-quiet" disabled={retryDisabled} onClick={onRetry}><ContentIcon name="reset" />{retryLabel ? formatProductMessage(retryLabel, t) : t('feedback.retryRefresh')}</button> : null}
+    {onRetry ? <ButtonBar label={t('common:actions.group')} className="grid"><Button icon="reset" type="button"  disabled={retryDisabled} onClick={onRetry} label={retryLabel ? formatProductMessage(retryLabel, t) : t('feedback.retryRefresh')} /></ButtonBar> : null}
   </div></IconPopover>;
 }

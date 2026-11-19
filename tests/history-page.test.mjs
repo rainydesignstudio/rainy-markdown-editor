@@ -59,7 +59,7 @@ test('all five history actions share the top toolbar while details and count ret
   const actions = walk(toolbar).filter(n => n.type === 'icon-button');
   assert.deepEqual(actions.map(n => n.props.tooltip), ['文章信息与主题', '从历史版本 Fork', '保存重要版本', '恢复此版本', '删除此版本']);
   assert.ok(actions[2].props.title.includes('当前编辑稿'));
-  assert.ok(actions.every(n => n.props.icon.type === 'action-icon'));
+  assert.deepEqual(actions.map(n => n.props.icon), ['edit', 'copy', 'save', 'history', 'delete']);
   const aside = p.find(n => n.type === 'aside');
   assert.ok(text(aside).includes('共 1 个历史版本'));
   assert.equal(walk(aside).at(-1).type, 'p');

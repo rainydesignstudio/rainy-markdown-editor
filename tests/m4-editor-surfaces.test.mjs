@@ -221,7 +221,7 @@ test('editing and forking a soft theme preserve surfaces and keep preview tokens
   const walk = node => Array.isArray(node) ? node.flatMap(walk) : node?.props ? [node, ...walk(node.props.children)] : [];
   const nodes = walk(plainPreview);
   assert.equal(nodes.find(node => node.type === 'input').props.placeholder, '测试表单');
-  const sample = nodes.find(node => node.type === 'button' && node.props.children === '测试按钮');
+  const sample = nodes.find(node => node.type === 'button' && [].concat(node.props.children).includes('测试按钮'));
   assert.ok(sample);
   assert.equal(sample.props.onClick, undefined);
 });

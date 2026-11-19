@@ -44,14 +44,15 @@ function dialog({ library = [latest], blockedReason = '', busy = false } = {}) {
 }
 
 test('update button applies the matching library theme directly and respects the existing block', () => {
+  const updateButton = node => node.type === 'button' && node.props['aria-label']?.startsWith('更新主题');
   const view = dialog();
-  const button = view.nodes.find(node => node.type === 'button' && node.props['aria-label']?.startsWith('更新主题'));
+  const button = view.nodes.find(updateButton);
   assert.ok(button);
   assert.equal(button.props.disabled, false);
   button.props.onClick();
   assert.deepEqual(view.selected, [latest]);
   assert.equal(view.nodes.filter(node => node.type === 'theme-update-tag').length, 2);
-  assert.equal(dialog({ library: [current] }).nodes.some(node => node.props?.['aria-label']?.startsWith('更新主题')), false);
-  assert.equal(dialog({ blockedReason: '归档文章只读' }).nodes.find(node => node.props?.['aria-label']?.startsWith('更新主题')).props.disabled, true);
-  assert.equal(dialog({ busy: true }).nodes.find(node => node.props?.['aria-label']?.startsWith('更新主题')).props.disabled, true);
+  assert.equal(dialog({ library: [current] }).nodes.some(updateButton), false);
+  assert.equal(dialog({ blockedReason: '归档文章只读' }).nodes.find(updateButton).props.disabled, true);
+  assert.equal(dialog({ busy: true }).nodes.find(updateButton).props.disabled, true);
 });

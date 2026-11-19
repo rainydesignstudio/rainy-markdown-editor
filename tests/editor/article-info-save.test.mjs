@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
 import { articleDraftBaseline, articleDraftChanged } from '../../src/lib/editingDrafts.ts';
 import { normalizeArticleDirectoryName } from '../../src/lib/articleFolder.ts';
 import * as messages from '../../src/lib/i18n/productMessages.ts';
+import { withActionComponents } from '../action-ui-fixture.mjs';
 
 const controller = await readFile(new URL('../../src/hooks/useEditorController.ts', import.meta.url), 'utf8');
 const tree = ts.createSourceFile('controller.ts', controller, ts.ScriptTarget.Latest, true);
@@ -77,7 +78,7 @@ function completedSave({ persistFails = false, becomesStale = false, quiet = fal
     mutationQueueRef: { current: { run: task => task(), canSave: () => true } },
     getStoredArticleDirectory: async (_root, month, folder) => { assert.equal(month, '2026-10'); assert.equal(folder, 'Renamed'); return {}; },
     prepareRenderRecord: async (source, _theme, _preview, _css, options) => { trace.push('prepare'); assert.equal(source, 'saved body'); assert.equal(options.articlePath, 'articles/2026-10/Renamed'); return { record: {} }; },
-    persistRenderRecord: async () => { trace.push('persist'); if (persistFails) throw new Error('disk full'); },
+    persistRenderRecord: async (_root, _target, prepared) => { trace.push('persist'); if (persistFails) throw new Error('disk full'); return prepared.record; },
     compileCurrent: async snapshot => { trace.push('compile'); compiledFormatRef.current = { snapshot, css: 'p{}' }; if (becomesStale) current = false; return true; },
     performSaveSnapshot: async snapshot => { trace.push('source'); return { ok: true, current: true, savedSnapshot: { ...snapshot, source: 'saved body' }, result: { sourceSaved: true, indexUpdated: true, article: { parse: { canCopy: true }, themeValid: true } } }; },
     renameSavedArticleFolder: async snapshot => { trace.push('rename'); return { ...snapshot, folder: 'Renamed', folderNameDraft: undefined }; },
@@ -168,7 +169,7 @@ test('article information has one save action, no per-folder saved badge, and En
     './EditableArticleTitle': { EditableArticleTitle: titleStub },
   };
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText, {
-    module, exports: module.exports, require: name => name === 'react/jsx-runtime' ? { jsx: React.createElement, jsxs: React.createElement, Fragment: React.Fragment } : modules[name],
+    module, exports: module.exports, require: withActionComponents(name => name === 'react/jsx-runtime' ? { jsx: React.createElement, jsxs: React.createElement, Fragment: React.Fragment } : modules[name]),
   });
   let saves = 0;
   const element = module.exports.ArticleInfoDialog({ article: { folder: 'Original', month: '2026-10', dirty: true, themeValid: true, theme: {} }, parsed: { diagnostics: [], metadata: { categories: [] } }, workspace: { projects: [] }, onSave: () => saves++, folderName: 'Renamed' });
@@ -192,7 +193,7 @@ test('article information has one save action, no per-folder saved badge, and En
   assert.equal(nodes.find(node => node.props.name === 'article-project').props.disabled, false);
   assert.equal(nodes.find(node => node.props.name === 'article-project').props.value, 'project');
   assert.equal(nodes.some(node => node.props.id === 'article-manage-heading'), false);
-  assert.equal(nodes.some(node => Array.isArray(node.props.children) && node.props.children.includes('dialogs:creation.create')), true);
+  assert.equal(nodes.some(node => [].concat(node.props.children).includes('dialogs:creation.create')), true);
   assert.equal(nodes.some(node => node.props.children === 'dialogs:creation.back'), true);
   nodes.length = 0;
   visit(module.exports.ArticleInfoDialog({ article: { dirty: true, themeValid: true, theme: {} }, parsed: { diagnostics: [{ level: 'error' }], metadata: { categories: [] } },

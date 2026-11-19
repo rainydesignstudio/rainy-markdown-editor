@@ -1,7 +1,6 @@
 import { ProductError, productJoin, productReference, productText } from "./i18n/productMessages";
 import { getStoredArticleDirectory } from './fileSystem';
-import { readRenderRecord, renderRecordMatches } from './article-format/renderRecords';
-import { readLibraryFile, contentHash } from './article-format/styles';
+import { readRenderRecord, renderRecordMatches, renderRecordFiles } from './article-format/renderRecords';
 import { parseArticle } from './frontMatter';
 import { localResourceReference, resourceReferences } from './resources/references';
 import { inspectArticleResources } from './resources/inspection';
@@ -100,16 +99,9 @@ export async function createArticleDocumentPackage(source: string, root: FileSys
     if (record) {
       const theme = JSON.parse(await (await articleDirectory.getFileHandle('theme.json')).getFile().then(file => file.text()));
       if (!await renderRecordMatches(record, source, theme)) throw new ProductError("articleExport.theRenderRecordDoesNotMatchTheSourceBeingExportedUpdateStyles");
-      const manifestPath = 'styles/.versions/' + record.environmentHash + '/manifest.json';
-      const manifest = await readLibraryFile(root, manifestPath);
-      if (await contentHash(await manifest.text()) !== record.environmentHash) throw new ProductError("articleExport.renderVersionManifestVerificationFailedTheDocumentPackageWasNotGenerated");
       await include('render.json', new Blob([JSON.stringify(record)]));
-      await include(manifestPath, manifest);
-      for (const asset of record.assets) {
-        const name = 'assets/.objects/' + asset.hash;
+      for (const [name, file] of await renderRecordFiles(root, record)) {
         if (entries[name]) continue;
-        const file = await readLibraryFile(root, name);
-        if (await contentHash(file) !== asset.hash) throw new ProductError('shared.compose', { parts: productJoin([productReference("articleExport.renderResourceIsMissingOrDamaged"), asset.path]) });
         await include(name, file);
       }
     }

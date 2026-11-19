@@ -8,6 +8,8 @@ import { useEditorControllerContext } from '../global/AppProviders';
 import { EditorWorkspace } from './EditorWorkspace';
 import { ImportProgressButton } from '../imports/ImportTasksDialog';
 import { availableArticleThemeUpdate } from '../../lib/articleThemeUpdate';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function EditorPage() {
   const { t } = useUITranslation('editor');
@@ -20,9 +22,9 @@ export function EditorPage() {
         <p id="editor-unavailable-kicker" className="eyebrow">{t('editor:eyebrow.editor')}</p>
         <h2 id="editor-unavailable-title" className="page-title font-heading">{controller.directory ? t('editor:empty.chooseArticle') : t('editor:empty.chooseLibrary')}</h2>
         <p className="mt-3">{controller.directory ? t('editor:empty.articleHelp') : t('editor:empty.libraryHelp')}</p>
-        <div className="editor-unavailable-actions">
-          {controller.directory ? <><button className="button button-quiet" type="button" onClick={() => controller.navigateArticleMode('overview')}>{t('articles:returnOverview')}</button><button className="button button-primary" type="button" data-create-article-trigger="editor" onClick={controller.createNewArticle}>{t('articles:newArticle')}</button></> : <button className="button button-primary" type="button" onClick={() => controller.navigateView('settings')}>{t('articles:directory.settings')}</button>}
-        </div>
+        <ButtonBar label={t('editor:toolbar.actions')} className="mt-2">
+          {controller.directory ? <><Button icon="back"  type="button" onClick={() => controller.navigateArticleMode('overview')} label={t('articles:returnOverview')} /><Button icon="plus" variant="primary"  type="button" data-create-article-trigger="editor" onClick={controller.createNewArticle} label={t('articles:newArticle')} /></> : <Button icon="settings" variant="primary"  type="button" onClick={() => controller.navigateView('settings')} label={t('articles:directory.settings')} />}
+        </ButtonBar>
       </section>
     );
   }
@@ -43,7 +45,7 @@ export function EditorPage() {
       mediaRevision={controller.mediaRefreshRevision}
       sourceFormatIssues={controller.sourceFormatIssues}
       status={controller.sourceStatus}
-      importProgress={<ImportProgressButton task={controller.markdownImport.pending.find(item => item.task.target.articleId === controller.currentArticleId)?.task ?? null} onClick={() => controller.markdownImport.openTasks(controller.currentArticleId)} />}
+      importProgress={<ImportProgressButton job={controller.markdownImport.pending.find(item => item.task.target.articleId === controller.currentArticleId) ?? null} onClick={() => controller.markdownImport.openTasks(controller.currentArticleId)} />}
       mobilePane={controller.mobilePane}
       directory={controller.directory}
       snippets={controller.snippets}

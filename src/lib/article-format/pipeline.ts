@@ -6,6 +6,7 @@ import { remarkHeadingIds, rehypeAlignSanitizedFragmentLinks } from '../articleT
 import { remarkArticleBlankParagraphs, remarkArticleSoftBreaks, rehypeArticleSourcePositions } from '../articleBlankParagraphs';
 import { rehypeArticleCodeHighlight, rehypeArticleCodeWhitespace } from '../articleCodeHighlight';
 import { SAFE_REHYPE_SCHEMA, rehypeSafeStyles } from './sanitize';
+import { rehypeInteractiveSvgIds } from './svgAnimation';
 import { getFormatSnapshot, type FormatSnapshot } from './runtime';
 import { resourceReferenceIntent } from '../resources/references';
 import remarkMath from 'remark-math';
@@ -17,7 +18,7 @@ export function articleMarkdownPlugins(snapshot: FormatSnapshot = getFormatSnaps
 }
 export function articleHtmlPlugins(snapshot: FormatSnapshot = getFormatSnapshot()): PluggableList {
   const prefix = snapshot.bundle.formatter.document?.preserveIds ? '' : 'user-content-';
-  return [rehypeRaw, [rehypeAlignSanitizedFragmentLinks, { prefix }], [rehypeSanitize, { ...SAFE_REHYPE_SCHEMA, clobberPrefix: prefix }],
+  return [rehypeRaw, [rehypeAlignSanitizedFragmentLinks, { prefix }], [rehypeSanitize, { ...SAFE_REHYPE_SCHEMA, clobberPrefix: prefix }], [rehypeInteractiveSvgIds, { prefix }],
     ...(snapshot.bundle.formatter.math ? [[rehypeArticleMath, snapshot.bundle.formatter.math] as PluggableList[number]] : []),
     ...(snapshot.bundle.formatter.mermaid ? [[rehypeArticleMermaid, snapshot.bundle.formatter.mermaid] as PluggableList[number]] : []),
     ...(snapshot.bundle.formatter.codeHighlight.enabled && snapshot.bundle.formatter.codeHighlight.engine !== 'prism' ? [rehypeArticleCodeHighlight] : []),

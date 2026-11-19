@@ -64,8 +64,8 @@ test('developer hash policy survives render-record preparation, persistence and 
   t.after(() => activateFormatBundle(structuredClone(DEFAULT_FORMAT_BUNDLE), null, 'built-in'));
   const outer = document.createElement('div'); outer.innerHTML = '<article class="article-preview"><section class="article-body"><p>body</p></section></article>';
   const prepared = await prepareRenderRecord('body', BASIC_THEME, outer, 'p{}', { snapshot, root });
-  await persistRenderRecord(root, await root.getDirectoryHandle('saved', { create: true }), prepared);
-  const restored = await restoreRenderEnvironment(root, prepared.record, snapshot);
+  const pointer = await persistRenderRecord(root, await root.getDirectoryHandle('saved', { create: true }), prepared);
+  const restored = await restoreRenderEnvironment(root, pointer, snapshot);
   assert.equal(restored.snapshot.configuration.validation.verifySha256, false);
   assert.equal(restored.snapshot.algorithms.fingerprint, algorithms.fingerprint);
   assert.deepEqual(restored.snapshot.algorithms.files, algorithms.files);

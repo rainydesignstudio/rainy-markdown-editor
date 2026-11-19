@@ -11,10 +11,11 @@ import * as editingLocation from '../src/lib/editingLocation.ts';
 import * as sourceLineDiagnostics from '../src/lib/sourceLineDiagnostics.ts';
 import { getFormatSnapshot } from '../src/lib/article-format/runtime.ts';
 import * as libraryConfiguration from '../src/lib/article-format/libraryConfiguration.ts';
+import { withActionComponents } from './action-ui-fixture.mjs';
 
 const instance = createUII18n('zh-CN');
 export function withUILocaleImports(resolve) {
-  return id => {
+  return withActionComponents(id => {
     if (id.endsWith('/PreviewCssDetails')) return { PreviewCssDetails: 'preview-css-details' };
     if (id.endsWith('/OperationFeedback')) return { OperationFeedback: 'operation-feedback' };
     if (id.endsWith('/articleListSorting')) return articleListSorting;
@@ -49,5 +50,5 @@ export function withUILocaleImports(resolve) {
     if (id.endsWith('/editingLocation')) return editingLocation;
     if (id.endsWith('/fontCatalog')) return { fontFamily, ...resolve(id) };
     return resolve(id);
-  };
+  });
 }

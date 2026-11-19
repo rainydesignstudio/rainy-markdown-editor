@@ -263,14 +263,6 @@
     }
   }
 
-  .toolbar-actions {
-    @apply flex w-full shrink-0 items-center justify-start gap-1 overflow-x-auto;
-
-    @variant md {
-      @apply w-auto justify-end gap-0.75 overflow-visible;
-    }
-  }
-
   .toolbar-icon-button {
     @apply relative flex min-h-9.5 min-w-max items-center justify-center gap-1.5 rounded-lg border border-transparent px-2 text-muted transition;
 
@@ -766,9 +758,7 @@
     .article-project-pin:hover::after,
     .article-project-pin:focus-visible::after,
     .project-settings-menu > summary:hover::after,
-    .project-settings-menu > summary:focus-visible::after,
-    .toolbar-actions > .toolbar-icon-button:last-child:hover::after,
-    .toolbar-actions > .toolbar-icon-button:last-child:focus-visible::after {
+    .project-settings-menu > summary:focus-visible::after {
       @apply left-auto right-0 translate-x-0;
     }
 

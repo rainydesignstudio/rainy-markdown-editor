@@ -8,7 +8,9 @@ import { knowledgeImportSource, chooseMarkdownImport } from '../../src/lib/impor
 import { connectKnowledgeSource } from '../../src/lib/knowledge/source.ts';
 import { parseArticle } from '../../src/lib/frontMatter.ts';
 import { BASIC_THEME } from '../../src/lib/themes.ts';
-import { monthKey } from '../../src/lib/fileSystem.ts';
+import { monthKey, pickDataDirectory } from '../../src/lib/fileSystem.ts';
+import {createUII18n} from '../../src/lib/i18n/runtime.ts';
+import {formatProductMessage} from '../../src/lib/i18n/productMessages.ts';
 import { tree, snapshot, allCounts } from '../knowledge/fs-fixture.mjs';
 
 const key = name => error => error.messageKey === name;
@@ -151,4 +153,19 @@ test('native file and directory picking request read only and never expose writa
     await assert.rejects(connected.assertTarget(sourceRoot), key('imports.sourceDirectoryMismatch'));
     assert.equal(allCounts(sourceRoot).writes, 0); assert.equal(allCounts(sourceRoot).creates, 0);
   } finally { globalThis.window = originalWindow; }
+});
+
+test('the native picker-active error is localized while cancellation and unrelated errors keep their semantics',async()=>{
+ const previous=globalThis.window,raw=new DOMException("Failed to execute 'showDirectoryPicker' on 'Window': File picker already active.",'InvalidStateError');
+ globalThis.window={showDirectoryPicker:async()=>{throw raw;}};
+ try{
+  let mapped;try{await pickDataDirectory();}catch(error){mapped=error;}
+  assert.equal(mapped.messageKey,'fileSystem.pickerAlreadyActive');
+  assert.equal(mapped.cause,raw,'the original browser error remains available for technical diagnostics');
+  const i18n=createUII18n('en-US');assert.match(formatProductMessage(mapped,i18n.getFixedT('en-US','messages')),/^The browser/);
+  assert.match(formatProductMessage(mapped,i18n.getFixedT('zh-CN','messages')),/^文件选择窗口/);
+  assert.equal(formatProductMessage(mapped.message,i18n.getFixedT('en-US','messages')),formatProductMessage(mapped,i18n.getFixedT('en-US','messages')),'guide result string bridges to the selected UI language');
+  const cancelled=new DOMException('cancelled','AbortError');window.showDirectoryPicker=async()=>{throw cancelled;};await assert.rejects(pickDataDirectory(),error=>error===cancelled);
+  const other=new Error('unrelated filesystem failure');window.showDirectoryPicker=async()=>{throw other;};await assert.rejects(pickDataDirectory(),error=>error===other);
+ }finally{globalThis.window=previous;}
 });

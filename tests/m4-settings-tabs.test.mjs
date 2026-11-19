@@ -53,6 +53,7 @@ function settingsPage(systemDark = false, format = getInitialFormatSnapshot()) {
       if (id === 'react-dom') return { createPortal: (children) => children };
       if (id.endsWith('/DialogFrame')) { const Dialog = (props) => jsx('dialog', props); return { DialogFrame: Dialog, DialogHeader: Dialog, DialogActions: Dialog, DialogButton: Dialog, DialogFooter: Dialog }; }
       if (id.endsWith('/FormatPackageControls')) return { FormatPackageControls: 'format-package-controls' };
+      if (id.endsWith('/RenderCacheControls')) return { RenderCacheControls: 'render-cache-controls' };
       if (id.endsWith('/FontDownloadSettings')) return { FontDownloadSettings: 'font-download-settings' };
       if (id.endsWith('/EditorThemeDesigner')) return { EditorThemeDesigner: 'editor-theme-designer' };
       if (id.endsWith('/UnsavedChangesDialog')) return { UnsavedChangesDialog: 'unsaved-changes-dialog' };
@@ -388,14 +389,14 @@ test('theme card actions are sibling icon controls; selected and foundational th
   const page = settingsPage(); page.switch('appearance');
   const theme = editorThemes.BUILTIN_EDITOR_THEMES.find(theme => theme.id === 'ink-white');
   const edit = page.find(node => node.props['aria-label'] === `编辑主题「${theme.name}」`);
-  assert.equal(edit.props['data-tooltip'], '编辑');
+  assert.equal(edit.props.tooltip, '编辑');
   edit.props.onClick(); page.render();
   const designer = page.find(node => node.type === 'editor-theme-designer');
   assert.equal(designer.props.editing, true);
   assert.equal(designer.props.source, theme);
   designer.props.onClose(); page.render();
   const deletion = page.find(node => node.props['aria-label'] === `删除主题「${theme.name}」`);
-  assert.equal(deletion.props['data-tooltip'], '删除');
+  assert.equal(deletion.props.tooltip, '删除');
   assert.equal(deletion.props.disabled, false);
   const base = editorThemes.BASE_EDITOR_THEME;
   assert.equal(page.find(node => node.props['aria-label'] === `删除主题「${base.name}」`).props.disabled, true);

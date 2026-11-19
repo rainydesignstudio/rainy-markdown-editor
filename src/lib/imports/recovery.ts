@@ -1,4 +1,4 @@
-import { ProductError } from '../i18n/productMessages';
+import { ProductError, localizeFilePickerError } from '../i18n/productMessages';
 import { getResourceDirectory, type ResourceDestination } from '../resources/storage';
 import type { ArticleWriteGuard } from '../fileSystem';
 import { importBookmarks, scopedImportBookmark, type ImportBookmarkStore } from './bookmarks';
@@ -28,7 +28,7 @@ export async function chooseImportReplacement(root: FileSystemDirectoryHandle, t
   if (!picker) throw new ProductError('imports.pickerUnavailable');
   let files: FileSystemFileHandle[];
   try { files = await picker({ multiple: false }); }
-  catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return null; throw error; }
+  catch (error) { if (error instanceof DOMException && error.name === 'AbortError') return null; throw localizeFilePickerError(error); }
   if (!current()) throw new ProductError('imports.changed');
   if (!files[0]) return null;
   const handle = files[0] as FileSystemFileHandle & { queryPermission: (options: { mode: 'read' }) => Promise<PermissionState> };

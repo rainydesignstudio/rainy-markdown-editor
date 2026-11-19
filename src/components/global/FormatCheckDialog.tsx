@@ -30,12 +30,6 @@ function FormatTabIcon({ tab }: { tab: FormatTab }) {
   </svg>;
 }
 
-function FormatActionIcon({ copy = false }: { copy?: boolean }) {
-  return <svg className="size-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    {copy ? <><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></> : <path d="m6 6 12 12M6 18 18 6" />}
-  </svg>;
-}
-
 function issueSource(issue: ArticleFormatIssue): (typeof ISSUE_SOURCES)[number]['id'] {
   if (issue.kind === 'element' || issue.kind === 'attribute') return 'html';
   if (issue.kind === 'engine') return 'check';
@@ -113,7 +107,7 @@ export function FormatCheckDialog({ mode, report, onDecision }: { mode: 'save' |
       <div className="grid gap-3">{GROUPS.map(group => <FormatDisclosure key={`${tab}:${group.severity}`} section={report[tab]} tab={tab} group={group} bodyLineOffset={report.bodyLineOffset ?? 0} />)}</div>
     </div>
     <DialogFooter><DialogActions>
-      {mode === 'copy' || mode === 'export' ? <><DialogButton autoFocus onClick={() => onDecision(false)}><FormatActionIcon />{mode === 'export' ? t('dialogs:ui.cancelExport') : t('dialogs:ui.doNotCopy')}</DialogButton><DialogButton variant="primary" onClick={() => onDecision(true)}><FormatActionIcon copy />{mode === 'export' ? (concerns ? t('dialogs:ui.exportAnyway') : t('dialogs:ui.continueExport')) : concerns ? t('dialogs:ui.copyAnyway') : t('dialogs:ui.copyRichText')}</DialogButton></> : <DialogButton autoFocus variant="primary" onClick={() => onDecision(false)}><FormatActionIcon />{t('common:actions.close')}</DialogButton>}
+      {mode === 'copy' || mode === 'export' ? <><DialogButton icon="close" autoFocus onClick={() => onDecision(false)}>{mode === 'export' ? t('dialogs:ui.cancelExport') : t('dialogs:ui.doNotCopy')}</DialogButton><DialogButton icon="copy" variant="primary" onClick={() => onDecision(true)}>{mode === 'export' ? (concerns ? t('dialogs:ui.exportAnyway') : t('dialogs:ui.continueExport')) : concerns ? t('dialogs:ui.copyAnyway') : t('dialogs:ui.copyRichText')}</DialogButton></> : <DialogButton icon="close" autoFocus variant="primary" onClick={() => onDecision(false)}>{t('common:actions.close')}</DialogButton>}
     </DialogActions></DialogFooter>
   </DialogFrame>;
 }

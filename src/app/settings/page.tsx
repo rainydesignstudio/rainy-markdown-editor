@@ -7,6 +7,7 @@ export default function SettingsRoute() {
   const controller = useEditorControllerContext();
   return (
     <SettingsPanel
+      renderCacheQueue={controller.mutationQueueRef.current}
       key={controller.contentLibraryRootSession}
       root={controller.directory}
       libraryReady={controller.editorAppearanceReady && controller.contentLibrariesState !== 'loading'}

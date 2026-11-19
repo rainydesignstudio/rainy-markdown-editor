@@ -68,6 +68,6 @@ export function TemplateDialog({ templates, categories, themes, defaultTheme, in
         <p className="shrink-0 text-xs text-faint">{selected ? t('dialogs:templates.starterTheme', { name: previewTheme.name }) : t('dialogs:ui.exampleTextInTheBlankManuscriptIsFor')}</p>
       </section>
     </div>
-    <DialogFooter><DialogActions><DialogButton onClick={onClose}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M18 6 6 18" /></svg>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" onClick={() => onCreate(selected, previewTheme)}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 5 7 7-7 7" /></svg>{t('dialogs:creation.next')}</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton icon="close" onClick={onClose}>{t('common:actions.cancel')}</DialogButton><DialogButton icon="expand" variant="primary" onClick={() => onCreate(selected, previewTheme)}>{t('dialogs:creation.next')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

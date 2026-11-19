@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import vm from 'node:vm';
 import ts from 'typescript';
 import { jsx, jsxs } from 'react/jsx-runtime';
+import { withActionComponents } from './action-ui-fixture.mjs';
 
 const themes = await import('../src/lib/editorThemes.ts');
 const cache = await import('../src/lib/editorThemeCache.ts');
@@ -37,7 +38,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
     exports: module.exports, module, URL,
     document,
     window: { matchMedia: () => media, location: { href: 'http://localhost/articles/' }, localStorage: storage },
-    require(id) {
+    require: withActionComponents(function(id) {
       if (id.endsWith('/onboarding/GuideArrival')) return { GuideArrival: 'guide-arrival' };
       if (id.endsWith('/onboarding/GuideSampleRenderer')) return { GuideSampleRenderer: 'guide-sample-renderer' };
       if (id.endsWith('/onboarding/EntryGuide')) return { EntryGuide: 'entry-guide' };
@@ -66,7 +67,7 @@ function provider(storage = { getItem() { return null; }, setItem() {}, removeIt
         useEffect, useLayoutEffect: useEffect,
       };
       throw new Error(`Unexpected provider import: ${id}`);
-    },
+    }),
   });
   function render() { cursor = 0; tree = module.exports.AppProviders({ children: 'app' }); while (effects.length) effects.shift()(); values.clear(); for (const [, key, value] of (themeStyle?.textContent ?? '').matchAll(/(--[a-z-]+): ([^;]+);/g)) values.set(key, value); }
   return { controller, root, values, writes, render, format, tree: () => tree, context: () => tree.props.value };

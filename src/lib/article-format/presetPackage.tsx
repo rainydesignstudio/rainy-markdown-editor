@@ -3,6 +3,7 @@ import React, { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server.browser';
 import ReactMarkdown from 'react-markdown';
 import DOMPurify from 'dompurify';
+import { rehypeInteractiveSvgIds, sanitizeSvgAnimations, SVG_ANIMATION_ATTRIBUTES, SVG_ANIMATION_TAGS } from './svgAnimation';
 import rehypeSanitize from 'rehype-sanitize';
 import { rehypeAlignSanitizedFragmentLinks } from '../articleTableOfContents';
 import { articleMarkdownPlugins, articleHtmlPlugins } from './pipeline';
@@ -108,7 +109,7 @@ function markdown(source: string) {
   let plugins = articleHtmlPlugins(snapshot);
   // The empty preset imposes no platform control policy. Safety remains active.
   if (snapshot.bundle.validator.meta.enabled === false) {
-    plugins = plugins.filter(p => !(Array.isArray(p) && p[0] === rehypeSanitize)).map(p => Array.isArray(p) && p[0] === rehypeAlignSanitizedFragmentLinks ? [rehypeAlignSanitizedFragmentLinks, { prefix: '' }] : p);
+    plugins = plugins.filter(p => !(Array.isArray(p) && p[0] === rehypeSanitize)).map(p => Array.isArray(p) && (p[0] === rehypeAlignSanitizedFragmentLinks || p[0] === rehypeInteractiveSvgIds) ? [p[0], { prefix: '' }] : p);
   }
   const html = renderToStaticMarkup(<ReactMarkdown remarkPlugins={articleMarkdownPlugins(snapshot)} remarkRehypeOptions={{ allowDangerousHtml: true }} rehypePlugins={plugins}
     components={{ code: ({ node: _node, children, className, ...props }) => {
@@ -116,7 +117,7 @@ function markdown(source: string) {
       return language && formatter.codeHighlight.engine === 'prism' ? <ArticleCodeBlock text={String(children)} language={language} formatter={formatter} /> : <code {...props} className={className}>{children}</code>;
     } }}>{source}</ReactMarkdown>);
   const template = document.createElement('template');
-  template.innerHTML = snapshot.bundle.validator.meta.enabled === false ? DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true }, ADD_TAGS: ['animate', 'animateTransform'], FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'form'], FORBID_ATTR: ['srcdoc'], ADD_FORBID_CONTENTS: ['annotation-xml'] }) : html;
+  template.innerHTML = snapshot.bundle.validator.meta.enabled === false ? sanitizeSvgAnimations(DOMPurify.sanitize(html, { USE_PROFILES: { html: true, svg: true, mathMl: true }, ADD_TAGS: [...SVG_ANIMATION_TAGS], ADD_ATTR: [...SVG_ANIMATION_ATTRIBUTES], FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'base', 'link', 'meta', 'form'], FORBID_ATTR: ['srcdoc'], ADD_FORBID_CONTENTS: ['annotation-xml'] })) : html;
   template.content.querySelectorAll('link[rel="preload"]').forEach(node => node.remove());
   return template.innerHTML;
 }

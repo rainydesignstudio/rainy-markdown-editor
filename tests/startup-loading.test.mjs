@@ -1,3 +1,4 @@
+import { withActionComponents } from './action-ui-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
@@ -83,7 +84,8 @@ async function startupPanel({fromGuide=false,reduced=false}={}) {
   const source=file.slice(file.indexOf('function StartupLoading('),file.indexOf('export function useEditorControllerContext'))+'\nglobalThis.component = StartupLoading;';
   let cursor=0,previous,cleanup,timerId=0,localeReady=false,retries=0,choices=0;
   const cells=[],effects=[],timers=new Map(),delays=new Map(),readiness=[],mediaListeners=new Set();
-  const context={...productMessages,ContentIcon:()=>null,GuideArrival:'guide-arrival',exports:{},require:()=>({jsx,jsxs}),useUITranslation:()=>({t:key=>key}),useUILocale:()=>({ready:localeReady}),
+  const requireAction = withActionComponents(id => id === 'react/jsx-runtime' ? { jsx, jsxs } : undefined);
+  const context={...productMessages,Button:requireAction('./Button').Button,ButtonBar:requireAction('./ButtonBar').ButtonBar,ContentIcon:()=>null,GuideArrival:'guide-arrival',exports:{},require:requireAction,useUITranslation:()=>({t:key=>key}),useUILocale:()=>({ready:localeReady}),
     useRef(initial){const i=cursor++;if(!(i in cells))cells[i]={current:initial};return cells[i];},
     useState(initial){const i=cursor++;if(!(i in cells))cells[i]=initial;return[cells[i],value=>{cells[i]=value;}];},
     useEffect(effect,deps){if(!previous||deps.some((v,i)=>v!==previous[i]))effects.push(()=>{cleanup?.();previous=deps;cleanup=effect();});},

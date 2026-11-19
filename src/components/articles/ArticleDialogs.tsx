@@ -7,7 +7,8 @@ import { formatUIMonth } from '../../lib/i18n/formatters';
 
 import { monthKey } from '../../lib/fileSystem';
 import type { ArticleSummary, ThemeConfig } from '../../lib/types';
-import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } from '../global/DialogFrame';
+import { DialogActions, DialogButton, DialogFrame, DialogHeader } from '../global/DialogFrame';
+import { ConfirmDialog } from '../global/ConfirmDialog';
 
 export function CopyDialog({ article, title, month, months, applyTheme, usesCurrentDraft, fromThemeLibrary = false, onChangeTitle, onChangeMonth, onClose, onConfirm }: {
   article: ArticleSummary;
@@ -34,7 +35,7 @@ export function CopyDialog({ article, title, month, months, applyTheme, usesCurr
         <label className="field-stack"><span className="field-label">{t('dialogs:ui.forkTitle')}</span><input className="field" autoFocus value={title} onChange={(event) => onChangeTitle(event.target.value)} /></label>
         <label className="field-stack"><span className="field-label">{t('dialogs:ui.savedMonth')}</span><SelectField label={t('dialogs:ui.savedMonth')} value={month} onChange={nextValue => onChangeMonth(nextValue)} options={[...(monthOptions.map((value) => ({ value: value, label: formatUIMonth(value, locale) })) ?? []), ...(!currentMonthAlreadyListed ? [{ value: currentMonth, label: [formatUIMonth(currentMonth, locale), " ", t('dialogs:ui.currentMonth')].join('') }] : [])]} /></label>
         <p className="status-copy">{fromThemeLibrary ? t('dialogs:ui.theCopyUsesCurrentEditsAndTheSelected') : usesCurrentDraft ? t('dialogs:ui.forkUsesCurrentEditsAndTheThemeSnapshot') : t('dialogs:ui.forkUsesThisSavedArticleSCurrentVersion')}{t('dialogs:ui.imagesAreCopiedToTheNewDirectoryHistory')}{applyTheme ? t('dialogs:templates.theme', { name: applyTheme.name, version: applyTheme.version }) : ''}{month !== article.month ? t('dialogs:templates.month', { month: formatUIMonth(month, locale) }) : ''}</p>
-        <DialogActions><DialogButton onClick={onClose}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="primary" onClick={onConfirm} disabled={!title.trim()}>{fromThemeLibrary ? t('dialogs:ui.copyAndApply') : t('dialogs:ui.createFork')}</DialogButton></DialogActions>
+        <DialogActions><DialogButton icon="close" onClick={onClose}>{t('common:actions.cancel')}</DialogButton><DialogButton icon="apply" variant="primary" onClick={onConfirm} disabled={!title.trim()}>{fromThemeLibrary ? t('dialogs:ui.copyAndApply') : t('dialogs:ui.createFork')}</DialogButton></DialogActions>
       </div>
     </DialogFrame>
   );
@@ -48,8 +49,8 @@ export function DeleteDialog({ articles, archived, trashEnabled = true, disabled
     : t(`dialogs:deletion.${archived ? 'archived' : 'manuscripts'}`, { count });
   const suffix = count > 1 ? t('dialogs:deletion.countSuffix', { count }) : '';
   return (
-    <DialogFrame titleId="delete-dialog-title" descriptionId="delete-dialog-copy" role="alertdialog" onClose={onClose}>
-      <DialogHeader titleId="delete-dialog-title" eyebrow={archived ? t('common:eyebrows.deleteArchive') : t('common:eyebrows.deleteManuscript')} title={trashEnabled ? t('messages:trash.moveTitle') : title} onClose={onClose} />
+    <ConfirmDialog titleId="delete-dialog-title" descriptionId="delete-dialog-copy" role="alertdialog" onClose={onClose} title={trashEnabled ? t('messages:trash.moveTitle') : title} eyebrow={archived ? t('common:eyebrows.deleteArchive') : t('common:eyebrows.deleteManuscript')}
+      cancel={{ label: t('dialogs:ui.keepManuscript'), autoFocus: true, onClick: onClose }} confirm={{ label: <>{t(trashEnabled ? 'messages:trash.moveConfirm' : 'messages:trash.permanentDelete')}{suffix}</>, icon: "delete", onClick: onConfirm, disabled: disabled, variant: "danger" }}>
       <div className="grid gap-5 p-4">
         <div className="flex items-start gap-3 rounded-lg border border-warning-line bg-warning-surface p-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-md bg-panel text-warning-strong" aria-hidden="true"><svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.3 3.8 2.2 18a2 2 0 0 0 1.7 3h16.2a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0Z" /><path d="M12 9v5M12 17.5h.01" /></svg></span>
@@ -59,7 +60,6 @@ export function DeleteDialog({ articles, archived, trashEnabled = true, disabled
           <div className="grid max-h-56 gap-2 overflow-x-clip overflow-y-auto scrollbar-thin scrollbar-thumb-line scrollbar-track-transparent">{articles.map((item) => <div key={item.id} className="grid gap-0.5"><strong className="break-words text-sm font-semibold text-primary">{item.parse.metadata.title || t('dialogs:ui.untitledArticle')}</strong><span className="break-all font-mono text-xs text-muted">{item.month}/{item.folder}</span></div>)}</div>
         </div>
       </div>
-      <DialogFooter><DialogActions><DialogButton autoFocus onClick={onClose}>{t('dialogs:ui.keepManuscript')}</DialogButton><DialogButton variant="danger" disabled={disabled} onClick={onConfirm}>{t(trashEnabled ? 'messages:trash.moveConfirm' : 'messages:trash.permanentDelete')}{suffix}</DialogButton></DialogActions></DialogFooter>
-    </DialogFrame>
+    </ConfirmDialog>
   );
 }

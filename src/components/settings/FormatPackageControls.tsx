@@ -11,8 +11,10 @@ import { canonicalFormatJson } from '../../lib/article-format/config';
 import { disposeRendererRunners } from '../../lib/article-format/package';
 import { useUITranslation } from '../global/UILocaleProvider';
 import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from '../global/DialogFrame';
-import { ContentIcon } from '../global/ContentIcon';
+
 import { UnsavedChangesDialog } from '../global/UnsavedChangesDialog';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function FormatPackageControls({ root }: { root: FileSystemDirectoryHandle }) {
   const { t } = useUITranslation('messages'), snapshot = useFormatSnapshot();
@@ -50,11 +52,11 @@ export function FormatPackageControls({ root }: { root: FileSystemDirectoryHandl
   };
   return <div className="grid gap-3">
     {declaration ? <p className="break-all font-mono text-xs text-muted">{declaration.id} · v{declaration.version} · {declaration.protocol}</p> : null}
-    <div className="flex flex-wrap gap-2"><OperationFeedback hideTrigger revision={revision} id={snapshot.error ? "format-problem" : "format-reload-result"} announce={!busy && Boolean(message)} lifetime={snapshot.error ? { mode: 'locked' } : undefined} notice={message} tone={failed || snapshot.error ? 'error' : 'success'} summary={snapshot.error ? productReference('feedback.formatUnavailable') : failed ? productReference('feedback.saveFailed') : undefined} /><button type="button" className="button button-quiet" disabled={busy} onClick={() => void reload()}><ContentIcon name="reset" />{t('formatPackage.reload')}</button>{declaration?.settings.length ? <button type="button" className="button button-quiet" disabled={busy} onClick={() => { setValues(declaration.values); setOpen(true); }}><ContentIcon name="edit" />{t('formatPackage.settings')}</button> : null}</div>
+    <ButtonBar label={t('common:actions.group')} className="flex flex-wrap gap-2"><OperationFeedback hideTrigger revision={revision} id={snapshot.error ? "format-problem" : "format-reload-result"} announce={!busy && Boolean(message)} lifetime={snapshot.error ? { mode: 'locked' } : undefined} notice={message} tone={failed || snapshot.error ? 'error' : 'success'} summary={snapshot.error ? productReference('feedback.formatUnavailable') : failed ? productReference('feedback.saveFailed') : undefined} /><Button icon="reset" type="button"  disabled={busy} onClick={() => void reload()} label={t('formatPackage.reload')} />{declaration?.settings.length ? <Button icon="edit" type="button"  disabled={busy} onClick={() => { setValues(declaration.values); setOpen(true); }} label={t('formatPackage.settings')} /> : null}</ButtonBar>
     {open && declaration ? <DialogFrame titleId="format-settings-title" onClose={close} focusActive={!discard} dismissible={!busy} className="flex min-h-0 max-w-lg flex-col overflow-hidden">
       <DialogHeader eyebrow="FORMAT" titleId="format-settings-title" title={t('formatPackage.settings')} onClose={close} closeDisabled={busy} />
       <div className="grid min-h-0 gap-4 overflow-x-clip overflow-y-auto p-4">{declaration.settings.map(setting => <label key={setting.key} className="field-stack"><span className="field-label">{setting.label}</span>{setting.type === 'select' ? <SelectField label={setting.label} disabled={busy} value={String(values[setting.key])} onChange={nextValue => setValues({ ...values, [setting.key]: nextValue })} options={[...(setting.options?.map(option => ({ value: option, label: option })) ?? [])]} /> : setting.type === 'boolean' ? <input type="checkbox" disabled={busy} checked={Boolean(values[setting.key])} onChange={event => setValues({ ...values, [setting.key]: event.target.checked })} /> : <input className="field" disabled={busy} type={setting.type === 'number' ? 'number' : 'text'} value={String(values[setting.key])} onChange={event => setValues({ ...values, [setting.key]: setting.type === 'number' ? Number(event.target.value) : event.target.value })} />}</label>)}</div>
-      <DialogFooter><DialogActions><DialogButton onClick={close} disabled={busy}>{t('formatPackage.cancel')}</DialogButton><DialogButton variant="primary" disabled={busy || !dirty} onClick={() => void reload(true)}>{t('formatPackage.save')}</DialogButton></DialogActions></DialogFooter>
+      <DialogFooter><DialogActions><DialogButton icon="close" onClick={close} disabled={busy}>{t('formatPackage.cancel')}</DialogButton><DialogButton icon="save" variant="primary" disabled={busy || !dirty} onClick={() => void reload(true)}>{t('formatPackage.save')}</DialogButton></DialogActions></DialogFooter>
     </DialogFrame> : null}
     {discard ? <UnsavedChangesDialog entries={[{ label: t('formatPackage.settings') }]} description={t('formatPackage.unsaved')} onContinue={() => setDiscard(false)} onSave={async () => { setDiscard(false); await reload(true); return !getFormatSnapshot().error; }} onCancel={() => setDiscard(false)} onDiscard={() => { setDiscard(false); setValues(declaration?.values ?? {}); setOpen(false); }} /> : null}
   </div>;

@@ -11,6 +11,8 @@ import { IconButton } from '../global/IconButton';
 import { ArticleImagePreview } from './ArticleImagePreview';
 import { mediaAssetKey } from './MediaGallery';
 import { useImageZoom } from '../../hooks/useImageZoom';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function MediaPreviewDialog({ initial, images = [], rendered, sessionKey, isCurrent, onClose }: {
   initial?: LibraryMediaAsset; images?: LibraryMediaAsset[]; rendered?: { src: string; alt: string; fileName: string }; sessionKey: number | string; isCurrent: () => boolean; onClose: () => void;
@@ -46,14 +48,14 @@ export function MediaPreviewDialog({ initial, images = [], rendered, sessionKey,
           imageProps={{ className: 'max-h-none max-w-none shrink-0', style: imageStyle }} /> : <img src={rendered!.src} alt={rendered!.alt} className="max-h-none max-w-none shrink-0" style={imageStyle} onLoad={event => onDimensions(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)} />}
       </div>
     </div>
-    <div className="flex shrink-0 flex-wrap items-center justify-center gap-2 border-t border-line p-4" role="group" aria-label={t('dialogs:ui.imagePreviewActions')}>
-      <IconButton tooltip={t('dialogs:ui.previousImageLeftArrow')} aria-label={t('dialogs:ui.previousImage')} disabled={index <= 0} onClick={() => move(-1)} icon={<span aria-hidden="true">←</span>} />
-      <IconButton tooltip={t('dialogs:ui.zoomOut')} aria-label={t('dialogs:ui.zoomOut')} disabled={!dimensions.width || scale <= 0.01} onClick={() => zoomTo(scale - 0.25)} icon={<span aria-hidden="true">−</span>} />
+    <ButtonBar label={t('dialogs:ui.imagePreviewActions')} className="justify-center border-t border-line p-4">
+      <IconButton tooltip={t('dialogs:ui.previousImageLeftArrow')} aria-label={t('dialogs:ui.previousImage')} disabled={index <= 0} onClick={() => move(-1)} icon="back" />
+      <IconButton tooltip={t('dialogs:ui.zoomOut')} aria-label={t('dialogs:ui.zoomOut')} disabled={!dimensions.width || scale <= 0.01} onClick={() => zoomTo(scale - 0.25)} icon="minus" />
       <span className="min-w-12 text-center font-mono text-xs text-secondary" role="status">{formatUINumber(Math.round(scale * 100) / 100, locale, { style: 'percent', maximumFractionDigits: 0 })}</span>
-      <IconButton tooltip={t('dialogs:ui.zoomIn')} aria-label={t('dialogs:ui.zoomIn')} disabled={!dimensions.width || scale >= 8} onClick={() => zoomTo(scale + 0.25)} icon={<span aria-hidden="true">+</span>} />
-      <button className="button button-quiet min-h-9 py-1 text-xs" disabled={!dimensions.width} onClick={() => zoomTo(1)}>{formatUINumber(1, locale, { style: 'percent' })}</button>
-      <button className="button button-quiet min-h-9 py-1 text-xs" disabled={!dimensions.width} onClick={() => zoomTo(null)}>{t('dialogs:ui.fitToWindow')}</button>
-      <IconButton tooltip={t('dialogs:ui.nextImageRightArrow')} aria-label={t('dialogs:ui.nextImage')} disabled={Boolean(rendered) || index >= images.length - 1} onClick={() => move(1)} icon={<span aria-hidden="true">→</span>} />
-    </div>
+      <IconButton tooltip={t('dialogs:ui.zoomIn')} aria-label={t('dialogs:ui.zoomIn')} disabled={!dimensions.width || scale >= 8} onClick={() => zoomTo(scale + 0.25)} icon="plus" />
+      <Button icon="target" className="min-h-9 py-1 text-xs" disabled={!dimensions.width} onClick={() => zoomTo(1)} label={formatUINumber(1, locale, { style: 'percent' })} />
+      <Button icon="expand" className="min-h-9 py-1 text-xs" disabled={!dimensions.width} onClick={() => zoomTo(null)} label={t('dialogs:ui.fitToWindow')} />
+      <IconButton tooltip={t('dialogs:ui.nextImageRightArrow')} aria-label={t('dialogs:ui.nextImage')} disabled={Boolean(rendered) || index >= images.length - 1} onClick={() => move(1)} icon="next" />
+    </ButtonBar>
   </DialogFrame>;
 }

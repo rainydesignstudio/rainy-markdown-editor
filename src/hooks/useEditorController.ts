@@ -681,7 +681,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
       if (snapshot.renderIssue) throw new Error(snapshot.renderIssue);
       const result = snapshot.renderRecord && snapshot.renderCss && await renderRecordMatches(snapshot.renderRecord, snapshot.source, snapshot.theme)
         ? { css: snapshot.renderCss, candidates: extractMarkdownClassCandidates(snapshot.source) }
-        : await compileArticleStyles(snapshot.source, snapshot.theme, { snapshot: snapshot.renderSnapshot?.id === snapshot.formatId ? snapshot.renderSnapshot : undefined });
+        : await compileArticleStyles(snapshot.source, snapshot.theme, { snapshot: snapshot.renderSnapshot?.id === snapshot.formatId ? snapshot.renderSnapshot : undefined, root: snapshot.directory ?? undefined });
       if (requestId !== compileRequestRef.current || !matchesSnapshot(snapshot)) return false;
       // Format rules must be checked against the committed preview, including its new stylesheet.
       flushSync(() => { setCompiledCss(result.css); setCompiledRevision(snapshot.revision); });
@@ -930,12 +930,11 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
         if (!matchesSnapshot(snapshot) || !mutationQueueRef.current.canSave(snapshot.documentToken)) throw new ProductError("controller.theArticleSessionChangedTheRenderRecordWasNotUpdated");
         const savedDirectory = await getStoredArticleDirectory(root, snapshot.month!, snapshot.folder!);
         if (!isAllowed()) return false;
-        await persistRenderRecord(root, savedDirectory, prepared);
-        return true;
+        return await persistRenderRecord(root, savedDirectory, prepared);
       });
       if (!persisted) return { ok: false };
       if (matchesSnapshot(snapshot)) {
-        const next = { ...articleRef.current, renderRecord: prepared.record, renderCss: compiled.css, renderIssue: undefined };
+        const next = { ...articleRef.current, renderRecord: persisted, renderCss: compiled.css, renderIssue: undefined };
         articleRef.current = next; setArticle(next);
       }
       return { ok: true };
@@ -3440,6 +3439,7 @@ export function useEditorController(seedLocale: UILocale = 'en-US') {
     root: directory, session: contentLibraryRootSession,
     isCurrent: (root, session) => directoryRef.current === root && contentLibraryRootSessionRef.current === session,
     protect: runAfterDraftDecision, queue: mutationQueueRef.current,
+    onImported:(stored,root)=>{if(directoryRef.current===root)setStoredArticles(items=>upsertStoredArticle(items,stored));},
     onCreated: async (stored, root) => {
       if (directoryRef.current !== root) return false;
       setStoredArticles(items => upsertStoredArticle(items, stored));

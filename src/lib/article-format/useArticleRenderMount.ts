@@ -31,11 +31,12 @@ function bindPreviewCitations(target: HTMLElement, host: HTMLElement) {
   target.addEventListener('click', click); return () => target.removeEventListener('click', click);
 }
 
-export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>, snapshot: FormatSnapshot, css: string, dark = false, options: { retained?: boolean; colorTheme?: ThemeConfig; onImageOpen?: (image: RenderedPreviewImage) => void; onSourceFind?: () => void } = {}) {
+export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>, snapshot: FormatSnapshot, css: string, dark = false, options: { retained?: boolean; colorTheme?: ThemeConfig; codeKey?: string; onImageOpen?: (image: RenderedPreviewImage) => void; onSourceFind?: () => void } = {}) {
   const { t } = useUITranslation('editor');
   const frameTitles = useRef({ light: '', dark: '' });
   const visibleFrameRef = useRef<HTMLIFrameElement | null>(null);
   const darkFrameRef = useRef<HTMLIFrameElement | null>(null);
+  const codeKeyRef=useRef(options.codeKey);codeKeyRef.current=options.codeKey;
   const [colorResult, setColorResult] = useState<{ snapshot: FormatSnapshot; css: string; theme?: ThemeConfig; colors: ArticleDarkColors } | null>(null);
   const darkColors = colorResult?.snapshot === snapshot && colorResult.css === css && colorResult.theme === options.colorTheme ? colorResult.colors : PENDING_DARK_COLORS;
   frameTitles.current = { light: t('preview.frame'), dark: t('preview.nativeDarkFrame') };
@@ -152,6 +153,7 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
       controller?.abort(); controller = new AbortController();
       const request = controller;
       const markup = articlePreviewMarkup(root);
+      const codeKey=codeKeyRef.current;
       const context = { snapshot, css, theme: options.colorTheme };
       setColorResult(null);
       void nativeDarkRendition(root, css, snapshot, request.signal, { ...options, width: host.clientWidth }).then(async result => {
@@ -200,6 +202,8 @@ export function useArticleRenderMount(hostRef: RefObject<HTMLDivElement | null>,
         if (!active || request.signal.aborted || !root.isConnected || articlePreviewMarkup(root) !== markup) return;
         if (darkStyle!.textContent !== result.css) darkStyle!.textContent = result.css;
         commitPreviewMarkup(darkMount!, snapshot.renderer ? sanitizePackageHtml(result.html, snapshot) : sanitizeHtml(result.html, snapshot));
+        darkMount!.dataset.previewCodeKey=codeKey??'';
+        setDarkIssue('');
         if (!native) { target.hidden = true; host.style.height = '100%'; }
         else {
           canonicalFrame = host.querySelector<HTMLIFrameElement>('iframe[data-article-frame="light"]');

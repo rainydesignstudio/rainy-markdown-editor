@@ -64,7 +64,8 @@
     "loading": "Loading",
     "editingUnavailable": "Editing unavailable",
     "unnamed": "Unnamed",
-    "snippetCopyName": "{{name}} copy"
+    "snippetCopyName": "{{name}} copy",
+    "loadDefaults": "Load defaults"
   },
   "templates": {
     "articleCategories": "Article categories: {{categories}}",

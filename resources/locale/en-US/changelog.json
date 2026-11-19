@@ -1100,6 +1100,46 @@
           ]
         }
       ]
+    },
+    "v0_4_1": {
+      "summary": "Switch between rendered output and read-only code, import single files or batches, manage layered rendering caches, and use consistent workspace controls.",
+      "sections": [
+        {
+          "title": "SVG compatibility and safety",
+          "items": [
+            "Retain controlled SVG visibility, hit areas, clipping, stroke proportions and timing; scope repeated event IDs and preserve authored animation state in copied output while blocking executable markup.",
+            "Fix timing-reference IDs, invisible hit targets, overlapping replay events and stale SVG timelines while retaining unchanged graphics."
+          ]
+        },
+        {
+          "title": "Rendered code view",
+          "items": [
+            "Add a result/code icon between preview color mode and scroll alignment; show matching read-only HTML/CSS with independent reading positions and paused alignment.",
+            "Respect save-only previews, dark mode and stale-result guards without saving, replaying or sampling an animation frame."
+          ]
+        },
+        {
+          "title": "Unified imports",
+          "items": [
+            "Drag or select multiple files in one import dialog. Article cards show attachment counts; icon popups provide status and recovery, with rings for real progress. Footer Import and Cancel operation replace records tabs, inline details and duplicate state text.",
+            "Create independently without forced navigation or rolling back successful files. Closing hides work; cancellation retains saved content. Target/permission changes stop remaining work, and resource recovery preserves manual body edits. The upload area and footer stay visible while the file list scrolls."
+          ]
+        },
+        {
+          "title": "Rendering caches and historical dependencies",
+          "items": [
+            "Keep rebuildable caches in the browser and deduplicate indispensable historical dependencies under cache/render.",
+            "Retain legacy compatibility, verify explicit migration/reclamation, and recover historical environments after browser cache clearing. Settings shows three usage figures and anchors cache actions at the bottom of the card."
+          ]
+        },
+        {
+          "title": "Workspace actions and feedback",
+          "items": [
+            "Unify workspace action buttons, icons, action bars, and standard confirmation dialogs. Icon-only actions use shared hover and keyboard tooltips.",
+            "Show indeterminate upload progress when the total is unknown. Summarize the result after loading defaults and allow failed refreshes to be retried separately."
+          ]
+        }
+      ]
     }
   }
 }

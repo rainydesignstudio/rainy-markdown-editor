@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { queryDirectoryReadWritePermission } from '../../lib/directoryBookmark';
-import { ProductError, productErrorMessage } from '../../lib/i18n/productMessages';
+import { ProductError, productErrorMessage, localizeFilePickerError } from '../../lib/i18n/productMessages';
 import { addKnowledgeSource, reconnectKnowledgeSource, restoreKnowledgeSource, readKnowledgeBindings, updateKnowledgeSource, disconnectKnowledgeSource, type KnowledgeRegistration, type KnowledgeConnection } from '../../lib/knowledge/source';
 import { createKnowledgeWorker, type KnowledgeWorkerClient } from '../../lib/knowledge/workerClient';
 import { rebuildKnowledgeIndex, searchKnowledgeIndex, type KnowledgeIndexProgress } from '../../lib/knowledge/indexing';
@@ -102,7 +102,9 @@ export function useKnowledgeLibrary(root: FileSystemDirectoryHandle | null, sess
       if (!current(token)) return;
       const picker = (window as Window & { showDirectoryPicker?: (options: { mode: 'read'; id: string }) => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
       if (!picker) throw new ProductError('knowledge.browserUnsupported');
-      const selected = await picker.call(window, { mode: 'read', id: 'rainy-knowledge-source' });
+      let selected: FileSystemDirectoryHandle;
+      try { selected = await picker.call(window, { mode: 'read', id: 'rainy-knowledge-source' }); }
+      catch (error) { throw localizeFilePickerError(error); }
       if (!current(token)) return;
       token = ++epoch.current; switched = true; stop(); clearDocument(); setResults(null);
       const linked = action === 'relocate' ? await reconnectKnowledgeSource(root, selected, undefined, () => current(token), selectedRef.current ?? undefined) : await addKnowledgeSource(root, selected, undefined, () => current(token), action === 'replace' ? selectedRef.current ?? undefined : undefined);

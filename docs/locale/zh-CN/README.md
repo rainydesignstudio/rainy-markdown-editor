@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.0.1"><img src="https://img.shields.io/badge/RELEASE-v0.4.0.1-2563EB?style=for-the-badge" alt="Release v0.4.0.1" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.1.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.1.0-2563EB?style=for-the-badge" alt="Release v0.4.1.0" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -74,7 +74,7 @@
 | 📥 **Markdown 导入** | 主题预选可换，正文先建档、资源后台复制，支持暂停、重试与补选。 |
 | 🧮 **公式与图** | 可选本地公式/静态 Mermaid 渲染，源码保持，输出按目标平台核对。 |
 
-内置多套文章主题和编辑器主题，公众号预设还提供二十多个片段和多份起稿模板。你也可以从空库开始，按需定制。
+内置多套文章主题和编辑器主题，公众号预设还提供基础片段和多份起稿模板。你也可以从空库开始，按需定制。
 
 在文稿信息中修改目录名后，点击“保存文章”与其他修改一并保存。中文及全角标点按输入保留；路径分隔符、保留字符和重名会被拒绝。界面显示新目录名，正文文件仍叫 `article.md`。
 
@@ -92,7 +92,7 @@
 
 **Agent Readable：先读 [AGENT-GUIDE.md](AGENT-GUIDE.md)；后续操作按[持续查阅要求](AGENT-GUIDE.md#doc-manual-use)取用说明书。** 安装来源与版本以你确认的仓库和分支为准。
 
-公开安装版为 `0.4.0.1`（package为 `0.4.0+patch.1`）。线上页面的实际功能以其运行版本为准。
+公开安装版为 `0.4.1.0`（package为 `0.4.1`）。线上页面的实际功能以其运行版本为准。
 
 <a name="doc-run-yourself"></a>
 
@@ -156,7 +156,7 @@ npm start
 
 ### 👁️ 文章预览操作
 
-预览标题栏的三个图标从左至右如下，悬停或键盘聚焦可查看提示；偏好按浏览器来源记住。
+预览明暗按钮后新增“查看渲染代码”，再点返回结果。只读HTML/CSS对应同一成功可见产物，包含仅保存刷新的留存画面；未就绪或失败会明确显示。两视图各自保留读位，切换不保存、不重播结果；代码态暂停滚动对齐并保留原偏好。选择在当前页面会话内保持。后面三个操作的顺序不变，悬停或键盘聚焦可查看提示；其偏好按浏览器来源记住。
 
 | 控件 | 默认 | 行为 |
 |---|---|---|
@@ -170,7 +170,7 @@ npm start
 
 交给外部Agent修改资料库前，由Agent关闭自动保存和自动快照、保存设置并确认生效，接手期间明确保存和建立历史检查点；交还时说明状态，恢复自动功能按你的选择办理。详见[Agent接手说明](AGENT-GUIDE.md#doc-agent-write-handoff)。
 
-预览深浅色开关位于三个预览操作按钮左侧，三个按钮的顺序保持。
+工具栏顺序：预览明暗 → 渲染代码/结果 → 滚动对齐 → 保存报告 → 仅保存刷新。
 
 源码工具栏提供“自动换行”和“语法高亮”，位于行号按钮左侧。按 `Alt/Option + Z` 切换自动换行，关闭后可横向滚动；高亮使用编辑器主题为 Markdown、HTML 与 CSS 着色，代码块和code/pre内文保持普通文字，不改变正文或文章主题。两项偏好由浏览器记住。
 
@@ -225,7 +225,7 @@ npm start
 
 ## 📥 导入 Markdown 与资源
 
-在文章页点“导入 Markdown”，选择 UTF-8 的 `.md` 或 `.markdown` 文件（上限2MiB）。默认选中资料库的文章主题，也可另选；导入会创建独立文稿和主题快照，保留原始文件。
+在文章页点“导入文章”，拖拽或点击上传框选择一份或多份UTF-8的 `.md`/`.markdown` 文件（每份上限2MiB）。卡片保留文章名并显示附件数；左侧图标的popup表示待上传、上传中或已上传，真实传输时显示环形进度。确认前可移除，核对主题、同名冲突及资源目录；底部“导入 N 篇”开始建稿，尚未确认时零目标写入。原件保留；坏文件的原因和补选/重试由状态图标提供。
 
 需要连同本地图片或附件导入时，请在导入窗口另选源目录并授权读取；仅选 Markdown 文件不能读取相邻资源。导入保留原文件，资源会复制到新文章。网络资源可能因站点权限或访问限制下载失败，可补选本地文件。
 
@@ -236,7 +236,7 @@ npm start
 ### ⏳ 后台任务与恢复
 
 - 正文先出现，编辑、撤销和保存可继续；资源在后台复制并显示进度，后到的资源不会覆盖你的修改。
-- “导入任务”可查看失败原因、暂停/取消、重试、补选源文件/源目录或替代资源。同库切稿继续，切库/失权暂停，删除目标取消；关闭页面后不继续运行，重开后需手动重试，可能从头下载。
+- 同一窗口直接列出文章卡片，没有记录页签或卡片详情。未建稿的“打开文章”禁用；正文及附件完成后可打开。状态图标保留失败原因、补选来源/文件、重试和适用的暂停/停止操作；任务记录写入失败可单独重存，不重建文章。底部“取消操作”停止本轮未完成项并关闭，保留已写入正文和资源；标题关闭/ESC只收起窗口。同库切稿继续，切库/失权暂停；关闭页面后不继续运行，重开需手动恢复。
 - 恢复会核对来源、目标和已有文件。无法确认的同名文件保留并报冲突，不覆盖；新选择的替代资源会记录来源。任务记录保存失败时保留已建文稿并提示重试。
 - 图片和附件可在素材库筛选、搜索、采用和下载。一般附件上限64MiB，图片按支持的格式和大小限制导入；受支持的图片可直接预览，SVG、PDF、音视频等附件不自动预览或执行。
 - 拖入/选择文件先确认文件清单和目标，取消不写入。采用共享素材会复制独立文稿资源；改名更新当前引用并保留历史所需原件，删除前核对引用。资源卡片与详情显示引用状态；“移动或复制”保留被正文、历史或共享位置引用的原件，未引用资源执行移动。引用状态未知时暂不可执行，操作前再次核对；多选模式可按Esc退出。
@@ -318,9 +318,12 @@ npm start
 │           ├── theme.json            # 文章独立主题快照
 │           ├── media/image/          # 文章图片及可选描述索引
 │           ├── media/file/           # 附件及index.json描述，按需生成
-│           ├── render.json           # 可选渲染成品与依赖引用
+│           ├── render.json           # 可选渲染身份与依赖引用
 │           └── history/snapshot-…/    # 源码、主题、清单与可选渲染记录
-├── styles/                          # 可选库级CSS及不可变渲染版本
+├── cache/render/                    # 历史必需依赖，按内容共享
+│   ├── manifests/<hash>.json
+│   └── objects/<hash>
+├── styles/                          # 可编辑库级CSS；.versions为旧存储
 │   ├── globals.css
 │   └── .versions/<hash>/manifest.json
 ├── assets/                          # 库级图片/SVG/字体，按需出现
@@ -337,6 +340,8 @@ npm start
 │       └── research-<sourceId>.json # 专题、收集及引用记录
 └── imports/tasks/<id>.json          # 独立资源任务
 ```
+浏览器缓存可清空后重建；cache/render/manifests与objects保存历史必需的去重依赖，整库备份保留。旧styles/.versions及assets/.objects仅经显式校验迁移，不能手动整目录删除。
+
 
 新建资料库装配所选预设的格式配置、随附渲染包、主题和起稿内容，并直接写入version 2的settings.json：普通建库采用默认设置，入场引导采用已确认选项，并额外准备所选模板和独立示例。普通建库的articles/初始为空；完整字体从所选来源补缺，已有字体保持。
 

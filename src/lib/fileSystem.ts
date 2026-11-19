@@ -1,4 +1,4 @@
-import { ProductError, productCause, productMessage, productReference, productText } from "./i18n/productMessages";
+import { ProductError, productCause, productMessage, productReference, productText, localizeFilePickerError } from "./i18n/productMessages";
 import { DEFAULT_PLATFORM_PRESET_ID, getPublicPlatformPreset } from './article-format/library';
 import { readRenderRecord, renderRecordMatches, writeRenderRecord, type RenderRecord } from './article-format/renderRecords';
 import { parseArticle, updateFrontMatter } from './frontMatter';
@@ -74,7 +74,9 @@ export async function pickDataDirectory(): Promise<DirectoryHandle> {
   const picker = (window as unknown as Window & {
     showDirectoryPicker: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>;
   }).showDirectoryPicker;
-  const handle = await picker({ mode: 'readwrite' });
+  let handle: DirectoryHandle;
+  try { handle = await picker({ mode: 'readwrite' }); }
+  catch (error) { throw localizeFilePickerError(error); }
   await ensurePermission(handle);
   return handle;
 }
@@ -161,16 +163,20 @@ export function sanitizeFolderName(value: string): string {
   return (cleaned || '未命名文稿').slice(0, 80);
 }
 
-async function uniqueFolderName(monthDirectory: FileSystemDirectoryHandle, desired: string): Promise<string> {
+async function uniqueFolderName(monthDirectory: FileSystemDirectoryHandle, desired: string, cache?:Map<string,Set<string>>): Promise<string> {
   const base = sanitizeFolderName(desired);
-  const names = new Set<string>();
-  for await (const [name, entry] of monthDirectory.entries()) {
-    if (entry.kind === 'directory') names.add(name.normalize('NFKC').toLowerCase());
+  let names=cache?.get(monthDirectory.name);
+  if(!names){
+    names=new Set<string>();
+    for await (const [name, entry] of monthDirectory.entries()) {
+      if (entry.kind === 'directory') names.add(name.normalize('NFKC').toLowerCase());
+    }
+    cache?.set(monthDirectory.name,names);
   }
-  if (!names.has(base.normalize('NFKC').toLowerCase())) return base;
+  if (!names.has(base.normalize('NFKC').toLowerCase())) {names.add(base.normalize('NFKC').toLowerCase());return base;}
   let count = 2;
   while (names.has(`${base}-${count}`.normalize('NFKC').toLowerCase())) count += 1;
-  return `${base}-${count}`;
+  const name=`${base}-${count}`;names.add(name.normalize('NFKC').toLowerCase());return name;
 }
 
 function isThemeConfig(value: unknown): value is ThemeConfig {
@@ -727,7 +733,7 @@ export async function saveStoredArticle(
   theme: ThemeConfig,
   existingFolder?: string | null,
   existingMonth?: string | null,
-  options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string; renderRecord?: RenderRecord | null; guard?: ArticleWriteGuard; requestPermission?: boolean } = {},
+  options: { writeTheme?: boolean; updateIndex?: boolean; expectedSource?: string; renderRecord?: RenderRecord | null; guard?: ArticleWriteGuard; requestPermission?: boolean; newFolderNames?:Map<string,Set<string>> } = {},
 ): Promise<SaveResult> {
   await ensurePermission(root, options.requestPermission !== false);
   await options.guard?.(root, []);
@@ -773,7 +779,7 @@ export async function saveStoredArticle(
     if (sanitizeFolderName(existingFolder) !== existingFolder) throw new ProductError("fileSystem.theExistingArticleDirectoryNameIsUnsafeRewritingWasRejected");
     folder = existingFolder;
   } else {
-    folder = await uniqueFolderName(monthDirectory, parsed.metadata.title);
+    folder = await uniqueFolderName(monthDirectory, parsed.metadata.title,options.newFolderNames);
   }
   const articlePath = ['articles', month, folder];
   const articleDirectory = options.expectedSource !== undefined ? await monthDirectory.getDirectoryHandle(folder) : await directory(monthDirectory, folder, articlePath, !existingFolder);

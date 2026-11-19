@@ -1,9 +1,10 @@
 'use client';
 
-import { useUILocale } from './UILocaleProvider';
+import { useUILocale, useUITranslation } from './UILocaleProvider';
 import { formatUINumber } from '../../lib/i18n/formatters';
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { ButtonBar } from './ButtonBar';
 
 export function PanelHeading({ title, icon, count, expanded, reserveAction = false, details, compact = false, variant = 'panel', as: Trigger = 'button', className = '', children, ...props }: Omit<ButtonHTMLAttributes<HTMLElement>, 'title'> & {
   title: ReactNode; icon?: ReactNode; count?: number; expanded?: boolean; reserveAction?: boolean; details?: ReactNode; compact?: boolean; variant?: 'panel' | 'choice'; as?: 'button' | 'summary';
@@ -27,10 +28,11 @@ export function CollapsiblePanel({ id, title, icon, count, open, onToggle, class
   id: string; title: string; icon: ReactNode; count?: number; open: boolean; onToggle: () => void;
   className?: string; contentClassName?: string; contentLabel?: string; headingActions?: ReactNode; children: ReactNode;
 }) {
+  const { t } = useUITranslation();
   return <section className={`collapsible-panel ${className}`} data-open={open} aria-labelledby={`${id}-heading`}>
     <div className="group/panel-heading relative flex shrink-0 items-center">
       <PanelHeading id={`${id}-heading`} title={title} icon={icon} count={count} expanded={open} reserveAction={Boolean(headingActions)} aria-controls={`${id}-content`} onClick={onToggle} className="min-w-0 flex-1" />
-      {headingActions ? <div className="absolute top-1/2 right-20 -translate-y-1/2">{headingActions}</div> : null}
+      {headingActions ? <ButtonBar label={t('actions.group')} className="absolute top-1/2 right-20 -translate-y-1/2">{headingActions}</ButtonBar> : null}
     </div>
     {open ? <div id={`${id}-content`} aria-label={contentLabel} className={`collapsible-panel-content ${contentClassName}`}>{children}</div> : null}
   </section>;

@@ -2,6 +2,7 @@ import { createArticleColorNormalizer } from '../articleDarkPreview';
 import { articleFormatAllowsCssProperty } from '../articleFormat';
 import { assertFormatReady, getFormatSnapshot } from './runtime';
 import { restorePreviewImageAttributes } from './previewImages';
+import {svgAnimatedProperties} from './svgAnimation';
 
 export { SAFE_REHYPE_SCHEMA, sanitizeStyleValue, rehypeSafeStyles, sanitizeHtml } from './sanitize';
 import { sanitizeHtml } from './sanitize';
@@ -89,6 +90,7 @@ export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSna
   const view = root.ownerDocument?.defaultView ?? window;
   const { normalizePaint } = createArticleColorNormalizer(root.ownerDocument);
   let localImageCount = 0;
+  const svgAnimations = new WeakMap<Element, Set<string>>();
 
   for (let index = 0; index < cloneElements.length; index += 1) {
     const source = sourceElements[index] as HTMLElement | undefined;
@@ -118,12 +120,19 @@ export function buildClipboardPayload(root: HTMLElement, snapshot = getFormatSna
     }
     const computed = view.getComputedStyle(source);
     const typed = (source as HTMLElement & { computedStyleMap?: () => ClipboardStyleMap }).computedStyleMap?.();
-    const keepProperty = (property: string) => !(generatedShell && (source === root || source === body) && rootStyleOmissions.has(property));
-    const styles = [...output.inlineProperties.filter(keepProperty).map((property) => {
+    const animated=source.namespaceURI==='http://www.w3.org/2000/svg'?svgAnimatedProperties(source,svgAnimations):undefined;
+    // Keep declarative base values, not the sampled frame's computed state.
+    const keepProperty = (property: string) => !animated?.has(property) && !(generatedShell && (source === root || source === body) && rootStyleOmissions.has(property));
+    const animationNode = ['set', 'animate', 'animateTransform'].includes(source.localName);
+    const styles = animationNode ? target.getAttribute('style') ?? '' : [...output.inlineProperties.filter(keepProperty).map((property) => {
       if (output.stripRootBackground && body !== root && (source === root || source === body) && (property === 'background-color' || property === 'background-image')) return '';
       const value = property.startsWith('grid-template-') ? typed?.get(property)?.toString() || computed.getPropertyValue(property) : computed.getPropertyValue(property);
       return articleFormatAllowsCssProperty(property, value) ? `${property}:${output.colorEncoding === 'rgb' ? normalizePaint(value) : value}` : '';
-    }), ...output.dimensionProperties.filter(keepProperty).map(property => `${property}:${clipboardDimension(source, computed, typed, property)}`)]
+    }), ...output.dimensionProperties.filter(keepProperty).map(property => `${property}:${clipboardDimension(source, computed, typed, property)}`),
+      ...[...(animated ?? [])].flatMap(property => {
+        const value = target.style.getPropertyValue(property);
+        return value ? [`${property}:${value}${target.style.getPropertyPriority(property) ? ' !important' : ''}`] : [];
+      })]
       .filter((value) => value && !value.endsWith(':'))
       .join(';');
     if (styles) target.setAttribute('style', styles);

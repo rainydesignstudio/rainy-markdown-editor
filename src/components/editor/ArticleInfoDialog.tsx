@@ -13,6 +13,8 @@ import { DialogActions, DialogButton, DialogFooter, DialogFrame, DialogHeader } 
 import { InformationButton, InformationIcon } from '../global/InformationButton';
 import { useLibraryCapability } from '../../hooks/useLibraryCapability';
 import { EditableArticleTitle } from './EditableArticleTitle';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 type Props = {
   article: WorkingArticle; parsed: ReturnType<typeof parseArticle>; stored: ArticleSummary | null;
@@ -76,13 +78,15 @@ export function ArticleInfoDialog({ article, parsed, stored, workspace, archived
           </section>
           {!creation ? <section className="grid min-w-0 shrink-0 gap-3 rounded-lg border border-line bg-list/50 p-4" aria-labelledby="article-manage-heading">
             <h3 id="article-manage-heading" className="font-sub-heading text-sm font-semibold text-primary">{t('dialogs:ui.manuscriptManagement')}</h3>
-            <button className="button button-quiet justify-start" type="button" disabled={!stored || busy} onClick={onOpenHistory}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M3 11a9 9 0 1 1 3 8M3 4v7h7M12 7v5l3 2" /></svg>{t('dialogs:ui.viewHistory')}</button>
-            {archived ? <button className="button button-quiet justify-start" type="button" disabled={busy} onClick={onUnarchive}>{t('dialogs:ui.unarchive')}</button> : null}
-            {stored ? <button className="button button-danger justify-start" type="button" disabled={busy} onClick={onDelete}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 14h10l1-14M10 11v6M14 11v6" /></svg>{t('dialogs:ui.deleteArticle')}</button> : null}
+            <ButtonBar label={t('dialogs:ui.manuscriptManagement')} className="grid">
+              <Button icon="history" className="justify-start" type="button" disabled={!stored || busy} onClick={onOpenHistory} label={t('dialogs:ui.viewHistory')} />
+              {archived ? <Button icon="restore" className="justify-start" type="button" disabled={busy} onClick={onUnarchive} label={t('dialogs:ui.unarchive')} /> : null}
+              {stored ? <Button icon="delete" variant="danger" className="justify-start" type="button" disabled={busy} onClick={onDelete} label={t('dialogs:ui.deleteArticle')} /> : null}
+            </ButtonBar>
           </section> : null}
         </div>
       </div>
     </form>
-    <DialogFooter><DialogActions><DialogButton onClick={creation?.onBack ?? onClose} disabled={busy}>{t(creation ? 'dialogs:creation.back' : 'dialogs:ui.backToEditor')}</DialogButton><DialogButton variant="primary" disabled={!article.dirty || readOnly || invalid} onClick={onSave}><svg className="size-4" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 3h14l3 3v15H3V3ZM7 3v6h10V3M7 21v-8h10v8" /></svg>{t(creation ? busy ? 'dialogs:ui.creating' : 'dialogs:creation.create' : 'dialogs:ui.saveArticle')}</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton icon="back" onClick={creation?.onBack ?? onClose} disabled={busy}>{t(creation ? 'dialogs:creation.back' : 'dialogs:ui.backToEditor')}</DialogButton><DialogButton icon={creation ? 'plus' : 'save'} variant="primary" disabled={!article.dirty || readOnly || invalid} onClick={onSave}>{t(creation ? busy ? 'dialogs:ui.creating' : 'dialogs:creation.create' : 'dialogs:ui.saveArticle')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

@@ -4,6 +4,7 @@
     "change": "修改标题"
   },
   "toolbar": {
+    "actions": "文稿操作",
     "statistics": "文章统计",
     "history": "历史版本",
     "historyShort": "历史",
@@ -75,7 +76,13 @@
     "scrollSync": "预览滚动对齐",
     "saveReport": "保存时显示格式检查",
     "saveOnly": "仅保存时刷新预览",
-    "actions": "预览操作"
+    "actions": "预览操作",
+    "showCode": "查看渲染代码",
+    "showResult": "查看渲染结果",
+    "codeLabel": "当前可见预览的渲染 HTML 与 CSS（只读）",
+    "codePending": "预览尚未就绪",
+    "codeFailed": "渲染代码不可用",
+    "scrollSyncCodeUnavailable": "代码视图中暂停预览滚动对齐"
   },
   "clipboard": {
     "title": "剪贴板接收区",

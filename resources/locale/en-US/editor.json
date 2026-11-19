@@ -4,6 +4,7 @@
     "change": "Rename title"
   },
   "toolbar": {
+    "actions": "Manuscript actions",
     "statistics": "Article statistics",
     "history": "History",
     "historyShort": "History",
@@ -75,7 +76,13 @@
     "scrollSync": "Align preview scrolling",
     "saveReport": "Show format check after manual save",
     "saveOnly": "Refresh preview only after saving",
-    "actions": "Preview actions"
+    "actions": "Preview actions",
+    "showCode": "View rendered code",
+    "showResult": "View rendered result",
+    "codeLabel": "Rendered HTML and CSS of the visible preview (read only)",
+    "codePending": "Preview not ready",
+    "codeFailed": "Rendered code unavailable",
+    "scrollSyncCodeUnavailable": "Preview scroll alignment is paused in code view"
   },
   "clipboard": {
     "title": "Clipboard receiver",

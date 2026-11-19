@@ -20,6 +20,6 @@ test('the shared original card form renders arbitrary declarations and a cancel 
   const tree = context.exports.ArticleExportForm({ choices: [{ id:'custom-doc', title:'Custom document', extension:'custom', detail:'application/custom' },{ id:'blocked', title:'Blocked', disabled:true }], selected:'custom-doc', onSelect:id=>selections.push(id), filename:{base:'稿件',name:'稿件.custom',onChange(){}}, busy:false, disabled:false, error:'', onSubmit(){}, onClose(){} });
   const nodes=walk(tree), radios=nodes.filter(node=>node.type==='input'&&node.props.type==='radio');
   assert.equal(radios.length,2); radios[0].props.onChange();radios[1].props.onChange();assert.deepEqual(selections,['custom-doc']);
-  const cancel=nodes.find(node=>node.type==='DialogButton'&&walk(node.props.children).some(child=>child.type==='ContentIcon'&&child.props.name==='close'));
+  const cancel=nodes.find(node=>node.type==='DialogButton'&&node.props.icon==='close');
   assert.ok(cancel);assert.ok(nodes.some(node=>node.type==='fieldset'));assert.ok(nodes.some(node=>node.type==='form'));
 });

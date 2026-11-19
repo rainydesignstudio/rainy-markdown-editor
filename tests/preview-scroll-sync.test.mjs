@@ -28,7 +28,7 @@ test('saved-source correspondence handles inserts, deletes, moves, ambiguous lin
   assert.equal(findNearestScrollAnchor([], 10), null);
 });
 
-function fixture({ shadowFrame = false } = {}) {
+function fixture({ shadowFrame = false, packageHost = false, resume } = {}) {
   const observers = [], resizeObservers = [], frames = new Map(), listeners = new Map(), samples = [];
   let nextFrame = 0, clock = 0, sourceMeasurements = 0, previewMeasurements = 0, sourceReads = 0, currentSource = 'a\nb\nc', renderedSource = currentSource;
   class MutationObserver { constructor(callback) { this.callback = callback; this.targets = []; observers.push(this); } observe(target) { this.targets.push(target); } disconnect() { this.targets = []; } }
@@ -40,6 +40,7 @@ function fixture({ shadowFrame = false } = {}) {
   const element = (line, top) => ({ tagName: 'P', ownerDocument: doc, getAttribute: () => String(line), closest: () => null, getBoundingClientRect() { previewMeasurements++; return { top: top - container.scrollTop, height: 30 }; } });
   const nodes = [element(1, 0), element(3, 300)];
   const root = { isConnected: true, tagName: 'ARTICLE', ownerDocument: doc, id: '', getAttribute: () => null, querySelectorAll: () => nodes };
+  const host = packageHost ? { ...root, tagName: 'DIV', hasAttribute: name => name === 'data-package-document', querySelector: () => root, querySelectorAll: () => [root, ...nodes] } : root;
   const container = { dataset: { previewMode: 'light' }, ownerDocument: doc, clientTop: 0, clientHeight: 200, scrollHeight: 1000, scrollTop: 0, querySelector: () => null, getBoundingClientRect: () => ({ top: 0 }), addEventListener() {}, removeEventListener() {} };
   const inner = { scrollTop: 0, scrollHeight: 1000, clientHeight: 200 };
   const foreign = { defaultView: view, body: {}, documentElement: {}, scrollingElement: inner, fonts: { addEventListener() {}, removeEventListener() {} }, addEventListener() {}, removeEventListener() {}, querySelector: () => shownRoot };
@@ -47,17 +48,32 @@ function fixture({ shadowFrame = false } = {}) {
   const shownRoot = { ...root, ownerDocument: foreign, querySelectorAll: () => shownNodes };
   const iframe = { contentDocument: foreign, hasAttribute: () => false };
   const shadow = { nodeType: 11, host: {}, querySelector: selector => selector.includes('dark') && container.dataset.previewMode === 'dark' ? iframe : null };
-  if (shadowFrame) { container.dataset.previewMode = 'dark'; root.getRootNode = () => shadow; }
+  if (shadowFrame) { container.dataset.previewMode = 'dark'; host.getRootNode = () => shadow; }
   const textarea = { closest: () => viewport };
   const previousMutation = globalThis.MutationObserver, previousResize = globalThis.ResizeObserver;
   globalThis.MutationObserver = MutationObserver; globalThis.ResizeObserver = ResizeObserver;
-  const dispose = connectPreviewScrollSync({ textarea, container, getRoot: () => root, getSource: () => { sourceReads++; return currentSource; }, getRenderedSource: () => renderedSource, onSample: value => samples.push(value) });
+  const dispose = connectPreviewScrollSync({ textarea, container, getRoot: () => host, getSource: () => { sourceReads++; return currentSource; }, getRenderedSource: () => renderedSource, onSample: value => samples.push(value), resume });
   const flush = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn()); };
   const flushAll = () => { for (let attempts = 0; frames.size && attempts < 100; attempts++) flush(); assert.equal(frames.size, 0); };
   return { viewport, container, inner, shadow, listeners, observers, resizeObservers, frames, samples, flush, flushAll, sourceReads: () => sourceReads,
     setSource(value) { currentSource = value; observers[0].callback(); },
     counts: () => [sourceMeasurements, previewMeasurements], dispose() { dispose(); globalThis.MutationObserver = previousMutation; globalThis.ResizeObserver = previousResize; } };
 }
+
+test('returning to a manual reading position waits for the next source scroll even after layout changes', () => {
+  const f = fixture({ resume: { waiting: true } });
+  try {
+    f.container.scrollTop = 425;
+    f.flushAll();
+    f.resizeObservers[0].callback();
+    f.flushAll();
+    assert.equal(f.container.scrollTop, 425);
+    f.viewport.scrollTop = 205;
+    f.listeners.get('scroll').callback();
+    f.flushAll();
+    assert.equal(f.container.scrollTop, 300);
+  } finally { f.dispose(); }
+});
 
 test('rapid scroll events coalesce; warm jobs do not remeasure text/preview; cleanup removes every listener and observer', () => {
   const f = fixture();
@@ -113,4 +129,17 @@ test('dark iframe inside a ShadowRoot drives its own scroller and rebinding pres
     assert.equal(f.inner.scrollTop, 300);
   } finally { f.dispose(); }
   assert.ok(f.observers.every(observer => !observer.targets.length));
+});
+
+test('render-package wrappers do not hide valid anchors when reconnecting across frames', () => {
+  const f = fixture({ shadowFrame: true, packageHost: true, resume: { waiting: true } });
+  try {
+    f.inner.scrollTop = 425;
+    f.flushAll();
+    assert.equal(f.inner.scrollTop, 425);
+    f.viewport.scrollTop = 205;
+    f.listeners.get('scroll').callback();
+    f.flushAll();
+    assert.equal(f.inner.scrollTop, 300);
+  } finally { f.dispose(); }
 });

@@ -6,6 +6,8 @@ import { useUITranslation } from '../global/UILocaleProvider';
 import { productReference } from '../../lib/i18n/productMessages';
 import { DEFAULT_FONT_SOURCE, getFontSource, setFontSource, subscribeFontSource, type FontSourceId } from '../../lib/fontSources';
 import { cancelLocalFontDownload, getInitialLocalFontStatus, getLocalFontStatus, subscribeLocalFontStatus } from '../../lib/localFonts';
+import { Button } from '../global/Button';
+import { ButtonBar } from '../global/ButtonBar';
 
 export function FontDownloadSettings({ root, onRetry }: { root: FileSystemDirectoryHandle | null; onRetry?: () => Promise<boolean> }) {
   const { t } = useUITranslation('settings');
@@ -20,7 +22,7 @@ export function FontDownloadSettings({ root, onRetry }: { root: FileSystemDirect
   return <section className="flex min-w-0 flex-col gap-4 rounded-xl border border-line bg-list/50 p-5" aria-labelledby="font-settings-title">
     <header className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
       <div><h3 id="font-settings-title" className="font-heading text-lg font-semibold text-primary">{t('fontDownloads.heading')}</h3><p className="mt-1 text-xs text-muted">{t('fontDownloads.scope')}</p></div>
-      <div className="flex items-center gap-2"><OperationFeedback label={t('common:feedback.fileProblems', { count: 1 })} id="font-download" notice={unsaved ? productReference('feedback.fontPreferenceFailed') : failed ? status.notice : null} tone={unsaved || failed ? 'warning' : 'info'} summary={unsaved ? productReference('feedback.fontPreferenceFailed') : downloading ? productReference('feedback.fontsLoading', { completed: status.completed, total: status.total }) : productReference('feedback.fontsIncomplete')} /><span className="rounded-md bg-panel px-2.5 py-1 text-xs text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning-strong" data-tone={ready ? 'success' : failed ? 'warning' : 'neutral'} role="status">
+      <div className="flex items-center gap-2"><ButtonBar label={t('common:feedback.fileProblems', { count: 1 })} className="empty:hidden"><OperationFeedback label={t('common:feedback.fileProblems', { count: 1 })} id="font-download" notice={unsaved ? productReference('feedback.fontPreferenceFailed') : failed ? status.notice : null} tone={unsaved || failed ? 'warning' : 'info'} summary={unsaved ? productReference('feedback.fontPreferenceFailed') : downloading ? productReference('feedback.fontsLoading', { completed: status.completed, total: status.total }) : productReference('feedback.fontsIncomplete')} /></ButtonBar><span className="rounded-md bg-panel px-2.5 py-1 text-xs text-muted data-[tone=success]:text-success data-[tone=warning]:text-warning-strong" data-tone={ready ? 'success' : failed ? 'warning' : 'neutral'} role="status">
         {downloading ? t('messages:feedback.fontsLoading', { completed: status.completed, total: status.total }) : t(ready ? 'fontDownloads.ready' : failed ? 'fontDownloads.incomplete' : root ? 'fontDownloads.unchecked' : 'ui.notConnected')}
       </span></div>
     </header>
@@ -35,12 +37,12 @@ export function FontDownloadSettings({ root, onRetry }: { root: FileSystemDirect
     </fieldset>
     <p className="mt-auto text-xs text-muted">{t('fontDownloads.description')}</p>
     {!root ? <p className="text-xs text-faint">{t('fontDownloads.connectFirst')}</p> : null}
-    {root && !ready && (downloading || onRetry) ? <div className="flex flex-wrap items-center gap-3">
-      {!downloading && onRetry ? <button type="button" className="button button-quiet" disabled={retrying} onClick={async () => {
+    {root && !ready && (downloading || onRetry) ? <ButtonBar label={t('common:actions.group')}>
+      {!downloading && onRetry ? <Button icon="reset" type="button"  disabled={retrying} onClick={async () => {
         setRetrying(true);
         try { await onRetry(); } finally { setRetrying(false); }
-      }}>{t(retrying ? 'fontDownloads.checking' : failed ? 'fontDownloads.retryDownload' : 'fontDownloads.retry')}</button> : null}
-      {downloading ? <button type="button" className="button button-quiet" onClick={cancelLocalFontDownload}>{t('fontDownloads.cancel')}</button> : null}
-    </div> : null}
+      }} label={t(retrying ? 'fontDownloads.checking' : failed ? 'fontDownloads.retryDownload' : 'fontDownloads.retry')} /> : null}
+      {downloading ? <Button icon="close" type="button"  onClick={cancelLocalFontDownload} label={t('fontDownloads.cancel')} /> : null}
+    </ButtonBar> : null}
   </section>;
 }

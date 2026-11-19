@@ -400,7 +400,7 @@ This produces verifiable adaptations without promising zero-difference replicati
 
 With library CSS, `css.stylesheets` loads foundations from local modules, including preflight, media rules, nesting, icons and fonts; see [library styles](FORMAT.md#doc-library-styles). Article themes retain their JSON structure/node overrides. `render.document` maps article selectors to the real container; editor themes do not participate.
 
-Configure container and inherited fonts/colors/backgrounds before adding overrides. Snippets use that environment's classes/tokens. Choose output according to the target website publishing workflow; back up `render.json` and shared dependencies. Old manuscripts without records cannot promise restoration of their original library CSS.
+Configure container and inherited fonts/colors/backgrounds before adding overrides. Snippets use that environment's classes/tokens. Choose output according to the target website publishing workflow; back up `render.json` and referenced persistent dependencies in `cache/render`; browser working caches do not travel with the library. Old manuscripts without records cannot promise restoration of their original library CSS.
 
 Save as `guide-paper.json`. In the CSS string, `\n` represents newlines; JSON cannot contain comments or unescaped newlines. The app's CSS tab can edit the same content.
 
@@ -466,6 +466,10 @@ Code windows: the defaults include `//mac-style-code-block` and `//mac-style-cod
 Select an existing snippet under **Templates → Snippets**, then use **Duplicate snippet** to create an independent copy prefilled with its code, description, icon and category. Confirm the copy’s name, ID and trigger, resolve conflicts, then validate and save. The original stays unchanged.
 
 <a name="doc-snippet-example"></a>
+
+For existing SVG content, rendering and copying retain authored base values and `set`/`animate`/`animateTransform` timelines, with independently scoped event IDs for repeated inserts. Only controlled paint/geometry targets are accepted; scripts, handler attributes, executable URLs and animation of executable attributes remain blocked. See the [rendering contract](FORMAT.md#doc-preview-host). Verify real events and replay, not just XML or a static screenshot.
+
+Built-in hit areas follow visibility, so a hidden play control cannot queue another run. Replays restart one timeline instead of retaining delayed starts from an earlier run. Changing SVG content recreates that graphic’s timeline; unrelated text edits and result/code switching retain unchanged graphics.
 
 ### Complete snippet example
 

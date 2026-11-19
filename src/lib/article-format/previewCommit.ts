@@ -8,10 +8,15 @@ export function commitPreviewMarkup(target: HTMLElement, html: string): void {
   const anchorTop = anchor && target.contains(anchor) ? anchor.getBoundingClientRect().top : null;
   const template = doc.createElement('template');
   template.innerHTML = html;
+  const svgMarkup=(element:Element)=>element.outerHTML.replace(/\sdata-source-line="\d+"/g,'');
   function matches(current: Node, next: Node): boolean {
     if (current.nodeType !== next.nodeType || current.nodeName !== next.nodeName) return false;
     if (current.nodeType !== 1) return true;
     const a = current as Element, b = next as Element;
+    // A plain paragraph must not consume the wrapper of an existing animated graphic.
+    if(a.namespaceURI==='http://www.w3.org/1999/xhtml'&&a.localName==='p'&&Boolean(a.querySelector('svg set,svg animate,svg animateTransform'))!==Boolean(b.querySelector('svg set,svg animate,svg animateTransform')))return false;
+    // A changed animation graph needs a fresh SVG timeline; unchanged artwork keeps its state.
+    if(a.namespaceURI==='http://www.w3.org/2000/svg'&&a.localName==='svg'&&svgMarkup(a)!==svgMarkup(b)&&(a.querySelector('set,animate,animateTransform')||b.querySelector('set,animate,animateTransform')))return false;
     return a.namespaceURI === b.namespaceURI && a.id === b.id &&
       (a.localName !== 'img' || a.getAttribute('src') === b.getAttribute('src'));
   }

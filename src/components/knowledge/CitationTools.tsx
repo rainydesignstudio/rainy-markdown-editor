@@ -1,6 +1,8 @@
 'use client';
+
+import type { IconGraphic } from '../global/ContentIcon';
 import { SelectField } from '../global/SelectField';
-import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useUITranslation } from '../global/UILocaleProvider';
 import { DialogFrame, DialogHeader, DialogFooter, DialogActions, DialogButton } from '../global/DialogFrame';
@@ -10,12 +12,13 @@ import { ContentIcon } from '../global/ContentIcon';
 import { readCitations, insertCitation, isLegacyCitationMarker, setCitationText, tidyCitations } from '../../lib/knowledge/citations';
 import { insertUndoableText } from '../../lib/nativeTextareaEdit';
 import type { KnowledgeCapture } from '../../lib/knowledge/model';
+import { Button } from '../global/Button';
 export type CitationRequest = { capture?: KnowledgeCapture; excerpt?: boolean; edit?: string };
 export function CitationTools({ body, textareaRef, onChange, request, onConsumed, disabled, scope, onReferenced, loadChanges, icon }: {
   body: string; textareaRef: MutableRefObject<HTMLTextAreaElement | null>; onChange: (body: string) => void; request: CitationRequest | null; onConsumed: () => void; disabled: boolean; scope: string;
   loadChanges?: () => Promise<string[]>;
   onReferenced?: (capture: KnowledgeCapture, id: string) => void | Promise<void>;
-  icon?: ReactNode;
+  icon?: IconGraphic;
 }) {
   const { t } = useUITranslation('knowledge');
   const [open, setOpen] = useState(false), [chosen, setChosen] = useState(''), [text, setText] = useState(''), [quote, setQuote] = useState(false), [issue, setIssue] = useState('');
@@ -61,7 +64,7 @@ export function CitationTools({ body, textareaRef, onChange, request, onConsumed
       }
     } catch (error) { setIssue(error instanceof Error && error.message !== 'citationInvalid' && error.message !== 'citationMissing' ? t('citationTrackingFailed', { cause: error.message }) : t('citationInvalid')); }
   };
-  return <>{!open && issue ? <span role="alert" className="text-xs text-danger">{issue}</span> : null}{icon ? <IconButton icon={icon} tooltip={t('citation')} disabled={disabled} onClick={() => begin()} /> : <button className="button button-quiet" type="button" disabled={disabled} onClick={() => begin()}>{t('citation')}</button>}
+  return <>{!open && issue ? <span role="alert" className="text-xs text-danger">{issue}</span> : null}{icon ? <IconButton icon={icon} tooltip={t('citation')} disabled={disabled} onClick={() => begin()} /> : <Button icon="quote"  type="button" disabled={disabled} onClick={() => begin()} label={t('citation')} />}
     {open && typeof document !== 'undefined' ? createPortal(<DialogFrame wide titleId="citation-title" onClose={() => setOpen(false)}><DialogHeader titleId="citation-title" eyebrow={t('eyebrow')} title={t('citation')} onClose={() => setOpen(false)} />
       <div className="grid gap-3 p-4"><p className="text-xs text-muted">{t('citationHelp')}</p>
         <label className="grid gap-1 text-xs text-muted">{t('citationChoose')}<SelectField label={t('citationChoose')} value={chosen} onChange={nextValue => { setChosen(nextValue); setText(entries.find(entry => entry.id === nextValue)?.text ?? pending.current?.capture?.title ?? ''); }} options={[{ value: "", label: t('citationNew') }, ...(entries.map(entry => ({ value: entry.id, label: ["[", entry.number, "] ", entry.text.slice(0, 80), changed.includes(entry.id) ? ' · ' + t('change.changed') : ''].join('') })) ?? [])]} /></label>
@@ -69,6 +72,6 @@ export function CitationTools({ body, textareaRef, onChange, request, onConsumed
         {pending.current?.excerpt ? <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" className="accent-accent" checked={quote} onChange={event => setQuote(event.target.checked)} />{t('citationQuote')}</label> : null}
         {isLegacyCitationMarker(base.current.slice(selection.current.start, selection.current.end)) ? <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" className="accent-accent" checked={adoptLegacy} onChange={event => setAdoptLegacy(event.target.checked)} />{t('citationAdoptLegacy')}</label> : null}
         <p className="text-xs text-muted">{t('citationLegacy')}</p>{issue || invalid ? <p role="alert" className="text-sm text-danger">{issue || t('citationInvalid')}</p> : null}
-      </div><DialogFooter><DialogActions><TooltipButton className="button button-quiet" tooltip={t('citationTidyHelp')} disabled={locked} onClick={() => run('tidy')}><ContentIcon name="reset" />{t('citationTidy')}</TooltipButton><DialogButton disabled={locked || !dirty} onClick={() => run('save')}><ContentIcon name="save" />{t('citationSave')}</DialogButton><DialogButton variant="primary" disabled={locked || dirty} onClick={() => run('insert')}><ContentIcon name="apply" />{t('citationInsert')}</DialogButton></DialogActions></DialogFooter>
+      </div><DialogFooter><DialogActions><TooltipButton className="button button-quiet" tooltip={t('citationTidyHelp')} disabled={locked} onClick={() => run('tidy')}><ContentIcon name="reset" />{t('citationTidy')}</TooltipButton><DialogButton icon="save" disabled={locked || !dirty} onClick={() => run('save')}>{t('citationSave')}</DialogButton><DialogButton icon="apply" variant="primary" disabled={locked || dirty} onClick={() => run('insert')}>{t('citationInsert')}</DialogButton></DialogActions></DialogFooter>
     </DialogFrame>, document.body) : null}</>;
 }

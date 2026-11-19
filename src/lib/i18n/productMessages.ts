@@ -85,6 +85,13 @@ export class ProductError extends Error implements ProductMessageInfo {
   }
 }
 
+/** Normalize only the browser-owned picker message; retain its exact diagnostic cause. */
+export function localizeFilePickerError(error: unknown): unknown {
+  const message = error && typeof error === 'object' && 'message' in error ? String(error.message) : '';
+  return /(?:^|:\s*)File picker already active\.?$/i.test(message)
+    ? Object.assign(new ProductError('fileSystem.pickerAlreadyActive'), { cause: error }) : error;
+}
+
 export function productCause(error: unknown): ProductMessageValue {
   return isProductMessage(error) ? { messageKey: error.messageKey, messageParams: error.messageParams }
     : error instanceof Error ? error.message

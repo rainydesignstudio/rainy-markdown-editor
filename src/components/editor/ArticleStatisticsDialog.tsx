@@ -49,6 +49,6 @@ export function ArticleStatisticsDialog({ title, dirty, statistics, issue, onClo
         <p id="article-statistics-description" className="text-xs text-faint">{t('dialogs:ui.statisticsUseTheCurrentPreviewBodyExcludingMetadata')}</p>
       </> : <p id="article-statistics-description" className="rounded-lg border border-warning-line bg-warning-surface p-4 text-sm text-warning-strong" role="status">{issue || t('dialogs:ui.bodyPreviewIsNotReadyTryAgainShortly')}</p>}
     </div>
-    <DialogFooter><DialogActions><DialogButton onClick={onClose}>{t('common:actions.close')}</DialogButton></DialogActions></DialogFooter>
+    <DialogFooter><DialogActions><DialogButton icon="close" onClick={onClose}>{t('common:actions.close')}</DialogButton></DialogActions></DialogFooter>
   </DialogFrame>;
 }

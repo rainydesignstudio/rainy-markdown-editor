@@ -7,6 +7,7 @@ import * as React from 'react';
 import * as jsx from 'react/jsx-runtime';
 import { createRoot } from 'react-dom/client';
 import { JSDOM } from 'jsdom';
+import { withActionComponents } from './action-ui-fixture.mjs';
 
 const code = ts.transpileModule(await readFile(new URL('../src/components/themes/LibraryCssEditor.tsx', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
 async function fixture(t) {
@@ -36,7 +37,7 @@ async function fixture(t) {
     '../global/UnsavedChangesDialog': { UnsavedChangesDialog: p => element('div', { 'data-unsaved': true }, [element('button', { key: 'continue', onClick: p.onContinue }, 'continue'), element('button', { key: 'discard', onClick: p.onDiscard }, 'discard'), element('button', { key: 'save-leave', onClick: p.onSave }, 'save-leave')]) },
     '../content/SnippetTextarea': { SnippetTextarea: React.forwardRef((p, ref) => { input = p; return element('textarea', { ref, value: p.value, disabled: p.disabled, readOnly: true, 'aria-label': p.ariaLabel }); }) },
   };
-  vm.runInNewContext(code, { module, exports: module.exports, window: dom.window, requestAnimationFrame: callback => callback(), require(id) { if (!(id in imports)) throw new Error(id); return imports[id]; } });
+  vm.runInNewContext(code, { module, exports: module.exports, window: dom.window, requestAnimationFrame: callback => callback(), require: withActionComponents(function(id) { if (!(id in imports)) throw new Error(id); return imports[id]; }) });
   const mount = createRoot(dom.window.document.getElementById('root'));
   const render = () => mount.render(element(module.exports.LibraryCssEditor, { ...props, ref }));
   await React.act(async () => { render(); });

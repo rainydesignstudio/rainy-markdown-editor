@@ -21,14 +21,14 @@ export function importTargetGuard(root: FileSystemDirectoryHandle, source: Reado
   };
 }
 
-export async function createMarkdownImport(root: FileSystemDirectoryHandle, source: ReadonlyImportSource, theme: ThemeConfig, current: () => boolean) {
+export async function createMarkdownImport(root: FileSystemDirectoryHandle, source: ReadonlyImportSource, theme: ThemeConfig, current: () => boolean, options:{folderNames?:Map<string,Set<string>>}={}) {
   const guard = importTargetGuard(root, source, current); await guard(root, []);
   const file = await source.readMarkdown(), content = await readMarkdownImport(file);
   if (content.hash !== source.origin.hash) throw new ProductError('imports.sourceChanged');
   const prepared = prepareMarkdownImport(content.text, source.origin.path, theme), plan = planMarkdownResources(parseArticle(prepared).body);
   const target = replaceArticleBody(prepared, plan.body);
   const links = parseKnowledgeText(content.text, source.origin.path).links.filter(link => link.kind === 'wiki' || !/^(?:[a-z][\w+.-]*:|\/\/|#)/i.test(link.target) && /\.(?:md|markdown)(?:[?#]|$)/i.test(link.target));
-  const result = await saveStoredArticle(root, target, theme, null, null, { guard, requestPermission: false });
+  const result = await saveStoredArticle(root, target, theme, null, null, { guard, requestPermission: false,newFolderNames:options.folderNames });
   const now = new Date().toISOString();
   const task: ImportTask = {
     schemaVersion: 1, id: crypto.randomUUID(), createdAt: now, updatedAt: now,

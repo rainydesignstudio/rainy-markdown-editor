@@ -23,7 +23,9 @@ import { PreviewModeSwitch } from '../editor/PreviewModeSwitch';
 import { ModeSwitch } from '../global/ModeSwitch';
 import { IconButton } from '../global/IconButton';
 import { ButtonBar } from '../global/ButtonBar';
-import { EditorActionIcon } from '../global/EditorTopbar';
+import { ContentIcon } from '../global/ContentIcon';
+import { Button } from '../global/Button';
+import { ConfirmDialog } from '../global/ConfirmDialog';
 
 type Props = {
   articleTitle: string;
@@ -96,11 +98,10 @@ function HistoryRestoreConfirm({
   onConfirm: () => void;
 }) {
   const { t } = useUITranslation('dialogs');
-  return <DialogFrame titleId="history-restore-title" role="alertdialog" onClose={onCancel} dismissible={!busy}>
-    <DialogHeader titleId="history-restore-title" eyebrow={t('dialogs:ui.versionHistory')} title={t('dialogs:ui.restoreThisVersion')} onClose={onCancel} closeDisabled={busy} />
-    <div className="p-4"><p className="text-sm text-muted">{t('dialogs:ui.aProtectedCheckpointIsSavedFirstThenThe')}</p></div>
-    <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={onCancel}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy || !canRestore} onClick={onConfirm}>{t('dialogs:ui.confirmRestore')}</DialogButton></DialogActions></DialogFooter>
-  </DialogFrame>;
+  return <ConfirmDialog titleId="history-restore-title" role="alertdialog" onClose={onCancel} dismissible={!busy} title={t('dialogs:ui.restoreThisVersion')} eyebrow={t('dialogs:ui.versionHistory')} closeDisabled={busy}
+           cancel={{ label: t('common:actions.cancel'), onClick: onCancel, disabled: busy }} confirm={{ label: t('dialogs:ui.confirmRestore'), icon: "restore", onClick: onConfirm, disabled: busy || !canRestore, variant: "danger" }}>
+           <div className="p-4"><p className="text-sm text-muted">{t('dialogs:ui.aProtectedCheckpointIsSavedFirstThenThe')}</p></div>
+         </ConfirmDialog>;
 }
 
 export function ArticleHistoryView(props: Props) {
@@ -169,24 +170,24 @@ export function ArticleHistoryView(props: Props) {
       <header className="workspace-toolbar">
         <div className="toolbar-context"><div className="title-stack min-w-0 flex-1">
           <button ref={backButtonRef} className="return-crumb" type="button" data-history-back="true" onClick={onClose} disabled={busy}>
-            <span className="return-crumb-icon" aria-hidden="true"><EditorActionIcon name="back" /></span><span>{t('dialogs:ui.backToEditorAlternative')}</span>
+            <span className="return-crumb-icon" aria-hidden="true"><ContentIcon name="back" /></span><span>{t('dialogs:ui.backToEditorAlternative')}</span>
           </button>
           <h1 className="font-heading max-w-full truncate text-base font-semibold text-primary" id="history-view-title">{t('dialogs:templates.historyTitle', { title: articleTitle })}</h1>
         </div></div>
         <ButtonBar className="ml-auto flex-nowrap" label={t('dialogs:history.versionActions')}>
-          <IconButton tooltip={t('dialogs:ui.articleInformationAndTheme')} icon={<EditorActionIcon name="edit" className="size-4" />} onClick={() => setModal('info')} disabled={!selected || busy} />
-          <IconButton data-history-fork-trigger="true" tooltip={t('dialogs:ui.forkFromHistory')} icon={<EditorActionIcon name="copy" className="size-4" />} onClick={() => setModal('fork')} disabled={!selected || busy || !canSaveAs || !selected.themeMatches} />
-          <IconButton tooltip={t('dialogs:ui.saveImportantVersion')} icon={<EditorActionIcon name="save" className="size-4" />} onClick={onManualSnapshot} disabled={busy || !canRestore} title={t('dialogs:history.saveCurrent')} />
-          <IconButton tooltip={t('dialogs:ui.restoreThisVersionAlternative')} icon={<EditorActionIcon name="history" className="size-4" />} onClick={() => setRestoreTarget(selected)} disabled={!selected || busy || !canRestore || !selected.themeMatches} />
-          <IconButton tone="danger" tooltip={t('dialogs:history.deleteVersion')} icon={<EditorActionIcon name="delete" className="size-4" />} onClick={() => setDeleteTarget(selected)} disabled={!selected || busy || !canDelete || refreshPending} />
+          <IconButton tooltip={t('dialogs:ui.articleInformationAndTheme')} icon="edit" onClick={() => setModal('info')} disabled={!selected || busy} />
+          <IconButton data-history-fork-trigger="true" tooltip={t('dialogs:ui.forkFromHistory')} icon="copy" onClick={() => setModal('fork')} disabled={!selected || busy || !canSaveAs || !selected.themeMatches} />
+          <IconButton tooltip={t('dialogs:ui.saveImportantVersion')} icon="save" onClick={onManualSnapshot} disabled={busy || !canRestore} title={t('dialogs:history.saveCurrent')} />
+          <IconButton tooltip={t('dialogs:ui.restoreThisVersionAlternative')} icon="history" onClick={() => setRestoreTarget(selected)} disabled={!selected || busy || !canRestore || !selected.themeMatches} />
+          <IconButton tone="danger" tooltip={t('dialogs:history.deleteVersion')} icon="delete" onClick={() => setDeleteTarget(selected)} disabled={!selected || busy || !canDelete || refreshPending} />
         </ButtonBar>
       </header>
       <div className="history-view-content">
           {issues.length ? <div className="content-library-issues" role="status">{issues.map((item) => <p className="break-words" key={`${item.snapshotId}:${item.message}`}><strong>{item.snapshotId}</strong> · {formatDiagnosticMessage(item, t)}</p>)}</div> : null}
-          <div className="flex flex-wrap items-center gap-2">
+          <ButtonBar label={t('common:actions.group')}>
             <p className="status-copy m-0">{t('dialogs:history.context', { path: `${month}/${folder}` })}</p><OperationFeedback hideTrigger id={`history-operation-${month}/${folder}`} announce={notice.notify !== false} notice={notice} tone={notice.tone} onRetry={refreshPending ? onRefreshHistory : undefined} retryDisabled={busy} />
-            {refreshPending ? <button className="button button-quiet" type="button" onClick={onRefreshHistory} disabled={busy}>{t('dialogs:ui.retryRefreshingHistory')}</button> : null}
-          </div>
+            {refreshPending ? <Button icon="reset"  type="button" onClick={onRefreshHistory} disabled={busy} label={t('dialogs:ui.retryRefreshingHistory')} /> : null}
+          </ButtonBar>
           <div className="history-grid">
             <aside className="flex h-40 min-h-0 shrink-0 flex-col lg:h-auto lg:w-68"><nav className="history-list" aria-label={t('dialogs:ui.historyList')}>
               {snapshots.map((snapshot) => (
@@ -195,12 +196,14 @@ export function ArticleHistoryView(props: Props) {
                     <strong>{snapshot.title || t('dialogs:ui.untitledManuscript')}</strong>
                     <span>{formatSnapshotTime(snapshot.createdAt, locale, t('common:dates.invalid'))} · {t(`dialogs:historyKinds.${snapshot.kind}`)}</span>
                   </button>
-                  <IconButton variant="history" aria-pressed={snapshot.retained}
-                    tooltip={snapshot.kind === 'automatic' ? t(snapshot.retained ? 'dialogs:ui.unprotect' : 'dialogs:ui.protectVersion') : t('messages:articleHistory.manualSnapshotsAndCheckpointsBeforeRestoreAreAlwaysProtectedProtectionCannotBe')}
-                    aria-label={t(snapshot.retained ? 'dialogs:ui.unprotect' : 'dialogs:ui.protectVersion')}
-                    icon={<EditorActionIcon name={snapshot.retained ? 'lock' : 'unlock'} className="size-4" />}
-                    onClick={() => { if (snapshot.kind === 'automatic' && !busy && !refreshPending) onToggleRetention(snapshot, !snapshot.retained); }}
-                    disabled={snapshot.kind !== 'automatic'} aria-disabled={busy || refreshPending || snapshot.kind !== 'automatic'} />
+                  <ButtonBar label={t(snapshot.retained ? 'dialogs:ui.unprotect' : 'dialogs:ui.protectVersion')}>
+                    <IconButton variant="history" aria-pressed={snapshot.retained}
+                      tooltip={snapshot.kind === 'automatic' ? t(snapshot.retained ? 'dialogs:ui.unprotect' : 'dialogs:ui.protectVersion') : t('messages:articleHistory.manualSnapshotsAndCheckpointsBeforeRestoreAreAlwaysProtectedProtectionCannotBe')}
+                      aria-label={t(snapshot.retained ? 'dialogs:ui.unprotect' : 'dialogs:ui.protectVersion')}
+                      icon={snapshot.retained ? 'lock' : 'unlock'}
+                      onClick={() => { if (snapshot.kind === 'automatic' && !busy && !refreshPending) onToggleRetention(snapshot, !snapshot.retained); }}
+                      disabled={snapshot.kind !== 'automatic'} aria-disabled={busy || refreshPending || snapshot.kind !== 'automatic'} />
+                  </ButtonBar>
                 </div>
               ))}
               {!snapshots.length ? <p className="status-copy">{t('dialogs:ui.noCompleteHistoryYetSaveAnImportantVersion')}</p> : null}
@@ -233,7 +236,7 @@ export function ArticleHistoryView(props: Props) {
     {modal === 'info' && selected ? <DialogFrame titleId="history-info-title" onClose={() => setModal(null)}>
       <DialogHeader titleId="history-info-title" eyebrow={t('dialogs:ui.versionHistory')} title={t('dialogs:ui.articleInformationAndTheme')} onClose={() => setModal(null)} />
       <div className="p-4"><section className="history-metadata-comparison" aria-label={t('dialogs:ui.articleInformationChanges')}>{metadata.map((item) => <div key={item.key} className="history-metadata-row" data-changed={item.changed}><strong>{t(`dialogs:historyFields.${item.key}`)}</strong><span>{item.key === 'themeSnapshot' ? t('dialogs:history.savedSnapshot') : item.before || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span><span>{item.key === 'themeSnapshot' ? t('dialogs:history.changedFields', { fields: item.after }) : item.after || (item.key === 'categories' ? t('dialogs:ui.none') : '—')}</span></div>)}</section></div>
-      <DialogFooter><DialogActions><DialogButton onClick={() => setModal(null)}>{t('common:actions.close')}</DialogButton></DialogActions></DialogFooter>
+      <DialogFooter><DialogActions><DialogButton icon="close" onClick={() => setModal(null)}>{t('common:actions.close')}</DialogButton></DialogActions></DialogFooter>
     </DialogFrame> : null}
     {modal === 'fork' && selected ? <DialogFrame titleId="history-fork-title" onClose={() => setModal(null)} dismissible={!busy}>
       <DialogHeader titleId="history-fork-title" eyebrow={t('dialogs:ui.versionHistory')} title={t('dialogs:ui.forkFromHistory')} onClose={() => setModal(null)} closeDisabled={busy} />
@@ -254,13 +257,12 @@ export function ArticleHistoryView(props: Props) {
                     <p className="status-copy">{t('dialogs:ui.copyArticleAssetsAndTheSelectedThemeSnapshot')}</p>
         {notice.tone === 'error' ? <p className="text-sm text-danger" role="alert">{formatProductMessage(notice, t)}</p> : null}
       </form>
-      <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={() => setModal(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton form="history-fork-form" type="submit" variant="primary" disabled={busy || !canSaveAs || !selected.themeMatches || !copyTitle.trim()}>{t('dialogs:ui.createIndependentFork')}</DialogButton></DialogActions></DialogFooter>
+      <DialogFooter><DialogActions><DialogButton icon="close" disabled={busy} onClick={() => setModal(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton icon="copy" form="history-fork-form" type="submit" variant="primary" disabled={busy || !canSaveAs || !selected.themeMatches || !copyTitle.trim()}>{t('dialogs:ui.createIndependentFork')}</DialogButton></DialogActions></DialogFooter>
     </DialogFrame> : null}
-    {deleteTarget ? <DialogFrame titleId="history-delete-title" role="alertdialog" onClose={() => setDeleteTarget(null)} dismissible={!busy}>
-      <DialogHeader titleId="history-delete-title" eyebrow={t('dialogs:ui.versionHistory')} title={t('dialogs:history.deleteVersion')} onClose={() => setDeleteTarget(null)} closeDisabled={busy} />
-      <div className="grid gap-3 p-4"><p className="text-sm text-primary">{deleteTarget.title} · {formatSnapshotTime(deleteTarget.createdAt, locale, t('common:dates.invalid'))}</p><p className="text-sm text-muted">{t('dialogs:history.deleteExplanation')}</p>{deleteTarget.retained ? <p className="text-sm text-warning">{t('dialogs:history.deleteProtectedExplanation')}</p> : null}{notice.tone === 'error' ? <p className="text-sm text-danger" role="alert">{formatProductMessage(notice, t)}</p> : null}</div>
-      <DialogFooter><DialogActions><DialogButton disabled={busy} onClick={() => setDeleteTarget(null)}>{t('common:actions.cancel')}</DialogButton><DialogButton variant="danger" disabled={busy || !canDelete || refreshPending} onClick={async () => { if (await onDelete(deleteTarget)) setDeleteTarget(null); }}>{t('dialogs:history.confirmDelete')}</DialogButton></DialogActions></DialogFooter>
-    </DialogFrame> : null}
+    {deleteTarget ? <ConfirmDialog titleId="history-delete-title" role="alertdialog" onClose={() => setDeleteTarget(null)} dismissible={!busy} title={t('dialogs:history.deleteVersion')} eyebrow={t('dialogs:ui.versionHistory')} closeDisabled={busy}
+                      cancel={{ label: t('common:actions.cancel'), onClick: () => setDeleteTarget(null), disabled: busy }} confirm={{ label: t('dialogs:history.confirmDelete'), icon: "delete", onClick: async () => { if (await onDelete(deleteTarget)) setDeleteTarget(null); }, disabled: busy || !canDelete || refreshPending, variant: "danger" }}>
+                      <div className="grid gap-3 p-4"><p className="text-sm text-primary">{deleteTarget.title} · {formatSnapshotTime(deleteTarget.createdAt, locale, t('common:dates.invalid'))}</p><p className="text-sm text-muted">{t('dialogs:history.deleteExplanation')}</p>{deleteTarget.retained ? <p className="text-sm text-warning">{t('dialogs:history.deleteProtectedExplanation')}</p> : null}{notice.tone === 'error' ? <p className="text-sm text-danger" role="alert">{formatProductMessage(notice, t)}</p> : null}</div>
+                    </ConfirmDialog> : null}
     </>
   );
 }

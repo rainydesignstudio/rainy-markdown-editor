@@ -1,5 +1,7 @@
 'use client';
 
+import { ContentIcon } from '../global/ContentIcon';
+
 import { useUITranslation } from '../global/UILocaleProvider';
 
 import type { ArticleSummary } from '../../lib/types';
@@ -16,13 +18,6 @@ type Props = {
   onDelete: (article: ArticleSummary) => void;
 };
 
-function ActionIcon({ name }: { name: 'info' | 'archive' | 'fork' | 'delete' }) {
-  const common = { viewBox: '0 0 24 24', 'aria-hidden': true as const, fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  if (name === 'info') return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M12 10.5V16M12 7.5h.01" /></svg>;
-  if (name === 'archive') return <svg {...common}><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v12h14V8M10 12h4" /></svg>;
-  if (name === 'delete') return <svg {...common}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" /></svg>;
-  return <svg {...common}><circle cx="7" cy="5" r="2" /><circle cx="17" cy="5" r="2" /><circle cx="12" cy="19" r="2" /><path d="M7 7v4a5 5 0 0 0 5 5M17 7v4a5 5 0 0 1-5 5" /></svg>;
-}
 
 export function ArticleActionsMenu({ article, archived, disabled = false, insetSummary = false, onInfo, onArchive, onFork, onDelete }: Props) {
   const { t } = useUITranslation('articles');
@@ -57,10 +52,10 @@ export function ArticleActionsMenu({ article, archived, disabled = false, insetS
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg><span className="article-action-menu-label">{t('common:actions.more')}</span>
       </summary>
       <div role="group" aria-label={t('articles:actions.articleLabel', { title: article.parse.metadata.title })}>
-        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onInfo(article); }}><ActionIcon name="info" />{t('articles:info')}</button>
-        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onFork(article); }}><ActionIcon name="fork" />{t('articles:fork')}</button>
-        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onArchive(article, !archived); }}><ActionIcon name="archive" />{archived ? t('articles:unarchive') : t('articles:collections.archived')}</button>
-        {archived ? <><span className="my-1 h-px bg-line" aria-hidden="true" /><button className="text-warning-strong hover:bg-warning-surface hover:text-warning-strong focus-visible:bg-warning-surface focus-visible:text-warning-strong" type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onDelete(article); }}><ActionIcon name="delete" />{t('articles:deleteArchive')}</button></> : null}
+        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onInfo(article); }}><ContentIcon name="info" />{t('articles:info')}</button>
+        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onFork(article); }}><ContentIcon name="fork" />{t('articles:fork')}</button>
+        <button type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onArchive(article, !archived); }}><ContentIcon name={archived ? 'restore' : 'archive'} />{archived ? t('articles:unarchive') : t('articles:collections.archived')}</button>
+        {archived ? <><span className="my-1 h-px bg-line" aria-hidden="true" /><button className="text-warning-strong hover:bg-warning-surface hover:text-warning-strong focus-visible:bg-warning-surface focus-visible:text-warning-strong" type="button" disabled={disabled} onClick={(event) => { closeMenu(event); onDelete(article); }}><ContentIcon name="delete" />{t('articles:deleteArchive')}</button></> : null}
       </div>
     </details>
   );
