@@ -30,7 +30,7 @@ export const ArticlePreviewCanvas = memo(function ArticlePreviewCanvas({
   const [openedImage, setOpenedImage] = useState<RenderedPreviewImage | null>(null);
   useEffect(() => setOpenedImage(null), [parsed.body, snapshot.id, media?.sessionKey]);
   const codeKey=useMemo(()=>packageInputKey(parsed.body,article.theme,snapshot),[parsed.body,article.theme,snapshot]);
-  const { target, native, darkIssue, darkFrameRef } = useArticleRenderMount(lightHostRef, snapshot, compiledCss, dark, { retained: !canonical, codeKey, onImageOpen: setOpenedImage, onSourceFind: onOpenSourceFind });
+  const { target, native, darkIssue, darkFrameRef } = useArticleRenderMount(lightHostRef, snapshot, compiledCss, dark, { retained: !canonical, editorWheel: true, codeKey, onImageOpen: setOpenedImage, onSourceFind: onOpenSourceFind });
   useEffect(()=>{
     const host=lightHostRef.current;if(!codeActive||!host||!target||!onCode)return;
     return observeRenderedCode(host,target,()=>readRenderedCode(target,darkFrameRef.current,input,dark,codeReady&&parsed.canCopy&&article.themeValid,darkIssue||(!parsed.canCopy||!article.themeValid?t('preview.repair'):'')),onCode);

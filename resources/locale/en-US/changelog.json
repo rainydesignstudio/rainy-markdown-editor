@@ -1140,6 +1140,9 @@
           ]
         }
       ]
+    },
+    "v0_4_1_1": {
+      "summary": "Fix intermittent loss of wheel scrolling in the article preview after reloading the editor."
     }
   }
 }

@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.1.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.1.0-2563EB?style=for-the-badge" alt="Release v0.4.1.0" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.4.1.1-2563EB?style=for-the-badge" alt="Release v0.4.1.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -92,7 +92,7 @@
 
 **Agent Readable：先读 [AGENT-GUIDE.md](AGENT-GUIDE.md)；后续操作按[持续查阅要求](AGENT-GUIDE.md#doc-manual-use)取用说明书。** 安装来源与版本以你确认的仓库和分支为准。
 
-公开安装版为 `0.4.1.0`（package为 `0.4.1`）。线上页面的实际功能以其运行版本为准。
+公开安装版为 `0.4.1.1`（package为 `0.4.1+patch.1`）。线上页面的实际功能以其运行版本为准。
 
 <a name="doc-run-yourself"></a>
 

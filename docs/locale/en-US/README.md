@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="../../../LICENSE"><img src="https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge" alt="MIT License" /></a>
-  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.1.0"><img src="https://img.shields.io/badge/RELEASE-v0.4.1.0-2563EB?style=for-the-badge" alt="Release v0.4.1.0" /></a>
+  <a href="https://github.com/rainydesignstudio/rainy-markdown-editor/tree/v0.4.1.1"><img src="https://img.shields.io/badge/RELEASE-v0.4.1.1-2563EB?style=for-the-badge" alt="Release v0.4.1.1" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&amp;logo=nextdotjs&amp;logoColor=white" alt="Next.js 16" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&amp;logo=react&amp;logoColor=black" alt="React 19" /></a>
   <a href="../../../package.json"><img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" /></a>
@@ -92,7 +92,7 @@ Copy this request into a clean Agent conversation with little unrelated context:
 
 **Agent Readable: start with [AGENT-GUIDE.md](AGENT-GUIDE.md); consult the manuals for later operations under the [ongoing manual-use requirements](AGENT-GUIDE.md#doc-manual-use).** Use the repository and branch you confirm for the installation source and version.
 
-The released installer is `0.4.1.0` (package `0.4.1`). Features on an online page depend on its actual running version.
+The released installer is `0.4.1.1` (package `0.4.1+patch.1`). Features on an online page depend on its actual running version.
 
 <a name="doc-run-yourself"></a>
 
