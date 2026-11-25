@@ -11,11 +11,18 @@ import { initializeThemeDefaults } from '../src/lib/themeDefaults.ts';
 import { GUIDE_PROFILES } from '../src/lib/entryGuide.ts';
 import { tree, snapshot } from './knowledge/fs-fixture.mjs';
 
+async function assertLibraryReadme(root, locale) {
+  const expected = await readFile(new URL('../resources/template/fresh-library/' + locale + '/README.md', import.meta.url), 'utf8');
+  const actual = await (await (await root.getFileHandle('README.md')).getFile()).text();
+  assert.equal(actual, expected);
+}
+
 test('every language/profile copies a complete saved example with the selected settings and immutable render dependencies', async () => {
   await preloadPreparedLibraries();
   for (const locale of ['zh-CN', 'en-US']) for (const profile of GUIDE_PROFILES) {
     const plan = { profile: profile.id, name: 'Test', writer: 'agent', autoSave: false, autoSnapshot: false, themeId: 'rose', colorMode: 'dark' };
     const root = await createNamedDataDirectory(tree('parent'), 'Test', profile.preset, locale, { guide: plan });
+    await assertLibraryReadme(root, locale);
     const ready = getFreshGuide(root); assert.ok(ready);
     assert.notEqual(ready.month, '2000-01');
     const article = await readStoredArticleById(root, ready.month, ready.folder);
@@ -37,8 +44,10 @@ test('warm prepared components are reused, and a second creation does not refetc
   try {
     await preloadPreparedLibraries({ locale: 'en-US', preset: 'empty' });
     await prepareBuiltinLibrary({ locale: 'zh-CN', preset: 'wechat-article' }); const first = requests;
-    await createNamedDataDirectory(tree('parent'), 'One', 'empty', 'en-US');
-    await createNamedDataDirectory(tree('parent'), 'Two', 'wechat-article', 'zh-CN');
+    const english = await createNamedDataDirectory(tree('parent'), 'One', 'empty', 'en-US');
+    const chinese = await createNamedDataDirectory(tree('parent'), 'Two', 'wechat-article', 'zh-CN');
+    await assertLibraryReadme(english, 'en-US');
+    await assertLibraryReadme(chinese, 'zh-CN');
     assert.equal(requests, first);
   } finally { globalThis.fetch = real; }
 });

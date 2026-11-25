@@ -91,7 +91,7 @@ test('new library stays inside its named child and existing libraries reopen wit
   await assert.rejects(assertExistingDataDirectory(parent), /不是完整的资料库/);
   const library = await createNamedDataDirectory(parent, '我的文稿');
   assert.deepEqual([...parent.children.keys()], ['我的文稿']);
-  assert.deepEqual([...library.children.keys()].sort(), ['articles', 'assets', 'format', 'settings.json', 'snippets', 'templates', 'themes']);
+  assert.deepEqual([...library.children.keys()].sort(), ['README.md', 'articles', 'assets', 'format', 'settings.json', 'snippets', 'templates', 'themes']);
   await assertExistingDataDirectory(library);
   await assert.rejects(createNamedDataDirectory(parent, '我的文稿'), /已有/);
   assert.deepEqual([...parent.children.keys()], ['我的文稿']);

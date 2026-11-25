@@ -44,6 +44,7 @@ for (const locale of ['zh-CN', 'en-US']) {
       await articleDir.getDirectoryHandle('_history', { create: true });
       await initializeLibraryFormat(root, preset);
       await initializeThemeDefaults(root, locale, { previewSample: true, contentSeed: preset === 'empty' ? 'markdown' : 'rich' });
+      await fs.copyFile(path.join(cwd, 'resources/template/fresh-library', locale, 'README.md'), path.join(disk, 'README.md'));
       await fs.mkdir(path.join(disk, 'assets/images'), { recursive: true });
       await fs.copyFile(path.join(cwd, 'public/images/article-sample.png'), path.join(disk, 'assets/images/article-sample.png'));
       let sample;

@@ -1183,5 +1183,10 @@
     "version": "0.4.1.1",
     "status": "published",
     "summary": "修复编辑页重新加载后正文预览偶发无法用滚轮滚动。"
+  },
+  {
+    "version": "0.4.1.2",
+    "status": "published",
+    "summary": "新建资料库按建库语言在库根写入 README，说明同版本本地手册的查阅、拉取与复用。"
   }
 ]
